@@ -16,12 +16,17 @@ CXX="${CXX:-g++}"
 
 "$BIN"
 
-if command -v pio >/dev/null 2>&1; then
+PIO_BIN="$(command -v pio || true)"
+if [ -z "$PIO_BIN" ] && [ -x "$HOME/.venvs/pio/bin/pio" ]; then
+  PIO_BIN="$HOME/.venvs/pio/bin/pio"
+fi
+
+if [ -n "$PIO_BIN" ]; then
   echo
   echo "PlatformIO found. Building the ESP32 firmware..."
-  (cd "$ROOT/uc" && pio run -e esp32doit-devkit-v1)
+  (cd "$ROOT/uc" && "$PIO_BIN" run -e esp32doit-devkit-v1)
 else
   echo
-  echo "PlatformIO not on PATH; firmware image not built."
+  echo "PlatformIO not found; firmware image not built."
   echo "Install it with: pip install platformio"
 fi
