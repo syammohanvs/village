@@ -257,12 +257,14 @@ Example refusals:
 | `IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED` | Hardware commissioning gate is still closed. |
 | `IRRIGATION_BLOCKED_ALREADY_ACTIVE` | A session is already running. |
 | `IRRIGATION_BLOCKED_COOLDOWN` | The post-session lockout is still active. |
+| `IRRIGATION_BLOCKED_LOCKOUT` | A failed session's no-rise lockout is still active. |
 | `IRRIGATION_BLOCKED_BOOT_GUARD` | The post-boot guard has not elapsed. |
 | `IRRIGATION_STOPPED_LOW_WATER` | Water ran low during a pulse. |
 | `IRRIGATION_STOPPED_SENSOR_INVALID` | A required reading became invalid mid-session. |
 | `IRRIGATION_STOPPED_MAX_RUNTIME` | Cumulative pump time limit reached. |
 | `IRRIGATION_STOPPED_MAX_PULSES` | No moisture rise after the allowed pulses. |
 | `IRRIGATION_STOPPED_LINK_LOST` | A **manual** session lost laptop communication. |
+| `IRRIGATION_STOPPED_PUMP_DISABLED` | The pump was disabled while a session was active. |
 | `IRRIGATION_STOPPED_USER` | Explicit stop. |
 | `WASTE_INDICATED` | Category LED activated for the bounded duration. |
 | `WASTE_UNKNOWN_CATEGORY` | Category was not organic/plastic/paper; no LED changed. |
@@ -310,10 +312,10 @@ Example refusals:
         "id": "organic", "installed": true, "empty_cm": 60, "full_cm": 12,
         "near_full_pct": 75, "full_pct": 90, "median_samples": 5,
         "confirm_readings": 3, "timeout_us": 30000,
-        "blind_zone_cm": 3, "max_range_cm": 400
+        "blind_zone_cm": 3, "max_range_cm": 400, "max_age_ms": 3000
       },
-      { "id": "plastic", "installed": true, "empty_cm": 60, "full_cm": 12, "near_full_pct": 75, "full_pct": 90, "median_samples": 5, "confirm_readings": 3, "timeout_us": 30000, "blind_zone_cm": 3, "max_range_cm": 400 },
-      { "id": "paper", "installed": true, "empty_cm": 60, "full_cm": 12, "near_full_pct": 75, "full_pct": 90, "median_samples": 5, "confirm_readings": 3, "timeout_us": 30000, "blind_zone_cm": 3, "max_range_cm": 400 }
+      { "id": "plastic", "installed": true, "empty_cm": 60, "full_cm": 12, "near_full_pct": 75, "full_pct": 90, "median_samples": 5, "confirm_readings": 3, "timeout_us": 30000, "blind_zone_cm": 3, "max_range_cm": 400, "max_age_ms": 3000 },
+      { "id": "paper", "installed": true, "empty_cm": 60, "full_cm": 12, "near_full_pct": 75, "full_pct": 90, "median_samples": 5, "confirm_readings": 3, "timeout_us": 30000, "blind_zone_cm": 3, "max_range_cm": 400, "max_age_ms": 3000 }
     ],
     "irrigation": {
       "auto_enabled": true, "pump_enabled": false,
@@ -467,3 +469,21 @@ labels them "static display — not instrumented".
 Any breaking change increments `protocol_version`. Additive fields may be added
 without a bump; clients must ignore unknown fields. Example documents live in
 `shared/examples/`.
+
+## 10. Demo and simulator isolation
+
+The backend has two separate simulated devices:
+
+- the **live simulator** used when `VILLAGE_DEVICE_MODE=simulator`, which takes
+  the place of the ESP32 for development; and
+- the **demo simulator**, always available for Demo mode.
+
+A request with `mode: "demo"` is routed only to the demo simulator. It can never
+reach the real ESP32, even if one is connected. Responses carry
+`physical: false` and the state envelope says `source.kind: "demo"`. The
+dashboard shows a Demo banner. Demo commands are simulated and do not change
+any GPIO. Demo events are stored in separate tables from live events.
+
+If the deployment uses the live simulator, `physical` is also `false` and the
+source says `simulator`. It must never be presented as a physical run.
+
