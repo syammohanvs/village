@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "note": "Optional prepared reply recordings. Add language/intent paths to files; the frontend falls back to browser speech synthesis for anything absent.",
+  "files": {}
+}
