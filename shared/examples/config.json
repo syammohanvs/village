@@ -1,0 +1,93 @@
+{
+  "protocol_version": 1,
+  "device_id": "village-a1b2c3",
+  "config_revision": 7,
+  "config": {
+    "revision": 7,
+    "soil": {
+      "dry_raw": 2800,
+      "wet_raw": 1100,
+      "min_span_raw": 400,
+      "samples": 9,
+      "max_age_ms": 5000
+    },
+    "reservoir": {
+      "wet_threshold_mv": 1200,
+      "dry_threshold_mv": 2400,
+      "confirm_readings": 3,
+      "max_age_ms": 5000,
+      "calibrated": false
+    },
+    "light": {
+      "installed": true,
+      "output_type": "analog",
+      "analog_bright_high": true,
+      "digital_dark_when_high": true,
+      "dark_threshold": 1600,
+      "bright_threshold": 2400,
+      "stable_ms": 4000,
+      "max_age_ms": 5000
+    },
+    "bins": [
+      {
+        "id": "organic",
+        "installed": true,
+        "empty_cm": 60,
+        "full_cm": 12,
+        "near_full_pct": 75,
+        "full_pct": 90,
+        "median_samples": 5,
+        "confirm_readings": 3,
+        "timeout_us": 30000,
+        "blind_zone_cm": 3,
+        "max_range_cm": 400,
+        "max_age_ms": 3000
+      },
+      {
+        "id": "plastic",
+        "installed": true,
+        "empty_cm": 60,
+        "full_cm": 12,
+        "near_full_pct": 75,
+        "full_pct": 90,
+        "median_samples": 5,
+        "confirm_readings": 3,
+        "timeout_us": 30000,
+        "blind_zone_cm": 3,
+        "max_range_cm": 400,
+        "max_age_ms": 3000
+      },
+      {
+        "id": "paper",
+        "installed": true,
+        "empty_cm": 60,
+        "full_cm": 12,
+        "near_full_pct": 75,
+        "full_pct": 90,
+        "median_samples": 5,
+        "confirm_readings": 3,
+        "timeout_us": 30000,
+        "blind_zone_cm": 3,
+        "max_range_cm": 400,
+        "max_age_ms": 3000
+      }
+    ],
+    "irrigation": {
+      "auto_enabled": true,
+      "pump_enabled": false,
+      "dry_start_pct": 35,
+      "stop_pct": 55,
+      "dry_confirm_ms": 30000,
+      "pulse_ms": 4000,
+      "max_pulse_ms": 8000,
+      "soak_ms": 45000,
+      "max_cumulative_ms": 15000,
+      "max_pulses": 4,
+      "cooldown_ms": 300000,
+      "link_timeout_ms": 30000
+    },
+    "waste": {
+      "indicate_ms": 8000
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "protocol_version": 1,
+  "command_id": "9f3d2a0e-6a8b-4d2e-9d1f-2c7e5b8a4f10",
+  "type": "IRRIGATION_REQUEST",
+  "result": "ACCEPTED",
+  "reason_code": "IRRIGATION_STARTED",
+  "reason": "Soil is dry and water is available. Watering for a short pulse.",
+  "at_uptime_ms": 90120,
+  "irrigation": {
+    "state": "pumping",
+    "pump_on": true,
+    "pulses_done": 1,
+    "pulse_limit": 4
+  }
+}
