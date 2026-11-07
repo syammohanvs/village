@@ -1,0 +1,111 @@
+{
+  "protocol_version": 1,
+  "device_id": "village-a1b2c3",
+  "boot_id": "b-7f3a91c2",
+  "uptime_ms": 84210,
+  "sample_seq": 512,
+  "config_revision": 4,
+  "sensors": {
+    "soil": {
+      "valid": true,
+      "calibrated": true,
+      "raw": 2310,
+      "percent": 27.6,
+      "state": "dry",
+      "age_ms": 180,
+      "fault": null
+    },
+    "reservoir": {
+      "valid": true,
+      "calibrated": true,
+      "state": "available",
+      "millivolts": 640,
+      "conductive": true,
+      "age_ms": 820,
+      "fault": null
+    },
+    "light": {
+      "valid": true,
+      "raw": 1980,
+      "brightness": "dark",
+      "output_type": "analog",
+      "age_ms": 240,
+      "fault": null
+    },
+    "bins": [
+      {
+        "id": "organic",
+        "installed": true,
+        "valid": true,
+        "distance_cm": 38.4,
+        "fill_pct_estimate": 45.5,
+        "state": "available",
+        "age_ms": 310,
+        "fault": null,
+        "near_blind_zone": false
+      },
+      {
+        "id": "plastic",
+        "installed": true,
+        "valid": true,
+        "distance_cm": 14.0,
+        "fill_pct_estimate": 95.8,
+        "state": "full",
+        "age_ms": 760,
+        "fault": null,
+        "near_blind_zone": false
+      },
+      {
+        "id": "paper",
+        "installed": true,
+        "valid": false,
+        "distance_cm": null,
+        "fill_pct_estimate": null,
+        "state": "unavailable",
+        "age_ms": 2400,
+        "fault": "no echo",
+        "near_blind_zone": false
+      }
+    ]
+  },
+  "actuators": {
+    "pump": {
+      "commanded": false,
+      "commissioned": false,
+      "feedback": "none"
+    },
+    "streetlights": {
+      "mode": "auto",
+      "commanded": false,
+      "led_count": 4,
+      "installed": true,
+      "feedback": "none"
+    },
+    "waste_indicator": {
+      "category": null,
+      "active": false,
+      "remaining_ms": 0
+    }
+  },
+  "irrigation": {
+    "auto_enabled": true,
+    "state": "idle",
+    "session": "none",
+    "pulses_done": 0,
+    "pulse_limit": 4,
+    "cumulative_pump_ms": 0,
+    "max_cumulative_pump_ms": 15000,
+    "cooldown_remaining_ms": 0,
+    "reason_code": "IDLE_PUMP_NOT_COMMISSIONED",
+    "reason": "Soil is dry and water is available, but the pump is not commissioned.",
+    "last_session": null
+  },
+  "faults": [],
+  "recent_events": [
+    {
+      "at_uptime_ms": 82000,
+      "code": "IDLE_PUMP_NOT_COMMISSIONED",
+      "text": "Soil is dry and water is available, but the pump is not commissioned."
+    }
+  ]
+}

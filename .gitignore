@@ -1,0 +1,66 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+uc/include/village/secrets.h
+!uc/include/village/secrets.example.h
+*.pem
+*.key
+
+# Downloaded AI models and recordings
+models/*
+!models/README.md
+!models/.gitkeep
+web/frontend/public/audio/*.wav
+web/frontend/public/audio/*.mp3
+web/frontend/public/audio/*.m4a
+web/frontend/public/audio/*.ogg
+recordings/
+*.raw
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node / build outputs
+node_modules/
+web/frontend/dist/
+web/frontend/.vite/
+web/frontend/coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# PlatformIO / firmware build outputs
+uc/.pio/
+uc/.pioenvs/
+uc/.piolibdeps/
+uc/.vscode/
+*.bin
+*.elf
+*.map
+
+# Runtime data, logs, databases
+data/
+run/
+logs/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+server.log
+
+# Scratch / editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+/tmp/

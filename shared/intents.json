@@ -1,0 +1,481 @@
+{
+  "version": 1,
+  "languages": [
+    { "code": "en", "label": "English", "whisper": "en" },
+    { "code": "ml", "label": "മലയാളം", "whisper": "ml" },
+    { "code": "hi", "label": "हिन्दी", "whisper": "hi" }
+  ],
+  "negations": {
+    "en": ["do not", "don't", "dont", "never", "not", "no"],
+    "ml": ["വേണ്ട", "അരുത്", "ചെയ്യരുത്", "ഇല്ല"],
+    "hi": ["मत", "नहीं", "न करें"]
+  },
+  "unknown": {
+    "en": "Please use one of the supported commands or contact local support.",
+    "ml": "സഹായിക്കാവുന്ന കമാൻഡുകളിൽ ഒന്ന് പറയുക, അല്ലെങ്കിൽ പ്രാദേശിക സഹായത്തെ സമീപിക്കുക.",
+    "hi": "कृपया समर्थित कमांड में से एक कहें, या स्थानीय सहायता से संपर्क करें।"
+  },
+  "no_speech": {
+    "en": "No speech was detected. Hold the button and speak clearly.",
+    "ml": "സംസാരം കേട്ടില്ല. ബട്ടൺ അമർത്തിപ്പിടിച്ച് വ്യക്തമായി സംസാരിക്കുക.",
+    "hi": "कोई आवाज़ नहीं सुनाई दी। बटन दबाकर साफ़ बोलें।"
+  },
+  "pending": {
+    "en": "Sent to the village controller. Waiting for acknowledgement.",
+    "ml": "വില്ലേജ് കൺട്രോളർക്ക് അയച്ചു. സ്ഥിരീകരണത്തിനായി കാത്തിരിക്കുന്നു.",
+    "hi": "विलेज कंट्रोलर को भेज दिया। पुष्टि की प्रतीक्षा है।"
+  },
+  "help_order": [
+    "VILLAGE_STATUS",
+    "LIGHTS_ON",
+    "LIGHTS_OFF",
+    "LIGHTS_AUTO",
+    "SOIL_STATUS",
+    "IRRIGATION_START",
+    "IRRIGATION_STOP",
+    "WATER_STATUS",
+    "BIN_STATUS",
+    "HELP"
+  ],
+  "intents": [
+    {
+      "id": "VILLAGE_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Village status",
+        "ml": "ഗ്രാമത്തിന്റെ അവസ്ഥ",
+        "hi": "गाँव की स्थिति"
+      },
+      "phrases": {
+        "en": [
+          "village status",
+          "what is happening",
+          "what is the village doing",
+          "how is the village",
+          "tell me the village status",
+          "status"
+        ],
+        "ml": [
+          "ഗ്രാമത്തിന്റെ അവസ്ഥ",
+          "എന്താണ് നടക്കുന്നത്",
+          "ഗ്രാമം എങ്ങനെയുണ്ട്",
+          "സ്റ്റാറ്റസ്",
+          "gramathinte avastha",
+          "enth aanu nadakkunnath"
+        ],
+        "hi": [
+          "गाँव की स्थिति",
+          "क्या हो रहा है",
+          "गाँव कैसा है",
+          "स्टेटस",
+          "gaon ki sthiti",
+          "kya ho raha hai"
+        ]
+      },
+      "response": {
+        "en": "The village is running. The screen shows the current soil, water, light and bin readings.",
+        "ml": "ഗ്രാമം പ്രവർത്തിക്കുന്നു. മണ്ണ്, വെള്ളം, വെളിച്ചം, ബിൻ എന്നിവയുടെ വിവരങ്ങൾ സ്ക്രീനിൽ കാണാം.",
+        "hi": "गाँव चल रहा है। मिट्टी, पानी, रोशनी और बिन की जानकारी स्क्रीन पर है।"
+      }
+    },
+    {
+      "id": "LIGHTS_ON",
+      "command": "LIGHTS_ON",
+      "actuation": true,
+      "label": {
+        "en": "Lights on",
+        "ml": "വിളക്കുകൾ കത്തിക്കുക",
+        "hi": "लाइट चालू करें"
+      },
+      "phrases": {
+        "en": [
+          "lights on",
+          "turn on the lights",
+          "switch on the streetlights",
+          "streetlights on",
+          "light on",
+          "turn the lights on"
+        ],
+        "ml": [
+          "വിളക്കുകൾ കത്തിക്കുക",
+          "തെരുവ് വിളക്കുകൾ കത്തിക്കുക",
+          "ലൈറ്റ് ഓൺ",
+          "vilakkukal kathikkuka",
+          "theruvu vilakkukal kathikkuka",
+          "light on"
+        ],
+        "hi": [
+          "लाइट चालू करो",
+          "बत्ती जलाओ",
+          "स्ट्रीट लाइट ऑन करो",
+          "लाइट ऑन",
+          "light chalu karo",
+          "batti jalao"
+        ]
+      },
+      "response_pending": {
+        "en": "Turning the streetlights on.",
+        "ml": "തെരുവ് വിളക്കുകൾ കത്തിക്കുന്നു.",
+        "hi": "स्ट्रीट लाइट चालू कर रहे हैं।"
+      },
+      "response_done": {
+        "en": "The streetlights are on.",
+        "ml": "തെരുവ് വിളക്കുകൾ കത്തിച്ചു.",
+        "hi": "स्ट्रीट लाइट चालू हैं।"
+      }
+    },
+    {
+      "id": "LIGHTS_OFF",
+      "command": "LIGHTS_OFF",
+      "actuation": true,
+      "label": {
+        "en": "Lights off",
+        "ml": "വിളക്കുകൾ അണയ്ക്കുക",
+        "hi": "लाइट बंद करें"
+      },
+      "phrases": {
+        "en": [
+          "lights off",
+          "turn off the lights",
+          "switch off the streetlights",
+          "streetlights off",
+          "light off",
+          "turn the lights off"
+        ],
+        "ml": [
+          "വിളക്കുകൾ അണയ്ക്കുക",
+          "തെരുവ് വിളക്കുകൾ അണയ്ക്കുക",
+          "ലൈറ്റ് ഓഫ്",
+          "vilakkukal anaykkuka",
+          "theruvu vilakkukal anaykkuka",
+          "light off"
+        ],
+        "hi": [
+          "लाइट बंद करो",
+          "बत्ती बुझाओ",
+          "स्ट्रीट लाइट ऑफ करो",
+          "लाइट ऑफ",
+          "light band karo",
+          "batti bujhao"
+        ]
+      },
+      "response_pending": {
+        "en": "Turning the streetlights off.",
+        "ml": "തെരുവ് വിളക്കുകൾ അണയ്ക്കുന്നു.",
+        "hi": "स्ट्रीट लाइट बंद कर रहे हैं।"
+      },
+      "response_done": {
+        "en": "The streetlights are off.",
+        "ml": "തെരുവ് വിളക്കുകൾ അണച്ചു.",
+        "hi": "स्ट्रीट लाइट बंद हैं।"
+      }
+    },
+    {
+      "id": "LIGHTS_AUTO",
+      "command": "LIGHTS_AUTO",
+      "actuation": true,
+      "label": {
+        "en": "Automatic lights",
+        "ml": "വിളക്കുകൾ ഓട്ടോ",
+        "hi": "लाइट ऑटो"
+      },
+      "phrases": {
+        "en": [
+          "automatic lights",
+          "lights automatic",
+          "auto lights",
+          "lights auto",
+          "automatic streetlights",
+          "streetlights automatic"
+        ],
+        "ml": [
+          "വിളക്കുകൾ ഓട്ടോ",
+          "ഓട്ടോമാറ്റിക് വിളക്കുകൾ",
+          "വിളക്കുകൾ സ്വയം",
+          "vilakkukal auto",
+          "automatic vilakkukal"
+        ],
+        "hi": [
+          "लाइट ऑटो",
+          "अपने आप लाइट",
+          "ऑटोमैटिक लाइट",
+          "light auto",
+          "apne aap light",
+          "automatic light"
+        ]
+      },
+      "response_pending": {
+        "en": "Putting the streetlights in automatic mode.",
+        "ml": "വിളക്കുകൾ ഓട്ടോ മോഡിലാക്കുന്നു.",
+        "hi": "स्ट्रीट लाइट को ऑटो मोड में डाल रहे हैं।"
+      },
+      "response_done": {
+        "en": "The streetlights follow the light sensor now.",
+        "ml": "വിളക്കുകൾ ഇപ്പോൾ പ്രകാശ സെൻസർ അനുസരിച്ച് പ്രവർത്തിക്കും.",
+        "hi": "स्ट्रीट लाइट अब लाइट सेंसर के अनुसार चलेंगी।"
+      }
+    },
+    {
+      "id": "SOIL_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Soil moisture",
+        "ml": "മണ്ണിലെ ഈർപ്പം",
+        "hi": "मिट्टी की नमी"
+      },
+      "phrases": {
+        "en": [
+          "soil moisture",
+          "soil status",
+          "how wet is the soil",
+          "is the soil dry",
+          "soil moisture status",
+          "moisture level"
+        ],
+        "ml": [
+          "മണ്ണിലെ ഈർപ്പം",
+          "മണ്ണ് നനവുണ്ടോ",
+          "മണ്ണിന്റെ അവസ്ഥ",
+          "mannile eerppam",
+          "mannu nanavundo",
+          "manninte avastha"
+        ],
+        "hi": [
+          "मिट्टी की नमी",
+          "मिट्टी की स्थिति",
+          "मिट्टी सूखी है क्या",
+          "mitti ki nami",
+          "mitti ki sthiti",
+          "mitti sookhi hai kya"
+        ]
+      },
+      "response": {
+        "en": "The calibrated soil moisture reading is shown on the dashboard.",
+        "ml": "മണ്ണിലെ ഈർപ്പത്തിന്റെ അളവ് ഡാഷ്ബോർഡിൽ കാണാം.",
+        "hi": "मिट्टी की नमी का माप डैशबोर्ड पर दिख रहा है।"
+      }
+    },
+    {
+      "id": "IRRIGATION_START",
+      "command": "IRRIGATION_REQUEST",
+      "actuation": true,
+      "label": {
+        "en": "Start irrigation",
+        "ml": "നനയ്ക്കാൻ തുടങ്ങുക",
+        "hi": "सिंचाई शुरू करें"
+      },
+      "phrases": {
+        "en": [
+          "start irrigation",
+          "start watering",
+          "water the plants",
+          "turn on the pump",
+          "begin irrigation",
+          "irrigate the garden",
+          "start the drip"
+        ],
+        "ml": [
+          "നനയ്ക്കാൻ തുടങ്ങുക",
+          "വെള്ളം ഒഴിക്കുക",
+          "പമ്പ് ഓൺ ചെയ്യുക",
+          "നനയ്ക്കൽ തുടങ്ങുക",
+          "nanaykkan thudanguka",
+          "vellam ozhikkuka",
+          "pump on cheyyuka"
+        ],
+        "hi": [
+          "पानी देना शुरू करो",
+          "सिंचाई शुरू करो",
+          "पंप चालू करो",
+          "पौधों को पानी दो",
+          "pani dena shuru karo",
+          "sinchai shuru karo",
+          "pump chalu karo"
+        ]
+      },
+      "response_pending": {
+        "en": "Sending the irrigation request to the controller.",
+        "ml": "നനയ്ക്കാനുള്ള അഭ്യർത്ഥന കൺട്രോളർക്ക് അയക്കുന്നു.",
+        "hi": "सिंचाई का अनुरोध कंट्रोलर को भेज रहे हैं।"
+      },
+      "response_done": {
+        "en": "The controller accepted the irrigation request.",
+        "ml": "കൺട്രോളർ നനയ്ക്കാനുള്ള അഭ്യർത്ഥന സ്വീകരിച്ചു.",
+        "hi": "कंट्रोलर ने सिंचाई का अनुरोध स्वीकार किया।"
+      }
+    },
+    {
+      "id": "IRRIGATION_STOP",
+      "command": "IRRIGATION_STOP",
+      "actuation": true,
+      "label": {
+        "en": "Stop irrigation",
+        "ml": "നനയ്ക്കുന്നത് നിർത്തുക",
+        "hi": "सिंचाई बंद करें"
+      },
+      "phrases": {
+        "en": [
+          "stop irrigation",
+          "stop watering",
+          "turn off the pump",
+          "stop the pump",
+          "end irrigation",
+          "stop the drip"
+        ],
+        "ml": [
+          "നനയ്ക്കുന്നത് നിർത്തുക",
+          "വെള്ളം നിർത്തുക",
+          "പമ്പ് ഓഫ് ചെയ്യുക",
+          "നനയ്ക്കൽ നിർത്തുക",
+          "nanaykkunnath nirthuka",
+          "vellam nirthuka",
+          "pump off cheyyuka"
+        ],
+        "hi": [
+          "पानी देना बंद करो",
+          "सिंचाई बंद करो",
+          "पंप बंद करो",
+          "पानी रोको",
+          "pani dena band karo",
+          "sinchai band karo",
+          "pump band karo"
+        ]
+      },
+      "response_pending": {
+        "en": "Sending the stop request to the controller.",
+        "ml": "നിർത്താനുള്ള അഭ്യർത്ഥന കൺട്രോളർക്ക് അയക്കുന്നു.",
+        "hi": "रोकने का अनुरोध कंट्रोलर को भेज रहे हैं।"
+      },
+      "response_done": {
+        "en": "The controller stopped the irrigation.",
+        "ml": "കൺട്രോളർ നനയ്ക്കൽ നിർത്തി.",
+        "hi": "कंट्रोलर ने सिंचाई रोक दी।"
+      }
+    },
+    {
+      "id": "WATER_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Water availability",
+        "ml": "വെള്ളം ലഭ്യമാണോ",
+        "hi": "पानी उपलब्ध है क्या"
+      },
+      "phrases": {
+        "en": [
+          "water availability",
+          "is there water",
+          "water status",
+          "reservoir status",
+          "do we have water",
+          "reservoir water status"
+        ],
+        "ml": [
+          "വെള്ളം ഉണ്ടോ",
+          "ടാങ്കിൽ വെള്ളം ഉണ്ടോ",
+          "ജല ലഭ്യത",
+          "vellam undo",
+          "tankil vellam undo",
+          "jala labhyatha"
+        ],
+        "hi": [
+          "पानी है क्या",
+          "टंकी में पानी है क्या",
+          "पानी की उपलब्धता",
+          "pani hai kya",
+          "tanki mein pani hai kya",
+          "pani ki uplabdhata"
+        ]
+      },
+      "response": {
+        "en": "The reservoir shows only water available, low water, or unavailable. The dashboard shows which.",
+        "ml": "ടാങ്കിൽ വെള്ളം ഉണ്ടോ ഇല്ലയോ എന്ന് മാത്രമേ അറിയൂ; ഡാഷ്ബോർഡിൽ അത് കാണാം.",
+        "hi": "टंकी में पानी है या नहीं, केवल वही पता है; डैशबोर्ड पर वह दिख रहा है।"
+      }
+    },
+    {
+      "id": "BIN_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Bin status",
+        "ml": "ബിന്നിന്റെ അവസ്ഥ",
+        "hi": "बिन की स्थिति"
+      },
+      "phrases": {
+        "en": [
+          "bin status",
+          "waste bin status",
+          "how full are the bins",
+          "bin levels",
+          "waste status",
+          "are the bins full"
+        ],
+        "ml": [
+          "ബിന്നിന്റെ അവസ്ഥ",
+          "ചപ്പുചവറിന്റെ അവസ്ഥ",
+          "ബിൻ നിറഞ്ഞോ",
+          "binte avastha",
+          "chappuchavarinte avastha",
+          "bin niranjo"
+        ],
+        "hi": [
+          "कूड़ेदान की स्थिति",
+          "कचरे के डिब्बे की स्थिति",
+          "बिन भर गया क्या",
+          "koodedan ki sthiti",
+          "kachre ke dibbe ki sthiti",
+          "bin bhar gaya kya"
+        ]
+      },
+      "response": {
+        "en": "The three bin levels are shown on the dashboard. Fill is estimated from the measured distance.",
+        "ml": "മൂന്ന് ബിന്നുകളുടെ അവസ്ഥ ഡാഷ്ബോർഡിൽ കാണാം. അകലത്തിൽ നിന്ന് കണക്കാക്കിയ ഏകദേശ നിറവാണ് ഇത്.",
+        "hi": "तीनों बिन की स्थिति डैशबोर्ड पर है। यह दूरी से अनुमानित भराव है।"
+      }
+    },
+    {
+      "id": "HELP",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Help",
+        "ml": "സഹായം",
+        "hi": "मदद"
+      },
+      "phrases": {
+        "en": [
+          "help",
+          "what can i say",
+          "supported commands",
+          "show commands",
+          "voice help"
+        ],
+        "ml": [
+          "സഹായം",
+          "എന്ത് പറയാം",
+          "കമാൻഡുകൾ",
+          "sahayam",
+          "enth parayam",
+          "commands"
+        ],
+        "hi": [
+          "मदद",
+          "सहायता",
+          "क्या कह सकते हैं",
+          "कमांड",
+          "madad",
+          "sahayata",
+          "kya keh sakte hain"
+        ]
+      },
+      "response": {
+        "en": "You can say: village status, lights on, lights off, automatic lights, soil moisture, start irrigation, stop irrigation, water availability, bin status, or help.",
+        "ml": "ഇവ പറയാം: ഗ്രാമത്തിന്റെ അവസ്ഥ, വിളക്കുകൾ കത്തിക്കുക, വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ ഓട്ടോ, മണ്ണിലെ ഈർപ്പം, നനയ്ക്കാൻ തുടങ്ങുക, നനയ്ക്കുന്നത് നിർത്തുക, വെള്ളം ഉണ്ടോ, ബിന്നിന്റെ അവസ്ഥ, സഹായം.",
+        "hi": "आप कह सकते हैं: गाँव की स्थिति, लाइट चालू करो, लाइट बंद करो, लाइट ऑटो, मिट्टी की नमी, सिंचाई शुरू करो, सिंचाई बंद करो, पानी है क्या, बिन की स्थिति, मदद।"
+      }
+    }
+  ]
+}
