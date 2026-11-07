@@ -14,7 +14,7 @@ and uses no paid API.
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
-| Dashboard (React/Vite, charcoal/burgundy/gold) | **implementation in progress; build/test pending** |
+| Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 15 tests pass** |
 | Hardware wiring, pump, sensors | **not physically verified — see docs/bench-test.md** |
 | Waste model (Teachable Machine) | **you must supply the three exported files** |
 
@@ -111,6 +111,10 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 - Backend: **17 passed** (demo isolation, ack-not-assumed, retries with the same
   command id, stale/disconnected, config validation, waste/full-bin, voice
   rejection, settings).
+- Frontend: typecheck clean, **15 tests passed**, production build succeeded.
+- Browser walk: **7/7 routes render, 0 console errors**; Demo toggle, demo
+  scenario, confirmed Start, Lights Off and the 10-phrase voice panel were
+  driven in Chromium against the running server.
 - Whisper: `GET /health` → `{"status":"ok"}` with `ggml-base.bin` loaded.
 - Hardware: **not tested**; the bench checklist is in
   [docs/bench-test.md](docs/bench-test.md).
