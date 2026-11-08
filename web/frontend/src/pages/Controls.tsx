@@ -237,8 +237,17 @@ export function Controls() {
 
           <Card kicker="Lighting" title="Streetlights">
             <p className="control-reason">
-              Sensor reads <strong>{titleCase(lightSensor?.brightness ?? 'unknown')}</strong>. Last
-              output: {lights?.commanded ? 'commanded on' : 'commanded off'}.
+              {lightSensor && lightSensor.installed === false ? (
+                <>
+                  No LDR is installed, so there is no light reading. Last output:{' '}
+                  {lights?.commanded ? 'commanded on' : 'commanded off'}.
+                </>
+              ) : (
+                <>
+                  Sensor reads <strong>{titleCase(lightSensor?.brightness ?? 'unknown')}</strong>.
+                  Last output: {lights?.commanded ? 'commanded on' : 'commanded off'}.
+                </>
+              )}
             </p>
             <div className="segmented segmented--wide" role="group" aria-label="Streetlight mode">
               {(['auto', 'on', 'off'] as const).map((value) => (

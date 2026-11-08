@@ -37,6 +37,7 @@ export interface ReservoirReading {
 }
 
 export interface LightReading {
+  installed?: boolean;
   valid: boolean;
   raw: number | null;
   brightness: Brightness;

@@ -75,6 +75,17 @@ describe('Village dashboard', () => {
     expect(labels).not.toMatch(/water used/i);
   });
 
+  it('never reports a light level when no LDR is installed', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightInstalled: false, lightBrightness: 'unknown' }),
+    );
+    renderApp();
+
+    expect(await screen.findByText('Not installed')).toBeInTheDocument();
+    expect(screen.queryByText('Dark')).not.toBeInTheDocument();
+    expect(screen.getByText(/No LDR wired/i)).toBeInTheDocument();
+  });
+
   it('greys out values and says when the frame is stale', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ stale: true, ageMs: 7200 }));
     renderApp();

@@ -224,9 +224,23 @@ export function Sensors() {
 
         <Card kicker="Light" title="LDR streetlight sensor">
           <div className={cx('reading-value', inactive && 'is-inactive')}>
-            <span className="reading-big">{titleCase(light?.brightness ?? 'unknown')}</span>
-            <Chip tone={light?.brightness === 'dark' ? 'warn' : 'gold'}>
-              {light?.raw !== null && light?.raw !== undefined ? `raw ${light.raw}` : 'no raw value'}
+            <span className="reading-big">
+              {light && light.installed === false ? 'Not installed' : titleCase(light?.brightness ?? 'unknown')}
+            </span>
+            <Chip
+              tone={
+                light && light.installed === false
+                  ? 'neutral'
+                  : light?.brightness === 'dark'
+                    ? 'warn'
+                    : 'gold'
+              }
+            >
+              {light && light.installed === false
+                ? 'no sensor'
+                : light?.raw !== null && light?.raw !== undefined
+                  ? `raw ${light.raw}`
+                  : 'no raw value'}
             </Chip>
           </div>
           <dl className="mini-kv">
@@ -244,7 +258,10 @@ export function Sensors() {
             </div>
           </dl>
           {light?.fault && <p className="error-text">Fault: {light.fault}</p>}
-          <p className="hint">A stale light reading is shown as unknown, never as bright or dark.</p>
+          <p className="hint">
+            A stale light reading is shown as unknown, never as bright or dark. With no LDR
+            installed the controller reports nothing — a floating pin is not a measurement.
+          </p>
         </Card>
       </div>
 
@@ -470,7 +487,24 @@ export function Sensors() {
               </fieldset>
 
               <fieldset className="config-section">
-                <legend>Streetlight LDR thresholds</legend>
+                <legend>Streetlight LDR and lamps</legend>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.light.installed)}
+                    onChange={(event) =>
+                      update((next) => {
+                        next.light.installed = event.target.checked;
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>The LDR and streetlight lamps are wired.</strong> Until this is
+                    ticked the controller reports no light level and keeps the lamp outputs off —
+                    an unwired ADC pin reads noise that would otherwise look like a real
+                    “dark”/“bright” observation.
+                  </span>
+                </label>
                 <div className="field-grid">
                   <label className="field">
                     <span>Dark below (raw)</span>

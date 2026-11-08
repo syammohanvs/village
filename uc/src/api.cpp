@@ -114,7 +114,7 @@ void buildStatus(JsonDocument& doc) {
   JsonObject l = sensors["light"].to<JsonObject>();
   l["installed"] = rt.config.light.installed;
   l["valid"] = light.valid;
-  l["raw"] = light.raw;
+  if (light.installed) l["raw"] = light.raw; else l["raw"] = nullptr;
   l["brightness"] = toString(light.brightness);
   l["output_type"] = rt.config.light.digital ? "digital" : "analog";
   l["age_ms"] = light.age_ms;

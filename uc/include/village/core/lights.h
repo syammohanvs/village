@@ -93,6 +93,14 @@ class LightsModel {
     LightReading r;
     r.installed = cfg.light.installed;
     r.digital = cfg.light.digital;
+    if (!cfg.light.installed) {
+      // No LDR is wired: a floating ADC pin still reads noise, so reporting a
+      // brightness here would be an invented observation. Report nothing.
+      r.valid = false;
+      r.brightness = Brightness::Unknown;
+      r.fault = "not installed";
+      return r;
+    }
     r.raw = raw_;
     if (!has_sample_) {
       r.fault = "no sample";

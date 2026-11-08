@@ -84,6 +84,10 @@ export function Dashboard() {
   const soil = sensors?.soil;
   const reservoir = sensors?.reservoir;
   const light = sensors?.light;
+  // A floating ADC pin reads noise; without an installed LDR there is no
+  // brightness observation to show.
+  const lightWired = light?.installed !== false;
+  const lightLabel = lightWired ? titleCase(light?.brightness ?? 'unknown') : 'Not installed';
   const pump = status?.actuators?.pump;
   const lights = status?.actuators?.streetlights;
   const irrigation = status?.irrigation;
@@ -210,15 +214,30 @@ export function Dashboard() {
           icon={<IconLamp size={21} />}
           label="Streetlights"
           value={lightModeLabel(lights?.mode)}
-          sub={`${titleCase(light?.brightness ?? 'unknown')} light · ${
+          sub={`${lightLabel} light · ${
             lights?.commanded ? 'commanded on' : 'commanded off'
           }`}
           chip={{
-            text: titleCase(light?.brightness ?? 'unknown'),
-            tone: light?.brightness === 'dark' ? 'warn' : light?.brightness === 'bright' ? 'gold' : 'neutral',
+            text: lightLabel,
+            tone: !lightWired
+              ? 'neutral'
+              : light?.brightness === 'dark'
+                ? 'warn'
+                : light?.brightness === 'bright'
+                  ? 'gold'
+                  : 'neutral',
           }}
           inactive={inactive}
-          footer={light && <span>{light.raw !== null ? `LDR raw ${light.raw}` : 'no LDR value'} · {formatAge(light.age_ms)}</span>}
+          footer={
+            lightWired && light ? (
+              <span>
+                {light.raw !== null ? `LDR raw ${light.raw}` : 'no LDR value'} ·{' '}
+                {formatAge(light.age_ms)}
+              </span>
+            ) : (
+              <span>No LDR wired · reporting nothing</span>
+            )
+          }
         />
       </div>
 

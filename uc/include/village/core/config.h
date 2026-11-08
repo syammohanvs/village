@@ -25,7 +25,10 @@ struct ReservoirConfig {
 };
 
 struct LightConfig {
-  bool installed = true;
+  // False by default: a board with no LDR and no streetlight LEDs must not
+  // report a brightness (a floating ADC pin reads plausible noise) and must
+  // not drive the outputs. Turn it on once the sensor is actually wired.
+  bool installed = false;
   bool digital = false;              // false = analogue AO, true = digital DO
   bool analog_bright_high = true;    // module AO rises with light
   bool digital_dark_when_high = true;  // typical LDR module DO

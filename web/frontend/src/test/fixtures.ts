@@ -12,6 +12,7 @@ export interface StateOptions {
   soilCalibrated?: boolean;
   reservoirState?: 'available' | 'low' | 'uncalibrated' | 'unavailable';
   lightBrightness?: 'bright' | 'dark' | 'unknown';
+  lightInstalled?: boolean;
   lightsMode?: 'auto' | 'manual' | 'unknown';
   lightsCommanded?: boolean;
   lastError?: string | null;
@@ -32,6 +33,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     soilCalibrated = true,
     reservoirState = 'available',
     lightBrightness = 'dark',
+    lightInstalled = true,
     lightsMode = 'auto',
     lightsCommanded = false,
     lastError = null,
@@ -81,8 +83,9 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
           fault: null,
         },
         light: {
-          valid: lightBrightness !== 'unknown',
-          raw: 1980,
+          installed: lightInstalled,
+          valid: lightInstalled && lightBrightness !== 'unknown',
+          raw: lightInstalled ? 1980 : null,
           brightness: lightBrightness,
           output_type: 'analog',
           age_ms: 240,
