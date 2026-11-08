@@ -303,6 +303,25 @@ The component and content tests are part of the normal suite
 and stale links, demo mode, the adult notes, the read-aloud call and closing
 with Escape. The suite is 37 web tests in 7 files.
 
+## Reservoir probes — bench check (2026-11-08)
+
+Two wire probes on a 15 kΩ excitation resistor were read through the running
+server:
+
+```text
+probes in air       3145 mV   state low       conductive false
+probes in well water ~1600 mV state available conductive true
+```
+
+The default 1200 / 2400 mV thresholds did not fit this water, so they were
+changed to **wet ≤ 2300 mV** and **dry ≥ 2800 mV**. The state takes about six
+seconds to change because it requires three consecutive two-second samples.
+A brief ~190 mV reading occurred when the prongs touched; it still reported
+*available*, which is correct — water is present.
+
+The reservoir is calibrated (`calibrated: true`, config revision 8) and is
+reported as **Available / Low** only; no percentage or volume is produced.
+
 ## Setup checklist at verification time
 
 ```text

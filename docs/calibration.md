@@ -39,10 +39,22 @@ The probes detect **one minimum water level**, not a continuous level. The
 dashboard only shows **Available**, **Low**, **Uncalibrated** or
 **Unavailable**. There is deliberately no percentage, litre or capacity field.
 
-Proposed circuit (see `wiring.md`): GPIO 25 → 47 kΩ → probe A; probe A →
-GPIO 35; probe B → GND. The firmware excites the probes for a few
-milliseconds, averages seven ADC samples, then returns the pin to high
-impedance.
+Circuit fitted here (see `wiring.md`): GPIO 25 → **15 kΩ** → probe A; probe A
+→ GPIO 35; probe B → GND. 47 kΩ is also fine and gives a lower wet voltage. The
+firmware excites the probes for a few milliseconds, averages seven ADC samples,
+then returns the pin to high impedance.
+
+Measured on **2026-11-08** with well water and a 15 kΩ resistor:
+
+| Condition | Millivolts | State |
+| --- | ---: | --- |
+| probes in air | **3145** | Low |
+| probes in well water | **~1600** | Available |
+| prongs touching (brief short) | ~190 | Available (water present) |
+
+Thresholds chosen from those readings: **wet ≤ 2300 mV**, **dry ≥ 2800 mV**.
+The gap is a deliberate dead band; the controller reports *Unavailable* rather
+than guessing when a reading sits between them.
 
 1. With the probes **dry in air**, note the millivolt reading.
 2. With the probes **in water at the real spacing**, note the millivolt
@@ -51,8 +63,14 @@ impedance.
    comfortably below the dry reading. The dry threshold must be at least
    100 mV above the wet threshold. The UI saves `calibrated: true`.
 4. Confirm the state changes when the probes are lifted out and dipped back in.
+   It takes **three confirmations (~6 s)** because the controller samples every
+   two seconds and refuses to flip on one reading.
 5. Confirm irrigation is blocked with **Low water** and that a running pulse
    stops immediately when the probes are lifted.
+
+Well water is not municipal water: its mineral content, and therefore its
+conductivity and voltage, can differ from tap water and can change over time.
+Re-check the two readings if the water source changes.
 
 Water resistance is not zero, and the reading depends on probe area, spacing
 and water conductivity. Re-calibrate if the probes are moved. A broken probe

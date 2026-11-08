@@ -168,16 +168,19 @@ Module DO   →  not connected
 ### Reservoir probes (two wires, one level)
 
 ```
- GPIO 25 ──[ 47 kΩ ]──●──── probe A
+ GPIO 25 ──[ 15 kΩ ]──●──── probe A
                        │
                   GPIO 35 (ADC1, 11 dB)
                        │
                     probe B ── GND
 ```
 
-- Drive GPIO 25 HIGH for a short measurement, wait **≥ 5 ms** for the node to
-  settle, average several ADC samples, then set GPIO 25 to `INPUT` (high
-  impedance, no pull-up/pull-down).
+- 15 kΩ was fitted on this build; 47 kΩ works too and gives a lower wet
+  voltage. Drive GPIO 25 HIGH for a short measurement, wait **≥ 5 ms** for the
+  node to settle, average several ADC samples, then set GPIO 25 to `INPUT`
+  (high impedance, no pull-up/pull-down).
+- Measured here: **3145 mV in air**, **~1600 mV in well water**; thresholds
+  **2300 / 2800 mV**.
 - Wet water conducts: probe A is pulled down through the water, so the ADC
   voltage falls. Dry: no current, the 47 kΩ pulls the node up, so the ADC
   voltage rises. The actual voltage depends on water conductivity, probe area

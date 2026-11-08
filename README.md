@@ -20,7 +20,8 @@ and uses no paid API.
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
 | Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
 | Cloudflare Pages | **repo `village`, branch `main`, build root `web/frontend`** |
-| Hardware wiring | **streetlights + LDR working; soil bench-only; reservoir, bins and pump not wired** |
+| Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
+| Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
 | Waste model (Teachable Machine) | **you must supply the three exported files** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
