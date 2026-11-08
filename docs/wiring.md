@@ -177,9 +177,42 @@ with a known logic-level MOSFET or a relay module and document the change.
 - Keep the reservoir's maximum water surface **below the drip outlets** so the
   drip line cannot continue siphoning after the pump stops.
 
-### LDR module
+### LDR (light sensor) — GPIO 32
 
-- VCC 3.3 V, GND common, AO to **GPIO 32**.
+The input is **GPIO 32** (header `D32`, ADC1 channel 4). It is 3.3 V only:
+never feed it 5 V.
+
+**A. Three- or four-pin LDR module** (small board with a comparator):
+
+- `VCC` → **3V3**, `GND` → **GND**, `AO` → **GPIO 32**.
+- No extra resistor: the module already has the divider on board.
+- If the module has only `DO`, connect `DO` → GPIO 32 and set
+  `light.output_type` to `digital`. Typical modules drive DO HIGH in darkness;
+  the `digital_dark_when_high` setting handles that.
+
+**B. Bare two-leg LDR** (no board):
+
+Build a divider with one fixed resistor. Recommended **10 kΩ**:
+
+```
+ 3V3 ──[ LDR ]──●── GPIO 32 (D32)
+                 │
+             [ 10 kΩ ]
+                 │
+                GND
+```
+
+- LDR on the **3.3 V side**, 10 kΩ to **GND** → the reading **rises with
+  light**, so `analog_bright_high = true` (the default).
+- With a typical LDR (≈1 kΩ bright, ≈10 kΩ indoors, ≈1 MΩ dark) the raw
+  reading runs roughly **3000 bright / 1650 indoors / 50 dark** on the 0–4095
+  scale, which brackets the default thresholds (dark 1600, bright 2400).
+- Any value from 4.7 kΩ to 47 kΩ works; 10 kΩ gives the widest usable range.
+- Swapping the two parts (10 kΩ to 3V3, LDR to GND) inverts the reading; then
+  set `analog_bright_high = false` instead of rewiring.
+
+**After wiring, tick “The LDR is wired” on Sensors and save**, otherwise the
+controller still reports no light level.
 - **The controller starts with the LDR and the lamps marked as not wired.**
   These are two separate facts and two separate tick boxes on **Sensors**:
   **The streetlight lamps are wired** (`light.installed`) and **The LDR is
