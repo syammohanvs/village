@@ -26,7 +26,7 @@ namespace pins {
 inline constexpr const char* kBoardProfile = "esp32doit-devkit-v1";
 inline constexpr const char* kBoardDescription =
     "30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1";
-inline constexpr const char* kPinMapVersion = "1.0.0-30pin";
+inline constexpr const char* kPinMapVersion = "1.1.0-30pin";
 inline constexpr std::size_t kHeaderPins = 30;
 
 inline constexpr bool isAdc1(int gpio) {
@@ -125,6 +125,18 @@ inline constexpr bool isSafeOutput(int gpio) {
          !isStrappingPin(gpio) && !isUart0(gpio);
 }
 
+// GPIO12 is the one strapping pin allowed, and ONLY for a source-wired lamp:
+//
+//   GPIO12 ──[ R ]──▶|── GND
+//
+// At reset the pin is high-impedance and that path pulls it LOW, which is the
+// level the flash-voltage strapping needs.  Never wire a lamp the other way
+// (3V3 -> lamp -> pin): that pulls the pin HIGH at boot and the board may not
+// start.  Every other strapping pin stays banned for outputs.
+inline constexpr bool isSafeLampOutput(int gpio) {
+  return isSafeOutput(gpio) || gpio == 12;
+}
+
 // Analog use is restricted to ADC1 because Wi-Fi is active for the whole
 // exhibition.  ADC2 is shared with the radio and is not usable reliably.
 inline constexpr bool isSafeAnalog(int gpio) {
@@ -149,8 +161,10 @@ inline constexpr int RESERVOIR_EXCITE = 25;
 inline constexpr int PUMP_GATE = 26;
 
 // Four streetlight LEDs, one per pin, each with its own series resistor.
-// 330 ohms per lamp gives roughly 3-5 mA per pin for red/yellow/green LEDs.
-inline constexpr int STREETLIGHT_LEDS[4] = {13, 14, 19, 21};
+// These four are consecutive on the 30-pin header (D13, D12, D14, D27), which
+// keeps the lamp loom tidy.  GPIO12 is a strapping pin: see isSafeLampOutput
+// and docs/wiring.md before changing how a lamp is wired.
+inline constexpr int STREETLIGHT_LEDS[4] = {13, 12, 14, 27};
 inline constexpr int STREETLIGHT_LAMP_COUNT = 4;
 
 // Three waste-category indicator LEDs.
@@ -163,10 +177,10 @@ inline constexpr int WASTE_LED_PAPER = 23;
 inline constexpr int BIN_TRIG[3] = {4, 16, 17};
 inline constexpr int BIN_ECHO[3] = {36, 39, 18};
 
-// Left free on purpose: GPIO 27 is the only remaining non-strapping,
-// non-flash, output-capable pin.  GPIO 2/5/12/15 are strapping pins and are
-// deliberately unused.  GPIO 1/3 remain the USB serial console.
-inline constexpr int SPARE_SAFE_OUTPUT = 27;
+// Left free on purpose.  GPIO 19 and 21 were freed when the lamps moved to the
+// consecutive header run; 19 is kept as the named spare.  GPIO 2/5/15 are
+// strapping pins and stay unused.  GPIO 1/3 remain the USB serial console.
+inline constexpr int SPARE_SAFE_OUTPUT = 19;
 
 // ---------------------------------------------------------------------------
 // Compile-time checks.  A bad edit fails the build rather than the exhibit.
@@ -185,11 +199,16 @@ static_assert(isSafeOutput(WASTE_LED_PLASTIC), "plastic LED must be a safe outpu
 static_assert(isSafeOutput(WASTE_LED_PAPER), "paper LED must be a safe output");
 static_assert(isSafeOutput(SPARE_SAFE_OUTPUT), "spare pin must be a safe output");
 
-static_assert(isSafeOutput(STREETLIGHT_LEDS[0]) &&
-                  isSafeOutput(STREETLIGHT_LEDS[1]) &&
-                  isSafeOutput(STREETLIGHT_LEDS[2]) &&
-                  isSafeOutput(STREETLIGHT_LEDS[3]),
-              "every streetlight LED pin must be a safe output");
+static_assert(isSafeLampOutput(STREETLIGHT_LEDS[0]) &&
+                  isSafeLampOutput(STREETLIGHT_LEDS[1]) &&
+                  isSafeLampOutput(STREETLIGHT_LEDS[2]) &&
+                  isSafeLampOutput(STREETLIGHT_LEDS[3]),
+              "every streetlight LED pin must be a safe lamp output");
+
+// The only strapping pin a lamp may use is GPIO12, and it must stay the one at
+// index 1 in the array so the wiring note above keeps matching the code.
+static_assert(isStrappingPin(STREETLIGHT_LEDS[1]) && STREETLIGHT_LEDS[1] == 12,
+              "the strapping lamp pin must be GPIO12");
 
 static_assert(isSafeOutput(BIN_TRIG[0]) && isSafeOutput(BIN_TRIG[1]) &&
                   isSafeOutput(BIN_TRIG[2]),

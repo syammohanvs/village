@@ -49,9 +49,9 @@ logical order.
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
 | Pump MOSFET gate | **26** | D26 | Digital output | Safe output, boot-low |
 | Streetlight LED 1 | **13** | D13 | Digital output | Safe output |
-| Streetlight LED 2 | **14** | D14 | Digital output | Safe output |
-| Streetlight LED 3 | **19** | D19 | Digital output | Safe output |
-| Streetlight LED 4 | **21** | D21 | Digital output | Safe output |
+| Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
+| Streetlight LED 3 | **14** | D14 | Digital output | Safe output |
+| Streetlight LED 4 | **27** | D27 | Digital output | Safe output |
 | Waste LED — organic | **33** | D33 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
@@ -82,8 +82,8 @@ The firmware's `uc/include/village/pins.h` encodes all of this and has
 pins. A bad edit fails the build.
 
 **GPIO budget:** 25 GPIOs are exposed (23 excluding UART0). **18 are assigned**;
-4 of the remaining 5 are strapping pins deliberately avoided; 1 (GPIO 27) is a
-spare safe output. There is no shortage for this build.
+GPIO 19 (and 21) are spare safe outputs, and the remaining strapping pins are
+avoided. There is no shortage for this build.
 
 ## 3. Power
 
@@ -228,36 +228,45 @@ Each LED needs its own series resistor:
  GPIO ──[ 220 Ω ]──▶|── GND        (3.3 V LED, ~6 mA)
 ```
 
-- **Streetlights: one LED per pin — GPIO 13, 14, 19 and 21 — with 330 Ω in
-  series with each lamp.**
+- **Streetlights: one LED per pin — GPIO 13, 12, 14 and 27 — with 100 Ω in
+  series with each lamp.** These four are consecutive on the 30-pin header
+  (`D13 D12 D14 D27`, between D26 and GND), which keeps the wiring tidy.
 
 ```
- GPIO 13 ──[ 330 Ω ]──▶|── GND      lamp 1
- GPIO 14 ──[ 330 Ω ]──▶|── GND      lamp 2
- GPIO 19 ──[ 330 Ω ]──▶|── GND      lamp 3
- GPIO 21 ──[ 330 Ω ]──▶|── GND      lamp 4
+ GPIO 13 ──[ 100 Ω ]──▶|── GND      lamp 1
+ GPIO 12 ──[ 100 Ω ]──▶|── GND      lamp 2   <- boot-sensitive, see below
+ GPIO 14 ──[ 100 Ω ]──▶|── GND      lamp 3
+ GPIO 27 ──[ 100 Ω ]──▶|── GND      lamp 4
 ```
 
   One resistor per LED, never one shared resistor for lamps wired in parallel.
 
-- **Current with 330 Ω** at a 3.3 V GPIO: `I = (3.3 − Vf) / 330`.
+- **GPIO12 (D12) must be wired exactly as drawn: pin → resistor → LED anode →
+  cathode → GND.** It is a boot strapping pin (MTDI) and must be **LOW when the
+  board starts**. In this direction the pin is high-impedance at reset and the
+  resistor/LED path pulls it low, which is the required level. Wiring it the
+  other way round (3V3 → LED → pin, i.e. sinking) pulls it **high at boot** and
+  the board may fail to start until that lamp is disconnected. If the board
+  ever stops booting after a lamp change, disconnect D12 first.
 
-  | LED colour | Vf (approx) | Current at 330 Ω |
+- **Current with 100 Ω** at a 3.3 V GPIO: `I = (3.3 − Vf) / 100`, about
+  **2–3.5 mA** for the measured white LEDs here (Vf ≈ 2.93 V). That is a good
+  indicator brightness and well inside the ~10 mA per-pin target.
+
+  | LED colour | Vf (approx) | Current at 100 Ω |
   | --- | ---: | ---: |
-  | Red | 1.8 V | ~4.5 mA |
-  | Yellow | 2.1 V | ~3.6 mA |
-  | Green | 2.2 V | ~3.3 mA |
-  | White | 2.9 V | ~1.2 mA |
-  | Blue | 3.0 V | ~0.9 mA |
+  | Red | 1.8 V | ~15 mA (**too high**) |
+  | Yellow | 2.1 V | ~12 mA (**too high**) |
+  | Green | 2.2 V | ~11 mA (**too high**) |
+  | White | 2.9 V | ~3 mA ✔ |
+  | Blue | 3.0 V | ~2.5 mA ✔ |
 
-  330 Ω is a good choice for red, yellow and green: 3–4.5 mA is bright for a
-  small indicator LED. White and blue LEDs will be visibly **dim** at 1 mA —
-  safe, but if they must be bright use 100–150 Ω instead and keep each pin
-  under ~10 mA.
+  100 Ω suits **white or blue** LEDs. For red/yellow/green use 330 Ω, which
+  gives 3–4.5 mA. This build was measured with white LEDs at Vf ≈ 2.93 V.
 
 - **Current budget:** each pin drives exactly one lamp, so every pin carries
-  only ~1–5 mA. The ESP32's recommended continuous limit is 20 mA per pin, so
-  there is a wide margin on all four.
+  only ~2–3 mA here. The ESP32's recommended continuous limit is 20 mA per
+  pin, so there is a wide margin on all four.
 - The GPIO is the only supply: each LED's current returns through the board's
   ground, so keep the ground wire short and common with the board.
 - Organic = GPIO 33, plastic = GPIO 22, paper = GPIO 23, each with 220 Ω.

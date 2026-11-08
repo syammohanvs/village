@@ -45,9 +45,19 @@ TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[0]));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[1]));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[2]));
-  CHECK(pins::isSafeOutput(pins::STREETLIGHT_LEDS[0]));
-  CHECK(pins::isSafeOutput(pins::STREETLIGHT_LEDS[3]));
+  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
+    CHECK(pins::isSafeLampOutput(pins::STREETLIGHT_LEDS[i]));
+  }
   CHECK(pins::STREETLIGHT_LAMP_COUNT == 4);
+  CHECK(pins::STREETLIGHT_LEDS[1] == 12);
+  // GPIO12 is the documented strapping exception: banned as a general output,
+  // allowed only for a source-wired lamp.
+  CHECK(!pins::isSafeOutput(12));
+  CHECK(pins::isSafeLampOutput(12));
+  CHECK(pins::isSafeLampOutput(13));
+  CHECK(!pins::isSafeLampOutput(2));
+  CHECK(!pins::isSafeLampOutput(5));
+  CHECK(!pins::isSafeLampOutput(15));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_ORGANIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PLASTIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PAPER));

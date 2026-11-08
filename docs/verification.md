@@ -136,7 +136,7 @@ Host safety-core tests:
 $ ./scripts/test_firmware.sh
 Running 33 firmware core tests
 ...
-424 checks, 0 failed
+433 checks, 0 failed
 ALL FIRMWARE CORE TESTS PASSED
 ```
 
@@ -261,7 +261,8 @@ is the honest result; the app reports “Recognition model not installed”.
 - Physical sensors, LEDs, pump, probes and LDR behaviour. The ESP32 itself is
   flashed, boots, joins the home Wi-Fi and serves the HTTP API over the LAN, but
   no sensor or actuator is wired/tested yet. The streetlight wiring (GPIO
-  13/14/19/21, one lamp each) has not been checked at all.
+  13/12/14/27, one lamp each at 100 Ω) has not been fully checked: only D13
+  with one white LED (Vf 2.93 V) has been lit and measured.
 - A physical Stop while water is flowing.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera

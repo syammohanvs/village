@@ -10,7 +10,7 @@ and uses no paid API.
 | Part | State |
 | --- | --- |
 | Git, structure, protocol, 30-pin GPIO map | **done** |
-| Firmware safety core + host tests | **424 checks, 0 failed** |
+| Firmware safety core + host tests | **433 checks, 0 failed** |
 | ESP32 board | **flashed 2026-11-08; on home Wi-Fi at 192.168.1.8** |
 | Wireless firmware updates (OTA) | **verified 2026-11-08 from the Windows host** |
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
@@ -97,7 +97,7 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
 The purchased board is the **30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1**
 (4 MB flash, AMS1117, micro-USB). The pin map uses GPIO numbers only:
 soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump **26**,
-streetlights **13/14/19/21** (one lamp each), waste LEDs **33/22/23**, bin triggers **4/16/17**,
+streetlights **13/12/14/27** (one lamp each), waste LEDs **33/22/23**, bin triggers **4/16/17**,
 bin echoes **36/39/18**. All analogue inputs are **ADC1** because Wi-Fi is
 active. Flash pins, input-only misuse, strapping pins and UART0 are avoided;
 the firmware has `static_assert` checks. See [docs/wiring.md](docs/wiring.md)
@@ -107,12 +107,12 @@ circuit and the unidentified driver-component warning.
 ## Tests run locally
 
 ```bash
-./scripts/test_firmware.sh      # 424 checks + PlatformIO build
+./scripts/test_firmware.sh      # 433 checks + PlatformIO build
 cd web/backend && .venv/bin/python -m pytest -q   # or VILLAGE_VENV
 cd web/frontend && npm run typecheck && npm test && npm run build
 ```
 
-- Firmware core: **424 checks, 0 failed** (irrigation safeguards, stop,
+- Firmware core: **433 checks, 0 failed** (irrigation safeguards, stop,
   duplicate commands, stale sensors, calibration polarity, LDR hysteresis,
   bin echo loss, persisted command ids).
 - ESP32 build: **SUCCESS** for `esp32doit-devkit-v1`.

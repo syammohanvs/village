@@ -81,7 +81,7 @@ device's own `millis()`.
     "reservoir_sense_adc": 35,
     "ldr": 32,
     "pump_gate": 26,
-    "streetlight_leds": [13, 14, 19, 21],
+    "streetlight_leds": [13, 12, 14, 27],
     "waste_leds": { "organic": 33, "plastic": 22, "paper": 23 },
     "bin_trig": [4, 16, 17],
     "bin_echo": [36, 39, 18]
