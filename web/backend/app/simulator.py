@@ -104,6 +104,7 @@ def default_config() -> dict[str, Any]:
         },
         "light": {
             "installed": True,
+            "sensor_fitted": True,
             "output_type": "analog",
             "analog_bright_high": True,
             "digital_dark_when_high": True,

@@ -112,7 +112,7 @@ void buildStatus(JsonDocument& doc) {
 
   const LightReading light = rt.lights.read(rt.config, now);
   JsonObject l = sensors["light"].to<JsonObject>();
-  l["installed"] = rt.config.light.installed;
+  l["installed"] = rt.config.light.sensor_fitted;
   l["valid"] = light.valid;
   if (light.installed) l["raw"] = light.raw; else l["raw"] = nullptr;
   l["brightness"] = toString(light.brightness);
@@ -278,6 +278,7 @@ void writeConfig(JsonObject out, const DeviceConfig& c) {
 
   JsonObject light = out["light"].to<JsonObject>();
   light["installed"] = c.light.installed;
+  light["sensor_fitted"] = c.light.sensor_fitted;
   light["output_type"] = c.light.digital ? "digital" : "analog";
   light["analog_bright_high"] = c.light.analog_bright_high;
   light["digital_dark_when_high"] = c.light.digital_dark_when_high;
@@ -362,6 +363,7 @@ bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
 
   JsonObjectConst light = c["light"].as<JsonObjectConst>();
   out.light.installed = light["installed"] | out.light.installed;
+  out.light.sensor_fitted = light["sensor_fitted"] | out.light.sensor_fitted;
   const char* output_type = light["output_type"] | "analog";
   out.light.digital = std::strcmp(output_type, "digital") == 0;
   out.light.analog_bright_high =

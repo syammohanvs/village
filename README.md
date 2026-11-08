@@ -10,7 +10,7 @@ and uses no paid API.
 | Part | State |
 | --- | --- |
 | Git, structure, protocol, 30-pin GPIO map | **done** |
-| Firmware safety core + host tests | **417 checks, 0 failed** |
+| Firmware safety core + host tests | **424 checks, 0 failed** |
 | ESP32 board | **flashed 2026-11-08; on home Wi-Fi at 192.168.1.8** |
 | Wireless firmware updates (OTA) | **verified 2026-11-08 from the Windows host** |
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
@@ -107,12 +107,12 @@ circuit and the unidentified driver-component warning.
 ## Tests run locally
 
 ```bash
-./scripts/test_firmware.sh      # 417 checks + PlatformIO build
+./scripts/test_firmware.sh      # 424 checks + PlatformIO build
 cd web/backend && .venv/bin/python -m pytest -q   # or VILLAGE_VENV
 cd web/frontend && npm run typecheck && npm test && npm run build
 ```
 
-- Firmware core: **417 checks, 0 failed** (irrigation safeguards, stop,
+- Firmware core: **424 checks, 0 failed** (irrigation safeguards, stop,
   duplicate commands, stale sensors, calibration polarity, LDR hysteresis,
   bin echo loss, persisted command ids).
 - ESP32 build: **SUCCESS** for `esp32doit-devkit-v1`.

@@ -136,7 +136,7 @@ Host safety-core tests:
 $ ./scripts/test_firmware.sh
 Running 33 firmware core tests
 ...
-417 checks, 0 failed
+424 checks, 0 failed
 ALL FIRMWARE CORE TESTS PASSED
 ```
 

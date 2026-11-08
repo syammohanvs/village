@@ -95,10 +95,12 @@ session; local automatic watering continues if the laptop disappears.
 - A commanded off state is not a connectivity test. Check the LED and resistor
   in the bench test.
 - **Everything reads “Not installed” and the lamps never switch on:** the
-  controller starts with `light.installed = false` on purpose. A floating ADC
-  pin reads plausible noise, so an unwired LDR must not report “dark”. Tick
-  **The LDR and streetlight lamps are wired** on **Sensors** once they are
-  connected, then save.
+  controller starts with both hardware facts false on purpose. A floating ADC
+  pin reads plausible noise, so an unwired LDR must not report “dark”, and
+  unwired lamps must not be driven. Tick the matching box on **Sensors** —
+  **The streetlight lamps are wired** for the four outputs, **The LDR is
+  wired** for the sensor — then save. They are independent: you can test the
+  lamps before the LDR is fitted.
 
 ## Wireless update says “No response from device”
 

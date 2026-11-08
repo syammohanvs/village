@@ -499,10 +499,24 @@ export function Sensors() {
                     }
                   />
                   <span>
-                    <strong>The LDR and streetlight lamps are wired.</strong> Until this is
-                    ticked the controller reports no light level and keeps the lamp outputs off —
-                    an unwired ADC pin reads noise that would otherwise look like a real
-                    “dark”/“bright” observation.
+                    <strong>The streetlight lamps are wired.</strong> Until this is ticked the
+                    four lamp outputs stay off. This does not affect the light sensor.
+                  </span>
+                </label>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.light.sensor_fitted)}
+                    onChange={(event) =>
+                      update((next) => {
+                        next.light.sensor_fitted = event.target.checked;
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>The LDR is wired.</strong> Until this is ticked the controller
+                    reports no light level — an unwired ADC pin reads noise that would otherwise
+                    look like a real “dark”/“bright” observation.
                   </span>
                 </label>
                 <div className="field-grid">

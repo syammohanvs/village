@@ -180,12 +180,13 @@ with a known logic-level MOSFET or a relay module and document the change.
 ### LDR module
 
 - VCC 3.3 V, GND common, AO to **GPIO 32**.
-- **The controller starts with the LDR and streetlights marked as not
-  installed.** A board with nothing on GPIO 32 reads plausible-looking noise,
-  so it reports no light level and keeps the lamps off rather than inventing a
-  "dark" observation. Once the module and the four LEDs are wired, tick
-  **The LDR and streetlight lamps are wired** on **Sensors** (or set
-  `light.installed` to `true` in the configuration) and save.
+- **The controller starts with the LDR and the lamps marked as not wired.**
+  These are two separate facts and two separate tick boxes on **Sensors**:
+  **The streetlight lamps are wired** (`light.installed`) and **The LDR is
+  wired** (`light.sensor_fitted`). A board with nothing on GPIO 32 reads
+  plausible-looking noise, so an unticked LDR reports no light level rather
+  than inventing a "dark" observation; an unticked lamps box keeps the four
+  outputs off.
 - If the module has only a digital output, connect DO to GPIO 32 and set
   `light.output_type` to `digital` in the configuration.
 - Typical modules output HIGH in darkness on DO; the configuration has

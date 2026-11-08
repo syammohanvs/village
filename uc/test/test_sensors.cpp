@@ -171,6 +171,7 @@ TEST(reservoir_threshold_change_invalidates_the_old_state) {
 TEST(lights_auto_has_hysteresis_and_delay) {
   DeviceConfig c;
   c.light.installed = true;
+  c.light.sensor_fitted = true;
   c.light.dark_threshold = 1600;
   c.light.bright_threshold = 2400;
   c.light.stable_ms = 4000;
@@ -202,6 +203,7 @@ TEST(lights_auto_has_hysteresis_and_delay) {
 TEST(lights_stale_sensor_fails_safe_in_auto) {
   DeviceConfig c;
   c.light.installed = true;
+  c.light.sensor_fitted = true;
   c.light.stable_ms = 0;
   c.light.max_age_ms = 5000;
   LightsModel m;
@@ -218,6 +220,7 @@ TEST(lights_stale_sensor_fails_safe_in_auto) {
 TEST(lights_digital_mode_and_not_installed) {
   DeviceConfig c;
   c.light.installed = true;
+  c.light.sensor_fitted = true;
   c.light.digital = true;
   c.light.digital_dark_when_high = true;
   c.light.stable_ms = 0;
@@ -226,6 +229,7 @@ TEST(lights_digital_mode_and_not_installed) {
   CHECK(m.read(c, 0).brightness == Brightness::Dark);
 
   c.light.installed = false;
+  c.light.sensor_fitted = false;
   LightReading missing = m.read(c, 0);
   CHECK(!missing.installed);
   CHECK(!missing.valid);
@@ -239,6 +243,7 @@ TEST(lights_digital_mode_and_not_installed) {
 TEST(light_defaults_to_not_installed_and_points_at_the_wiring_docs) {
   DeviceConfig c;
   CHECK(!c.light.installed);
+  CHECK(!c.light.sensor_fitted);
   LightsModel m;
   m.observeAnalog(3000, 1000, c.light);
   LightReading r = m.read(c, 1000);
@@ -249,6 +254,24 @@ TEST(light_defaults_to_not_installed_and_points_at_the_wiring_docs) {
   LightOutput out = m.output(c, 1000);
   CHECK(!out.on);
   CHECK(out.reason == &reasons::kLightsNotInstalled);
+}
+
+TEST(lamps_and_ldr_are_independent_hardware_facts) {
+  DeviceConfig c;
+  c.light.installed = true;       // the streetlight lamps are wired
+  c.light.sensor_fitted = false;  // but there is no LDR
+  LightsModel m;
+  m.observeAnalog(3000, 1000, c.light);
+  LightReading r = m.read(c, 1000);
+  CHECK(!r.installed);
+  CHECK(!r.valid);
+  CHECK(r.brightness == Brightness::Unknown);
+  CHECK(r.raw == 0);
+  // Manual control still works: the lamps do not depend on the sensor.
+  m.setMode(LightMode::ManualOn);
+  LightOutput on = m.output(c, 1000);
+  CHECK(on.on);
+  CHECK(on.reason == &reasons::kLightsManualOn);
 }
 
 TEST(lights_manual_modes_work_without_a_sensor) {

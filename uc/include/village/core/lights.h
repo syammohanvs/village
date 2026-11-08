@@ -91,9 +91,9 @@ class LightsModel {
 
   LightReading read(const DeviceConfig& cfg, uint32_t now) const {
     LightReading r;
-    r.installed = cfg.light.installed;
+    r.installed = cfg.light.sensor_fitted;
     r.digital = cfg.light.digital;
-    if (!cfg.light.installed) {
+    if (!cfg.light.sensor_fitted) {
       // No LDR is wired: a floating ADC pin still reads noise, so reporting a
       // brightness here would be an invented observation. Report nothing.
       r.valid = false;

@@ -159,6 +159,7 @@ export interface ReservoirConfig {
 
 export interface LightConfig {
   installed: boolean;
+  sensor_fitted?: boolean;
   output_type: 'analog' | 'digital' | string;
   analog_bright_high: boolean;
   digital_dark_when_high: boolean;
