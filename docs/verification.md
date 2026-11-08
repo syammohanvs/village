@@ -56,24 +56,64 @@ firmware 0.1.0, protocol 1
 The first boot reports `nvs_open failed: NOT_FOUND` because no settings have
 been saved yet; this is expected and the firmware uses its defaults. The pump
 gate is **DISABLED** in this build. The board is running and broadcasting
-`Village-Setup` because `secrets.h` still contains the placeholder Wi-Fi
-values. The laptop has not yet joined that AP, so the dashboard remains in
-simulator mode until it does.
+`Village-Setup` because `secrets.h` still contained the placeholder Wi-Fi
+values at that point.
+
+### Station mode on the home Wi-Fi — same day
+
+The user did not want to lose internet, so the board was reconfigured to join
+the laptop's own network instead of starting its access point.
+`ASIANET Giga Fiber` and its saved key were written into the git-ignored
+`uc/include/village/secrets.h` and the image was rebuilt and reflashed. Boot log:
+
+```text
+[net] connecting to 'ASIANET Giga Fiber'...
+[net] connected: IP 192.168.1.8, RSSI -79 dBm
+[net] mDNS: http://village.local/
+[boot] village-470968, boot b-232ec7db, pump gate DISABLED
+```
+
+The laptop reaches the board directly (no AP switch, no client-isolation
+problem):
+
+```text
+$ curl http://192.168.1.8/api/v1/health
+{"protocol_version":1,"device_id":"village-470968","boot_id":"b-232ec7db",
+ "firmware":"0.1.0", ... "wifi":{"mode":"sta","ssid":"ASIANET Giga Fiber",
+ "ip":"192.168.1.8","rssi":-78,"connected":true}, "pump_commissioned":false}
+```
+
+With `.env` set to `VILLAGE_DEVICE_MODE=real` and
+`VILLAGE_DEVICE_URL=http://192.168.1.8`, `/api/v1/state?mode=live` reports
+`physical: true`, `source.kind: "esp32"`, `connected: true`, and the values the
+hardware can actually support:
+
+```text
+soil        state "uncalibrated"  percent null
+reservoir   state "uncalibrated"  no percentage
+light       installed false       no reading
+bins        all "unavailable"     no distance
+pump        commissioned false, enabled false, commanded false
+```
+
+That is the honest state of an unwired board: the link works, nothing pretends a
+sensor is fitted.
 
 Host safety-core tests:
 
 ```text
 $ ./scripts/test_firmware.sh
-Running 32 firmware core tests
+Running 33 firmware core tests
 ...
-405 checks, 0 failed
+416 checks, 0 failed
 ALL FIRMWARE CORE TESTS PASSED
 ```
 
 They cover wet-soil blocking, low-water blocking and stopping, invalid sensor
 stops, maximum runtime, pulse limits and lockout, boot pump-off, duplicate
-commands, stop interruption, LDR hysteresis, bin echo loss, calibration
-polarity, command history persistence and the GPIO rules.
+commands, stop interruption, LDR hysteresis (and that an uninstalled LDR
+reports nothing), bin echo loss, calibration polarity, command history
+persistence and the GPIO rules.
 
 ## Backend
 
@@ -188,14 +228,11 @@ is the honest result; the app reports “Recognition model not installed”.
 ## Not verified
 
 - Physical sensors, LEDs, pump, probes and LDR behaviour. The ESP32 itself is
-  flashed, boots, runs the HTTP API and starts its fallback AP, but no sensor or
-  actuator is wired/tested yet.
-- The dashboard-to-ESP32 link over `Village-Setup` (the laptop has not joined
-  that AP yet).
+  flashed, boots, joins the home Wi-Fi and serves the HTTP API over the LAN, but
+  no sensor or actuator is wired/tested yet.
 - A physical Stop while water is flowing.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera
   classification in this build.
-- A physical Stop while water is flowing.
 
 The bench checklist in `docs/bench-test.md` is the required next physical step.

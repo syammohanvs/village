@@ -160,14 +160,23 @@ Or use the Espressif Flash Download Tool: ESP32, DIO, 40 MHz, 4 MB, the merged
 file at `0x0`. The individual files are exported too, for the multi-file
 alternative in `FLASH-WINDOWS.txt`.
 
-**The exported current build still has the placeholder Wi-Fi values.** If you
-flash it as-is, station mode fails after 15 s and the board starts its fallback
-access point `Village-Setup` (password `village1234`, address
-`http://192.168.4.1`). That is a usable demonstration arrangement: connect the
+**The Wi-Fi values come from `uc/include/village/secrets.h`, which is
+git-ignored.** A fresh checkout has the placeholder SSID `VillageLab`, so if
+you flash it unchanged station mode fails after 15 s and the board starts its
+fallback access point `Village-Setup` (password `village1234`, address
+`http://192.168.4.1`). That fallback is usable for a demonstration — connect the
 laptop to that AP, set `VILLAGE_DEVICE_MODE=real` and
-`VILLAGE_DEVICE_URL=http://192.168.4.1`, then restart the backend. For home
-Wi-Fi, edit `uc/include/village/secrets.h`, re-run the export script, and flash
-the refreshed image.
+`VILLAGE_DEVICE_URL=http://192.168.4.1`, then restart the backend — but the
+laptop then has no internet.
+
+For the home Wi-Fi (so the laptop keeps its internet), put the SSID and
+password in `secrets.h`, re-run the export script, flash the refreshed image,
+and use the IP printed in the boot log:
+
+```text
+[net] connected: IP 192.168.1.8, RSSI -79 dBm
+[net] mDNS: http://village.local/
+```
 
 ## 6. Run
 
