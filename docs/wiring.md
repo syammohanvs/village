@@ -182,13 +182,23 @@ with a known logic-level MOSFET or a relay module and document the change.
 The input is **GPIO 32** (header `D32`, ADC1 channel 4). It is 3.3 V only:
 never feed it 5 V.
 
-**A. Three- or four-pin LDR module** (small board with a comparator):
+**A. LM393 "digital LDR module"** (the common 3-pin board: VCC / GND / DO):
 
-- `VCC` → **3V3**, `GND` → **GND**, `AO` → **GPIO 32**.
-- No extra resistor: the module already has the divider on board.
-- If the module has only `DO`, connect `DO` → GPIO 32 and set
-  `light.output_type` to `digital`. Typical modules drive DO HIGH in darkness;
-  the `digital_dark_when_high` setting handles that.
+- `VCC` → **3V3**, `GND` → **GND**, `DO` → **GPIO 32**.
+- **Power it from 3.3 V, not 5 V.** The comparator's output swings to whatever
+  VCC is, so a 5 V supply puts 5 V on DO and that would exceed the ESP32's
+  3.6 V pin limit. At 3.3 V the output is already safe and **no resistor is
+  needed**.
+- If it must run from 5 V, divide DO before the pin: `DO → 10 kΩ → GPIO 32`
+  with `20 kΩ` from GPIO 32 to GND (about 3.33 V at the pin). A 1 kΩ / 2 kΩ
+  pair works the same way.
+- Set `light.output_type` to `digital`. This module is threshold-only: it
+  reports *light* or *dark*, not a continuous brightness.
+- **Polarity varies between batches.** Some drive DO HIGH in light, some HIGH
+  in darkness. Cover the sensor and watch the reading, then set
+  `digital_dark_when_high` to match (`true` means a HIGH pin is reported as
+  dark). The on-board potentiometer sets the trigger level.
+- It draws about 15 mA, which the board's 3.3 V regulator supplies easily.
 
 **B. Bare two-leg LDR** (no board):
 
