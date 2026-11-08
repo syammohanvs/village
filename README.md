@@ -19,7 +19,7 @@ and uses no paid API.
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
 | Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
-| Cloudflare Pages | **repo `village`, branch `main`, build root `web/frontend`** |
+| Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
 | Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
 | Waste model (Teachable Machine) | **you must supply the three exported files** |
@@ -99,7 +99,7 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
   Cloudflare deployment, troubleshooting, waste model, bench test.
 - `scripts/` — setup, download, launch, stop, dev, tests.
 
-**Cloudflare Pages builds only `web/frontend`.** The firmware (`uc/`) and the
+**Cloudflare builds only `web/frontend`.** The firmware (`uc/`) and the
 Python backend (`web/backend/`) sit outside that root, so a firmware commit
 cannot affect the site build. A push to `main` triggers the build; see
 [docs/deployment-cloudflare.md](docs/deployment-cloudflare.md).

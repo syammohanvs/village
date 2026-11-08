@@ -1,3 +1,0 @@
-# SPA fallback: every client-side route is served index.html.
-# Pages Functions still handle /api/* and /models/* before this rule.
-/*    /index.html   200
