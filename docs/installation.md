@@ -131,6 +131,44 @@ If port 8000 is already used by another project, keep `VILLAGE_PORT=8010`.
 and enable the pump in **Controls → Pump commissioning**. That two-key gate is
 deliberate.
 
+### Windows-ready merged image
+
+For flashing from Windows without PlatformIO, build and export a single image:
+
+```bash
+./scripts/export_firmware.sh
+```
+
+It writes to:
+
+```
+C:\Users\<your-windows-user>\Downloads\aivillage-firmware\
+    village-firmware-merged.bin   <-- flash at 0x0
+    FLASH-WINDOWS.txt
+    flash-merged.bat
+    bootloader.bin / partitions.bin / boot_app0.bin / firmware.bin
+```
+
+The merged image is the correct one for a fresh board. Use esptool:
+
+```bat
+py -m pip install esptool
+py -m esptool --chip esp32 --port COM5 --baud 921600 write_flash -z 0x0 village-firmware-merged.bin
+```
+
+Or use the Espressif Flash Download Tool: ESP32, DIO, 40 MHz, 4 MB, the merged
+file at `0x0`. The individual files are exported too, for the multi-file
+alternative in `FLASH-WINDOWS.txt`.
+
+**The exported current build still has the placeholder Wi-Fi values.** If you
+flash it as-is, station mode fails after 15 s and the board starts its fallback
+access point `Village-Setup` (password `village1234`, address
+`http://192.168.4.1`). That is a usable demonstration arrangement: connect the
+laptop to that AP, set `VILLAGE_DEVICE_MODE=real` and
+`VILLAGE_DEVICE_URL=http://192.168.4.1`, then restart the backend. For home
+Wi-Fi, edit `uc/include/village/secrets.h`, re-run the export script, and flash
+the refreshed image.
+
 ## 6. Run
 
 ```bash
