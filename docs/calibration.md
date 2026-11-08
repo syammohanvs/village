@@ -20,7 +20,10 @@ polarity switch.
 2. Read the raw value on **Sensors**.
 3. Put the probe in **wet soil** and let it settle.
 4. Read the raw value again.
-5. Enter both values and Save.
+5. Enter both values and Save. **Tick “I captured these readings from the real
+   soil”** before saving. The flag is deliberately separate from the endpoints:
+   valid-looking default endpoints must never claim calibration. Changing
+   either endpoint clears the tick, so it has to be confirmed again.
 6. The endpoints must differ by at least `min_span_raw` (default 400 counts),
    be within 0–4095 and not be identical. The controller rejects a bad pair.
 7. Water a little and confirm the percentage rises; let it dry and confirm it

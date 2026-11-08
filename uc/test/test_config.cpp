@@ -14,6 +14,8 @@ TEST(config_defaults_are_valid_and_conservative) {
   CHECK(c.irrigation.pump_enabled == false);
   CHECK(c.irrigation.auto_enabled == true);
   CHECK(c.reservoir.calibrated == false);
+  CHECK(!soilCalibrated(c.soil));
+  c.soil.calibrated = true;
   CHECK(soilCalibrated(c.soil));
 }
 
@@ -39,6 +41,7 @@ TEST(config_accepts_either_soil_polarity) {
   ConfigError err;
   c.soil.dry_raw = 1100;
   c.soil.wet_raw = 2800;
+  c.soil.calibrated = true;
   CHECK(validateConfig(c, err));
 
   float pct = -1;
@@ -61,12 +64,14 @@ TEST(config_accepts_either_soil_polarity) {
 
 TEST(config_clamps_soil_percentage_and_rejects_bad_span) {
   DeviceConfig c = defaults();
+  c.soil.calibrated = true;
   float pct = -1;
   CHECK(soilPercent(c.soil, 0, pct));
   CHECK_NEAR(pct, 100.0, 0.001);
   CHECK(soilPercent(c.soil, 4095, pct));
   CHECK_NEAR(pct, 0.0, 0.001);
 
+  c.soil.calibrated = true;
   c.soil.min_span_raw = 4000;
   CHECK(!soilCalibrated(c.soil));
   CHECK(!soilPercent(c.soil, 2000, pct));

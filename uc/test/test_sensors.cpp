@@ -17,6 +17,7 @@ DeviceConfig tunedSoil() {
   c.soil.min_span_raw = 400;
   c.soil.samples = 3;
   c.soil.max_age_ms = 5000;
+  c.soil.calibrated = true;
   c.irrigation.dry_start_pct = 35;
   c.irrigation.stop_pct = 55;
   return c;

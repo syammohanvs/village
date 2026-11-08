@@ -265,6 +265,7 @@ void writeConfig(JsonObject out, const DeviceConfig& c) {
   soil["min_span_raw"] = c.soil.min_span_raw;
   soil["samples"] = c.soil.samples;
   soil["max_age_ms"] = c.soil.max_age_ms;
+  soil["calibrated"] = c.soil.calibrated;
 
   JsonObject res = out["reservoir"].to<JsonObject>();
   res["wet_threshold_mv"] = c.reservoir.wet_threshold_mv;
@@ -344,6 +345,7 @@ bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
   out.soil.min_span_raw = soil["min_span_raw"] | out.soil.min_span_raw;
   out.soil.samples = soil["samples"] | out.soil.samples;
   out.soil.max_age_ms = soil["max_age_ms"] | out.soil.max_age_ms;
+  out.soil.calibrated = soil["calibrated"] | out.soil.calibrated;
 
   JsonObjectConst res = c["reservoir"].as<JsonObjectConst>();
   out.reservoir.wet_threshold_mv =

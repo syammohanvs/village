@@ -145,6 +145,7 @@ export interface SoilConfig {
   min_span_raw: number;
   samples?: number;
   max_age_ms?: number;
+  calibrated?: boolean;
 }
 
 export interface ReservoirConfig {

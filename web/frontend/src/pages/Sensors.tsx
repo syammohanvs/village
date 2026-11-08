@@ -313,9 +313,9 @@ export function Sensors() {
               <fieldset className="config-section">
                 <legend>Soil moisture — two raw endpoints</legend>
                 <p className="hint">
-                  Put the probe in dry air, note the raw value, then in water and note the raw value.
-                  Either polarity works: the firmware maps one endpoint to 0% and the other to 100%
-                  automatically.
+                  Put the probe in dry soil, note the raw value, then in wet soil and note the raw
+                  value. Either polarity works: the firmware maps one endpoint to 0% and the other
+                  to 100% automatically.
                 </p>
                 <div className="field-grid">
                   <label className="field">
@@ -331,6 +331,7 @@ export function Sensors() {
                       onChange={(event) =>
                         update((next) => {
                           next.soil.dry_raw = asNumber(event.target.value);
+                          next.soil.calibrated = false;
                         })
                       }
                     />
@@ -348,6 +349,7 @@ export function Sensors() {
                       onChange={(event) =>
                         update((next) => {
                           next.soil.wet_raw = asNumber(event.target.value);
+                          next.soil.calibrated = false;
                         })
                       }
                     />
@@ -357,6 +359,22 @@ export function Sensors() {
                   The controller requires the endpoints to differ by at least {draft.soil.min_span_raw || 400}{' '}
                   raw counts.
                 </p>
+                <label className="check-row" style={{ marginTop: 10 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(draft.soil.calibrated)}
+                    onChange={(event) =>
+                      update((next) => {
+                        next.soil.calibrated = event.target.checked;
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>I captured these readings from the real soil.</strong> Until this is
+                    ticked, the controller reports <em>uncalibrated</em> and blocks irrigation.
+                    Changing either endpoint clears the tick so it must be confirmed again.
+                  </span>
+                </label>
               </fieldset>
 
               <fieldset className="config-section">

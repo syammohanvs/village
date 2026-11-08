@@ -11,6 +11,9 @@ struct SoilConfig {
   uint16_t min_span_raw = 400;
   uint8_t samples = 9;
   uint16_t max_age_ms = 5000;
+  // Deliberately false until the real probe endpoints have been captured and
+  // confirmed.  Valid-looking default endpoints must not claim calibration.
+  bool calibrated = false;
 };
 
 struct ReservoirConfig {
@@ -80,12 +83,16 @@ struct ConfigError {
   const char* message = "";
 };
 
-inline bool soilCalibrated(const SoilConfig& c) {
+inline bool soilEndpointsValid(const SoilConfig& c) {
   if (c.dry_raw > 4095 || c.wet_raw > 4095) return false;
   if (c.min_span_raw < 100) return false;
   const int diff = static_cast<int>(c.dry_raw) - static_cast<int>(c.wet_raw);
   const int span = diff < 0 ? -diff : diff;
   return span >= static_cast<int>(c.min_span_raw);
+}
+
+inline bool soilCalibrated(const SoilConfig& c) {
+  return c.calibrated && soilEndpointsValid(c);
 }
 
 // Maps a raw ADC reading to 0..100 % with either sensor polarity.  Returns
@@ -121,7 +128,7 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
   if (!inRange(c.soil.min_span_raw, 100, 4000)) {
     return fail("soil.min_span_raw", "Minimum span must be 100..4000 raw counts.");
   }
-  if (!soilCalibrated(c.soil)) {
+  if (!soilEndpointsValid(c.soil)) {
     return fail("soil.dry_raw/wet_raw",
                 "Dry and wet endpoints are too close or identical. They must differ by at least the minimum span.");
   }

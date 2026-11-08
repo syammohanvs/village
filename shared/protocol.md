@@ -295,7 +295,7 @@ Example refusals:
   "config": {
     "soil": {
       "dry_raw": 2800, "wet_raw": 1100, "min_span_raw": 400,
-      "samples": 9, "max_age_ms": 5000
+      "samples": 9, "max_age_ms": 5000, "calibrated": false
     },
     "reservoir": {
       "wet_threshold_mv": 1200, "dry_threshold_mv": 2400,

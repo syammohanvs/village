@@ -93,6 +93,7 @@ def default_config() -> dict[str, Any]:
             "min_span_raw": 400,
             "samples": 9,
             "max_age_ms": 5000,
+            "calibrated": True,
         },
         "reservoir": {
             "wet_threshold_mv": 1200,

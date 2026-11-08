@@ -336,6 +336,7 @@ def create_app(
             config = current["config"]
             config["soil"]["dry_raw"] = body.dry_raw
             config["soil"]["wet_raw"] = body.wet_raw
+            config["soil"]["calibrated"] = True
             saved = await gateway.put_config(body.mode, current["config_revision"], config)
         except DeviceError as exc:
             return error_response(exc)
