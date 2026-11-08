@@ -22,6 +22,8 @@ constexpr float kCmPerMicrosecond = 1.0f / 58.0f;
 
 uint32_t g_next_soil = 0;
 uint32_t g_next_light = 0;
+bool g_light_digital = false;
+bool g_light_mode_known = false;
 uint32_t g_next_bin = 0;
 uint8_t g_bin_index = 0;
 
@@ -30,6 +32,17 @@ uint32_t g_res_phase_ms = 0;
 uint32_t g_res_next_ms = 0;
 uint32_t g_res_sum = 0;
 uint8_t g_res_count = 0;
+
+// analogRead() leaves the pad configured for the ADC, after which digitalRead()
+// returns 0 for ever.  Every switch between analog and digital light sensing
+// must therefore restore the pin mode, not just change the config flag.
+void ensureLightPinMode() {
+  const bool digital = rt.config.light.digital;
+  if (g_light_mode_known && g_light_digital == digital) return;
+  pinMode(pins::LDR_ADC, digital ? INPUT : ANALOG);
+  g_light_digital = digital;
+  g_light_mode_known = true;
+}
 
 void releaseReservoirExcitation() {
   digitalWrite(pins::RESERVOIR_EXCITE, LOW);
@@ -62,6 +75,7 @@ void setupSensors() {
   analogSetPinAttenuation(pins::SOIL_MOISTURE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::RESERVOIR_SENSE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::LDR_ADC, ADC_11db);
+  ensureLightPinMode();
 
   const uint32_t now = millis();
   g_next_soil = now;
@@ -84,6 +98,7 @@ void sampleSensors(uint32_t now) {
   // --- light --------------------------------------------------------------
   if (static_cast<int32_t>(now - g_next_light) >= 0) {
     g_next_light = now + kLightPeriodMs;
+    ensureLightPinMode();
     if (rt.config.light.digital) {
       rt.lights.observeDigital(digitalRead(pins::LDR_ADC) == HIGH, now,
                                rt.config.light);

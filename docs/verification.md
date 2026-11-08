@@ -130,6 +130,32 @@ force: `b-213ac95f` → `b-6a29256e`.
 
 USB flashing still works and remains the recovery path.
 
+### LDR streetlight sensor verified — same day
+
+An LM393 "digital LDR module" was wired as VCC → 3V3, GND → GND, DO → **GPIO 32**.
+Measured at DO: **0 V in light**, **3.3 V covered**, so the module is LOW for
+light and HIGH for dark — the firmware's `digital_dark_when_high = true`.
+
+A real firmware defect surfaced during the test: `analogRead()` on the pin
+leaves the pad configured for the ADC, after which `digitalRead()` returns 0
+forever. The controller had run in analog mode at boot, so switching to digital
+without a reboot never worked and no cover was ever seen. `sensors.cpp` now
+restores the pad mode (`pinMode(LDR_ADC, digital ? INPUT : ANALOG)`) at setup
+and whenever the configured mode changes.
+
+With that fixed, a recorded hold test gave:
+
+```text
+68.0 s  raw=4095            hand covers the LDR
+71.3 s  brightness=dark     lamps ON   (~3.3 s stabilising delay)
+93.0 s  raw=0               hand removed
+95.5 s  brightness=bright   lamps OFF  (~2.5 s)
+```
+
+A 25-second cover held steady, so the lamps do not feed enough light back into
+the LDR to cycle it in this arrangement. Digital mode is threshold-only by
+design: the dashboard reports bright/dark, not a light level.
+
 Host safety-core tests:
 
 ```text
@@ -258,11 +284,11 @@ is the honest result; the app reports “Recognition model not installed”.
 
 ## Not verified
 
-- Physical sensors, LEDs, pump, probes and LDR behaviour. The ESP32 itself is
-  flashed, boots, joins the home Wi-Fi and serves the HTTP API over the LAN, but
-  no sensor or actuator is wired/tested yet. The streetlight wiring (GPIO
-  13/12/14/27, one lamp each at 100 Ω) has not been fully checked: only D13
-  with one white LED (Vf 2.93 V) has been lit and measured.
+- Physical soil, reservoir, pump and ultrasonic-bin behaviour. The ESP32 is
+  flashed, joins the home Wi-Fi and serves the API over the LAN. One
+  streetlight LED was measured at 100 Ω (Vf 2.93 V) and the LDR module was
+  tested end to end, but the other three lamps were only exercised as GPIO
+  outputs, not measured individually.
 - A physical Stop while water is flowing.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera

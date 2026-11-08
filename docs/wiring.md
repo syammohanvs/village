@@ -199,6 +199,14 @@ never feed it 5 V.
   `digital_dark_when_high` to match (`true` means a HIGH pin is reported as
   dark). The on-board potentiometer sets the trigger level.
 - It draws about 15 mA, which the board's 3.3 V regulator supplies easily.
+- **Measured on this build:** DO is **0 V in light** and **3.3 V covered**, so
+  `digital_dark_when_high = true`. The on-board potentiometer must be set so
+  the output switches at the light level you care about.
+- The module also exposes **AO** (a real analog level, roughly 1.23 V lit and
+  2.4 V covered here). If you ever want a brightness reading instead of just
+  light/dark, connect AO to GPIO 32 instead, set `light.output_type` to
+  `analog` and `light.analog_bright_high` to **false** (the voltage rises in
+  the dark).
 
 **B. Bare two-leg LDR** (no board):
 
