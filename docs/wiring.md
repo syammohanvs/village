@@ -137,17 +137,33 @@ with a known logic-level MOSFET or a relay module and document the change.
 
 ## 5. Sensors
 
-### Soil moisture probe
+### Soil moisture probe — GPIO 34
 
-- Interface board VCC to **3.3 V** (preferred) and GND to common ground.
-- AO to **GPIO 34**. If the board is powered from 5 V, measure AO first: it may
-  exceed 3.3 V, in which case use a divider (e.g. 10 kΩ / 20 kΩ) or power the
-  board from 3.3 V.
-- The probe is resistive and will corrode if continuously powered. Power it
-  from 3.3 V only while the exhibit is running, and keep the probe out of
-  standing water when not in use.
+An LM393 interface board (VCC / GND / **DO** / **AO**) plus a two-prong probe.
+
+```
+Module VCC  →  3V3
+Module GND  →  GND
+Module AO   →  D34 (GPIO 34, ADC1_CH6)
+Module DO   →  not connected
+```
+
+- **Use AO, not DO.** AO is the analog soil reading, which is what a moisture
+  percentage needs. DO is only the comparator's wet/dry threshold set by the
+  blue potentiometer and would discard the analog information.
+- **Power the module from 3.3 V.** GPIO 34 is input-only and must never see
+  more than 3.3 V; at 5 V VCC the AO pin can rise above that. If you must use
+  5 V, measure AO first and add a divider (10 kΩ / 20 kΩ) before GPIO 34.
+- The probe is resistive and corrodes under continuous DC. The supplied probe
+  is nickel-plated to slow this, but keep it out of standing water and unplug
+  it when the exhibit is not running. Continuous sampling is fine for a
+  two-day event.
+- Insert the prongs to a **consistent depth** and mark that depth: the reading
+  depends on how much metal is in the soil.
 - Calibration is two raw readings: dry soil and wet soil. The firmware accepts
-  either polarity.
+  either polarity, so do not worry which way the voltage moves — just record
+  which reading came from dry soil and which from wet soil.
+- Only the prongs go in the soil. Never bury the interface board.
 
 ### Reservoir probes (two wires, one level)
 
