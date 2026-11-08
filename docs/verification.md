@@ -1,6 +1,6 @@
 # Verification record
 
-Recorded on 2026-11-07 on the exhibition laptop. This is a log of what was
+Recorded on 2026-11-07 and updated 2026-11-08 on the exhibition laptop. This is a log of what was
 actually run, not a claim about hardware that was not connected.
 
 ## Firmware
@@ -13,13 +13,52 @@ esp32doit-devkit-v1  SUCCESS   00:00:09.825
 
 $ pio run -e esp32doit-devkit-v1 -t size
    text    data     bss     dec     hex filename
- 734649  157128   22729  914506   df44a .pio/build/esp32doit-devkit-v1/firmware.elf
+ 734713  157128   22729  914570   df48a .pio/build/esp32doit-devkit-v1/firmware.elf
 ```
 
 `firmware.bin`: 856 KB. The board profile is `esp32doit-devkit-v1` (30-pin
-ESP32-WROOM-32). Flashing was **not** performed: no board was connected to this
-session, and the instructions say not to flash hardware without explicit
-instruction.
+ESP32-WROOM-32).
+
+### Physical flash performed — 2026-11-08
+
+The user connected the board and asked for it to be programmed. The port was
+confirmed, not assumed:
+
+```text
+COM3  Silicon Labs CP210x USB to UART Bridge
+Chip type:  ESP32-D0WD-V3 (revision v3.1)
+Features:   Wi-Fi, BT, Dual Core + LP Core, 240MHz
+Flash size: 4MB
+MAC:        68:09:47:df:ed:40
+```
+
+Install method: portable Python 3.14.4 + esptool 5.6.0, writing the merged
+image at offset `0x0` at 460800 baud. The write reported:
+
+```text
+Wrote 941632 bytes (574391 compressed) at 0x00000000 in 14.6 seconds
+Hash of data verified.
+Verification successful (digest matched).
+```
+
+Boot log from the flashed board:
+
+```text
+=== Our AI-Powered Smart Green Village ===
+firmware 0.1.0, protocol 1
+[net] connecting to 'VillageLab'...
+[api] listening on :80
+[boot] village-470968, boot b-8eead1d6, pump gate DISABLED
+[boot] pump output is LOW; config revision 1
+[net] station mode failed; AP fallback started, SSID 'Village-Setup', IP 192.168.4.1
+```
+
+The first boot reports `nvs_open failed: NOT_FOUND` because no settings have
+been saved yet; this is expected and the firmware uses its defaults. The pump
+gate is **DISABLED** in this build. The board is running and broadcasting
+`Village-Setup` because `secrets.h` still contains the placeholder Wi-Fi
+values. The laptop has not yet joined that AP, so the dashboard remains in
+simulator mode until it does.
 
 Host safety-core tests:
 
@@ -27,7 +66,7 @@ Host safety-core tests:
 $ ./scripts/test_firmware.sh
 Running 32 firmware core tests
 ...
-404 checks, 0 failed
+405 checks, 0 failed
 ALL FIRMWARE CORE TESTS PASSED
 ```
 
@@ -148,8 +187,12 @@ is the honest result; the app reports “Recognition model not installed”.
 
 ## Not verified
 
-- Any physical ESP32, pump, LED, probe, LDR or HC-SR04 behaviour.
-- Flashing the firmware image.
+- Physical sensors, LEDs, pump, probes and LDR behaviour. The ESP32 itself is
+  flashed, boots, runs the HTTP API and starts its fallback AP, but no sensor or
+  actuator is wired/tested yet.
+- The dashboard-to-ESP32 link over `Village-Setup` (the laptop has not joined
+  that AP yet).
+- A physical Stop while water is flowing.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera
   classification in this build.
