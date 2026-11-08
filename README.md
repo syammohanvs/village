@@ -12,6 +12,7 @@ and uses no paid API.
 | Git, structure, protocol, 30-pin GPIO map | **done** |
 | Firmware safety core + host tests | **416 checks, 0 failed** |
 | ESP32 board | **flashed 2026-11-08; on home Wi-Fi at 192.168.1.8** |
+| Wireless firmware updates (OTA) | **verified 2026-11-08 from the Windows host** |
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |

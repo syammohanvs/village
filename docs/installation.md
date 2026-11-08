@@ -178,6 +178,52 @@ and use the IP printed in the boot log:
 [net] mDNS: http://village.local/
 ```
 
+### Updating firmware without the USB cable (OTA)
+
+The build starts a password-protected ArduinoOTA listener on **port 3232** as
+soon as it joins the Wi-Fi. The password is `VILLAGE_OTA_PASSWORD` in
+`uc/include/village/secrets.h`. Turn the feature off entirely with
+`#define VILLAGE_ENABLE_OTA 0` in `uc/include/village/build_config.h`.
+
+**Run the uploader on Windows, not inside WSL.** The board opens a UDP
+connection back to the sender, and WSL sits behind a NAT the LAN cannot reach;
+an upload started in WSL authenticates and then stalls with
+`No response from device`.
+
+Copy the exported folder (`scripts/export_firmware.sh` does this) and then, in
+`C:\Users\<you>\Downloads\aivillage-firmware\`:
+
+1. Put the OTA password in `ota_auth.tmp` — just the password, nothing else.
+   The helper deletes the file as it reads it, so the password never appears on
+   the command line.
+2. Run:
+   ```bat
+   python\python.exe tools\ota_flash.py 192.168.1.8
+   ```
+
+Expected output:
+
+```text
+Sending invitation to 192.168.1.8
+Authenticating...OK
+Uploading ... 100%
+```
+
+The board prints `[ota] update starting; pump and lamps forced off`, shows
+progress every 10%, then reboots. Because the flash layout has two app slots
+(`app0`/`app1`), a failed update does not brick the board: it boots the image
+that was already working.
+
+If you prefer PlatformIO on a Linux host that shares the board's LAN (not WSL):
+
+```bash
+export VILLAGE_OTA_PASSWORD="$(sed -n 's/.*VILLAGE_OTA_PASSWORD "\(.*\)"/\1/p' uc/include/village/secrets.h)"
+cd uc
+pio run -e esp32doit-devkit-v1-ota -t upload --upload-port 192.168.1.8
+```
+
+USB flashing always remains the recovery path.
+
 ## 6. Run
 
 ```bash

@@ -19,3 +19,7 @@
 // #define VILLAGE_STATIC_IP "192.168.1.50"
 // #define VILLAGE_GATEWAY "192.168.1.1"
 // #define VILLAGE_SUBNET "255.255.255.0"
+
+// Password for over-the-air firmware updates (ArduinoOTA).  Required when
+// VILLAGE_ENABLE_OTA is 1 (the default).  Use a long random value.
+#define VILLAGE_OTA_PASSWORD "replace-with-another-long-random-token"

@@ -15,6 +15,21 @@
 
 During the exhibition, do not change Wi-Fi modes or power-cycle the router.
 
+### Powering the board without the laptop
+
+The USB cable is only power once the image is flashed. To free the laptop:
+
+- use a **phone charger or 5 V power bank** into the board's USB port, or
+- feed a regulated **5 V** into `VIN`/`5V` and `GND`.
+
+Never put 5 V on the `3V3` pin, and never feed external 5 V while the USB data
+cable is also plugged into the laptop. If the router gives the board a different
+address after a reboot, update `VILLAGE_DEVICE_URL` in `.env` and restart the
+backend; Windows can also resolve `village.local`.
+
+Firmware can be updated over Wi-Fi once the board is on the network — see
+`docs/installation.md` (“Updating firmware without the USB cable”).
+
 ## What the dashboard shows
 
 - **What the village is doing and why** — the controller's own reason, such as

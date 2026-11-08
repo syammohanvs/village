@@ -69,6 +69,7 @@ void loop() {
   const uint32_t now = millis();
 
   networkLoop(now);
+  otaLoop();
   handleApi();
   sampleSensors(now);
 

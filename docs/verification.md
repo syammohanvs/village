@@ -99,6 +99,37 @@ pump        commissioned false, enabled false, commanded false
 That is the honest state of an unwired board: the link works, nothing pretends a
 sensor is fitted.
 
+### Wireless firmware update (OTA) verified — same day
+
+The firmware gained a password-protected ArduinoOTA listener on port 3232. It
+only starts after station mode connects, and `[ota] ready on 192.168.1.8 port
+3232 (password required)` appears in the boot log.
+
+The first attempts stalled at `No response from device`:
+
+- from WSL, because espota advertises `0.0.0.0` as the host, and WSL is behind
+  a NAT the board cannot reach;
+- from Windows until espota was told the host address, because the same
+  `0.0.0.0` default left the board with nowhere to send the image.
+
+Passing the Windows LAN address fixed it (`-I 192.168.1.6`, detected
+automatically by `scripts/ota_flash_win.py`). The board's own log:
+
+```text
+[ota] update starting; pump and lamps forced off
+[ota] 0%
+[ota] 10%
+...
+[ota] 80%
+```
+
+and the health endpoint changed boot id from `b-d2b83a86` to a new one after
+the reboot, with the app reconnecting on its own. The OTA password was then
+rotated and the whole update repeated to prove the new secret is the one in
+force: `b-213ac95f` → `b-6a29256e`.
+
+USB flashing still works and remains the recovery path.
+
 Host safety-core tests:
 
 ```text
@@ -234,5 +265,8 @@ is the honest result; the app reports “Recognition model not installed”.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera
   classification in this build.
+- An OTA update interrupted midway (power loss during the transfer). The two
+  app slots should keep the previous image bootable, but that has not been
+  provoked on hardware.
 
 The bench checklist in `docs/bench-test.md` is the required next physical step.

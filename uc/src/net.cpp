@@ -5,6 +5,11 @@
 
 #include "village/build_config.h"
 #include "village/device_state.h"
+#include "village/outputs.h"
+
+#if VILLAGE_ENABLE_OTA
+#include <ArduinoOTA.h>
+#endif
 
 #if __has_include("village/secrets.h")
 #include "village/secrets.h"
@@ -26,6 +31,7 @@ uint32_t g_sta_started_ms = 0;
 bool g_sta_started = false;
 bool g_sta_was_connected = false;
 bool g_fallback_done = false;
+bool g_ota_started = false;
 
 void startMdns() {
 #if VILLAGE_ENABLE_MDNS
@@ -47,6 +53,52 @@ void startAccessPoint() {
 }
 
 }  // namespace
+
+void startOta() {
+#if VILLAGE_ENABLE_OTA
+  if (g_ota_started) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+#ifndef VILLAGE_OTA_PASSWORD
+#error "VILLAGE_OTA_PASSWORD must be defined in secrets.h when OTA is enabled."
+#endif
+  ArduinoOTA.setHostname("village");
+  ArduinoOTA.setPort(3232);
+  ArduinoOTA.setPassword(VILLAGE_OTA_PASSWORD);
+  // Our own responder already owns village.local; enabling OTA's would try to
+  // initialise mDNS a second time.  The IP is what an upload targets anyway.
+  ArduinoOTA.setMdnsEnabled(false);
+  ArduinoOTA.onStart([]() {
+    // An update reboots the board, so nothing may be left running: force the
+    // pump and the lamps off before the flash is written.
+    applyPump(false);
+    applyStreetlights(false);
+    Serial.println("[ota] update starting; pump and lamps forced off");
+  });
+  ArduinoOTA.onEnd([]() { Serial.println("[ota] update written; rebooting"); });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    static unsigned int lastDecile = 100;
+    if (!total) return;
+    const unsigned int decile = (progress * 10u) / total;
+    if (decile != lastDecile) {
+      lastDecile = decile;
+      Serial.printf("[ota] %u%%\n", decile * 10u);
+    }
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("[ota] failed, code %u\n", static_cast<unsigned>(error));
+  });
+  ArduinoOTA.begin();
+  g_ota_started = true;
+  Serial.printf("[ota] ready on %s port 3232 (password required)\n",
+                WiFi.localIP().toString().c_str());
+#endif
+}
+
+void otaLoop() {
+#if VILLAGE_ENABLE_OTA
+  if (g_ota_started) ArduinoOTA.handle();
+#endif
+}
 
 void startNetwork() {
   initIdentity();
@@ -80,6 +132,7 @@ void networkLoop(uint32_t now) {
       Serial.printf("[net] connected: IP %s, RSSI %d dBm\n",
                     WiFi.localIP().toString().c_str(), WiFi.RSSI());
       startMdns();
+      startOta();
     }
     return;
   }

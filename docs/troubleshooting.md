@@ -94,6 +94,26 @@ session; local automatic watering continues if the laptop disappears.
   are inverted.
 - A commanded off state is not a connectivity test. Check the LED and resistor
   in the bench test.
+- **Everything reads “Not installed” and the lamps never switch on:** the
+  controller starts with `light.installed = false` on purpose. A floating ADC
+  pin reads plausible noise, so an unwired LDR must not report “dark”. Tick
+  **The LDR and streetlight lamps are wired** on **Sensors** once they are
+  connected, then save.
+
+## Wireless update says “No response from device”
+
+- Run the uploader from **Windows**, not from WSL. The board sends the image
+  back over UDP to the machine that invited it, and WSL is behind a NAT the
+  LAN cannot reach.
+- The uploader must tell the board a reachable host address. `tools\ota_flash.py`
+  detects it automatically; a raw `espota.py` call needs `-I <this-pc-lan-ip>`.
+- Check the board is on the same network and still answers
+  `http://<board-ip>/api/v1/health`.
+- `Authenticating...OK` followed by silence means the invitation was accepted
+  and the return path failed — that is the host-address problem above, not a
+  wrong password. A wrong password fails before authentication.
+- If Windows Defender Firewall blocks the inbound UDP reply, allow Python on
+  private networks, or use USB flashing.
 
 ## Voice does not work
 

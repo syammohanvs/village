@@ -22,3 +22,10 @@
 #ifndef VILLAGE_ENABLE_MDNS
 #define VILLAGE_ENABLE_MDNS 1
 #endif
+
+// Password-protected over-the-air firmware updates.  Enabled by default so a
+// mounted board can be updated without the USB cable, but it only starts once
+// station mode is connected, and it always requires VILLAGE_OTA_PASSWORD.
+#ifndef VILLAGE_ENABLE_OTA
+#define VILLAGE_ENABLE_OTA 1
+#endif

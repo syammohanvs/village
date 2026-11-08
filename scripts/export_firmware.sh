@@ -14,6 +14,7 @@ fi
 [ -n "$PIO_BIN" ] || { echo "PlatformIO not found. Install it or set VILLAGE_PIO."; exit 1; }
 
 BUILD="$ROOT/uc/.pio/build/esp32doit-devkit-v1"
+BUILD_OTA="$ROOT/uc/.pio/build/esp32doit-devkit-v1-ota"
 BOOTAPP="$HOME/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
 ESPTOOL="$HOME/.platformio/packages/tool-esptoolpy/esptool.py"
 PIO_PY="$HOME/.venvs/pio/bin/python"
@@ -23,6 +24,9 @@ PIO_PY="$HOME/.venvs/pio/bin/python"
 
 echo "== Building firmware =="
 (cd "$ROOT/uc" && "$PIO_BIN" run -e esp32doit-devkit-v1)
+
+echo "== Building the OTA image =="
+(cd "$ROOT/uc" && "$PIO_BIN" run -e esp32doit-devkit-v1-ota)
 
 echo "== Creating one-file merged image =="
 "$PIO_PY" "$ESPTOOL" --chip esp32 merge_bin \
@@ -36,13 +40,16 @@ echo "== Creating one-file merged image =="
 WIN_USER="${VILLAGE_WIN_USER:-$(cmd.exe /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r\n' || true)}"
 [ -n "$WIN_USER" ] || WIN_USER="$(whoami)"
 DEST="${VILLAGE_EXPORT_DIR:-/mnt/c/Users/$WIN_USER/Downloads/aivillage-firmware}"
-mkdir -p "$DEST"
+mkdir -p "$DEST" "$DEST/tools"
 
 cp "$BUILD/village-firmware-merged.bin" "$DEST/"
 cp "$BUILD/firmware.bin" "$DEST/"
 cp "$BUILD/bootloader.bin" "$DEST/"
 cp "$BUILD/partitions.bin" "$DEST/"
 cp "$BOOTAPP" "$DEST/boot_app0.bin"
+cp "$BUILD_OTA/firmware.bin" "$DEST/firmware-ota.bin"
+cp "$HOME/.platformio/packages/framework-arduinoespressif32/tools/espota.py" "$DEST/tools/espota.py"
+cp "$ROOT/scripts/ota_flash_win.py" "$DEST/tools/ota_flash.py"
 cp "$ROOT/uc/include/village/secrets.example.h" "$DEST/secrets.example.h"
 
 # Show the configured SSID (never the password/token) and warn if placeholders
@@ -59,6 +66,7 @@ Smart Green Village — ESP32 firmware
 Files
 -----
 village-firmware-merged.bin   <-- flash THIS at 0x0 (one file)
+firmware-ota.bin              wireless update image (see OTA below)
 firmware.bin                  app only (0x10000) — not for a fresh board
 bootloader.bin                (0x1000)
 partitions.bin                (0x8000)
@@ -116,6 +124,27 @@ Multi-file alternative (same result)
   py -m esptool --chip esp32 --port COM5 --baud 921600 ^
     write_flash -z 0x1000 bootloader.bin 0x8000 partitions.bin ^
     0xe000 boot_app0.bin 0x10000 firmware.bin
+
+Wireless updates (OTA)
+----------------------
+This build starts a password-protected ArduinoOTA listener on port 3232 once
+it has joined the Wi-Fi. The password is VILLAGE_OTA_PASSWORD in
+uc/include/village/secrets.h on the WSL side.
+
+From WINDOWS (required — WSL is behind a NAT the board cannot reach), run:
+
+  python tools\ota_flash.py <board-ip>
+
+It reads the password from ota_auth.tmp beside this file and deletes it, so the
+password never appears on the command line. Create that file first from WSL or
+Notepad, then run the command. The board reboots after a successful update.
+
+From WSL, the equivalent one-liner (same LAN restriction applies):
+
+  export VILLAGE_OTA_PASSWORD=...
+  cd uc && pio run -e esp32doit-devkit-v1-ota -t upload --upload-port <board-ip>
+
+USB flashing always remains available as the recovery path.
 
 After flashing
 --------------
