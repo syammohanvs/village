@@ -47,6 +47,7 @@ TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[2]));
   CHECK(pins::isSafeOutput(pins::STREETLIGHT_LEDS[0]));
   CHECK(pins::isSafeOutput(pins::STREETLIGHT_LEDS[3]));
+  CHECK(pins::STREETLIGHT_LAMP_COUNT == 4);
   CHECK(pins::isSafeOutput(pins::WASTE_LED_ORGANIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PLASTIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PAPER));

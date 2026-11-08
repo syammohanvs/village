@@ -148,8 +148,10 @@ inline constexpr int RESERVOIR_EXCITE = 25;
 // the driver; this GPIO only carries the logic signal.
 inline constexpr int PUMP_GATE = 26;
 
-// Four streetlight LEDs, each with its own series resistor.
+// Four streetlight LEDs, one per pin, each with its own series resistor.
+// 330 ohms per lamp gives roughly 3-5 mA per pin for red/yellow/green LEDs.
 inline constexpr int STREETLIGHT_LEDS[4] = {13, 14, 19, 21};
+inline constexpr int STREETLIGHT_LAMP_COUNT = 4;
 
 // Three waste-category indicator LEDs.
 inline constexpr int WASTE_LED_ORGANIC = 33;

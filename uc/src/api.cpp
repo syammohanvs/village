@@ -147,7 +147,7 @@ void buildStatus(JsonDocument& doc) {
   JsonObject sl = actuators["streetlights"].to<JsonObject>();
   sl["mode"] = toString(lights.mode);
   sl["commanded"] = lights.on;
-  sl["led_count"] = 4;
+  sl["led_count"] = pins::STREETLIGHT_LAMP_COUNT;
   sl["installed"] = rt.config.light.installed;
   sl["feedback"] = "none";
 
@@ -243,7 +243,9 @@ void buildHealth(JsonDocument& doc) {
   pm["ldr"] = pins::LDR_ADC;
   pm["pump_gate"] = pins::PUMP_GATE;
   JsonArray street = pm["streetlight_leds"].to<JsonArray>();
-  for (int i = 0; i < 4; ++i) street.add(pins::STREETLIGHT_LEDS[i]);
+  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
+    street.add(pins::STREETLIGHT_LEDS[i]);
+  }
   JsonObject waste = pm["waste_leds"].to<JsonObject>();
   waste["organic"] = pins::WASTE_LED_ORGANIC;
   waste["plastic"] = pins::WASTE_LED_PLASTIC;

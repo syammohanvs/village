@@ -81,7 +81,7 @@ The firmware's `uc/include/village/pins.h` encodes all of this and has
 `static_assert` checks for ADC1, input-only, strapping, flash and duplicate
 pins. A bad edit fails the build.
 
-**GPIO budget:** 25 GPIOs are exposed (23 excluding UART0). 18 are assigned;
+**GPIO budget:** 25 GPIOs are exposed (23 excluding UART0). **18 are assigned**;
 4 of the remaining 5 are strapping pins deliberately avoided; 1 (GPIO 27) is a
 spare safe output. There is no shortage for this build.
 
@@ -227,7 +227,39 @@ Each LED needs its own series resistor:
  GPIO ──[ 220 Ω ]──▶|── GND        (3.3 V LED, ~6 mA)
 ```
 
-- Four streetlight LEDs on GPIO 13, 14, 19, 21, each with 220 Ω.
+- **Streetlights: one LED per pin — GPIO 13, 14, 19 and 21 — with 330 Ω in
+  series with each lamp.**
+
+```
+ GPIO 13 ──[ 330 Ω ]──▶|── GND      lamp 1
+ GPIO 14 ──[ 330 Ω ]──▶|── GND      lamp 2
+ GPIO 19 ──[ 330 Ω ]──▶|── GND      lamp 3
+ GPIO 21 ──[ 330 Ω ]──▶|── GND      lamp 4
+```
+
+  One resistor per LED, never one shared resistor for lamps wired in parallel.
+
+- **Current with 330 Ω** at a 3.3 V GPIO: `I = (3.3 − Vf) / 330`.
+
+  | LED colour | Vf (approx) | Current at 330 Ω |
+  | --- | ---: | ---: |
+  | Red | 1.8 V | ~4.5 mA |
+  | Yellow | 2.1 V | ~3.6 mA |
+  | Green | 2.2 V | ~3.3 mA |
+  | White | 2.9 V | ~1.2 mA |
+  | Blue | 3.0 V | ~0.9 mA |
+
+  330 Ω is a good choice for red, yellow and green: 3–4.5 mA is bright for a
+  small indicator LED. White and blue LEDs will be visibly **dim** at 1 mA —
+  safe, but if they must be bright use 100–150 Ω instead and keep each pin
+  under ~10 mA.
+
+- **Current budget:** each pin drives exactly one lamp, so every pin carries
+  only ~1–5 mA. The ESP32's recommended continuous limit is 20 mA per pin, so
+  there is a wide margin on all four.
+- The GPIO is the only supply: each LED's current returns through the board's
+  ground, so keep the ground wire short and common with the board.
+- Organic = GPIO 33, plastic = GPIO 22, paper = GPIO 23, each with 220 Ω.
 - Organic = GPIO 33, plastic = GPIO 22, paper = GPIO 23, each with 220 Ω.
 - Total LED current is small (~40 mA) and can come from the board's 3.3 V
   regulator. If brighter LEDs or a 5 V LED strip are used, switch them with a

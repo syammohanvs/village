@@ -14,7 +14,7 @@ void setupOutputs() {
   digitalWrite(pins::PUMP_GATE, LOW);
   pinMode(pins::PUMP_GATE, OUTPUT);
 
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
     digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
     pinMode(pins::STREETLIGHT_LEDS[i], OUTPUT);
   }
@@ -52,7 +52,7 @@ void applyPump(bool on) {
 
 void applyStreetlights(bool on) {
   const bool allowed = on && rt.config.light.installed;
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
     digitalWrite(pins::STREETLIGHT_LEDS[i], allowed ? HIGH : LOW);
   }
 }
@@ -67,7 +67,9 @@ void applyWasteCategory(WasteCategory category) {
 
 void allOutputsOff() {
   digitalWrite(pins::PUMP_GATE, LOW);
-  for (int i = 0; i < 4; ++i) digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
+  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
+    digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
+  }
   digitalWrite(pins::WASTE_LED_ORGANIC, LOW);
   digitalWrite(pins::WASTE_LED_PLASTIC, LOW);
   digitalWrite(pins::WASTE_LED_PAPER, LOW);
