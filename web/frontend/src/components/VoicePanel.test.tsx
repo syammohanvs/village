@@ -40,7 +40,9 @@ vi.mock('../lib/audio', () => ({
 vi.mock('../lib/speech', () => ({
   speechSupported: () => true,
   stopSpeaking: vi.fn(),
+  speakText: vi.fn(async () => undefined),
   speakReply: vi.fn(async () => 'none'),
+  voiceAvailable: () => true,
 }));
 
 async function openPanel() {

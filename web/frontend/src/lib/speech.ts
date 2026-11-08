@@ -44,12 +44,12 @@ function playAudioFile(url: string): Promise<boolean> {
   });
 }
 
-export function speakText(text: string, language: string): Promise<void> {
+export function speakText(text: string, language: string, rate = 0.98): Promise<void> {
   if (!text || !speechSupported()) return Promise.resolve();
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLanguage(language);
-    utterance.rate = 0.98;
+    utterance.rate = rate;
     utterance.onend = () => resolve();
     utterance.onerror = () => resolve();
     window.speechSynthesis.speak(utterance);
@@ -78,4 +78,21 @@ export async function speakReply(
     return 'speech';
   }
   return 'none';
+}
+
+/**
+ * True when the browser reports at least one voice for the language.
+ * An empty voice list means "not known yet", so it is reported as available
+ * rather than warning the reader about a problem that may not exist.
+ */
+export function voiceAvailable(language: string): boolean {
+  if (!speechSupported()) return false;
+  try {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return true;
+    const prefix = speechLanguage(language).split('-')[0].toLowerCase();
+    return voices.some((voice) => (voice.lang || '').toLowerCase().startsWith(prefix));
+  } catch {
+    return true;
+  }
 }

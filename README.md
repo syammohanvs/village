@@ -17,8 +17,9 @@ and uses no paid API.
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
-| Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 16 tests pass** |
-| Hardware wiring, pump, sensors | **not physically verified — see docs/bench-test.md** |
+| Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
+| Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 15/15** |
+| Hardware wiring | **streetlights + LDR working; soil bench-only; reservoir, bins and pump not wired** |
 | Waste model (Teachable Machine) | **you must supply the three exported files** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
@@ -26,9 +27,12 @@ physical part needs the commissioning checks below.
 
 The board itself is programmed and reachable: it joins the home Wi-Fi in
 station mode (so the laptop keeps its internet) and `/api/v1/state?mode=live`
-reports `source.kind: "esp32"`. Nothing is wired to it yet, so it honestly
-reports soil and reservoir **uncalibrated**, the bins **unavailable**, no light
-level, and the pump **disabled**.
+reports `source.kind: "esp32"`. The four streetlight lamps and the LDR module
+are wired and working, including automatic lamps in the dark. The soil probe is
+connected but calibrated only against wheat flour so far, so treat its
+percentage as a bench check until it is redone in real soil. The reservoir
+probes, ultrasonic bins and pump are not wired yet; the pump stays disabled by
+both safety gates.
 
 ## Quick start
 
@@ -89,7 +93,8 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
 - `web/frontend/` — React 19 + TypeScript + Vite.
 - `web/backend/` — FastAPI + SQLite + simulator + Whisper proxy.
 - `shared/` — protocol, multilingual phrase dictionary, JSON examples.
-- `docs/` — wiring, installation, calibration, operation, troubleshooting,
+- `docs/` — wiring, installation, calibration, operation, Lia guide,
+  troubleshooting,
   waste model, bench test.
 - `scripts/` — setup, download, launch, stop, dev, tests.
 
@@ -163,4 +168,5 @@ An acknowledged command proves the controller decided, not that water flowed.
 7. After the talk: `./scripts/stop.sh`, pump off, power down.
 
 More: [installation](docs/installation.md), [calibration](docs/calibration.md),
-[operation](docs/operation.md), [troubleshooting](docs/troubleshooting.md).
+[operation](docs/operation.md), [Lia guide](docs/lia-guide.md),
+[troubleshooting](docs/troubleshooting.md).

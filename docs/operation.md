@@ -30,6 +30,28 @@ backend; Windows can also resolve `village.local`.
 Firmware can be updated over Wi-Fi once the board is on the network — see
 `docs/installation.md` (“Updating firmware without the USB cable”).
 
+## Lia, the village guide
+
+The **Help with Lia** button at the bottom right opens a guide written for
+children and first-time visitors. On the first visit it opens by itself with a
+short welcome and six large choices: show me around, water the plants, use the
+lights, sort waste, talk to the village, or help with a problem.
+
+- Choose **English**, **മലയാളം** or **हिन्दी**. The choice is remembered.
+- **Read aloud** uses the browser's own voice. It works without internet; if
+  the laptop has no voice for that language, the words are still shown.
+- **Maybe later** dismisses the welcome. The helper button stays on every page.
+- **What is happening now?** explains the current soil, tank, bins, lamps and
+  pump in plain words. It says *not calibrated*, *stale* or *offline* instead of
+  inventing a number, and it never reports litres or savings.
+
+Topics that touch hardware show a **With a grown-up** note. The last step
+usually gives a safe physical demonstration, such as covering the LDR to watch
+the lamps come on. Young children should always do those with an adult.
+
+The full guide, including how to edit its sentences, is in
+[lia-guide.md](lia-guide.md).
+
 ## What the dashboard shows
 
 - **What the village is doing and why** — the controller's own reason, such as

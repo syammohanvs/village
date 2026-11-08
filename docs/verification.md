@@ -272,6 +272,37 @@ soil scenario changed the demo simulator, Start irrigation was sent and
 **confirmed by the controller**, Lights Off was accepted, the Stop control
 stayed available, and the voice panel listed all 10 supported phrases.
 
+## Lia guide — browser check (2026-11-08)
+
+The guide was driven in headless Chromium 156 through the DevTools protocol
+against the running build, not read from the source. **16/16 checks passed:**
+
+- the welcome message and all six topic buttons render;
+- the language switch changes the whole card to Malayalam, including the six
+  labels and the "Maybe later" button;
+- "Maybe later" closes the card, stores `dismissed: true` and keeps the
+  **Help with Lia** button;
+- the helper button reopens the guide and is **not covered by the existing
+  Voice launcher** (it sits above it; the browser check hit-tests the centre of
+  the button);
+- **What is happening now?** narrates the live village in Malayalam and contains
+  no litre claim;
+- switching back to English and opening **Show me around** shows the dashboard
+  step, and **Next** advances to the sensors step.
+
+Screenshots: `/tmp/opencode/lia-welcome.png` (800×600),
+`/tmp/opencode/lia-desktop.png` (1440×900), `/tmp/opencode/lia-mobile.png`
+(390×844), `/tmp/opencode/lia-fab.png` (both launchers in place) and
+`/tmp/opencode/lia-live.png` (offline narration). On desktop the card is 702 px
+tall and fits a 900 px window without scrolling; on the phone it scrolls in one
+column. The Lia launcher occupies x 1266–1418, y 762–816 and the Voice launcher
+x 1313–1418, y 829–878 — no overlap.
+
+The component and content tests are part of the normal suite
+(`lia.test.ts`, `LiaGuide.test.tsx`). They cover uncalibrated probes, offline
+and stale links, demo mode, the adult notes, the read-aloud call and closing
+with Escape. The suite is 37 web tests in 7 files.
+
 ## Setup checklist at verification time
 
 ```text

@@ -17,6 +17,7 @@ import {
   IconVillagers,
   IconWaste,
 } from './Icons';
+import { LiaGuide } from './LiaGuide';
 import { StatusStrip } from './StatusStrip';
 
 const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
@@ -183,6 +184,8 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <LiaGuide />
     </div>
   );
 }

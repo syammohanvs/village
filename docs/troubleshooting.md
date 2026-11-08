@@ -117,6 +117,21 @@ session; local automatic watering continues if the laptop disappears.
 - If Windows Defender Firewall blocks the inbound UDP reply, allow Python on
   private networks, or use USB flashing.
 
+## Lia does not read aloud
+
+- **Read aloud** is a switch on the Lia card; it is off by default.
+- If the card says the browser cannot read aloud, use Chrome or Edge. Firefox
+  may have no speech synthesis.
+- If it says the device has no voice for Malayalam or Hindi, install that
+  language's voice in the operating system. The words are still displayed.
+- Nothing is downloaded: speech is generated locally by the browser.
+
+## Lia says a probe is not calibrated
+
+That is the honest state, not a fault. A probe reports a real percentage only
+after the two endpoints are captured and confirmed on **Sensors**. Until then
+Lia refuses to guess. See [calibration.md](calibration.md).
+
 ## Voice does not work
 
 - `curl http://127.0.0.1:8181/health` should return `{"status":"ok"}`.
