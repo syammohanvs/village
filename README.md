@@ -18,7 +18,8 @@ and uses no paid API.
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
-| Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 15/15** |
+| Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
+| Cloudflare Pages | **repo `village`, branch `main`, build root `web/frontend`** |
 | Hardware wiring | **streetlights + LDR working; soil bench-only; reservoir, bins and pump not wired** |
 | Waste model (Teachable Machine) | **you must supply the three exported files** |
 
@@ -94,9 +95,13 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
 - `web/backend/` — FastAPI + SQLite + simulator + Whisper proxy.
 - `shared/` — protocol, multilingual phrase dictionary, JSON examples.
 - `docs/` — wiring, installation, calibration, operation, Lia guide,
-  troubleshooting,
-  waste model, bench test.
+  Cloudflare deployment, troubleshooting, waste model, bench test.
 - `scripts/` — setup, download, launch, stop, dev, tests.
+
+**Cloudflare Pages builds only `web/frontend`.** The firmware (`uc/`) and the
+Python backend (`web/backend/`) sit outside that root, so a firmware commit
+cannot affect the site build. A push to `main` triggers the build; see
+[docs/deployment-cloudflare.md](docs/deployment-cloudflare.md).
 
 ## Board and wiring
 
@@ -169,4 +174,5 @@ An acknowledged command proves the controller decided, not that water flowed.
 
 More: [installation](docs/installation.md), [calibration](docs/calibration.md),
 [operation](docs/operation.md), [Lia guide](docs/lia-guide.md),
+[Cloudflare deployment](docs/deployment-cloudflare.md),
 [troubleshooting](docs/troubleshooting.md).
