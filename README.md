@@ -16,7 +16,7 @@ and uses no paid API.
 | LDR sensor + auto streetlights | **verified 2026-11-08 (LM393 module, GPIO 32)** |
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
-| Whisper.cpp + multilingual `ggml-small.bin` | **built and running on 8181** |
+| Whisper.cpp + multilingual `ggml-large-v3-turbo.bin` | **built and running on 8181** |
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
 | Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
@@ -145,9 +145,9 @@ cd web/frontend && npm run typecheck && npm test && npm run build
    `VILLAGE_WHISPER_MODEL`. `scripts/download_models.sh` fetches
    `ggml-base.bin` (142 MB) and verifies its SHA-256
    `60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe`;
-   this deployment runs `ggml-small.bin` (~466 MB) for a ~3 s voice command.
-   `ggml-large-v3-turbo.bin` is also installed and gives the most accurate
-   transcript, at roughly 22 s per command on this CPU. English-only
+   this deployment runs `ggml-large-v3-turbo.bin` (~1.6 GB) for the most accurate transcript.
+   `ggml-small.bin` (~466 MB) is also installed and answers in ~3 s when a
+   short wait matters more than accuracy (~22 s here for turbo). English-only
    `*.en.bin` files are refused.
 2. **Whisper server** — build `whisper-server` (instructions in
    [docs/installation.md](docs/installation.md)) or set
