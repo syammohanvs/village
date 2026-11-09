@@ -407,13 +407,14 @@ command still takes ~22 s on this CPU. For a live voice demo `ggml-small.bin`
 is the better trade; turbo is the better choice for accuracy when a short wait
 is acceptable.
 
-**Both models were measured through the live backend, and the deployment was
-left on `ggml-large-v3-turbo.bin`.** `ggml-small.bin` answered the 5 s clip in
-**2.6 s** and the 11 s clip in **3.8 s** (the 5 s truncation, “ask not.”, is
-the clip being cut mid-sentence, not the model); turbo keeps the exact
-transcript at **~22–27 s**. `launch.sh` detected the model change in the
-running process, restarted the server with the new file, and readiness
-reported the new name — the behaviour that was missing before.
+**All three models were measured through the live backend and the deployment
+was returned to `ggml-base.bin`.** With 8 threads base answers the 5 s clip in
+**0.73 s**, small in **2.6 s** and turbo in **~22–27 s**; the 5 s truncation
+(“ask not.”) is the clip being cut mid-sentence, not the model. Each switch
+was made by changing `VILLAGE_WHISPER_MODEL`; `launch.sh` detected the
+different model in the running process, restarted the server with the new
+file, and readiness reported the new name — the behaviour that was missing
+before.
 
 Two things found while doing it, both fixed:
 
