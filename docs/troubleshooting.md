@@ -136,8 +136,9 @@ Lia refuses to guess. See [calibration.md](calibration.md).
 
 - `curl http://127.0.0.1:8181/health` should return `{"status":"ok"}`.
 - Check `data/logs/whisper.log` and `VILLAGE_WHISPER_BIN`.
-- The model must be `models/whisper/ggml-base.bin` (multilingual), not
-  `ggml-base.en.bin`.
+- The file named by `VILLAGE_WHISPER_MODEL` must be a **multilingual** ggml
+  build (`ggml-base.bin`, `ggml-small.bin`, `ggml-large-v3-turbo.bin`, …). An
+  English-only `*.en.bin` file is refused with `WHISPER_MODEL_WRONG`.
 - Allow microphone permission in the browser. Use Chromium if speech
   recognition or audio capture is restricted.
 - Push-to-talk records for at most 10 seconds; silence returns “No speech was

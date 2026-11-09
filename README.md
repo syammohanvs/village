@@ -16,7 +16,7 @@ and uses no paid API.
 | LDR sensor + auto streetlights | **verified 2026-11-08 (LM393 module, GPIO 32)** |
 | ESP32 firmware image for `esp32doit-devkit-v1` | **builds successfully** |
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
-| Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
+| Whisper.cpp + multilingual `ggml-large-v3-turbo.bin` | **built and running on 8181** |
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
 | Lia guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
@@ -108,7 +108,7 @@ cannot affect the site build. A push to `main` triggers the build; see
 
 The purchased board is the **30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1**
 (4 MB flash, AMS1117, micro-USB). The pin map uses GPIO numbers only:
-soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump gate **19**,
+soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump gate **26**,
 streetlights **13/12/14/27** (one lamp each), waste LEDs **21/22/23**, bin triggers **4/16/17**,
 bin echoes **36/39/18**. All analogue inputs are **ADC1** because Wi-Fi is
 active. Flash pins, input-only misuse, strapping pins and UART0 are avoided;
@@ -135,15 +135,18 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 - Browser walk: **7/7 routes render, 0 console errors**; Demo toggle, demo
   scenario, confirmed Start, Lights Off and the 10-phrase voice panel were
   driven in Chromium against the running server.
-- Whisper: `GET /health` → `{"status":"ok"}` with `ggml-base.bin` loaded.
+- Whisper: `GET /health` → `{"status":"ok"}` with the multilingual model loaded.
 - Hardware: **not tested**; the bench checklist is in
   [docs/bench-test.md](docs/bench-test.md).
 
 ## Models you must supply
 
-1. **Whisper** — `models/whisper/ggml-base.bin` (multilingual). The download
-   script verifies SHA-256
-   `60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe`.
+1. **Whisper** — a multilingual ggml model, selected by
+   `VILLAGE_WHISPER_MODEL`. `scripts/download_models.sh` fetches
+   `ggml-base.bin` (142 MB) and verifies its SHA-256
+   `60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe`;
+   this deployment runs `ggml-large-v3-turbo.bin` (~1.6 GB), which is much
+   better for Malayalam and Hindi. English-only `*.en.bin` files are refused.
 2. **Whisper server** — build `whisper-server` (instructions in
    [docs/installation.md](docs/installation.md)) or set
    `VILLAGE_WHISPER_BIN` in `.env`.

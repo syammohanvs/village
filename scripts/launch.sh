@@ -17,6 +17,9 @@ PORT="${VILLAGE_PORT:-8000}"
 VENV="${VILLAGE_VENV:-$ROOT/.venv}"
 WHISPER_BIN="${VILLAGE_WHISPER_BIN:-$ROOT/models/whisper/whisper-server}"
 WHISPER_URL="${VILLAGE_WHISPER_URL:-http://127.0.0.1:8181}"
+WHISPER_MODEL="${VILLAGE_WHISPER_MODEL:-$ROOT/models/whisper/ggml-base.bin}"
+WHISPER_THREADS="${VILLAGE_WHISPER_THREADS:-$(nproc 2>/dev/null || echo 4)}"
+case "$WHISPER_MODEL" in /*) ;; *) WHISPER_MODEL="$ROOT/$WHISPER_MODEL" ;; esac
 
 info() { printf '\n== %s ==\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -44,29 +47,52 @@ fi
 
 info "Starting whisper.cpp (if the binary and model are present)"
 WHISPER_READY=0
-if curl -fsS -m 2 "${WHISPER_URL}/health" >/dev/null 2>&1; then
-  WHISPER_READY=1
-  printf 'Whisper is already running at %s\n' "$WHISPER_URL"
-elif [ -x "$WHISPER_BIN" ] && [ -f models/whisper/ggml-base.bin ]; then
+WHISPER_ALREADY=0
+WHISPER_PIDFILE="$ROOT/data/run/whisper.pid"
+# A server started by a previous run is reused only when it is loaded with the
+# model this configuration names.  Otherwise switching VILLAGE_WHISPER_MODEL
+# would silently keep the old model, which is exactly how a "base" server
+# survives a switch to a larger one.
+if [ -f "$WHISPER_PIDFILE" ]; then
+  OLD_WPID="$(cat "$WHISPER_PIDFILE" || true)"
+  if [ -n "${OLD_WPID:-}" ] && kill -0 "$OLD_WPID" 2>/dev/null; then
+    RUNNING_CMDLINE="$(tr '\0' ' ' < "/proc/$OLD_WPID/cmdline" 2>/dev/null || true)"
+    if printf '%s' "$RUNNING_CMDLINE" | grep -Fq -- "$WHISPER_MODEL"; then
+      WHISPER_ALREADY=1
+      WHISPER_READY=1
+      printf 'Whisper already running at %s with %s\n' "$WHISPER_URL" "$(basename "$WHISPER_MODEL")"
+    else
+      printf 'Whisper is running a different model; restarting it with %s\n' "$(basename "$WHISPER_MODEL")"
+      kill "$OLD_WPID" 2>/dev/null || true
+      for _ in $(seq 1 25); do kill -0 "$OLD_WPID" 2>/dev/null || break; sleep 0.2; done
+      kill -9 "$OLD_WPID" 2>/dev/null || true
+    fi
+  fi
+  rm -f "$WHISPER_PIDFILE"
+fi
+
+if [ "$WHISPER_ALREADY" != 1 ] && [ -x "$WHISPER_BIN" ] && [ -f "$WHISPER_MODEL" ]; then
   WP="${WHISPER_URL##*:}"
   WP="${WP%%/*}"
   HOSTPART="${WHISPER_URL#*://}"
   HOSTPART="${HOSTPART%%:*}"
-  if [ -f data/run/whisper.pid ]; then
-    OLD_WPID="$(cat data/run/whisper.pid || true)"
-    if [ -n "${OLD_WPID:-}" ] && kill -0 "$OLD_WPID" 2>/dev/null; then kill "$OLD_WPID" 2>/dev/null || true; fi
-    rm -f data/run/whisper.pid
-  fi
-  setsid "$WHISPER_BIN" -m models/whisper/ggml-base.bin --host "$HOSTPART" --port "$WP" \
+  setsid "$WHISPER_BIN" -m "$WHISPER_MODEL" -t "$WHISPER_THREADS" --host "$HOSTPART" --port "$WP" \
     > data/logs/whisper.log 2>&1 < /dev/null &
-  echo $! > data/run/whisper.pid
-  for _ in $(seq 1 40); do
+  echo $! > "$WHISPER_PIDFILE"
+  for _ in $(seq 1 120); do
     if curl -fsS -m 2 "${WHISPER_URL}/health" >/dev/null 2>&1; then WHISPER_READY=1; break; fi
     sleep 0.5
   done
   if [ "$WHISPER_READY" = 1 ]; then printf 'Whisper started; model loaded.\n'; else printf 'Whisper did not become ready; see data/logs/whisper.log\n'; fi
-else
-  printf 'Whisper binary or model not found. Voice will report "not ready" until supplied.\n'
+fi
+
+if [ "$WHISPER_READY" != 1 ] && curl -fsS -m 2 "${WHISPER_URL}/health" >/dev/null 2>&1; then
+  WHISPER_READY=1
+  printf 'Whisper is answering at %s but was not started by this script; its model was not checked.\n' "$WHISPER_URL"
+fi
+
+if [ "$WHISPER_READY" != 1 ] && { [ ! -x "$WHISPER_BIN" ] || [ ! -f "$WHISPER_MODEL" ]; }; then
+  printf 'Whisper binary or model not found (%s). Voice will report "not ready" until supplied.\n' "$WHISPER_MODEL"
   printf 'See docs/installation.md for the whisper.cpp build and model download.\n'
 fi
 

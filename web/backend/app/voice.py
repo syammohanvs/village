@@ -49,6 +49,16 @@ def wav_info(data: bytes) -> dict[str, Any]:
     return {"duration_s": round(seconds, 2), "channels": channels, "rate": rate, "bits": bits}
 
 
+def english_only_model(name: str) -> bool:
+    """True for whisper.cpp's English-only builds (``ggml-*.en.bin``).
+
+    Any other ``ggml-*.bin`` is multilingual: base, small, medium,
+    large-v3 and large-v3-turbo all work, so the guard rejects only the
+    English-only variants rather than insisting on one exact filename.
+    """
+    return name.endswith(".en.bin") or ".en." in name
+
+
 class WhisperClient:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -72,7 +82,23 @@ class WhisperClient:
                         detail = str(exc)
         except httpx.HTTPError as exc:
             detail = str(exc)
-        installed = bool(exists and size > 1_000_000)
+        installed = bool(
+            exists and size > 1_000_000 and not english_only_model(model.name)
+        )
+        english_only = english_only_model(model.name)
+        if english_only:
+            # A wrong model is a configuration mistake the operator can fix
+            # without looking at the server, so it is reported first.
+            message = (
+                f"{model.name} is English-only. Use a multilingual ggml model "
+                "(for example ggml-base.bin or ggml-large-v3-turbo.bin)."
+            )
+        elif not server_ok:
+            message = "Whisper server is not reachable."
+        elif not exists or size <= 1_000_000:
+            message = "The multilingual Whisper model is missing."
+        else:
+            message = "Whisper is ready."
         return {
             "enabled": True,
             "server_reachable": server_ok,
@@ -81,15 +107,11 @@ class WhisperClient:
             "model_file_present": exists,
             "model_bytes": size,
             "model_name": model.name,
-            "multilingual": model.name == "ggml-base.bin",
+            "multilingual": not english_only,
             "languages": ["en", "ml", "hi"],
             "ready": bool(server_ok and installed),
             "detail": detail,
-            "message": (
-                "Whisper is ready." if server_ok and installed
-                else ("Whisper server is not reachable." if not server_ok
-                      else "The multilingual ggml-base.bin model is missing.")
-            ),
+            "message": message,
         }
 
     async def transcribe(self, data: bytes, language: str) -> dict[str, Any]:
@@ -112,10 +134,12 @@ class WhisperClient:
                 503, "WHISPER_MODEL_MISSING",
                 f"the multilingual Whisper model is missing at {model}. Run scripts/download_models.sh.",
             )
-        if model.name != "ggml-base.bin":
+        if english_only_model(model.name):
             raise VoiceError(
-                503, "WHISPER_MODEL_WRONG",
-                "the configured model is not ggml-base.bin (multilingual). ggml-base.en.bin only understands English.",
+                503,
+                "WHISPER_MODEL_WRONG",
+                f"{model.name} only understands English. Use a multilingual ggml "
+                "model (for example ggml-base.bin or ggml-large-v3-turbo.bin).",
             )
 
         try:

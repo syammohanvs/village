@@ -49,6 +49,32 @@ This downloads the **multilingual** `models/whisper/ggml-base.bin` (about
 142 MB) and verifies its SHA-256. Do **not** use `ggml-base.en.bin`; it only
 understands English.
 
+### Choosing a larger model
+
+The model is whatever `VILLAGE_WHISPER_MODEL` in `.env` names, and
+`scripts/launch.sh` starts the server with it. Any multilingual ggml build
+works:
+
+| File | Size | Use |
+| --- | ---: | --- |
+| `ggml-base.bin` | 142 MB | default; fine for clear English commands |
+| `ggml-small.bin` | ~466 MB | sensible minimum for Malayalam/Hindi |
+| `ggml-large-v3-turbo.bin` | ~1.6 GB | near-large accuracy at much lower cost — recommended for ml/hi |
+| `ggml-large-v3.bin` | ~2.9 GB | best accuracy, heaviest |
+
+Download the extra file into `models/whisper/` and point the variable at it,
+for example:
+
+```bash
+curl -L -o models/whisper/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+# .env
+VILLAGE_WHISPER_MODEL=models/whisper/ggml-large-v3-turbo.bin
+```
+
+An English-only `*.en.bin` file is refused by the backend with
+`WHISPER_MODEL_WRONG`, whichever name it has.
+
 ### Build whisper.cpp once
 
 ```bash

@@ -377,6 +377,55 @@ test was reported as "not on" because the window had already closed — the LED
 was fine. Repeat the command, or raise `waste.indicate_ms`, when watching by
 hand.
 
+## Whisper switched to large-v3-turbo — 2026-11-10
+
+The speech model is no longer fixed to the 142 MB `ggml-base.bin`. It is
+whatever `VILLAGE_WHISPER_MODEL` names, and `scripts/launch.sh` starts the
+server with that file.
+
+```
+model     models/whisper/ggml-large-v3-turbo.bin
+size      1,624,555,275 bytes (1.6 GB)
+sha256    1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69
+server    whisper-server -t 8, 127.0.0.1:8181
+readiness multilingual true, ready true, model_name ggml-large-v3-turbo.bin
+```
+
+Measured with an 11 s English sample (`whisper.cpp`'s `jfk.wav`) and a 5 s
+trim of it, on 8 CPU threads:
+
+| Model | 5 s clip | Transcript |
+| --- | ---: | --- |
+| base (previous) | ~2.5 s | exact |
+| **large-v3-turbo** | **~22–27 s** | exact |
+| small (measured on a second server) | ~2.6 s | "ask not." (slightly truncated) |
+
+The turbo transcript is correct, including punctuation and the negation, so
+the intent layer correctly classes it as **NEGATED**. The cost is latency: one
+request decodes a full 30 s window whatever the clip length, so a short
+command still takes ~22 s on this CPU. For a live voice demo `ggml-small.bin`
+is the better trade; turbo is the better choice for accuracy when a short wait
+is acceptable.
+
+Two things found while doing it, both fixed:
+
+- **`scripts/launch.sh` reused a running server regardless of its model.** A
+  switch to a larger model appeared to work (readiness reported the new name)
+  while the old `ggml-base.bin` server kept answering — the first "turbo"
+  measurement was really base at 2.5 s. The script now compares the running
+  process's command line with the configured model and restarts it when they
+  differ, and it writes `-t <cores>` so all CPU threads are used.
+- **The backend refused every model except the literal `ggml-base.bin`.**
+  The guard now rejects only English-only `*.en.bin` names, so base, small,
+  medium, large-v3 and large-v3-turbo all work. Covered by
+  `web/backend/tests/test_voice.py` (English-only refused, turbo accepted,
+  readiness flags an English-only file).
+
+Malayalam and Hindi are still **untested with real speech**; the sample above
+is English. The language is passed through to whisper.cpp, but the words in
+`shared/intents.json` and the child's actual pronunciation remain the real
+test.
+
 ## Not verified
 
 - Physical soil, reservoir, pump and ultrasonic-bin behaviour,
