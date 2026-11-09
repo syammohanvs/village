@@ -30,6 +30,20 @@
 #define VILLAGE_ENABLE_OTA 1
 #endif
 
+// BENCH-ONLY: drive the pump gate HIGH at boot with no commissioning.
+//
+// This exists so the MOSFET can be measured with a dummy load while the pump
+// is still disconnected: it proves the GPIO, the series resistor and the gate
+// pull-down actually switch the channel.  It bypasses BOTH pump gates, so:
+//   * leave it 0 in every build that can be connected to a pump;
+//   * the board reports it as board.pump_bench_drive and logs it at boot;
+//   * set it back to 0 and reflash before the pump is wired.
+#ifndef VILLAGE_PUMP_BENCH_DRIVE
+#define VILLAGE_PUMP_BENCH_DRIVE 0
+#endif
+static_assert(VILLAGE_PUMP_BENCH_DRIVE == 0 || VILLAGE_PUMP_BENCH_DRIVE == 1,
+              "VILLAGE_PUMP_BENCH_DRIVE must be 0 or 1");
+
 // BENCH-TEST OVERRIDE — all three waste indicator LEDs held lit.
 //
 // Set to 1 while the three indicator LEDs are being wired: the pins are

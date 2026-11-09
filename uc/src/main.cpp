@@ -60,9 +60,17 @@ void setup() {
                 loaded ? "Controller started from saved configuration. Pump is off."
                        : "Controller started with default configuration. Pump is off.");
   Serial.printf("[boot] %s, boot %s, pump gate %s\n", g_device_id, g_boot_id,
-                VILLAGE_PUMP_COMMISSIONED == 1 ? "commissioned" : "DISABLED");
-  Serial.printf("[boot] pump output is LOW; config revision %lu\n",
-                static_cast<unsigned long>(rt.config.revision));
+                VILLAGE_PUMP_BENCH_DRIVE == 1
+                    ? "BENCH DRIVE"
+                    : (VILLAGE_PUMP_COMMISSIONED == 1 ? "commissioned"
+                                                      : "DISABLED"));
+  if (VILLAGE_PUMP_BENCH_DRIVE == 1) {
+    Serial.println("[boot] BENCH DRIVE is on: the pump gate is HIGH with no "
+                   "commissioning. The pump must be disconnected.");
+  } else {
+    Serial.printf("[boot] pump output is LOW; config revision %lu\n",
+                  static_cast<unsigned long>(rt.config.revision));
+  }
 }
 
 void loop() {

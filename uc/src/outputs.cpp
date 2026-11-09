@@ -16,11 +16,19 @@ namespace {
 inline int wasteLedLevel(bool on) {
   return (VILLAGE_WASTE_LEDS_ALWAYS_ON == 1 || on) ? HIGH : LOW;
 }
+
+// The pump gate is LOW unless the two commissioning gates allow it.  The
+// bench-drive build (VILLAGE_PUMP_BENCH_DRIVE) holds it HIGH so the MOSFET can
+// be measured with a dummy load; that build must never see a real pump.
+inline int pumpGateLevel(bool on) {
+  return (VILLAGE_PUMP_BENCH_DRIVE == 1 || on) ? HIGH : LOW;
+}
 }  // namespace
 
 void setupOutputs() {
-  // Pump first: LOW before the pin becomes an output.
-  digitalWrite(pins::PUMP_GATE, LOW);
+  // Pump first: the gate level is written before the pin becomes an output.
+  // In a normal build that level is LOW; the bench-drive build holds HIGH.
+  digitalWrite(pins::PUMP_GATE, pumpGateLevel(false));
   pinMode(pins::PUMP_GATE, OUTPUT);
 
   for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
@@ -54,8 +62,9 @@ void setupOutputs() {
 }
 
 void applyPump(bool on) {
-  const bool allowed = on && VILLAGE_PUMP_COMMISSIONED == 1 &&
-                       rt.config.irrigation.pump_enabled;
+  const bool allowed =
+      VILLAGE_PUMP_BENCH_DRIVE == 1 ||
+      (on && VILLAGE_PUMP_COMMISSIONED == 1 && rt.config.irrigation.pump_enabled);
   digitalWrite(pins::PUMP_GATE, allowed ? HIGH : LOW);
 }
 
@@ -75,7 +84,7 @@ void applyWasteCategory(WasteCategory category) {
 }
 
 void allOutputsOff() {
-  digitalWrite(pins::PUMP_GATE, LOW);
+  digitalWrite(pins::PUMP_GATE, pumpGateLevel(false));
   for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
     digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
   }
