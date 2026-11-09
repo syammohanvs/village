@@ -332,9 +332,55 @@ waste_model missing · audio warn
 `ready` is therefore **false**: the waste model has not been supplied yet. This
 is the honest result; the app reports “Recognition model not installed”.
 
+## Waste indicator LEDs wired and exercised — 2026-11-09
+
+The three category LEDs moved off the ADC-side pin to the free header edge:
+
+| Bin | GPIO | Colour | Resistor |
+| --- | ---: | --- | ---: |
+| Organic | 21 (D21) | green | 330 Ω |
+| Plastic | 22 (D22) | red | 330 Ω |
+| Paper | 23 (D23) | yellow | 330 Ω |
+
+Pin map version is now **`1.2.0-30pin`**, and `GET /api/v1/health` reports
+`board.waste_leds_always_on` so the wiring aid cannot be mistaken for the
+exhibit build.
+
+Wiring was done in two passes, because a dark pin and a missed window look the
+same:
+
+1. A bench build with `VILLAGE_WASTE_LEDS_ALWAYS_ON 1` drove all three pins HIGH
+   at boot. The operator confirmed **all three LEDs lit** as they were
+   connected, which proved the LEDs, the resistors and the pin choice before any
+   command was involved.
+2. The switch was returned to `0`, the image was flashed over OTA (boot id
+   changed, board rejoined Wi-Fi on its own), and each command was sent
+   **straight to the device** rather than through the dashboard:
+
+```text
+INDICATE_WASTE organic  -> ACCEPTED  "Organic-bin indicator activated"
+                           status: category organic, active true, 4909 ms left
+INDICATE_WASTE plastic  -> ACCEPTED  "Plastic-bin indicator activated"
+                           status: category plastic, active true
+INDICATE_WASTE paper    -> ACCEPTED  "Paper-bin indicator activated"
+                           status: category paper, active true
+after expiry            -> status: category null, active false
+```
+
+The operator confirmed the colours on the pins: **green on D21**, **red on D22
+with D21/D23 dark**, **yellow on D23**, and all three dark after each window.
+
+One honest detail found while doing this: `WasteIndicator::indicate` clamps the
+requested duration to the configured `waste.indicate_ms` (8000 ms here), so a
+command asking for 12 or 30 seconds still lights for about eight. The first red
+test was reported as "not on" because the window had already closed — the LED
+was fine. Repeat the command, or raise `waste.indicate_ms`, when watching by
+hand.
+
 ## Not verified
 
-- Physical soil, reservoir, pump and ultrasonic-bin behaviour. The ESP32 is
+- Physical soil, reservoir, pump and ultrasonic-bin behaviour,
+  except the three waste indicator LEDs above (2026-11-09). The ESP32 is
   flashed, joins the home Wi-Fi and serves the API over the LAN. One
   streetlight LED was measured at 100 Ω (Vf 2.93 V) and the LDR module was
   tested end to end, but the other three lamps were only exercised as GPIO
