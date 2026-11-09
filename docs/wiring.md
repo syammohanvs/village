@@ -343,12 +343,12 @@ Each LED needs its own series resistor:
   **23** (yellow), each with its own **330 Ω** series resistor. The three sit
   together on the free header edge, so the indicator loom leaves the board on
   one side.
-- **Bench-test state: all three indicator pins are held HIGH in the current
-  build.** `VILLAGE_WASTE_LEDS_ALWAYS_ON` in `uc/include/village/build_config.h`
-  is `1`, so each LED lights as soon as it is connected, without an
-  `INDICATE_WASTE` command. Set it back to `0` and reflash for the exhibit,
-  where the LEDs follow the recognised category and are otherwise dark.
-  `GET /api/v1/health` reports the switch as `board.waste_leds_always_on`.
+- **Wiring aid: `VILLAGE_WASTE_LEDS_ALWAYS_ON`.** In
+  `uc/include/village/build_config.h`, `1` holds all three pins HIGH so each
+  LED lights as soon as it is connected; `0` is the exhibit setting, where the
+  LEDs follow the recognised category and are otherwise dark. It is **`0` in
+  the current build**. `GET /api/v1/health` reports the switch as
+  `board.waste_leds_always_on`.
 - Total LED current is small (~40 mA) and can come from the board's 3.3 V
   regulator. If brighter LEDs or a 5 V LED strip are used, switch them with a
   transistor/MOSFET from the 5 V rail instead, and keep the GPIO only as the

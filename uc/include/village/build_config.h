@@ -41,7 +41,7 @@
 // This only affects the LED pins.  It cannot enable the pump, and the pump
 // keeps its own two independent gates.
 #ifndef VILLAGE_WASTE_LEDS_ALWAYS_ON
-#define VILLAGE_WASTE_LEDS_ALWAYS_ON 1
+#define VILLAGE_WASTE_LEDS_ALWAYS_ON 0
 #endif
 static_assert(VILLAGE_WASTE_LEDS_ALWAYS_ON == 0 ||
                   VILLAGE_WASTE_LEDS_ALWAYS_ON == 1,
