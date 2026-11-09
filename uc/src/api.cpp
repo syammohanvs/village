@@ -225,6 +225,7 @@ void buildHealth(JsonDocument& doc) {
   board["flash_size"] = ESP.getFlashChipSize();
   board["mac"] = WiFi.macAddress();
   board["pin_map_version"] = pins::kPinMapVersion;
+  board["waste_leds_always_on"] = VILLAGE_WASTE_LEDS_ALWAYS_ON == 1;
 
   JsonObject wifi = root["wifi"].to<JsonObject>();
   wifi["mode"] = networkMode();

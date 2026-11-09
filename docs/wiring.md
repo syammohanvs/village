@@ -52,7 +52,7 @@ logical order.
 | Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
 | Streetlight LED 3 | **14** | D14 | Digital output | Safe output |
 | Streetlight LED 4 | **27** | D27 | Digital output | Safe output |
-| Waste LED — organic | **33** | D33 | Digital output | Safe output |
+| Waste LED — organic | **21** | D21 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
 | Bin 1 trigger (organic) | **4** | D4 | Digital output | Safe output |
@@ -61,7 +61,7 @@ logical order.
 | Bin 2 echo | **39** | VN | Digital input | Input-only; **needs divider** |
 | Bin 3 trigger (paper) | **17** | D17 | Digital output | Safe output (WROOM only) |
 | Bin 3 echo | **18** | D18 | Digital input | Safe input; **needs divider** |
-| Spare | 27 | D27 | — | One safe output left free |
+| Spare | 19 | D19 | — | One safe output left free |
 
 ### Why not other pins
 
@@ -339,8 +339,16 @@ Each LED needs its own series resistor:
   pin, so there is a wide margin on all four.
 - The GPIO is the only supply: each LED's current returns through the board's
   ground, so keep the ground wire short and common with the board.
-- Organic = GPIO 33, plastic = GPIO 22, paper = GPIO 23, each with 220 Ω.
-- Organic = GPIO 33, plastic = GPIO 22, paper = GPIO 23, each with 220 Ω.
+- Organic = GPIO **21** (green), plastic = GPIO **22** (red), paper = GPIO
+  **23** (yellow), each with its own **330 Ω** series resistor. The three sit
+  together on the free header edge, so the indicator loom leaves the board on
+  one side.
+- **Bench-test state: all three indicator pins are held HIGH in the current
+  build.** `VILLAGE_WASTE_LEDS_ALWAYS_ON` in `uc/include/village/build_config.h`
+  is `1`, so each LED lights as soon as it is connected, without an
+  `INDICATE_WASTE` command. Set it back to `0` and reflash for the exhibit,
+  where the LEDs follow the recognised category and are otherwise dark.
+  `GET /api/v1/health` reports the switch as `board.waste_leds_always_on`.
 - Total LED current is small (~40 mA) and can come from the board's 3.3 V
   regulator. If brighter LEDs or a 5 V LED strip are used, switch them with a
   transistor/MOSFET from the 5 V rail instead, and keep the GPIO only as the

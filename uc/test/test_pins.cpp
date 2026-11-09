@@ -40,6 +40,19 @@ TEST(pin_map_avoids_strapping_flash_and_input_only_outputs) {
   CHECK(!pins::isSafeOutput(3));
 }
 
+TEST(waste_leds_share_the_free_header_side) {
+  // The three indicators are wired together on the free header edge.
+  CHECK(pins::WASTE_LED_ORGANIC == 21);
+  CHECK(pins::WASTE_LED_PLASTIC == 22);
+  CHECK(pins::WASTE_LED_PAPER == 23);
+  // Moved off the old ADC-capable pin so the lamps and the LDR keep D32/D33.
+  CHECK(pins::WASTE_LED_ORGANIC != 33);
+  // The named spare stays free.
+  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_ORGANIC);
+  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_PLASTIC);
+  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_PAPER);
+}
+
 TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::PUMP_GATE));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[0]));

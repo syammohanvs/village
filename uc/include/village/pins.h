@@ -26,7 +26,7 @@ namespace pins {
 inline constexpr const char* kBoardProfile = "esp32doit-devkit-v1";
 inline constexpr const char* kBoardDescription =
     "30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1";
-inline constexpr const char* kPinMapVersion = "1.1.0-30pin";
+inline constexpr const char* kPinMapVersion = "1.2.0-30pin";
 inline constexpr std::size_t kHeaderPins = 30;
 
 inline constexpr bool isAdc1(int gpio) {
@@ -168,7 +168,11 @@ inline constexpr int STREETLIGHT_LEDS[4] = {13, 12, 14, 27};
 inline constexpr int STREETLIGHT_LAMP_COUNT = 4;
 
 // Three waste-category indicator LEDs.
-inline constexpr int WASTE_LED_ORGANIC = 33;
+//
+// They sit together on the free header side (D21, D22, D23) so the three
+// indicator cables leave the board on one edge, away from the lamp loom and
+// the sensor headers.  None of the three is a strapping pin.
+inline constexpr int WASTE_LED_ORGANIC = 21;
 inline constexpr int WASTE_LED_PLASTIC = 22;
 inline constexpr int WASTE_LED_PAPER = 23;
 
@@ -177,9 +181,9 @@ inline constexpr int WASTE_LED_PAPER = 23;
 inline constexpr int BIN_TRIG[3] = {4, 16, 17};
 inline constexpr int BIN_ECHO[3] = {36, 39, 18};
 
-// Left free on purpose.  GPIO 19 and 21 were freed when the lamps moved to the
-// consecutive header run; 19 is kept as the named spare.  GPIO 2/5/15 are
-// strapping pins and stay unused.  GPIO 1/3 remain the USB serial console.
+// Left free on purpose.  GPIO 19 is the named spare; the waste LEDs took 21
+// when they moved to the free header side.  GPIO 2/5/15 are strapping pins and
+// stay unused.  GPIO 1/3 remain the USB serial console.
 inline constexpr int SPARE_SAFE_OUTPUT = 19;
 
 // ---------------------------------------------------------------------------

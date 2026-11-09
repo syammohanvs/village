@@ -29,3 +29,20 @@
 #ifndef VILLAGE_ENABLE_OTA
 #define VILLAGE_ENABLE_OTA 1
 #endif
+
+// BENCH-TEST OVERRIDE — all three waste indicator LEDs held lit.
+//
+// Set to 1 while the three indicator LEDs are being wired: the pins are
+// driven HIGH at boot and stay HIGH, so an LED lights the moment it is
+// connected, without waiting for an INDICATE_WASTE command.  Set back to 0
+// for the exhibit, where the indicators follow the recognised category and
+// are otherwise dark.
+//
+// This only affects the LED pins.  It cannot enable the pump, and the pump
+// keeps its own two independent gates.
+#ifndef VILLAGE_WASTE_LEDS_ALWAYS_ON
+#define VILLAGE_WASTE_LEDS_ALWAYS_ON 1
+#endif
+static_assert(VILLAGE_WASTE_LEDS_ALWAYS_ON == 0 ||
+                  VILLAGE_WASTE_LEDS_ALWAYS_ON == 1,
+              "VILLAGE_WASTE_LEDS_ALWAYS_ON must be 0 or 1");

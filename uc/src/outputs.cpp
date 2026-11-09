@@ -9,6 +9,15 @@
 
 namespace village {
 
+namespace {
+// The waste pins are normally dark until a category is commanded.  The
+// bench-test override (VILLAGE_WASTE_LEDS_ALWAYS_ON) holds all three lit so a
+// freshly connected LED lights immediately; it never touches the pump.
+inline int wasteLedLevel(bool on) {
+  return (VILLAGE_WASTE_LEDS_ALWAYS_ON == 1 || on) ? HIGH : LOW;
+}
+}  // namespace
+
 void setupOutputs() {
   // Pump first: LOW before the pin becomes an output.
   digitalWrite(pins::PUMP_GATE, LOW);
@@ -21,7 +30,7 @@ void setupOutputs() {
   const int waste[] = {pins::WASTE_LED_ORGANIC, pins::WASTE_LED_PLASTIC,
                        pins::WASTE_LED_PAPER};
   for (int pin : waste) {
-    digitalWrite(pin, LOW);
+    digitalWrite(pin, wasteLedLevel(false));
     pinMode(pin, OUTPUT);
   }
 
@@ -60,9 +69,9 @@ void applyStreetlights(bool on) {
 void applyWasteCategory(WasteCategory category) {
   bool organic = false, plastic = false, paper = false;
   categoryLeds(category, organic, plastic, paper);
-  digitalWrite(pins::WASTE_LED_ORGANIC, organic ? HIGH : LOW);
-  digitalWrite(pins::WASTE_LED_PLASTIC, plastic ? HIGH : LOW);
-  digitalWrite(pins::WASTE_LED_PAPER, paper ? HIGH : LOW);
+  digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(organic));
+  digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(plastic));
+  digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(paper));
 }
 
 void allOutputsOff() {
@@ -70,9 +79,9 @@ void allOutputsOff() {
   for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
     digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
   }
-  digitalWrite(pins::WASTE_LED_ORGANIC, LOW);
-  digitalWrite(pins::WASTE_LED_PLASTIC, LOW);
-  digitalWrite(pins::WASTE_LED_PAPER, LOW);
+  digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(false));
+  digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(false));
+  digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(false));
   for (int i = 0; i < 3; ++i) digitalWrite(pins::BIN_TRIG[i], LOW);
 }
 
