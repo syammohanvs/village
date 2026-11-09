@@ -108,7 +108,7 @@ cannot affect the site build. A push to `main` triggers the build; see
 
 The purchased board is the **30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1**
 (4 MB flash, AMS1117, micro-USB). The pin map uses GPIO numbers only:
-soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump **26**,
+soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump gate **19**,
 streetlights **13/12/14/27** (one lamp each), waste LEDs **21/22/23**, bin triggers **4/16/17**,
 bin echoes **36/39/18**. All analogue inputs are **ADC1** because Wi-Fi is
 active. Flash pins, input-only misuse, strapping pins and UART0 are avoided;

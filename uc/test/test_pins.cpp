@@ -53,6 +53,17 @@ TEST(waste_leds_share_the_free_header_side) {
   CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_PAPER);
 }
 
+TEST(pump_gate_shares_the_free_header_side) {
+  // The pump gate moved to the free edge so its signal wire leaves the board
+  // beside the waste indicators instead of crossing the lamp loom.
+  CHECK(pins::PUMP_GATE == 19);
+  CHECK(pins::SPARE_SAFE_OUTPUT == 26);
+  CHECK(pins::PUMP_GATE != 26);
+  CHECK(pins::PUMP_GATE != pins::WASTE_LED_ORGANIC);
+  CHECK(pins::PUMP_GATE != pins::WASTE_LED_PLASTIC);
+  CHECK(pins::PUMP_GATE != pins::WASTE_LED_PAPER);
+}
+
 TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::PUMP_GATE));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[0]));
