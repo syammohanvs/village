@@ -109,31 +109,80 @@ avoided. There is no shortage for this build.
   board documentation explicitly allows it. Powering through USB is the
   simplest safe arrangement for the exhibit.
 
-## 4. Pump driver — the unidentified component
+## 4. Pump driver — IRFZ44N (measure before trusting)
 
-The exact three-legged power component purchased with the pump has **not been
-identified**. Do not assume it is a MOSFET, do not assume its pinout, and do
-not connect it until it is identified.
+The pump is a **DC 3–6 V mini submersible** rated **130–220 mA**, maximum lift
+**40–110 mm**. It is powered from **VIN** with the 5 V 2 A power bank; the GPIO
+only drives the gate.
+
+The part in hand is an **IRFZ44N** — a standard-level N-channel MOSFET (TO-220,
+G-D-S, tab = drain). Its on-resistance is specified at **Vgs = 10 V**, not
+3.3 V, so it must be measured at 3.3 V before it is used. A 2N3904 is also in
+the kit and is **not** a suitable pump switch: 200 mA is below the pump's
+running current and its start-up surge.
 
 Required driver interface:
 
 | Property | Requirement |
 | --- | --- |
 | Type | Logic-level N-channel MOSFET (preferred) or a driver module with a transistor/optocoupler. |
-| Gate threshold | Must switch fully on at **Vgs ≤ 3.3 V**. |
+| Gate threshold | Must switch fully on at **Vgs ≤ 3.3 V** — for the IRFZ44N that is a measurement, not an assumption. |
 | Current | Rated above the pump's measured stall current, with margin. |
 | Gate resistor | 220 Ω–1 kΩ in series from GPIO 26. |
 | Gate pull-down | 10 kΩ from gate to GND, so the pump is off while the ESP32 boots. |
 | Flyback | Diode across the pump, cathode to +5 V. |
 | Ground | MOSFET source to the common ground. |
 
-Good candidates for a small 3–6 V pump are AO3400, IRLML2502 or a comparable
-logic-level MOSFET. An IRF520 module is often sold as “3.3 V compatible” but
-its threshold is marginal at 3.3 V; measure it rather than trusting the label.
+### Measure the IRFZ44N before trusting it
 
-If the component turns out to be a linear regulator, a BJT without a base
-resistor, or a module with an unknown pinout, **do not use it**. Replace it
-with a known logic-level MOSFET or a relay module and document the change.
+Use a dummy load (5 V lamp, or 47 Ω / 1 W resistor), **not** the pump:
+
+```
+VIN (+5 V) ── dummy load ──┬── IRFZ44N drain (middle leg / tab)
+                           │
+GPIO 26 / 3V3 ──[220 Ω]── gate
+                           │
+                       [10 kΩ]
+                           │
+GND ───────────────────── source (right leg)
+```
+
+With the gate held at **3.3 V**, measure Vds across the load-on MOSFET:
+
+| Vds | Decision |
+| --- | --- |
+| < 0.3 V | fully on — use it |
+| 0.3–0.8 V | usable at ~200 mA, it will warm slightly |
+| > 1 V, or a dim lamp | not switching at 3.3 V — replace it |
+
+If it fails, use a **logic-level** part: IRLZ44N (same G-D-S pinout, drop-in) or
+an AO3400/IRLML2502 module. **Do not** use the 2N3904 as the switch, and **do
+not** pull the gate up to 5 V: at reset the GPIO is an input, so a 5 V pull-up
+would turn the pump on during boot and put 5 V on a 3.3 V pin.
+
+### Wiring once Vds passes
+
+```
+VIN (+5 V) ──┬──────── pump +
+             │
+          [1N4007]   cathode → +5 V, anode → drain
+             │
+GPIO 26 ──[220 Ω]── gate
+             │
+         [10 kΩ]
+             │
+GND ─────────┴── source ─── pump −
+```
+
+- Pump **+** to VIN, pump **−** to the drain; source to the common ground.
+- 1N4007 across the pump is mandatory; 100 µF across the pump terminals is
+  optional and tames the start-up surge.
+- Power bank into **VIN** with USB unplugged. OTA is used for firmware, so the
+  cable never has to be connected while the pump is powered.
+- Keep the intake above the sludge line and **below** the reservoir probes'
+  low level, so “Available” means the pump is submerged. Never run it dry.
+- The outlet must be within about **10 cm** of the water surface; this pump
+  cannot lift higher.
 
 ## 5. Sensors
 

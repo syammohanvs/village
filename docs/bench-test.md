@@ -21,11 +21,13 @@ until step 8.
 
 ## B. LEDs
 
-- [ ] Each of the four streetlight LEDs has its own resistor (220 Ω nominal).
+- [ ] Each of the four streetlight LEDs has its own resistor (**100 Ω** on this
+      build; 220 Ω is also fine).
 - [ ] Each lights from the Controls page.
-- [ ] Organic, plastic and paper LEDs light individually and only for the
-      correct category.
-- [ ] All LEDs are off after boot.
+- [x] Organic, plastic and paper LEDs light individually and only for the
+      correct category (green D21, red D22, yellow D23 — verified 2026-11-09,
+      see `docs/verification.md`).
+- [x] All LEDs are off after boot.
 - [ ] LED current measured; the board regulator is not overheating.
 
 ## C. Light sensor
@@ -49,7 +51,8 @@ until step 8.
 
 ## E. Reservoir probes
 
-- [ ] 47 kΩ resistor between GPIO 25 and probe A.
+- [ ] **15 kΩ** between GPIO 25 and probe A (47 kΩ also works, with a narrower
+      wet/dry window).
 - [ ] Probe A also connects to GPIO 35.
 - [ ] Probe B connects to GND.
 - [ ] Dry millivolts recorded: __________
@@ -64,7 +67,8 @@ until step 8.
 
 ## F. HC-SR04 bins
 
-- [ ] Each echo passes through a divider: 1 kΩ series, 2 kΩ to GND.
+- [ ] Each echo passes through a divider: **1 kΩ series, 2 kΩ to GND**
+      (10 kΩ / 20 kΩ also gives 3.33 V and is fine).
 - [ ] Trigger and echo GPIOs match the wiring table.
 - [ ] Empty distance measured for each bin: organic ____ plastic ____ paper ____
 - [ ] Full distance measured for each bin: organic ____ plastic ____ paper ____
@@ -75,13 +79,30 @@ until step 8.
 
 ## G. Pump driver and pump
 
-- [ ] The three-legged power component is **identified** (marking/datasheet).
-      If it is not a logic-level MOSFET or a suitable driver, do not use it.
-- [ ] Gate threshold is specified at ≤ 3.3 V, or the measured gate voltage
-      switches it fully on.
-- [ ] Gate resistor 220 Ω–1 kΩ; gate pull-down 10 kΩ.
-- [ ] Flyback diode across the pump, cathode to +5 V.
-- [ ] Driver tested with a dummy load (lamp/resistor) before the pump.
+**Part in hand: IRFZ44N** (standard-level N-channel MOSFET, TO-220, G-D-S),
+with a **2N3904** small-signal NPN also available.
+
+- The pump is a **DC 3–6 V mini submersible**, rated **130–220 mA**, maximum
+  lift **40–110 mm**. Its outlet must sit within about 10 cm of the water
+  surface; above that it stalls.
+- The **2N3904 is not used as the pump switch**: its 200 mA rating is below the
+  pump's running current and its start-up surge.
+- The IRFZ44N is specified at **Vgs = 10 V**, so it has to be measured at
+  3.3 V before it is trusted:
+
+  | Measured Vds (dummy load, gate at 3V3) | Decision |
+  | --- | --- |
+  | < 0.3 V | usable as-is |
+  | 0.3–0.8 V | usable at 200 mA; it will warm |
+  | > 1 V, or a dim lamp | replace with a logic-level part (IRLZ44N, AO3400) |
+
+- [ ] Driver tested with a **dummy load** (5 V lamp or 47 Ω / 1 W resistor)
+      before the pump, gate tied to 3V3.
+- [ ] Measured Vds: __________ (record it; see the table above).
+- [ ] Gate resistor **220 Ω**; gate pull-down **10 kΩ**.
+- [ ] Flyback diode (**1N4007**) across the pump, cathode to +5 V.
+- [ ] Pump powered from **VIN** with the 5 V 2 A power bank, USB unplugged;
+      the board's 3.3 V regulator is not in the pump path.
 - [ ] Pump connected **in water**, never dry.
 - [ ] Running current: __________ Stall current: __________
 - [ ] 5 V rail holds up; the MOSFET does not overheat.
