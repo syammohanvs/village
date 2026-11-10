@@ -41,7 +41,8 @@ vi.mock('../lib/audio', () => ({
 vi.mock('../lib/speech', () => ({
   speechSupported: () => true,
   stopSpeaking: vi.fn(),
-  speakText: vi.fn(async () => undefined),
+  primeVoices: vi.fn(async () => []),
+  speakText: vi.fn(async () => true),
   speakReply: vi.fn(async () => 'none'),
   voiceAvailable: () => true,
 }));

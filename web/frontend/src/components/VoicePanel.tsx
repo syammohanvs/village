@@ -5,7 +5,7 @@ import { useDemo } from '../lib/demo';
 import { ApiError, api, errorMessage } from '../lib/api';
 import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
-import { speakReply, speechSupported, stopSpeaking } from '../lib/speech';
+import { speakReply, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
 import { describeVillage } from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
@@ -155,7 +155,11 @@ export function VoicePanel() {
     try {
       const how = await speakReply(text, language, intent);
       if (how === 'none') {
-        setTtsNote('Spoken replies are unavailable in this browser. The text above is the full reply.');
+        setTtsNote(
+          speechSupported() && !voiceAvailable(language)
+            ? `This computer has no ${VOICE_LANGUAGE_NAMES[language] ?? language} voice, so the reply is shown as text.`
+            : 'Spoken replies are unavailable in this browser. The text above is the full reply.',
+        );
       }
     } finally {
       speakingRef.current = false;

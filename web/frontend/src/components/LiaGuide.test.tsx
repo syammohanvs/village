@@ -13,7 +13,8 @@ const village = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 vi.mock('../lib/village', () => ({ useVillage: () => village.current }));
 
 const speech = vi.hoisted(() => ({
-  speakText: vi.fn(async (_text: string, _language: string, _rate?: number) => undefined),
+  speakText: vi.fn(async (_text: string, _language: string, _rate?: number) => true),
+  primeVoices: vi.fn(async () => []),
   stopSpeaking: vi.fn(),
   speechSupported: vi.fn(() => true),
   voiceAvailable: vi.fn(() => true),
@@ -77,6 +78,16 @@ describe('Lia guide', () => {
     }
     expect(screen.getByRole('button', { name: 'Maybe later' })).toBeInTheDocument();
     expect(screen.getByTestId('lia-read-aloud')).toBeInTheDocument();
+  });
+
+  it('disables read-aloud with an explanation when the language voice is missing', async () => {
+    speech.voiceAvailable.mockReturnValue(false);
+    renderGuide();
+    openGuide();
+    await act(async () => { await Promise.resolve(); });
+
+    expect(screen.getByTestId('lia-read-aloud')).toBeDisabled();
+    expect(screen.getByText(/no .* voice/i)).toBeInTheDocument();
   });
 
   it('switches to Malayalam without losing the structure', async () => {

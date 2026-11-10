@@ -14,7 +14,7 @@ import {
   type LiaPrefs,
   type LiaTopicId,
 } from '../lib/lia';
-import { speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
+import { primeVoices, speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
 import { subscribeOpenLia } from '../lib/liaUi';
 import { useVoiceUi } from '../lib/voiceUi';
@@ -102,6 +102,7 @@ export function LiaGuide() {
   const [view, setView] = useState<LiaView>({ kind: 'home' });
   const [speaking, setSpeaking] = useState(false);
   const [voiceTick, setVoiceTick] = useState(0);
+  const [voiceNote, setVoiceNote] = useState('');
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const copy = LIA_COPY[prefs.language];
@@ -174,12 +175,31 @@ export function LiaGuide() {
       .join(' ');
   }, [copy, liveItems, messages, view]);
 
+  const audioSupported = speechSupported();
+  const missingVoice = useMemo(() => {
+    if (!audioSupported) return false;
+    return !voiceAvailable(prefs.language);
+  }, [audioSupported, prefs.language, voiceTick]);
+  const languageLabel =
+    LIA_LANGUAGES.find((entry) => entry.code === prefs.language)?.label ?? prefs.language;
+
   const speakNow = useCallback(() => {
     const text = currentText();
     if (!text) return;
+    // No voice for this language means silence, not a slow browser: say so
+    // rather than leaving the button looking broken.
+    if (missingVoice) {
+      setVoiceNote(copy.voiceMissing(languageLabel));
+      return;
+    }
     setSpeaking(true);
-    void speakText(text, prefs.language, 0.92).finally(() => setSpeaking(false));
-  }, [currentText, prefs.language]);
+    setVoiceNote('');
+    void speakText(text, prefs.language, 0.92)
+      .then((ok) => {
+        if (!ok) setVoiceNote(copy.voiceMissing(languageLabel));
+      })
+      .finally(() => setSpeaking(false));
+  }, [currentText, prefs.language, missingVoice, languageLabel, copy]);
 
   useEffect(() => {
     return subscribeOpenLia((entry) => {
@@ -241,16 +261,11 @@ export function LiaGuide() {
     const handler = () => setVoiceTick((value) => value + 1);
     const synth = window.speechSynthesis;
     synth.addEventListener?.('voiceschanged', handler);
+    // Chrome fills the list after mount; without this the first check sees an
+    // empty list and calls every language "available".
+    void primeVoices().then(() => setVoiceTick((value) => value + 1));
     return () => synth.removeEventListener?.('voiceschanged', handler);
   }, []);
-
-  const audioSupported = speechSupported();
-  const missingVoice = useMemo(() => {
-    if (!audioSupported) return false;
-    return !voiceAvailable(prefs.language);
-  }, [audioSupported, prefs.language, voiceTick]);
-  const languageLabel =
-    LIA_LANGUAGES.find((entry) => entry.code === prefs.language)?.label ?? prefs.language;
 
   const toggleReadAloud = () => {
     const next = !prefs.readAloud;
@@ -509,8 +524,14 @@ export function LiaGuide() {
                 aria-pressed={prefs.readAloud}
                 aria-busy={speaking}
                 onClick={toggleReadAloud}
-                disabled={!audioSupported}
-                title={audioSupported ? copy.readAloud : copy.speechUnavailable}
+                disabled={!audioSupported || missingVoice}
+                title={
+                  !audioSupported
+                    ? copy.speechUnavailable
+                    : missingVoice
+                      ? copy.voiceMissing(languageLabel)
+                      : copy.readAloud
+                }
                 data-testid="lia-read-aloud"
               >
                 <IconSpeaker size={16} /> {copy.readAloud}
@@ -521,6 +542,7 @@ export function LiaGuide() {
             {audioSupported && missingVoice && (
               <p className="lia-note">{copy.voiceMissing(languageLabel)}</p>
             )}
+            {audioSupported && !missingVoice && voiceNote && <p className="lia-note">{voiceNote}</p>}
 
             {view.kind === 'home' && renderHome()}
             {view.kind === 'topic' && renderTopic(view.id, view.step)}
