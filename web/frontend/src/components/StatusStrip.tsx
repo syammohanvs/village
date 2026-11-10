@@ -6,7 +6,7 @@ import { IconAlert, IconSparkle } from './Icons';
 // One line at most. The old strip could stack three warnings and push the
 // dashboard below the fold; the cards themselves already say what is unknown.
 export function StatusStrip() {
-  const { demo } = useDemo();
+  const { demo, setMode } = useDemo();
   const { connected, stale, simulator, ageMs, connection } = useVillage();
 
   if (demo) {
@@ -18,6 +18,14 @@ export function StatusStrip() {
             <strong>Simulation</strong> — the physical board will not respond. Commands are
             simulated with <code>mode: demo</code>.
           </span>
+          <button
+            type="button"
+            className="banner-action"
+            onClick={() => setMode('live')}
+            data-testid="back-to-live"
+          >
+            Back to live readings
+          </button>
         </div>
       </div>
     );

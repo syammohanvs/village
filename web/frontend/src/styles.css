@@ -507,6 +507,24 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .conn-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .conn-pill--live { color: var(--success); border-color: rgba(108, 197, 150, .4); }
 .conn-pill--live .dot { animation: conn-pulse 1.8s ease-in-out infinite; }
+.conn-pill--demo {
+  color: var(--gold-2);
+  border-color: var(--gold-dim);
+  cursor: pointer;
+}
+.conn-pill--demo:hover { background: rgba(217,180,91,.12); }
+.banner-action {
+  margin-left: auto;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.banner-action:hover { background: rgba(255,255,255,.06); }
 .conn-pill--stale { color: var(--warn); border-color: rgba(227, 176, 75, .4); }
 .conn-pill--offline { color: var(--danger); border-color: rgba(224, 91, 103, .4); }
 .conn-age { color: var(--muted); font-variant-numeric: tabular-nums; }

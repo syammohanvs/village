@@ -4,6 +4,7 @@ import { cx, formatAge } from '../lib/format';
 import { openLia } from '../lib/liaUi';
 import { PAGES, SETUP_PAGE, pageMeta } from '../lib/pages';
 import { useVillage } from '../lib/village';
+import { useDemo } from '../lib/demo';
 import { Emblem } from './Emblem';
 import {
   IconActivity,
@@ -34,6 +35,7 @@ function clockOf(iso: string | null | undefined): string | null {
 
 function ConnectionPill() {
   const { connected, stale, connection, ageMs } = useVillage();
+  const { demo, setMode } = useDemo();
   // A clock that advances once a second is the cheapest honest proof that the
   // page is still being fed.  A relative "N ms ago" flickers between 0 and
   // 1000 because the backend polls every second, which reads as a frozen
@@ -45,8 +47,8 @@ function ConnectionPill() {
     return () => clearInterval(timer);
   }, []);
 
-  const label = !connected ? 'Offline' : stale ? 'Stale' : 'Live';
-  const tone = !connected ? 'offline' : stale ? 'stale' : 'live';
+  const label = demo ? 'Simulation' : !connected ? 'Offline' : stale ? 'Stale' : 'Live';
+  const tone = demo ? 'demo' : !connected ? 'offline' : stale ? 'stale' : 'live';
   const lastSuccess = connection?.last_success_at ?? null;
   const clock = clockOf(lastSuccess);
   const sinceLast = lastSuccess ? Math.max(0, now - Date.parse(lastSuccess)) : null;
@@ -54,18 +56,33 @@ function ConnectionPill() {
     <span
       className={cx('conn-pill', `conn-pill--${tone}`)}
       title={
-        connected
-          ? `Last frame from the controller: ${
-              Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
-            }${lastSuccess ? ` (${lastSuccess})` : ''}`
-          : connection?.last_error ?? 'No live frame from the controller.'
+        demo
+          ? 'Simulation mode: these readings are invented on the laptop. Press "Back to live" to talk to the board again.'
+          : connected
+            ? `Last frame from the controller: ${
+                Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
+              }${lastSuccess ? ` (${lastSuccess})` : ''}`
+            : connection?.last_error ?? 'No live frame from the controller.'
       }
       data-testid="connection-pill"
+      onClick={demo ? () => setMode('live') : undefined}
+      role={demo ? 'button' : undefined}
+      tabIndex={demo ? 0 : undefined}
+      onKeyDown={
+        demo
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setMode('live');
+              }
+            }
+          : undefined
+      }
     >
       <span className="dot" aria-hidden="true" />
       {label}
-      {connected && !stale && clock && <span className="conn-age">{clock}</span>}
-      {connected && stale && <span className="conn-age">{formatAge(ageMs)}</span>}
+      {!demo && connected && !stale && clock && <span className="conn-age">{clock}</span>}
+      {!demo && connected && stale && <span className="conn-age">{formatAge(ageMs)}</span>}
     </span>
   );
 }

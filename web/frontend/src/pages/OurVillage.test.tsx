@@ -123,6 +123,9 @@ describe('Our Village', () => {
     expect(await screen.findByTestId('demo-banner')).toHaveTextContent(
       /the physical board will not respond/i,
     );
+    // The pill must not claim the board is live while every number is invented.
+    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Simulation');
+    expect(screen.getByTestId('connection-pill')).not.toHaveTextContent('Live');
 
     const start = await screen.findByTestId('water-plants');
     expect(start).toBeEnabled();
@@ -132,6 +135,18 @@ describe('Our Village', () => {
     expect(api.sendCommand).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'IRRIGATION_REQUEST', mode: 'demo' }),
     );
+  });
+
+  it('leaves simulation in one press from the banner', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByTestId('back-to-live'));
+
+    await waitFor(() => expect(window.localStorage.getItem('village.demoMode')).toBe('live'));
+    await waitFor(() => expect(screen.queryByTestId('demo-banner')).not.toBeInTheDocument());
+    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live');
   });
 
   it('keeps Stop Watering reachable and reports an unconfirmed result', async () => {
