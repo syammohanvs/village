@@ -204,6 +204,15 @@ def create_app(
             "style-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; "
             "frame-ancestors 'none'"
         )
+        # The SPA shell must never be cached: it names the hashed bundle, so a
+        # cached copy keeps serving the previous build after a rebuild.  The
+        # hashed assets under /assets are the opposite — they can never change,
+        # so let the browser keep them.
+        path = request.url.path
+        if path.startswith("/assets/") and response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif response.headers.get("content-type", "").startswith("text/html"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     # ------------------------------------------------------------------
