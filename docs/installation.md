@@ -154,7 +154,7 @@ If port 8000 is already used by another project, keep `VILLAGE_PORT=8010`.
 `VILLAGE_PUMP_COMMISSIONED` in `uc/include/village/build_config.h` is `0`, and
 `config.irrigation.pump_enabled` is `false`. Complete the
 [bench test](bench-test.md), then set `VILLAGE_PUMP_COMMISSIONED 1`, reflash,
-and enable the pump in **Controls → Pump commissioning**. That two-key gate is
+and enable the pump in **Setup → Advanced → Pump commissioning**. That two-key gate is
 deliberate.
 
 ### Windows-ready merged image

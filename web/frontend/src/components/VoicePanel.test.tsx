@@ -18,6 +18,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       voiceIntents: vi.fn(),
       settings: vi.fn(),
       voiceTranscribe: vi.fn(),
+      events: vi.fn(),
     },
   };
 });
@@ -48,7 +49,7 @@ vi.mock('../lib/speech', () => ({
 async function openPanel() {
   const user = userEvent.setup();
   render(<App />);
-  await user.click(await screen.findByLabelText('Open voice command'));
+  await user.click(await screen.findByRole('button', { name: /start voice/i }));
   return { user, panel: await screen.findByTestId('voice-panel') };
 }
 
@@ -62,6 +63,7 @@ beforeEach(() => {
     unavailable_languages: [],
   });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true });
+  vi.mocked(api.events).mockResolvedValue({ events: [] });
   vi.mocked(api.voiceIntents).mockResolvedValue({
     intents: [
       {
@@ -94,8 +96,8 @@ describe('Voice panel', () => {
     });
 
     const { user, panel } = await openPanel();
-    await user.click(screen.getByRole('button', { name: /start recording/i }));
-    await user.click(await screen.findByRole('button', { name: /stop recording and send/i }));
+    await user.click(screen.getByRole('button', { name: /start speaking/i }));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
 
     expect(await screen.findByText('Unsupported request. No command was sent.')).toBeInTheDocument();
     expect(screen.getByText(/open the gate/)).toBeInTheDocument();
@@ -114,8 +116,8 @@ describe('Voice panel', () => {
     });
 
     const { user } = await openPanel();
-    await user.click(screen.getByRole('button', { name: /start recording/i }));
-    await user.click(await screen.findByRole('button', { name: /stop recording and send/i }));
+    await user.click(screen.getByRole('button', { name: /start speaking/i }));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
 
     await waitFor(() =>
       expect(api.sendCommand).toHaveBeenCalledWith(

@@ -16,7 +16,7 @@ import {
 } from '../lib/lia';
 import { speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
-import { useVoiceUi } from '../lib/voiceUi';
+import { subscribeOpenLia } from '../lib/liaUi';
 import { LiaAvatar } from './LiaAvatar';
 import {
   IconActivity,
@@ -93,10 +93,9 @@ type LiaView =
 export function LiaGuide() {
   const navigate = useNavigate();
   const { status, connected, stale, ageMs, demo } = useVillage();
-  const { open: voiceOpen } = useVoiceUi();
 
   const [prefs, setPrefs] = useState<LiaPrefs>(() => loadLiaPrefs());
-  const [open, setOpen] = useState<boolean>(() => !loadLiaPrefs().dismissed);
+  const [open, setOpen] = useState(false);
   const [view, setView] = useState<LiaView>({ kind: 'home' });
   const [speaking, setSpeaking] = useState(false);
   const [voiceTick, setVoiceTick] = useState(0);
@@ -131,11 +130,6 @@ export function LiaGuide() {
       saveLiaPrefs(next);
       return next;
     });
-  }, []);
-
-  const openGuide = useCallback(() => {
-    setView({ kind: 'home' });
-    setOpen(true);
   }, []);
 
   const chooseTopic = useCallback(
@@ -184,18 +178,15 @@ export function LiaGuide() {
     void speakText(text, prefs.language, 0.92).finally(() => setSpeaking(false));
   }, [currentText, prefs.language]);
 
-  const viewKey = view.kind === 'topic' ? `topic:${view.id}:${view.step}` : view.kind;
-
   useEffect(() => {
-    if (!open || !prefs.readAloud) return;
-    const text = currentText();
-    if (!text) return;
-    setSpeaking(true);
-    void speakText(text, prefs.language, 0.92).finally(() => setSpeaking(false));
-    // Keyed on the view rather than the polling envelope: live status updates
-    // must not restart the narration every two seconds.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, viewKey, prefs.readAloud, prefs.language]);
+    return subscribeOpenLia((entry) => {
+      setOpen(true);
+      if (entry === 'model') setView({ kind: 'topic', id: 'around', step: 0 });
+      else if (entry === 'voice') setView({ kind: 'topic', id: 'voice', step: 0 });
+      else if (entry === 'events') setView({ kind: 'live' });
+      else setView({ kind: 'home' });
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -261,7 +252,9 @@ export function LiaGuide() {
   const toggleReadAloud = () => {
     const next = !prefs.readAloud;
     commit({ readAloud: next });
-    if (!next) {
+    if (next) {
+      speakNow();
+    } else {
       stopSpeaking();
       setSpeaking(false);
     }
@@ -278,6 +271,21 @@ export function LiaGuide() {
     <>
       <p className="lia-welcome">{copy.welcome}</p>
       <p className="lia-child-note">{copy.childNote}</p>
+      <div className="lia-quick">
+        <button type="button" className="lia-quick-choice" onClick={() => chooseTopic('around')} data-testid="lia-quick-model">
+          <LiaPicture icon="dashboard" size={44} />
+          <span>{copy.quickModel}</span>
+        </button>
+        <button type="button" className="lia-quick-choice" onClick={() => chooseTopic('voice')} data-testid="lia-quick-voice">
+          <LiaPicture icon="voice" size={44} />
+          <span>{copy.quickVoice}</span>
+        </button>
+        <button type="button" className="lia-quick-choice" onClick={openLive} data-testid="lia-quick-events">
+          <LiaPicture icon="event" size={44} />
+          <span>{copy.quickEvents}</span>
+        </button>
+      </div>
+      <p className="lia-more-label">More topics</p>
       <div className="lia-topics">
         {LIA_TOPIC_ORDER.map((id) => {
           const topic = copy.topics[id];
@@ -289,23 +297,14 @@ export function LiaGuide() {
               onClick={() => chooseTopic(id)}
               data-testid={`lia-topic-${id}`}
             >
-              <LiaPicture icon={topic.icon} size={54} />
+              <LiaPicture icon={topic.icon} size={44} />
               <span className="lia-topic-copy">
                 <span className="lia-topic-label">{topic.label}</span>
-                {topic.adult && <span className="lia-topic-adult">{copy.adultLabel}</span>}
               </span>
             </button>
           );
         })}
       </div>
-      <button
-        type="button"
-        className="btn btn--gold btn--wide btn--large"
-        onClick={openLive}
-        data-testid="lia-live"
-      >
-        {copy.liveTitle}
-      </button>
       <div className="lia-foot">
         <button type="button" className="btn btn--ghost" onClick={close}>
           {copy.maybeLater}
@@ -445,20 +444,6 @@ export function LiaGuide() {
 
   return (
     <>
-      {!open && !voiceOpen && (
-        <button
-          type="button"
-          className="lia-fab"
-          onClick={openGuide}
-          aria-label={copy.helpButton}
-          title={copy.helpButton}
-          data-testid="lia-fab"
-        >
-          <LiaAvatar size={36} decorative />
-          <span className="lia-fab-label">{copy.helpButton}</span>
-        </button>
-      )}
-
       {open && (
         <div
           className="lia-backdrop"

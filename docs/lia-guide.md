@@ -33,10 +33,11 @@ The choice is remembered in `localStorage` under `village.lia.v1`. Clearing the
 site's storage brings the welcome back. The chosen language and the read-aloud
 setting are remembered too.
 
-## The helper button
+## The Talk to Lia button
 
-After the welcome is dismissed, a **Help with Lia** button stays at the bottom
-right of every page. It reopens the guide from anywhere. The button uses the
+Lia does not open by itself and there is no floating button. **Talk to Lia**
+sits at the bottom of the sidebar (and in the top bar on a phone), so the guide
+is one press away on every page. The button uses the
 same theme and the same avatar.
 
 ## Topics and steps

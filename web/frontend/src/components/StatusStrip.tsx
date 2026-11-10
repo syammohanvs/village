@@ -1,65 +1,67 @@
 import { useDemo } from '../lib/demo';
 import { formatAge } from '../lib/format';
 import { useVillage } from '../lib/village';
-import { IconAlert, IconInfo, IconSparkle } from './Icons';
+import { IconAlert, IconSparkle } from './Icons';
 
+// One line at most. The old strip could stack three warnings and push the
+// dashboard below the fold; the cards themselves already say what is unknown.
 export function StatusStrip() {
   const { demo } = useDemo();
-  const { connected, stale, connection, simulator, ageMs } = useVillage();
+  const { connected, stale, simulator, ageMs, connection } = useVillage();
 
-  const lastSeen =
-    ageMs === null || ageMs === undefined ? 'no frame received yet' : `last seen ${formatAge(ageMs)}`;
-
-  return (
-    <div className="status-strip" aria-live="polite">
-      {demo && (
+  if (demo) {
+    return (
+      <div className="status-strip" aria-live="polite">
         <div className="banner banner--demo" data-testid="demo-banner">
-          <IconInfo size={17} />
-          <div>
-            <strong>Demo mode</strong> — simulated data, physical controls disabled.
-            <span className="banner-detail">
-              Commands still go to the same endpoints, marked <code>mode: demo</code>.
-            </span>
-          </div>
+          <IconSparkle size={16} />
+          <span>
+            <strong>Simulation</strong> — the physical board will not respond. Commands are
+            simulated with <code>mode: demo</code>.
+          </span>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {simulator && (
+  if (simulator) {
+    return (
+      <div className="status-strip" aria-live="polite">
         <div className="banner banner--sim" data-testid="simulator-badge">
           <IconSparkle size={16} />
-          <div>
-            <strong>Simulator</strong>{' '}
-            <span className="banner-detail">
-              source.kind is “simulator”. Readings are generated on this laptop, not by an ESP32.
-            </span>
-          </div>
+          <span>
+            <strong>Simulation</strong> — these readings come from the laptop, not the board.
+          </span>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {!connected && (
+  if (!connected) {
+    return (
+      <div className="status-strip" aria-live="polite">
         <div className="banner banner--offline" role="status" data-testid="offline-banner">
-          <IconAlert size={17} />
-          <div>
-            <strong>Controller offline</strong> — {lastSeen}, not live.
-            <span className="banner-detail">
-              {connection?.last_error ?? 'No acknowledgement has arrived from the village controller.'}{' '}
-              Missing readings stay blank; they are never replaced with zero.
-            </span>
-          </div>
+          <IconAlert size={16} />
+          <span>
+            <strong>Controller offline</strong> — last seen {formatAge(ageMs)}.{' '}
+            {connection?.last_error ?? 'The cards stay visible; actions are disabled.'}
+          </span>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {connected && stale && (
+  if (stale) {
+    return (
+      <div className="status-strip" aria-live="polite">
         <div className="banner banner--stale" role="status" data-testid="stale-banner">
-          <IconAlert size={17} />
-          <div>
-            <strong>Last reading is {formatAge(ageMs)}</strong> — stale, not live.
-            <span className="banner-detail">
-              These are the most recent values; they are not moving and are not a live reading.
-            </span>
-          </div>
+          <IconAlert size={16} />
+          <span>
+            <strong>Last reading {formatAge(ageMs)}</strong> — stale, not live.
+          </span>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -47,6 +47,9 @@ export interface LiaCopy {
   welcome: string;
   role: string;
   homeTitle: string;
+  quickModel: string;
+  quickVoice: string;
+  quickEvents: string;
   childNote: string;
   maybeLater: string;
   readAloud: string;
@@ -104,10 +107,12 @@ const BIN_NAMES: Record<LiaLanguage, Record<string, string>> = {
 };
 
 const EN: LiaCopy = {
-  welcome:
-    "Hello! I’m Lia, your village helper. I can show you how our village saves water, sorts waste and lights its streets. What would you like to do?",
+  welcome: 'Hello! I’m Lia. I can help you explore our village.', 
   role: 'Village helper',
   homeTitle: 'What would you like to do?',
+  quickModel: 'Show me the model',
+  quickVoice: 'Help me use voice',
+  quickEvents: 'Explain what happened',
   childNote: 'Young children: try the physical demonstrations with an adult.',
   maybeLater: 'Maybe later',
   readAloud: 'Read aloud',
@@ -133,14 +138,14 @@ const EN: LiaCopy = {
     around: {
       id: 'around',
       icon: 'dashboard',
-      label: 'Show me around',
+      label: 'Show me the model',
       intro: 'Let me show you the village.',
       steps: [
-        { title: 'The dashboard', text: 'This page shows what the village is doing now.', icon: 'dashboard', page: '/' },
-        { title: 'The sensors', text: 'Here are the soil, the water tank and the light sensor.', icon: 'sensor', page: '/sensors' },
-        { title: 'The controls', text: 'Here you can water the plants or switch the lights.', icon: 'pump', page: '/controls' },
-        { title: 'The waste camera', text: 'The camera looks at waste and guesses its type.', icon: 'camera', page: '/waste' },
-        { title: 'The village diary', text: 'The Activity page lists what happened and when.', icon: 'event', page: '/activity' },
+        { title: 'Our Village', text: 'This page shows what the village is doing now and what you can try.', icon: 'dashboard', page: '/' },
+        { title: 'The sensors', text: 'Here are the soil, the water tank and the light sensor.', icon: 'sensor', page: '/setup#sensors' },
+        { title: 'Water and lights', text: 'The first three cards water the plants and switch the lights.', icon: 'pump', page: '/' },
+        { title: 'Sort Waste', text: 'The camera looks at waste and suggests a bin.', icon: 'camera', page: '/waste' },
+        { title: 'What Happened', text: 'This page lists what happened and why.', icon: 'event', page: '/activity' },
       ],
     },
     water: {
@@ -155,7 +160,7 @@ const EN: LiaCopy = {
       steps: [
         { title: 'Check the soil', text: 'A probe in the soil measures how wet it is.', icon: 'sensor' },
         { title: 'Check the tank', text: 'Two wires tell us if water is at the low level.', icon: 'tank' },
-        { title: 'Ask for water', text: 'Press Water plants on Controls, or say “water the plants”.', icon: 'pump', page: '/controls' },
+        { title: 'Ask for water', text: 'Press Water Plants on Our Village, or say “water the plants”.', icon: 'pump', page: '/' },
         { title: 'It stops by itself', text: 'The pump runs in short pulses. Stop works at any time.', icon: 'help' },
       ],
     },
@@ -171,7 +176,7 @@ const EN: LiaCopy = {
       steps: [
         { title: 'It watches the light', text: 'A light sensor sits near the lamps.', icon: 'sensor' },
         { title: 'Auto mode', text: 'When it gets dark, the lamps switch on. When it is bright, they switch off.', icon: 'light' },
-        { title: 'You can help', text: 'Press Lights On or Lights Off on Controls.', icon: 'dashboard', page: '/controls' },
+        { title: 'You can help', text: 'Choose On or Off on the Streetlights card.', icon: 'dashboard', page: '/' },
       ],
     },
     waste: {
@@ -186,7 +191,7 @@ const EN: LiaCopy = {
       steps: [
         { title: 'Three bins', text: 'Organic, plastic and paper.', icon: 'bin' },
         { title: 'Show the camera', text: 'Hold one clean item in front of the camera.', icon: 'camera', page: '/waste' },
-        { title: 'Read the guess', text: 'The screen shows a guess. It is not proof.', icon: 'help' },
+        { title: 'Read the guess', text: 'The screen suggests a bin. It is not proof of disposal.', icon: 'help' },
       ],
     },
     voice: {
@@ -196,7 +201,7 @@ const EN: LiaCopy = {
       intro: 'You can speak to the village in English, Malayalam or Hindi.',
       adultNote: 'Young children can try this with an adult.',
       steps: [
-        { title: 'Press the microphone', text: 'The microphone button is at the top of the screen.', icon: 'voice' },
+        { title: 'Open Our Village', text: 'Press Start voice on the voice card, or ask Lia.', icon: 'voice', page: '/' },
         { title: 'Say a short phrase', text: 'For example: “turn on the lights” or “water the plants”.', icon: 'voice' },
         { title: 'The village checks', text: 'It repeats what it heard. If it is not sure, it does nothing.', icon: 'help' },
       ],
@@ -208,10 +213,10 @@ const EN: LiaCopy = {
       intro: 'Let us check the village together.',
       adultNote: 'If the screen says Offline, ask a grown-up to check the power and Wi-Fi.',
       steps: [
-        { title: 'Is it connected?', text: 'Look at the pill at the top. Green means live.', icon: 'connection' },
-        { title: 'Is Demo on?', text: 'In Demo mode the numbers are pretend.', icon: 'dashboard' },
+        { title: 'Is it connected?', text: 'Look at the connection status at the top. Green means live.', icon: 'connection' },
+        { title: 'Is Simulation on?', text: 'In Simulation the numbers are generated and the board does not respond.', icon: 'dashboard' },
         { title: 'Is the camera model there?', text: 'If the waste page says “Recognition model not installed”, the model files are missing.', icon: 'camera', page: '/waste' },
-        { title: 'Still stuck?', text: 'Open the Activity page and read the last message.', icon: 'event', page: '/activity' },
+        { title: 'Still stuck?', text: 'Open What Happened and read the last message.', icon: 'event', page: '/activity' },
       ],
     },
   },
@@ -222,6 +227,9 @@ const ML: LiaCopy = {
     'ഹലോ! ഞാൻ ലിയ, നിങ്ങളുടെ വില്ലേജ് സഹായി. ഞങ്ങളുടെ ഗ്രാമം എങ്ങനെ വെള്ളം ലാഭിക്കുന്നു, മാലിന്യം തരംതിരിക്കുന്നു, തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു എന്ന് ഞാൻ കാണിച്ചുതരാം. നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
   role: 'ഗ്രാമ സഹായി',
   homeTitle: 'നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
+  quickModel: 'മാതൃക കാണിക്കൂ',
+  quickVoice: 'ശബ്ദം ഉപയോഗിക്കാൻ സഹായിക്കൂ',
+  quickEvents: 'എന്ത് സംഭവിച്ചു എന്ന് പറയൂ',
   childNote: 'കൊച്ചുകുട്ടികൾ: ശാരീരിക പ്രവർത്തനങ്ങൾ ഒരു മുതിർന്നയാളോടൊപ്പം ചെയ്യുക.',
   maybeLater: 'പിന്നീട്',
   readAloud: 'വായിച്ചു കേൾപ്പിക്കൂ',
@@ -251,8 +259,8 @@ const ML: LiaCopy = {
       intro: 'ഗ്രാമത്തിലെ പേജുകൾ ഞാൻ കാണിച്ചുതരാം.',
       steps: [
         { title: 'ഡാഷ്ബോർഡ്', text: 'ഗ്രാമം ഇപ്പോൾ എന്ത് ചെയ്യുന്നു എന്ന് ഈ പേജ് കാണിക്കുന്നു.', icon: 'dashboard', page: '/' },
-        { title: 'സെൻസറുകൾ', text: 'മണ്ണ്, വെള്ളം, വെളിച്ചം എന്നിവയുടെ വിവരം ഇവിടെ കാണാം.', icon: 'sensor', page: '/sensors' },
-        { title: 'നിയന്ത്രണങ്ങൾ', text: 'ഇവിടെ നിന്ന് ചെടികൾക്ക് വെള്ളം നൽകാം, വിളക്കുകൾ കത്തിക്കാം.', icon: 'pump', page: '/controls' },
+        { title: 'സെൻസറുകൾ', text: 'മണ്ണ്, വെള്ളം, വെളിച്ചം എന്നിവയുടെ വിവരം ഇവിടെ കാണാം.', icon: 'sensor', page: '/setup#sensors' },
+        { title: 'നിയന്ത്രണങ്ങൾ', text: 'ഇവിടെ നിന്ന് ചെടികൾക്ക് വെള്ളം നൽകാം, വിളക്കുകൾ കത്തിക്കാം.', icon: 'pump', page: '/' },
         { title: 'മാലിന്യ ക്യാമറ', text: 'ക്യാമറ മാലിന്യം നോക്കി അതിന്റെ തരം ഊഹിക്കുന്നു.', icon: 'camera', page: '/waste' },
         { title: 'ഗ്രാമ ഡയറി', text: 'എന്തൊക്കെ നടന്നു എന്ന് ആക്ടിവിറ്റി പേജ് കാണിക്കുന്നു.', icon: 'event', page: '/activity' },
       ],
@@ -269,7 +277,7 @@ const ML: LiaCopy = {
       steps: [
         { title: 'മണ്ണ് നോക്കൂ', text: 'മണ്ണിലെ പ്രോബ് അതിന്റെ ഈർപ്പം അളക്കുന്നു.', icon: 'sensor' },
         { title: 'ടാങ്ക് നോക്കൂ', text: 'വെള്ളം കുറഞ്ഞ നിലയിലുണ്ടോ എന്ന് രണ്ട് കമ്പികൾ പറയുന്നു.', icon: 'tank' },
-        { title: 'വെള്ളം ചോദിക്കൂ', text: 'നിയന്ത്രണങ്ങളിൽ ‘ചെടികൾക്ക് വെള്ളം’ അമർത്തുക, അല്ലെങ്കിൽ “water the plants” എന്ന് പറയുക.', icon: 'pump', page: '/controls' },
+        { title: 'വെള്ളം ചോദിക്കൂ', text: 'നിയന്ത്രണങ്ങളിൽ ‘ചെടികൾക്ക് വെള്ളം’ അമർത്തുക, അല്ലെങ്കിൽ “water the plants” എന്ന് പറയുക.', icon: 'pump', page: '/' },
         { title: 'തനിയെ നിൽക്കും', text: 'പമ്പ് ചെറിയ പൾസുകളായി ഓടും. എപ്പോൾ വേണമെങ്കിലും നിർത്താം.', icon: 'help' },
       ],
     },
@@ -285,7 +293,7 @@ const ML: LiaCopy = {
       steps: [
         { title: 'വെളിച്ചം നോക്കുന്നു', text: 'വിളക്കുകൾക്ക് സമീപം ഒരു വെളിച്ച സെൻസർ ഉണ്ട്.', icon: 'sensor' },
         { title: 'ഓട്ടോ മോഡ്', text: 'ഇരുട്ടാകുമ്പോൾ വിളക്കുകൾ കത്തും. വെളിച്ചമുള്ളപ്പോൾ അണയും.', icon: 'light' },
-        { title: 'നിങ്ങൾക്കും സഹായിക്കാം', text: 'നിയന്ത്രണങ്ങളിൽ ‘വിളക്കുകൾ ഓൺ’ അല്ലെങ്കിൽ ‘ഓഫ്’ അമർത്തുക.', icon: 'dashboard', page: '/controls' },
+        { title: 'നിങ്ങൾക്കും സഹായിക്കാം', text: 'നിയന്ത്രണങ്ങളിൽ ‘വിളക്കുകൾ ഓൺ’ അല്ലെങ്കിൽ ‘ഓഫ്’ അമർത്തുക.', icon: 'dashboard', page: '/' },
       ],
     },
     waste: {
@@ -310,7 +318,7 @@ const ML: LiaCopy = {
       intro: 'ഇംഗ്ലീഷ്, മലയാളം, ഹിന്ദി എന്നിവയിൽ ഗ്രാമത്തോട് സംസാരിക്കാം.',
       adultNote: 'കൊച്ചുകുട്ടികൾ ഇത് ഒരു മുതിർന്നയാളോടൊപ്പം ചെയ്യാം.',
       steps: [
-        { title: 'മൈക്രോഫോൺ അമർത്തൂ', text: 'സ്ക്രീനിന്റെ മുകളിൽ മൈക്രോഫോൺ ബട്ടൺ ഉണ്ട്.', icon: 'voice' },
+        { title: 'മൈക്രോഫോൺ അമർത്തൂ', text: 'Our Village തുറന്ന് Start voice അമർത്തുക.', icon: 'voice' },
         { title: 'ചെറിയ വാക്യം പറയൂ', text: 'ഉദാഹരണം: “turn on the lights” അല്ലെങ്കിൽ “water the plants”.', icon: 'voice' },
         { title: 'ഗ്രാമം പരിശോധിക്കും', text: 'കേട്ടത് അത് ആവർത്തിക്കും. ഉറപ്പില്ലെങ്കിൽ ഒന്നും ചെയ്യില്ല.', icon: 'help' },
       ],
@@ -322,10 +330,10 @@ const ML: LiaCopy = {
       intro: 'നമുക്ക് ഒരുമിച്ച് ഗ്രാമം പരിശോധിക്കാം.',
       adultNote: 'ഓഫ്ലൈൻ എന്ന് കണ്ടാൽ, പവറും വൈ-ഫൈയും പരിശോധിക്കാൻ ഒരു മുതിർന്നയാളിനോട് പറയുക.',
       steps: [
-        { title: 'കണക്ഷൻ ഉണ്ടോ?', text: 'മുകളിലെ പിൽ നോക്കുക. പച്ചയാണെങ്കിൽ ലൈവ് ആണ്.', icon: 'connection' },
+        { title: 'കണക്ഷൻ ഉണ്ടോ?', text: 'മുകളിലെ കണക്ഷൻ സ്റ്റാറ്റസ് നോക്കുക. പച്ചയാണെങ്കിൽ ലൈവ് ആണ്.', icon: 'connection' },
         { title: 'ഡെമോ ഓണാണോ?', text: 'ഡെമോ മോഡിൽ സംഖ്യകൾ നടിക്കലാണ്.', icon: 'dashboard' },
         { title: 'ക്യാമറ മോഡൽ ഉണ്ടോ?', text: 'മാലിന്യ പേജിൽ “Recognition model not installed” എന്ന് കണ്ടാൽ മോഡൽ ഫയലുകൾ ഇല്ല.', icon: 'camera', page: '/waste' },
-        { title: 'ഇപ്പോഴും പ്രശ്നമുണ്ടോ?', text: 'ആക്ടിവിറ്റി പേജ് തുറന്ന് അവസാന സന്ദേശം വായിക്കുക.', icon: 'event', page: '/activity' },
+        { title: 'ഇപ്പോഴും പ്രശ്നമുണ്ടോ?', text: 'What Happened തുറന്ന് അവസാന സന്ദേശം വായിക്കുക.', icon: 'event', page: '/activity' },
       ],
     },
   },
@@ -336,6 +344,9 @@ const HI: LiaCopy = {
     'नमस्ते! मैं लिया हूँ, आपकी गाँव सहायक। मैं आपको दिखाऊँगी कि हमारा गाँव पानी कैसे बचाता है, कचरा कैसे अलग करता है और सड़क की बत्तियाँ कैसे जलाता है। आप क्या करना चाहेंगे?',
   role: 'गाँव सहायक',
   homeTitle: 'आप क्या करना चाहेंगे?',
+  quickModel: 'मॉडल दिखाओ',
+  quickVoice: 'आवाज़ का उपयोग सिखाओ',
+  quickEvents: 'क्या हुआ, बताओ',
   childNote: 'छोटे बच्चे: शारीरिक प्रदर्शन किसी बड़े के साथ करें।',
   maybeLater: 'बाद में',
   readAloud: 'पढ़कर सुनाइए',
@@ -365,8 +376,8 @@ const HI: LiaCopy = {
       intro: 'मैं आपको गाँव के पेज दिखाती हूँ।',
       steps: [
         { title: 'डैशबोर्ड', text: 'यह पेज दिखाता है कि गाँव अभी क्या कर रहा है।', icon: 'dashboard', page: '/' },
-        { title: 'सेंसर', text: 'यहाँ मिट्टी, पानी की टंकी और रोशनी के सेंसर दिखते हैं।', icon: 'sensor', page: '/sensors' },
-        { title: 'कंट्रोल', text: 'यहाँ से पौधों को पानी दे सकते हैं या बत्तियाँ जला सकते हैं।', icon: 'pump', page: '/controls' },
+        { title: 'सेंसर', text: 'यहाँ मिट्टी, पानी की टंकी और रोशनी के सेंसर दिखते हैं।', icon: 'sensor', page: '/setup#sensors' },
+        { title: 'कंट्रोल', text: 'यहाँ से पौधों को पानी दे सकते हैं या बत्तियाँ जला सकते हैं।', icon: 'pump', page: '/' },
         { title: 'कचरा कैमरा', text: 'कैमरा कचरा देखकर उसका प्रकार अनुमान लगाता है।', icon: 'camera', page: '/waste' },
         { title: 'गाँव की डायरी', text: 'एक्टिविटी पेज बताता है कि क्या और कब हुआ।', icon: 'event', page: '/activity' },
       ],
@@ -383,7 +394,7 @@ const HI: LiaCopy = {
       steps: [
         { title: 'मिट्टी देखिए', text: 'मिट्टी में लगी प्रोब नमी नापती है।', icon: 'sensor' },
         { title: 'टंकी देखिए', text: 'दो तार बताते हैं कि कम स्तर पर पानी है या नहीं।', icon: 'tank' },
-        { title: 'पानी माँगिए', text: 'कंट्रोल में ‘पौधों को पानी’ दबाइए, या “water the plants” कहिए।', icon: 'pump', page: '/controls' },
+        { title: 'पानी माँगिए', text: 'कंट्रोल में ‘पौधों को पानी’ दबाइए, या “water the plants” कहिए।', icon: 'pump', page: '/' },
         { title: 'अपने आप रुकता है', text: 'पंप छोटे स्पंदों में चलता है। कभी भी रोक सकते हैं।', icon: 'help' },
       ],
     },
@@ -399,7 +410,7 @@ const HI: LiaCopy = {
       steps: [
         { title: 'रोशनी देखता है', text: 'बत्तियों के पास एक रोशनी सेंसर है।', icon: 'sensor' },
         { title: 'ऑटो मोड', text: 'अंधेरा होने पर बत्तियाँ जलती हैं। रोशनी में बंद हो जाती हैं।', icon: 'light' },
-        { title: 'आप भी मदद करें', text: 'कंट्रोल में ‘बत्तियाँ चालू’ या ‘बंद’ दबाइए।', icon: 'dashboard', page: '/controls' },
+        { title: 'आप भी मदद करें', text: 'कंट्रोल में ‘बत्तियाँ चालू’ या ‘बंद’ दबाइए।', icon: 'dashboard', page: '/' },
       ],
     },
     waste: {
@@ -424,7 +435,7 @@ const HI: LiaCopy = {
       intro: 'आप अंग्रेज़ी, मलयालम या हिंदी में गाँव से बात कर सकते हैं।',
       adultNote: 'छोटे बच्चे इसे किसी बड़े के साथ करें।',
       steps: [
-        { title: 'माइक्रोफ़ोन दबाइए', text: 'स्क्रीन के ऊपर माइक्रोफ़ोन बटन है।', icon: 'voice' },
+        { title: 'माइक्रोफ़ोन दबाइए', text: 'Our Village खोलकर Start voice दबाइए।', icon: 'voice' },
         { title: 'छोटा वाक्य कहिए', text: 'जैसे: “turn on the lights” या “water the plants”।', icon: 'voice' },
         { title: 'गाँव जाँचता है', text: 'जो सुना, वह दोहराता है। अगर पक्का न हो, तो कुछ नहीं करता।', icon: 'help' },
       ],
@@ -436,10 +447,10 @@ const HI: LiaCopy = {
       intro: 'आइए गाँव को साथ में जाँचें।',
       adultNote: 'अगर ऑफ़लाइन दिखे, तो किसी बड़े से बिजली और वाई-फ़ाई जाँचने को कहें।',
       steps: [
-        { title: 'कनेक्शन है?', text: 'ऊपर का पिल देखिए। हरा मतलब लाइव।', icon: 'connection' },
+        { title: 'कनेक्शन है?', text: 'ऊपर का कनेक्शन स्टेटस देखिए। हरा मतलब लाइव।', icon: 'connection' },
         { title: 'डेमो चालू है?', text: 'डेमो मोड में संख्याएँ नकली होती हैं।', icon: 'dashboard' },
         { title: 'कैमरा मॉडल है?', text: 'अगर कचरा पेज पर “Recognition model not installed” दिखे, तो मॉडल फ़ाइलें नहीं हैं।', icon: 'camera', page: '/waste' },
-        { title: 'फिर भी अटके?', text: 'एक्टिविटी पेज खोलकर आख़िरी संदेश पढ़िए।', icon: 'event', page: '/activity' },
+        { title: 'फिर भी अटके?', text: 'What Happened खोलकर आख़िरी संदेश पढ़िए।', icon: 'event', page: '/activity' },
       ],
     },
   },

@@ -39,7 +39,7 @@ The controller refuses with a reason. Check, in order:
 - `the soil is already wet enough` — the reading is at or above the dry-start
   threshold. This is correct behaviour.
 - `a required sensor reading is stale or invalid` — check the probe wiring and
-  the age shown on Sensors.
+  the age shown in **Setup → Sensors & Calibration**.
 - `a watering session is already running` — press Stop first.
 - `the post-session lockout is still active` — wait for the cooldown; after a
   no-rise failure it is 30 minutes. Fix the probe and/or wet the soil to clear
@@ -97,7 +97,7 @@ session; local automatic watering continues if the laptop disappears.
 - **Everything reads “Not installed” and the lamps never switch on:** the
   controller starts with both hardware facts false on purpose. A floating ADC
   pin reads plausible noise, so an unwired LDR must not report “dark”, and
-  unwired lamps must not be driven. Tick the matching box on **Sensors** —
+  unwired lamps must not be driven. Tick the matching box in **Setup → Sensors & Calibration** —
   **The streetlight lamps are wired** for the four outputs, **The LDR is
   wired** for the sensor — then save. They are independent: you can test the
   lamps before the LDR is fitted.
@@ -129,7 +129,7 @@ session; local automatic watering continues if the laptop disappears.
 ## Lia says a probe is not calibrated
 
 That is the honest state, not a fault. A probe reports a real percentage only
-after the two endpoints are captured and confirmed on **Sensors**. Until then
+after the two endpoints are captured and confirmed in **Setup → Sensors & Calibration**. Until then
 Lia refuses to guess. See [calibration.md](calibration.md).
 
 ## Voice does not work

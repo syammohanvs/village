@@ -435,6 +435,49 @@ is English. The language is passed through to whisper.cpp, but the words in
 `shared/intents.json` and the child's actual pronunciation remain the real
 test.
 
+## Simplified exhibition interface — 2026-11-10 (branch `dev`)
+
+The dashboard was reduced to the four things a Class 6 visitor or a judge needs,
+with configuration moved behind a smaller **Setup** link. The burgundy, black
+and gold palette is unchanged.
+
+```
+Navigation      Our Village · Sort Waste · What Happened · About & Help
+                + Setup (smaller, bottom) + one Talk to Lia entry
+Old addresses   /controls -> /        /settings -> /setup
+                /sensors  -> /setup#sensors   /villagers -> /about#sample-village
+Pages rewritten OurVillage, SortWaste, WhatHappened, AboutHelp, Setup
+Lia             opens on request, three quick choices, no autoplay
+Voice           opened from Our Village; readiness chip instead of "Live"
+```
+
+**Local gates:** `npm run typecheck` clean, `npx vitest run` **43 passed in 7
+files**, `npm run build` ok. Backend tests unchanged (22 passed on the voice
+change earlier).
+
+**Browser walk (Chromium, 47 checks, 0 failures, 0 console errors):**
+
+- Every route returns 200, renders the expected `<h1>`, and has no horizontal
+  overflow at 1440×900.
+- Four sidebar items, one visible **Talk to Lia**, and a smaller Setup link.
+- Lia opens from that entry, shows the three quick choices, and closes with
+  Escape.
+- **Start voice** on Our Village opens the panel; three languages are offered;
+  no "Live" badge is claimed.
+- Each of the four cards carries a **Try:** line and a **Watch the model:**
+  line.
+- Simulation is off by default, clearly labelled *the physical board will not
+  respond* when switched on, and is only changed by hand.
+- The legacy addresses redirect to the pages above.
+- At 390×844 there is no horizontal overflow, the burger is visible, and the
+  menu reaches Sort Waste.
+
+**Honest limits at the time of writing:** the ESP32 is disconnected, so the
+cards correctly show Unknown/Offline and the actions are disabled; no hardware
+behaviour was tested for this change. The waste model is still absent, so Sort
+Waste says the model is missing and keeps the camera off. The simulation path
+was exercised; the physical path was not.
+
 ## Not verified
 
 - Physical soil, reservoir, pump and ultrasonic-bin behaviour,

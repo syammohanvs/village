@@ -1,4 +1,4 @@
-import type { AppSettings, StateEnvelope } from '../types';
+import type { AppSettings, DeviceConfig, DeviceConfigDocument, StateEnvelope } from '../types';
 
 export interface StateOptions {
   connected?: boolean;
@@ -185,4 +185,53 @@ export function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings 
     updated_at: '2026-11-07T10:00:00Z',
     ...overrides,
   };
+}
+
+export function makeConfig(overrides: Partial<DeviceConfig> = {}): DeviceConfig {
+  return {
+    soil: { dry_raw: 4095, wet_raw: 1460, min_span_raw: 400, samples: 9, max_age_ms: 5000, calibrated: true },
+    reservoir: {
+      wet_threshold_mv: 2300,
+      dry_threshold_mv: 2800,
+      confirm_readings: 3,
+      max_age_ms: 5000,
+      calibrated: true,
+    },
+    light: {
+      installed: true,
+      sensor_fitted: true,
+      output_type: 'digital',
+      analog_bright_high: true,
+      digital_dark_when_high: true,
+      dark_threshold: 1600,
+      bright_threshold: 2400,
+      stable_ms: 4000,
+      max_age_ms: 5000,
+    },
+    bins: [
+      { id: 'organic', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
+      { id: 'plastic', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
+      { id: 'paper', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
+    ],
+    irrigation: {
+      auto_enabled: true,
+      pump_enabled: false,
+      dry_start_pct: 35,
+      stop_pct: 55,
+      dry_confirm_ms: 30000,
+      pulse_ms: 8000,
+      max_pulse_ms: 8000,
+      soak_ms: 45000,
+      max_cumulative_ms: 30000,
+      max_pulses: 4,
+      cooldown_ms: 300000,
+      link_timeout_ms: 30000,
+    },
+    waste: { indicate_ms: 8000 },
+    ...overrides,
+  };
+}
+
+export function makeConfigDocument(revision = 4, overrides: Partial<DeviceConfig> = {}): DeviceConfigDocument {
+  return { protocol_version: 1, device_id: 'village-test', config_revision: revision, config: makeConfig(overrides) };
 }

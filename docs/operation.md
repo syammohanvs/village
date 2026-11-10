@@ -80,14 +80,14 @@ water physically flowed. The dashboard keeps the two statements separate.
    reservoir is available. The controller may refuse with a reason — that is a
    feature, not a failure. Point out the pulse → soak → re-check sequence.
    Press **Stop irrigation** to show the immediate stop.
-4. **Waste camera.** Hold a plastic item in front of the camera. The stable
+4. **Sort Waste.** Hold a plastic item in front of the camera. The stable
    prediction lights the plastic LED. Move it away; show that repeated frames
    do not count as new items. Point out that recognition is not proof of
    disposal.
 5. **Voice.** Press the microphone, speak one command, show the recognised text
    and the matched command. Try “do not start irrigation” to show that a
    negated request is refused without action.
-6. **Activity.** Show the command log and the recognition event.
+6. **What Happened.** Show the command log and the recognition event.
 7. **Demo mode (optional).** Turn it on for a fast scenario demonstration:
    Dry soil, Low water, Night, Fill a bin. The banner says simulated data and
    physical controls are disabled. Never leave Demo mode on for the real
@@ -101,7 +101,7 @@ water physically flowed. The dashboard keeps the two statements separate.
 | Stop irrigation | Sends `IRRIGATION_STOP`; the pump stops immediately. Always visible during a session. |
 | Lights Auto / On / Off | Sends `LIGHTS_AUTO`, `LIGHTS_ON` or `LIGHTS_OFF`. Auto uses the LDR. |
 | Voice command | Push-to-talk, maximum 10 seconds. |
-| Waste camera | Opens the local camera classifier. |
+| Sort Waste | Opens the local camera classifier. |
 | Demo mode | Simulated readings and simulated commands only. |
 
 ## Voice commands

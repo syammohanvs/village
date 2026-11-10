@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiaGuide } from './LiaGuide';
 import { LIA_STORAGE_KEY } from '../lib/lia';
+import { openLia } from '../lib/liaUi';
 import { VoiceUiProvider } from '../lib/voiceUi';
 import { makeState } from '../test/fixtures';
 
@@ -30,6 +31,10 @@ function renderGuide() {
   );
 }
 
+function openGuide(entry: 'help' | 'model' | 'voice' | 'events' = 'help') {
+  act(() => openLia(entry));
+}
+
 function setVillage(overrides: Record<string, unknown> = {}) {
   village.current = {
     status: makeState().status,
@@ -43,16 +48,25 @@ function setVillage(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
   speech.speechSupported.mockReturnValue(true);
   speech.voiceAvailable.mockReturnValue(true);
   setVillage();
 });
 
 describe('Lia guide', () => {
-  it('welcomes a first-time visitor with the six large choices', () => {
+  it('stays closed until asked, then offers three quick choices and every topic', () => {
     renderGuide();
+    expect(screen.queryByTestId('lia-guide')).not.toBeInTheDocument();
+
+    openGuide();
     expect(screen.getByTestId('lia-guide')).toBeInTheDocument();
-    expect(screen.getByText(/Hello! I’m Lia, your village helper/)).toBeInTheDocument();
+    expect(screen.getByText(/Hello! I’m Lia. I can help you explore our village/)).toBeInTheDocument();
+
+    expect(screen.getByTestId('lia-quick-model')).toHaveTextContent('Show me the model');
+    expect(screen.getByTestId('lia-quick-voice')).toHaveTextContent('Help me use voice');
+    expect(screen.getByTestId('lia-quick-events')).toHaveTextContent('Explain what happened');
+
     for (const id of ['around', 'water', 'lights', 'waste', 'voice', 'help']) {
       expect(screen.getByTestId(`lia-topic-${id}`)).toBeInTheDocument();
     }
@@ -63,41 +77,43 @@ describe('Lia guide', () => {
   it('switches to Malayalam without losing the structure', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
+
     await user.click(screen.getByTestId('lia-lang-ml'));
     expect(screen.getByText(/ഹലോ!/)).toBeInTheDocument();
     expect(screen.getByTestId('lia-topic-water')).toHaveTextContent('ചെടികൾക്ക് വെള്ളം നൽകൂ');
     expect(screen.getByRole('button', { name: 'പിന്നീട്' })).toBeInTheDocument();
   });
 
-  it('remembers a dismissal and keeps the helper button everywhere', async () => {
+  it('remembers a dismissal and reopens from the shared entry point', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
     await user.click(screen.getByRole('button', { name: 'Maybe later' }));
     expect(screen.queryByTestId('lia-guide')).not.toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem(LIA_STORAGE_KEY) ?? '{}').dismissed).toBe(true);
 
-    const fab = screen.getByTestId('lia-fab');
-    expect(fab).toHaveAccessibleName('Help with Lia');
-    await user.click(fab);
+    openGuide();
     expect(screen.getByTestId('lia-guide')).toBeInTheDocument();
   });
 
-  it('closes with Escape and leaves the helper button in place', async () => {
+  it('closes with Escape without leaving a floating button behind', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
     await user.keyboard('{Escape}');
     expect(screen.queryByTestId('lia-guide')).not.toBeInTheDocument();
-    expect(screen.getByTestId('lia-fab')).toBeInTheDocument();
+    expect(screen.queryByTestId('lia-fab')).not.toBeInTheDocument();
   });
 
-  it('walks a topic step by step and shows the adult demonstration', async () => {
+  it('walks a topic step by step and shows the adult demonstration once', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
     await user.click(screen.getByTestId('lia-topic-water'));
     expect(screen.getByText('Check the soil')).toBeInTheDocument();
-    expect(screen.getByText(/Ask a grown-up to help/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('Check the tank')).toBeInTheDocument();
@@ -109,27 +125,31 @@ describe('Lia guide', () => {
     expect(screen.getByRole('button', { name: 'Back to topics' })).toBeInTheDocument();
   });
 
-  it('reads the welcome aloud and follows a language change', async () => {
+  it('reads aloud only when asked, in the selected language', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
+    expect(speech.speakText).not.toHaveBeenCalled();
     await user.click(screen.getByTestId('lia-read-aloud'));
     await waitFor(() => expect(speech.speakText).toHaveBeenCalled());
     expect(speech.speakText.mock.calls.at(-1)?.[0]).toContain('Hello! I’m Lia');
     expect(speech.speakText.mock.calls.at(-1)?.[1]).toBe('en');
 
+    await user.click(screen.getByTestId('lia-read-aloud'));
     await user.click(screen.getByTestId('lia-lang-hi'));
-    await waitFor(() =>
-      expect(speech.speakText.mock.calls.some((call) => call[1] === 'hi')).toBe(true),
-    );
+    const before = speech.speakText.mock.calls.length;
+    await user.click(screen.getByTestId('lia-read-aloud'));
+    await waitFor(() => expect(speech.speakText.mock.calls.length).toBeGreaterThan(before));
     expect(speech.speakText.mock.calls.at(-1)?.[0]).toContain('नमस्ते');
   });
 
-  it('narrates live values and keeps volume claims out', async () => {
+  it('opens the live explanation from the quick choice and keeps volume claims out', async () => {
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
-    await user.click(screen.getByRole('button', { name: 'What is happening now?' }));
+    await user.click(screen.getByTestId('lia-quick-events'));
     expect(screen.getByText(/The soil is dry \(28%\)/)).toBeInTheDocument();
     expect(screen.getByText(/There is water at the low level/)).toBeInTheDocument();
     expect(screen.queryByText(/litre|liter/i)).not.toBeInTheDocument();
@@ -146,8 +166,9 @@ describe('Lia guide', () => {
     });
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
-    await user.click(screen.getByRole('button', { name: 'What is happening now?' }));
+    await user.click(screen.getByTestId('lia-quick-events'));
     expect(screen.getByText(/soil probe is not calibrated/)).toBeInTheDocument();
     expect(screen.getByText(/tank probes are not calibrated/)).toBeInTheDocument();
     expect(screen.queryByText(/soil is dry \(28%\)/)).not.toBeInTheDocument();
@@ -157,8 +178,9 @@ describe('Lia guide', () => {
     setVillage({ status: null, connected: false });
     const user = userEvent.setup();
     renderGuide();
+    openGuide();
 
-    await user.click(screen.getByRole('button', { name: 'What is happening now?' }));
+    await user.click(screen.getByTestId('lia-quick-events'));
     expect(screen.getByText(/The village is offline/)).toBeInTheDocument();
     expect(screen.getByText(/check the power and Wi-Fi/)).toBeInTheDocument();
     expect(screen.queryByText(/soil is dry/)).not.toBeInTheDocument();

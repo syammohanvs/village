@@ -23,7 +23,7 @@ until step 8.
 
 - [ ] Each of the four streetlight LEDs has its own resistor (**100 Ω** on this
       build; 220 Ω is also fine).
-- [ ] Each lights from the Controls page.
+- [ ] Each lights from the Our Village page.
 - [x] Organic, plastic and paper LEDs light individually and only for the
       correct category (green D21, red D22, yellow D23 — verified 2026-11-09,
       see `docs/verification.md`).
@@ -138,7 +138,7 @@ with a **2N3904** small-signal NPN also available.
 - [ ] Set `VILLAGE_PUMP_COMMISSIONED 1` in
       `uc/include/village/build_config.h`.
 - [ ] Reflash.
-- [ ] Enable the pump in **Controls → Pump commissioning**.
+- [ ] Enable the pump in **Setup → Advanced → Pump commissioning**.
 - [ ] Run one short pulse in water while watching the current.
 - [ ] Record final timings and thresholds in `docs/calibration.md`.
 

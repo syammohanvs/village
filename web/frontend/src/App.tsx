@@ -1,17 +1,15 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { VoicePanel } from './components/VoicePanel';
 import { CommandsProvider } from './lib/commands';
 import { DemoProvider } from './lib/demo';
 import { VillageProvider } from './lib/village';
 import { VoiceUiProvider } from './lib/voiceUi';
-import { Activity } from './pages/Activity';
-import { Controls } from './pages/Controls';
-import { Dashboard } from './pages/Dashboard';
-import { Sensors } from './pages/Sensors';
-import { Settings } from './pages/Settings';
-import { Villagers } from './pages/Villagers';
-import { Waste } from './pages/Waste';
+import { AboutHelp } from './pages/AboutHelp';
+import { OurVillage } from './pages/OurVillage';
+import { Setup } from './pages/Setup';
+import { SortWaste } from './pages/SortWaste';
+import { WhatHappened } from './pages/WhatHappened';
 
 export default function App() {
   return (
@@ -22,14 +20,19 @@ export default function App() {
             <BrowserRouter>
               <Routes>
                 <Route element={<Layout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="sensors" element={<Sensors />} />
-                  <Route path="controls" element={<Controls />} />
-                  <Route path="waste" element={<Waste />} />
-                  <Route path="activity" element={<Activity />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="villagers" element={<Villagers />} />
-                  <Route path="*" element={<Dashboard />} />
+                  <Route index element={<OurVillage />} />
+                  <Route path="waste" element={<SortWaste />} />
+                  <Route path="activity" element={<WhatHappened />} />
+                  <Route path="about" element={<AboutHelp />} />
+                  <Route path="setup" element={<Setup />} />
+                  {/* Old addresses stay usable, so existing links and the
+                      printed exhibition notes do not break. */}
+                  <Route path="sensors" element={<Navigate to="/setup#sensors" replace />} />
+                  <Route path="settings" element={<Navigate to="/setup" replace />} />
+                  <Route path="controls" element={<Navigate to="/" replace />} />
+                  <Route path="villagers" element={<Navigate to="/about#sample-village" replace />} />
+                  <Route path="dashboard" element={<Navigate to="/" replace />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Routes>
               <VoicePanel />

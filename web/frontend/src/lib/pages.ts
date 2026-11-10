@@ -5,52 +5,44 @@ export interface PageMeta {
   kicker: string;
 }
 
+// The four things a visitor needs. Everything else lives in Setup.
 export const PAGES: PageMeta[] = [
   {
     path: '/',
-    title: 'Village Dashboard',
-    navLabel: 'Dashboard',
-    kicker: 'Overview · what the village is doing and why',
-  },
-  {
-    path: '/sensors',
-    title: 'Sensors & calibration',
-    navLabel: 'Sensors',
-    kicker: 'Live raw readings and two-point calibration',
-  },
-  {
-    path: '/controls',
-    title: 'Controls',
-    navLabel: 'Controls',
-    kicker: 'Manual commands, safety gates and the command log',
+    title: 'Our Village',
+    navLabel: 'Our Village',
+    kicker: 'What the village is doing, and what you can try',
   },
   {
     path: '/waste',
-    title: 'Waste camera',
-    navLabel: 'Waste camera',
-    kicker: 'Local recognition — an indication, never proof of disposal',
+    title: 'Sort Waste',
+    navLabel: 'Sort Waste',
+    kicker: 'Show one item to the camera and read the suggested bin',
   },
   {
     path: '/activity',
-    title: 'Activity',
-    navLabel: 'Activity',
-    kicker: 'Commands, recognitions, alerts and connection changes',
+    title: 'What Happened',
+    navLabel: 'What Happened',
+    kicker: 'A simple timeline of what the village did and why',
   },
   {
-    path: '/settings',
-    title: 'Settings',
-    navLabel: 'Settings',
-    kicker: 'Connection, voice, camera and first-run checks',
-  },
-  {
-    path: '/villagers',
-    title: 'Villagers',
-    navLabel: 'Villagers',
-    kicker: 'Fictional sample profiles for the exhibition',
+    path: '/about',
+    title: 'About & Help',
+    navLabel: 'About & Help',
+    kicker: 'The project, how it works, and how to demonstrate it',
   },
 ];
 
+export const SETUP_PAGE: PageMeta = {
+  path: '/setup',
+  title: 'Setup',
+  navLabel: 'Setup',
+  kicker: 'Connections, calibration, voice, camera and advanced options',
+};
+
+export const ALL_PAGES: PageMeta[] = [...PAGES, SETUP_PAGE];
+
 export function pageMeta(pathname: string): PageMeta {
   const normalised = pathname.replace(/\/+$/, '') || '/';
-  return PAGES.find((page) => page.path === normalised) ?? PAGES[0];
+  return ALL_PAGES.find((page) => page.path === normalised) ?? PAGES[0];
 }

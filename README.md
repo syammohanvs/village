@@ -74,12 +74,16 @@ Stop only this project:
   loud **unavailable** on a missing echo (never “empty”).
 - **Voice** — push-to-talk, English/Malayalam/Hindi, local Whisper, deterministic
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
-- **Waste camera** — local Teachable Machine model, stable predictions, one
-  event per item, correct category LED, full-bin warning without redirecting.
+- **Sort Waste** — local Teachable Machine model behind a large camera preview,
+  stable predictions, one event per item, the correct bin LED, and a full-bin
+  warning without redirecting.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
-- **Activity** — commands, acknowledgements, recognitions, connection events,
-  CSV export.
+- **What Happened** — one timeline of actions and reasons; raw codes, filters
+  and CSV export live under Advanced details.
+- **Navigation** — four pages (Our Village, Sort Waste, What Happened, About &
+  Help), a smaller Setup link, and one Talk to Lia entry. Old addresses
+  (`/sensors`, `/controls`, `/settings`, `/villagers`) redirect.
 
 ## Architecture
 

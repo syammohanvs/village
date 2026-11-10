@@ -70,7 +70,7 @@ never substitutes random predictions.
 | Background / unknown | none | none |
 
 The mapping is fixed in this build. The threshold, stable-frame count and
-cooldown are adjustable on the Waste page and in Settings.
+cooldown are adjustable in Setup → Voice & Camera.
 
 ## 5. Honest limits
 

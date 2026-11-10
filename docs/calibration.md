@@ -17,7 +17,7 @@ reading will be larger than the dry reading; the mapping handles it without a
 polarity switch.
 
 1. Put the probe in **dry soil** (the soil the village will actually use).
-2. Read the raw value on **Sensors**.
+2. Read the raw value in **Setup → Sensors & Calibration**.
 3. Put the probe in **wet soil** and let it settle.
 4. Read the raw value again.
 5. Enter both values and Save. **Tick “I captured these readings from the real

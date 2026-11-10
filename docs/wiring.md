@@ -297,10 +297,10 @@ Build a divider with one fixed resistor. Recommended **10 kΩ**:
 - Swapping the two parts (10 kΩ to 3V3, LDR to GND) inverts the reading; then
   set `analog_bright_high = false` instead of rewiring.
 
-**After wiring, tick “The LDR is wired” on Sensors and save**, otherwise the
+**After wiring, tick “The LDR is wired” in Setup → Sensors & Calibration and save**, otherwise the
 controller still reports no light level.
 - **The controller starts with the LDR and the lamps marked as not wired.**
-  These are two separate facts and two separate tick boxes on **Sensors**:
+  These are two separate facts and two separate tick boxes in **Setup → Sensors & Calibration**:
   **The streetlight lamps are wired** (`light.installed`) and **The LDR is
   wired** (`light.sensor_fitted`). A board with nothing on GPIO 32 reads
   plausible-looking noise, so an unticked LDR reports no light level rather
@@ -426,7 +426,7 @@ Do this in order, with the pump **disconnected** until step 7:
 3. Power the ESP32 alone from USB; measure 5 V and 3.3 V rails.
 4. Flash the firmware with the pump disabled. Confirm `/api/v1/health` reports
    the expected chip and pin map; confirm the pump gate is LOW at boot.
-5. Test each LED with the Controls page; measure the resistor current.
+5. Test each LED on the Our Village page; measure the resistor current.
 6. Test each HC-SR04 with a hand at 10 cm, 30 cm and beyond range; confirm
    “unavailable” when disconnected, never “empty”.
 7. Test the pump driver with a **dummy load** (a 5 V lamp or a resistor + LED)
@@ -449,7 +449,7 @@ The pump is protected by two independent gates:
 After the bench test passes:
 
 1. Set `VILLAGE_PUMP_COMMISSIONED 1` and reflash.
-2. In **Controls → Pump commissioning**, read the safety checklist and enable
+2. In **Setup → Advanced → Pump commissioning**, read the safety checklist and enable
    the pump. The device accepts this only when the compile-time gate is open.
 3. Fill the reservoir, place the probes, and run one short pulse with the
    pump in water while watching the current.

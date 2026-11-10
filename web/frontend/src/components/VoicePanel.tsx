@@ -39,6 +39,15 @@ const BLOCKED_STATUS = new Set(['unknown', 'negated', 'ambiguous', 'no_speech', 
 
 const MAX_SECONDS = 10;
 
+// Shown when the intent catalogue cannot be read: the demonstration still has
+// something to say even with the service offline.
+const LOCAL_EXAMPLES = [
+  { label: 'Lights on', phrase: 'turn on the lights' },
+  { label: 'Lights off', phrase: 'turn off the lights' },
+  { label: 'Water the plants', phrase: 'water the plants' },
+  { label: 'Stop watering', phrase: 'stop watering' },
+];
+
 type VoiceState = 'idle' | 'listening' | 'processing' | 'success' | 'rejected' | 'disconnected';
 
 function intentLabel(intent: VoiceIntent, language: string): string {
@@ -65,7 +74,7 @@ function orderedIntents(data: VoiceIntentsResponse | null): VoiceIntent[] {
 }
 
 export function VoicePanel() {
-  const { open, closePanel, openPanel } = useVoiceUi();
+  const { open, closePanel } = useVoiceUi();
   const { demo } = useDemo();
   const { send } = useCommands();
   const { connected } = useVillage();
@@ -208,7 +217,7 @@ export function VoicePanel() {
         setState('rejected');
         const reply =
           response.message ??
-          'That sounded like an unsupported, negated or unclear request. No command was sent.';
+          'Please use one of the commands shown, or ask the presenter for help. No command was sent.';
         setMessage(reply);
         void speak(reply, intent);
         return;
@@ -265,14 +274,7 @@ export function VoicePanel() {
   const helpIntents = orderedIntents(intents.data);
   const unavailable = new Set(readiness.data?.unavailable_languages ?? []);
 
-  if (!open) {
-    return (
-      <button className="voice-launcher" type="button" onClick={openPanel}>
-        <IconMic size={22} />
-        <span>Voice</span>
-      </button>
-    );
-  }
+  if (!open) return null;
 
   return (
     <section
@@ -287,13 +289,37 @@ export function VoicePanel() {
             <IconMic size={20} />
           </span>
           <div>
-            <p className="eyebrow">Push to talk</p>
-            <h2>Voice command</h2>
+            <p className="eyebrow">English · മലയാളം · हिन्दी</p>
+            <h2>Talk to the village</h2>
           </div>
         </div>
         <div className="voice-head-actions">
-          <span className={cx('chip', demo ? 'chip--warn' : 'chip--gold')}>
-            {demo ? 'Demo' : 'Live'}
+          <span
+            className={cx(
+              'chip',
+              demo
+                ? 'chip--warn'
+                : !connected
+                  ? 'chip--bad'
+                  : readiness.data?.whisper?.ready === false
+                    ? 'chip--warn'
+                    : 'chip--live',
+            )}
+            title={
+              !connected
+                ? 'The controller is offline, so a command cannot be acted on.'
+                : readiness.data?.whisper?.message ?? 'The local speech service is ready.'
+            }
+          >
+            {demo
+              ? 'Simulation'
+              : !connected
+                ? 'Controller offline'
+                : readiness.data?.whisper?.ready === false
+                  ? 'Speech not ready'
+                  : readiness.loading
+                    ? 'Checking speech…'
+                    : 'Speech ready'}
           </span>
           <button className="icon-btn" type="button" onClick={closePanel} aria-label="Close voice panel">
             <IconClose size={18} />
@@ -326,13 +352,13 @@ export function VoicePanel() {
             else void start();
           }}
           disabled={disabled && state !== 'listening'}
-          aria-label={state === 'listening' ? 'Stop recording and send' : 'Start recording'}
+          aria-label={state === 'listening' ? 'Stop Recording' : 'Start Speaking'}
         >
           <span className="ptt-ring" />
           {state === 'listening' ? (
             <>
               <IconPlug size={26} />
-              <span>Stop &amp; send · {Math.max(0, Math.ceil(MAX_SECONDS - elapsed))}s</span>
+              <span>Stop Recording · {Math.max(0, Math.ceil(MAX_SECONDS - elapsed))}s</span>
             </>
           ) : speaking ? (
             <>
@@ -342,7 +368,7 @@ export function VoicePanel() {
           ) : (
             <>
               <IconMic size={26} />
-              <span>Start listening</span>
+              <span>Start Speaking</span>
             </>
           )}
         </button>
@@ -350,8 +376,9 @@ export function VoicePanel() {
         <div className="voice-state" aria-live="polite">
           {state === 'idle' && !micError && (
             <p>
-              Press start, speak one short command, then press stop. Recordings stop automatically
-              after {MAX_SECONDS} seconds. {supported ? '' : 'Microphone access is unavailable here.'}
+              Press Start Speaking, say one short command, then press Stop Recording. Recording
+              stops automatically after {MAX_SECONDS} seconds.{' '}
+              {supported ? '' : 'The microphone or the controller is not available here.'}
             </p>
           )}
           {state === 'listening' && (
@@ -362,7 +389,7 @@ export function VoicePanel() {
               Listening — {elapsed.toFixed(1)}s of {MAX_SECONDS}s
             </p>
           )}
-          {state === 'processing' && <p>Converting to 16 kHz mono WAV and asking the local recogniser…</p>}
+          {state === 'processing' && <p>Understanding your words…</p>}
           {micError && <p className="error-text">{micError}</p>}
           {ttsNote && <p className="hint">{ttsNote}</p>}
         </div>
@@ -370,7 +397,7 @@ export function VoicePanel() {
 
       {transcript && (
         <div className="voice-transcript">
-          <p className="eyebrow">Heard</p>
+          <p className="eyebrow">You said</p>
           <p className="voice-heard">“{transcript}”</p>
         </div>
       )}
@@ -409,24 +436,35 @@ export function VoicePanel() {
       <div className="voice-help">
         <div className="voice-help-head">
           <p className="eyebrow">Say one of these</p>
-          <span className="hint">{intents.data?.intents?.length ?? 0} recognised phrases</span>
+          <span className="hint">
+            {helpIntents.length > 0 ? `${helpIntents.length} supported commands` : 'Example commands'}
+          </span>
         </div>
         <ul>
-          {helpIntents.slice(0, 10).map((intent) => {
-            const phrases = intentPhrases(intent, language);
-            return (
-              <li key={intent.id}>
-                <span className="help-label">{intentLabel(intent, language)}</span>
-                <span className="help-phrase">
-                  {phrases[0] ? `“${phrases[0]}”` : intent.id}
-                  {intent.command ? <em> · sends {intent.command}</em> : <em> · answer only</em>}
-                </span>
-              </li>
-            );
-          })}
+          {helpIntents.length > 0
+            ? helpIntents.slice(0, 10).map((intent) => {
+                const phrases = intentPhrases(intent, language);
+                return (
+                  <li key={intent.id}>
+                    <span className="help-label">{intentLabel(intent, language)}</span>
+                    <span className="help-phrase">
+                      {phrases[0] ? `“${phrases[0]}”` : intent.id}
+                      {intent.command ? <em> · sends {intent.command}</em> : <em> · answer only</em>}
+                    </span>
+                  </li>
+                );
+              })
+            : LOCAL_EXAMPLES.map((example) => (
+                <li key={example.label}>
+                  <span className="help-label">{example.label}</span>
+                  <span className="help-phrase">“{example.phrase}”</span>
+                </li>
+              ))}
         </ul>
-        {!intents.loading && helpIntents.length === 0 && (
-          <p className="hint">Phrase help is unavailable right now.</p>
+        {helpIntents.length === 0 && (
+          <p className="hint">
+            The full phrase list needs the local service. These examples work on the demonstration.
+          </p>
         )}
         {readiness.data?.whisper && readiness.data.whisper.ready === false && (
           <p className="notice notice--warn">
@@ -438,7 +476,8 @@ export function VoicePanel() {
       <footer className="voice-foot">
         <IconSparkle size={15} />
         <span>
-          Recognition runs on this laptop. {speechSupported() ? '' : 'Spoken replies need a browser with speech synthesis.'}
+          Speech recognition runs on this laptop. Spoken replies use this browser&apos;s own voice
+          {speechSupported() ? '' : ' (not available here, so replies are text only)'}.
         </span>
       </footer>
     </section>

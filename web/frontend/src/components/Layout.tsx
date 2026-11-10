@@ -1,57 +1,29 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useDemo } from '../lib/demo';
 import { cx, formatAge } from '../lib/format';
-import { PAGES, pageMeta } from '../lib/pages';
+import { openLia } from '../lib/liaUi';
+import { PAGES, SETUP_PAGE, pageMeta } from '../lib/pages';
 import { useVillage } from '../lib/village';
-import { useVoiceUi } from '../lib/voiceUi';
 import { Emblem } from './Emblem';
 import {
   IconActivity,
-  IconControls,
   IconDashboard,
+  IconInfo,
   IconMenu,
-  IconMic,
-  IconSensors,
   IconSettings,
-  IconVillagers,
   IconWaste,
 } from './Icons';
+import { LiaAvatar } from './LiaAvatar';
 import { LiaGuide } from './LiaGuide';
 import { StatusStrip } from './StatusStrip';
 
 const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
   '/': IconDashboard,
-  '/sensors': IconSensors,
-  '/controls': IconControls,
   '/waste': IconWaste,
   '/activity': IconActivity,
-  '/settings': IconSettings,
-  '/villagers': IconVillagers,
+  '/about': IconInfo,
+  '/setup': IconSettings,
 };
-
-function DemoSwitch() {
-  const { demo, toggle } = useDemo();
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={demo}
-      className={cx('demo-switch', demo && 'is-on')}
-      onClick={toggle}
-      title={
-        demo
-          ? 'Demo mode is on: every request asks the backend for simulated data.'
-          : 'Demo mode is off: requests ask for the live village.'
-      }
-    >
-      <span className="switch-track" aria-hidden="true">
-        <span className="switch-knob" />
-      </span>
-      <span className="demo-switch-label">Demo</span>
-    </button>
-  );
-}
 
 function ConnectionPill() {
   const { connected, stale, connection, ageMs } = useVillage();
@@ -74,11 +46,25 @@ function ConnectionPill() {
   );
 }
 
+function TalkToLia({ compact = false }: { compact?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={cx('talk-lia', compact && 'talk-lia--compact')}
+      onClick={() => openLia('help')}
+      data-testid="talk-to-lia"
+      aria-label="Talk to Lia"
+    >
+      <LiaAvatar size={compact ? 30 : 40} decorative />
+      {!compact && <span className="talk-lia-label">Talk to Lia</span>}
+    </button>
+  );
+}
+
 export function Layout() {
   const location = useLocation();
   const meta = pageMeta(location.pathname);
   const { simulator } = useVillage();
-  const { openPanel } = useVoiceUi();
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
@@ -101,7 +87,7 @@ export function Layout() {
 
       <aside className={cx('sidebar', navOpen && 'is-open')} aria-label="Village navigation">
         <div className="brand">
-          <Emblem size={66} />
+          <Emblem size={62} />
           <div className="brand-copy">
             <span className="brand-eyebrow">Smart Green</span>
             <span className="brand-name">Village</span>
@@ -127,13 +113,15 @@ export function Layout() {
         </nav>
 
         <div className="side-foot">
-          <p className="eyebrow">Data source</p>
-          <p className="source-line">
+          <TalkToLia />
+          <NavLink to={SETUP_PAGE.path} className="setup-link" data-testid="nav-setup">
+            <IconSettings size={16} />
+            <span>Setup</span>
+          </NavLink>
+          <p className="source-line" title={simulator ? 'Local simulator' : 'ESP32 over Wi-Fi'}>
             <span className={cx('dot', simulator ? 'dot--gold' : 'dot--green')} aria-hidden="true" />
-            {simulator ? 'Local simulator' : 'ESP32 over Wi-Fi'}
+            {simulator ? 'Simulator' : 'ESP32 over Wi-Fi'}
           </p>
-          <p className="hint">Protocol v1 · private LAN only</p>
-          <p className="hint">Not instrumented: solar, wind, buildings</p>
         </div>
       </aside>
 
@@ -159,22 +147,14 @@ export function Layout() {
           </button>
 
           <div className="appbar-heading">
-            <p className="appbar-kicker">{meta.kicker}</p>
             <h1 className="appbar-title">{meta.title}</h1>
           </div>
 
           <div className="appbar-actions">
             <ConnectionPill />
-            <button
-              type="button"
-              className="icon-btn mic-btn"
-              aria-label="Open voice command"
-              title="Voice command"
-              onClick={openPanel}
-            >
-              <IconMic size={19} />
-            </button>
-            <DemoSwitch />
+            <span className="appbar-lia">
+              <TalkToLia compact />
+            </span>
           </div>
         </header>
 

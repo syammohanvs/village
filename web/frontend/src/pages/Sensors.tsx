@@ -53,7 +53,7 @@ function validate(config: DeviceConfig): string | null {
   return null;
 }
 
-export function Sensors() {
+export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
   const { status, live, simulator } = useVillage();
   const { demo } = useDemo();
   const config = useApi<DeviceConfigDocument>(['device-config'], () => api.deviceConfig(), {});
@@ -135,22 +135,29 @@ export function Sensors() {
   };
 
   return (
-    <div className="page">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Raw readings first</p>
-          <h2 className="page-title">What the probes actually report</h2>
-          <p className="page-lede">
-            These are the controller&apos;s own values. Calibration changes how the raw numbers are
-            interpreted; it does not make them more precise than the probes allow.
-          </p>
+    <div className={cx('page', embedded && 'embedded-page')}>
+      {!embedded && (
+        <div className="page-intro">
+          <div>
+            <p className="eyebrow">Raw readings first</p>
+            <h2 className="page-title">What the probes actually report</h2>
+            <p className="page-lede">
+              These are the controller&apos;s own values. Calibration changes how the raw numbers are
+              interpreted; it does not make them more precise than the probes allow.
+            </p>
+          </div>
+          {draft && saved && (
+            <Chip tone={dirty ? 'warn' : 'live'}>
+              {dirty ? 'Unsaved changes' : `Saved · revision ${saved.config_revision}`}
+            </Chip>
+          )}
         </div>
-        {draft && saved && (
-          <Chip tone={dirty ? 'warn' : 'live'}>
-            {dirty ? 'Unsaved changes' : `Saved · revision ${saved.config_revision}`}
-          </Chip>
-        )}
-      </div>
+      )}
+      {embedded && draft && saved && (
+        <p className="hint embedded-note">
+          {dirty ? 'Unsaved calibration changes.' : `Calibration saved · revision ${saved.config_revision}`}
+        </p>
+      )}
 
       {Boolean(config.error) && <ErrorBlock error={config.error} onRetry={config.reload} />}
 

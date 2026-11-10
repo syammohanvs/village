@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
-import { makeSettings, makeState } from '../test/fixtures';
+import { makeConfigDocument, makeSettings, makeState } from '../test/fixtures';
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();
@@ -19,13 +19,18 @@ vi.mock('../lib/api', async (importOriginal) => {
       deviceHealth: vi.fn(),
       voiceReadiness: vi.fn(),
       wasteModelStatus: vi.fn(),
+      deviceConfig: vi.fn(),
+      putDeviceConfig: vi.fn(),
+      events: vi.fn(),
+      voiceIntents: vi.fn(),
     },
   };
 });
 
 beforeEach(() => {
-  window.history.pushState({}, '', '/settings');
+  window.history.pushState({}, '', '/setup');
   vi.mocked(api.state).mockResolvedValue(makeState());
+  vi.mocked(api.events).mockResolvedValue({ events: [] });
   vi.mocked(api.settings).mockResolvedValue(makeSettings());
   vi.mocked(api.putSettings).mockImplementation(async (patch) =>
     makeSettings({ ...patch, updated_at: '2026-11-08T09:00:00Z' }),
@@ -42,9 +47,26 @@ beforeEach(() => {
   vi.mocked(api.deviceHealth).mockResolvedValue({ reachable: true, device_id: 'village-test' });
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true });
+  vi.mocked(api.deviceConfig).mockResolvedValue(makeConfigDocument());
+  vi.mocked(api.putDeviceConfig).mockImplementation(async (revision, config) => ({
+    protocol_version: 1,
+    device_id: 'village-test',
+    config_revision: revision + 1,
+    config,
+  }));
 });
 
-describe('Settings', () => {
+describe('Setup', () => {
+  it('groups connections, sensors, voice and advanced options', async () => {
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Connections' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sensors & Calibration' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Voice & Camera' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Advanced' })).toBeInTheDocument();
+    expect(await screen.findByText(/Where the village controller lives/i)).toBeInTheDocument();
+  });
+
   it('keeps a local draft, validates it, and only saves a valid revision', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -71,5 +93,31 @@ describe('Settings', () => {
       expect.objectContaining({ waste_model_path: '/models/waste-test/' }),
     );
     await waitFor(() => expect(screen.getByTestId('settings-state')).toHaveTextContent('Saved'));
+  });
+
+  it('labels simulation clearly and never switches it on by itself', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const toggle = await screen.findByRole('switch', { name: 'Simulation mode' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.click(toggle);
+
+    expect((await screen.findAllByText(/the physical board will not respond/i)).length).toBeGreaterThan(0);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('keeps the pump commissioning controls usable for the presenter', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const gate = await screen.findByRole('switch', { name: 'Pump commissioning gate' });
+    await user.click(gate);
+
+    await waitFor(() => expect(api.putDeviceConfig).toHaveBeenCalled());
+    expect(api.putDeviceConfig).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.objectContaining({ irrigation: expect.objectContaining({ pump_enabled: true }) }),
+    );
   });
 });
