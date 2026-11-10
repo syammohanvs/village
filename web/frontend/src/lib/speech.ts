@@ -105,6 +105,37 @@ function nameScore(voice: SpeechSynthesisVoice): number {
   return 1;
 }
 
+/**
+ * Voices known to be Indian English.  Several engines ship an Indian voice
+ * under a wider tag (`en-GB` on some Android builds, `en` on others), so the
+ * name is checked as well as the language: a voice called Neerja or Heera is
+ * Indian whatever it is tagged.
+ */
+const INDIAN_VOICE_NAMES = ['neerja', 'heera', 'kalpana', 'swara', 'veena', 'lekha', 'priya', 'prabhat', 'rishi'];
+
+/**
+ * An Indian-English voice installed on this device, female first.
+ *
+ * Piper has no en_IN voice — its English model is American — so for English we
+ * prefer the device's own Indian voice when it has one.  Hindi and Malayalam
+ * stay on Piper, whose voices for those languages are Indian.
+ */
+export function pickIndianEnglishVoice(): SpeechSynthesisVoice | null {
+  const voices = voiceList();
+  if (voices.length === 0) return null;
+  const tag = (voice: SpeechSynthesisVoice) => (voice.lang || '').toLowerCase().replace('_', '-');
+  const named = (voice: SpeechSynthesisVoice) =>
+    INDIAN_VOICE_NAMES.some((entry) => (voice.name || '').toLowerCase().includes(entry));
+  // An `en-IN` tag is the strongest signal; a known Indian name is the
+  // fallback for engines that tag their Indian voice differently.
+  const indian = voices.filter(
+    (voice) => tag(voice).startsWith('en') && (tag(voice) === 'en-in' || named(voice)),
+  );
+  if (indian.length === 0) return null;
+  const female = indian.filter((voice) => nameScore(voice) === 2);
+  return (female[0] ?? indian[0]) as SpeechSynthesisVoice;
+}
+
 /** The best voice for a language: same language, female first. */
 export function pickVoice(language: string): SpeechSynthesisVoice | null {
   const voices = voiceList();
@@ -208,6 +239,21 @@ function playBlob(blob: Blob): Promise<boolean> {
 export async function speakText(text: string, language: string, rate = 0.98): Promise<boolean> {
   if (!text) return false;
   const ticket = ++speakSeq;
+  // Whatever is playing belongs to the previous reply; the ticket above makes
+  // a late synthesis inert, and this stops audio that has already started.
+  stopPlayback();
+
+  // English first: use an Indian voice from this device if one is installed.
+  if (language === 'en' && speechSupported()) {
+    await primeVoices();
+    const indian = pickIndianEnglishVoice();
+    if (indian) {
+      const spoken = await speakWithVoice(text, indian, rate, ticket);
+      if (spoken) return true;
+      if (ticket !== speakSeq) return false;
+    }
+  }
+
   // Piper's --length_scale is the inverse of a rate: >1 is slower.
   const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
   try {
@@ -224,21 +270,39 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   await primeVoices();
   const voice = pickVoice(language);
   if (!voice) return false;
+  return speakWithVoice(text, voice, rate, ticket);
+}
+
+function speakWithVoice(
+  text: string,
+  voice: SpeechSynthesisVoice,
+  rate: number,
+  ticket: number,
+): Promise<boolean> {
+  if (ticket !== speakSeq) return Promise.resolve(false);
   window.speechSynthesis.cancel();
   return new Promise((resolve) => {
     let settled = false;
+    let started = false;
     const finish = (ok: boolean) => {
       if (settled) return;
       settled = true;
       resolve(ok);
     };
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = speechLanguage(language);
+    utterance.lang = voice.lang || speechLanguage('en');
     utterance.voice = voice;
     utterance.rate = rate;
+    utterance.onstart = () => {
+      started = true;
+    };
     utterance.onend = () => finish(true);
     utterance.onerror = () => finish(false);
-    window.setTimeout(() => finish(false), 2500 + Math.min(60000, text.length * 90));
+    // Some engines never report the end of a long utterance.  Timing out is
+    // only a failure if the voice never began: once it has, reporting failure
+    // would make the caller read the same sentence again with the other
+    // engine, which is exactly two voices at once.
+    window.setTimeout(() => finish(started), 5000 + Math.min(120000, text.length * 160));
     window.speechSynthesis.speak(utterance);
   });
 }

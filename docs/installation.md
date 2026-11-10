@@ -311,12 +311,19 @@ git-ignored like the Whisper model):
 
 | Language | Voice | Size |
 | --- | --- | --- |
-| English | `en_US-lessac-medium` (female) | 61 MB |
+| English | the device's Indian English voice, else `en_US-lessac-medium` (female) | 61 MB |
 | Hindi | `hi_IN-priyamvada-medium` (female) | 61 MB |
 | Malayalam | `ml_IN-meera-medium` (female) | 61 MB |
 
-All three are 22,050 Hz "medium" models, so the village sounds like one
-speaker family. Synthesis is far faster than real time (a five-second sentence
+**English prefers an Indian voice.** Piper publishes no Indian English model —
+its English voice is American — so for English the dashboard first looks for an
+Indian English voice installed on the device (`en-IN`, or a voice named Neerja,
+Heera, Kalpana and similar, whichever tag the engine gives it). If there is
+one it is used; otherwise English falls back to Lessac. Hindi and Malayalam
+always use the Piper voices above, which are Indian.
+
+All three Piper models are 22,050 Hz "medium" ones, so each language sounds
+like one consistent speaker. Synthesis is far faster than real time (a five-second sentence
 takes about 0.2 s), needs no internet at runtime, and results are cached in
 `data/cache/tts/`, so a repeated reply is instant.
 
