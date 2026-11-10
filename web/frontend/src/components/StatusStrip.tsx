@@ -50,7 +50,10 @@ export function StatusStrip() {
         <div className="banner banner--offline" role="status" data-testid="offline-banner">
           <IconAlert size={16} />
           <span>
-            <strong>Controller offline</strong> — last seen {formatAge(ageMs)}.{' '}
+            <strong>Controller offline</strong> —{' '}
+            {ageMs === null || ageMs === undefined
+              ? 'no reading has arrived yet.'
+              : `last seen ${formatAge(ageMs)}.`}{' '}
             {connection?.last_error ?? 'The cards stay visible; actions are disabled.'}
           </span>
         </div>

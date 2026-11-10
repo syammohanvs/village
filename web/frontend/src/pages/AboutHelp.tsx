@@ -76,8 +76,9 @@ export function AboutHelp() {
             <li>
               <IconDroplet size={18} />
               <div>
-                <strong>Rainwater collection.</strong> Two probes in the tank report one minimum
-                level: water available or water low. The app never invents a percentage or litres.
+                <strong>Rainwater collection.</strong> Rain is collected in a tank so it can be
+                used later. Two probes in the tank then report one minimum level: water available or
+                water low. The app never invents a percentage or litres.
               </div>
             </li>
             <li>
@@ -130,7 +131,7 @@ export function AboutHelp() {
         </Card>
       </div>
 
-      <Card kicker="Two kinds of AI" title="What is AI here, and what is not">
+      <Card kicker="AI and automatic control" title="What is AI here, and what is not">
         <div className="two-col about-two">
           <div>
             <h3 className="about-h3">AI helps people</h3>
@@ -150,7 +151,8 @@ export function AboutHelp() {
               <li>The light sensor switches the lamps in Automatic mode.</li>
             </ul>
             <p className="hint">
-              These are ordinary rules, not a language model. They work with the laptop closed.
+              These are ordinary rules, not a language model. They are applied by the board itself,
+              so they do not depend on this page being open.
             </p>
           </div>
         </div>
@@ -159,9 +161,12 @@ export function AboutHelp() {
       <Card kicker="For visitors" title="Try it in five steps">
         <ol className="steps-list">
           <li>Look at the four cards on <Link to="/">Our Village</Link> and read what each one says.</li>
-          <li>Cover the light sensor with your hand. Watch the four streetlight LEDs.</li>
+          <li>
+            On <Link to="/">Our Village</Link>, choose <em>Automatic</em> for the streetlights, then
+            cover the light sensor with your hand. Watch the streetlight LEDs.
+          </li>
           <li>Show one clean item to the camera on <Link to="/waste">Sort Waste</Link> and see which bin LED lights.</li>
-          <li>Press <em>Start voice</em> on Our Village and say “turn on the lights”.</li>
+          <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>
         </ol>
         {rows.length === 0 && (
@@ -181,6 +186,11 @@ export function AboutHelp() {
         <p className="hint">
           The only measured things are soil moisture, the tank&apos;s minimum level, light, the bin
           distance sensors and the command acknowledgements.
+        </p>
+        <p className="hint">
+          <strong>Planned, not fitted:</strong> one working solar panel with an LED load and its own
+          voltage and current measurement, and time-of-flight sensors for bin fill. Neither is part
+          of this build, so the dashboard reports nothing for them.
         </p>
       </Card>
 
@@ -225,6 +235,9 @@ export function AboutHelp() {
           exhibition. No real villager is tracked, and these are not measured results.
         </Notice>
 
+        <details className="advanced about-sample-more">
+          <summary>Show the fictional villagers</summary>
+          <div className="advanced-body">
         <div className="villager-grid">
           {sample.map((profile) => {
             const history = profile.history ?? [];
@@ -251,6 +264,8 @@ export function AboutHelp() {
             );
           })}
         </div>
+          </div>
+        </details>
         <p className="hint">
           {profiles.error
             ? 'The profile service did not answer, so the built-in samples are shown.'

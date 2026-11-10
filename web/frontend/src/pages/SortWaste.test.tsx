@@ -31,14 +31,18 @@ beforeEach(() => {
 });
 
 describe('Sort Waste', () => {
-  it('says the model is missing and keeps the camera off instead of guessing', async () => {
+  it('says the model is missing and offers the preview without guessing', async () => {
     render(<App />);
 
     expect(await screen.findByText(/Recognition model is missing/i)).toBeInTheDocument();
-    expect(screen.getByText(/The camera stays off until the recognition model is installed/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Start the camera for a preview. Recognition needs the model./i),
+    ).toBeInTheDocument();
 
-    const start = screen.getByRole('button', { name: /start camera/i });
-    expect(start).toBeDisabled();
+    // Preview is a real capability, so the button is enabled and the page says
+    // plainly that no bin will be suggested.  Claiming preview while disabling
+    // the button was the contradiction.
+    expect(screen.getByTestId('start-camera')).toBeEnabled();
     expect(screen.queryByText(/\d+% confidence/i)).not.toBeInTheDocument();
   });
 
@@ -46,7 +50,7 @@ describe('Sort Waste', () => {
     vi.mocked(api.wasteModelStatus).mockRejectedValue(new Error('backend down'));
     render(<App />);
 
-    expect(await screen.findByText(/Recognition service unavailable/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Model status could not be checked/i)).toBeInTheDocument();
     expect(screen.getByText(/backend down/)).toBeInTheDocument();
   });
 

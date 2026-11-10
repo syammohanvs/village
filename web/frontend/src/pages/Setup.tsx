@@ -241,7 +241,11 @@ function Preferences() {
       setDraft({ ...next });
       setMessage(`Settings saved${next.updated_at ? ` · ${formatDateTime(next.updated_at)}` : '.'}`);
     } catch (cause) {
-      setSaveError(errorMessage(cause));
+      setSaveError(
+        cause instanceof ApiError && cause.status === 409
+          ? 'Settings changed elsewhere. Reload before saving.'
+          : errorMessage(cause),
+      );
     } finally {
       setSaving(false);
     }
@@ -259,13 +263,25 @@ function Preferences() {
             className={cx('chip', validation ? 'chip--warn' : dirty ? 'chip--warn' : 'chip--live')}
             data-testid="settings-state"
           >
-            {validation ? 'Needs attention' : dirty ? 'Unsaved changes' : 'Saved'}
+            {!draft || !saved
+              ? settings.error
+                ? 'Unavailable'
+                : 'Checking…'
+              : validation
+                ? 'Needs attention'
+                : dirty
+                  ? 'Unsaved changes'
+                  : 'Saved'}
           </span>
         }
       >
         {!draft || !saved ? (
           settings.error ? (
             <ErrorBlock error={settings.error} onRetry={settings.reload} />
+          ) : settings.error ? (
+            <p className="hint">
+              Settings unavailable — the backend did not answer, so no saved values are shown.
+            </p>
           ) : (
             <p className="hint">Reading app settings…</p>
           )
@@ -718,7 +734,24 @@ function Checklist() {
       }
     >
       {checklist.error ? (
-        <ErrorBlock error={checklist.error} onRetry={checklist.reload} />
+        <>
+          <ErrorBlock error={checklist.error} onRetry={checklist.reload} />
+          <ul className="checklist checklist--manual">
+            <li className="is-missing">
+              <span className="check-icon" aria-hidden="true">
+                <IconAlert size={15} />
+              </span>
+              <div>
+                <p className="check-label">Local checks (not confirmed by the service)</p>
+                <p className="hint">
+                  The service could not confirm anything, so walk these by hand: optics and probes
+                  seated, tank water above the probes, pump submerged, camera connected, the four
+                  lamps lit, and the board joined to the venue Wi-Fi.
+                </p>
+              </div>
+            </li>
+          </ul>
+        </>
       ) : items.length === 0 ? (
         <EmptyState title={checklist.loading ? 'Reading the checklist…' : 'No checklist items'}>
           The backend returns the pre-exhibition checks here when it has them.

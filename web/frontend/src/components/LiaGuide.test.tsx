@@ -55,7 +55,7 @@ beforeEach(() => {
 });
 
 describe('Lia guide', () => {
-  it('stays closed until asked, then offers three quick choices and every topic', () => {
+  it('stays closed until asked, then offers three quick choices and every topic', async () => {
     renderGuide();
     expect(screen.queryByTestId('lia-guide')).not.toBeInTheDocument();
 
@@ -67,7 +67,12 @@ describe('Lia guide', () => {
     expect(screen.getByTestId('lia-quick-voice')).toHaveTextContent('Help me use voice');
     expect(screen.getByTestId('lia-quick-events')).toHaveTextContent('Explain what happened');
 
-    for (const id of ['around', 'water', 'lights', 'waste', 'voice', 'help']) {
+    // The duplicate "Show me the model" entry is gone; the model is the first
+    // quick choice.  The longer list stays folded until it is asked for.
+    expect(screen.queryByTestId('lia-topic-around')).not.toBeInTheDocument();
+    expect(screen.getByText('More help topics')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByText('More help topics'));
+    for (const id of ['water', 'lights', 'waste', 'voice', 'help']) {
       expect(screen.getByTestId(`lia-topic-${id}`)).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: 'Maybe later' })).toBeInTheDocument();

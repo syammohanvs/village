@@ -50,6 +50,8 @@ export interface LiaCopy {
   quickModel: string;
   quickVoice: string;
   quickEvents: string;
+  startSpeaking: string;
+  moreTopics: string;
   childNote: string;
   maybeLater: string;
   readAloud: string;
@@ -113,6 +115,8 @@ const EN: LiaCopy = {
   quickModel: 'Show me the model',
   quickVoice: 'Help me use voice',
   quickEvents: 'Explain what happened',
+  startSpeaking: 'Start Speaking',
+  moreTopics: 'More help topics',
   childNote: 'Young children: try the physical demonstrations with an adult.',
   maybeLater: 'Maybe later',
   readAloud: 'Read aloud',
@@ -201,7 +205,7 @@ const EN: LiaCopy = {
       intro: 'You can speak to the village in English, Malayalam or Hindi.',
       adultNote: 'Young children can try this with an adult.',
       steps: [
-        { title: 'Open Our Village', text: 'Press Start voice on the voice card, or ask Lia.', icon: 'voice', page: '/' },
+        { title: 'Open Our Village', text: 'Press Start Speaking in the voice section at the top of Our Village.', icon: 'voice', page: '/' },
         { title: 'Say a short phrase', text: 'For example: “turn on the lights” or “water the plants”.', icon: 'voice' },
         { title: 'The village checks', text: 'It repeats what it heard. If it is not sure, it does nothing.', icon: 'help' },
       ],
@@ -230,6 +234,8 @@ const ML: LiaCopy = {
   quickModel: 'മാതൃക കാണിക്കൂ',
   quickVoice: 'ശബ്ദം ഉപയോഗിക്കാൻ സഹായിക്കൂ',
   quickEvents: 'എന്ത് സംഭവിച്ചു എന്ന് പറയൂ',
+  startSpeaking: 'സംസാരിക്കാൻ തുടങ്ങുക',
+  moreTopics: 'കൂടുതൽ സഹായ വിഷയങ്ങൾ',
   childNote: 'കൊച്ചുകുട്ടികൾ: ശാരീരിക പ്രവർത്തനങ്ങൾ ഒരു മുതിർന്നയാളോടൊപ്പം ചെയ്യുക.',
   maybeLater: 'പിന്നീട്',
   readAloud: 'വായിച്ചു കേൾപ്പിക്കൂ',
@@ -318,7 +324,7 @@ const ML: LiaCopy = {
       intro: 'ഇംഗ്ലീഷ്, മലയാളം, ഹിന്ദി എന്നിവയിൽ ഗ്രാമത്തോട് സംസാരിക്കാം.',
       adultNote: 'കൊച്ചുകുട്ടികൾ ഇത് ഒരു മുതിർന്നയാളോടൊപ്പം ചെയ്യാം.',
       steps: [
-        { title: 'മൈക്രോഫോൺ അമർത്തൂ', text: 'Our Village തുറന്ന് Start voice അമർത്തുക.', icon: 'voice' },
+        { title: 'മൈക്രോഫോൺ അമർത്തൂ', text: 'Our Village-ന്റെ മുകളിലുള്ള ശബ്ദ വിഭാഗത്തിൽ Start Speaking അമർത്തുക.', icon: 'voice' },
         { title: 'ചെറിയ വാക്യം പറയൂ', text: 'ഉദാഹരണം: “turn on the lights” അല്ലെങ്കിൽ “water the plants”.', icon: 'voice' },
         { title: 'ഗ്രാമം പരിശോധിക്കും', text: 'കേട്ടത് അത് ആവർത്തിക്കും. ഉറപ്പില്ലെങ്കിൽ ഒന്നും ചെയ്യില്ല.', icon: 'help' },
       ],
@@ -347,6 +353,8 @@ const HI: LiaCopy = {
   quickModel: 'मॉडल दिखाओ',
   quickVoice: 'आवाज़ का उपयोग सिखाओ',
   quickEvents: 'क्या हुआ, बताओ',
+  startSpeaking: 'बोलना शुरू करें',
+  moreTopics: 'और मदद के विषय',
   childNote: 'छोटे बच्चे: शारीरिक प्रदर्शन किसी बड़े के साथ करें।',
   maybeLater: 'बाद में',
   readAloud: 'पढ़कर सुनाइए',
@@ -435,7 +443,7 @@ const HI: LiaCopy = {
       intro: 'आप अंग्रेज़ी, मलयालम या हिंदी में गाँव से बात कर सकते हैं।',
       adultNote: 'छोटे बच्चे इसे किसी बड़े के साथ करें।',
       steps: [
-        { title: 'माइक्रोफ़ोन दबाइए', text: 'Our Village खोलकर Start voice दबाइए।', icon: 'voice' },
+        { title: 'माइक्रोफ़ोन दबाइए', text: 'Our Village में सबसे ऊपर आवाज़ वाले हिस्से में Start Speaking दबाइए।', icon: 'voice' },
         { title: 'छोटा वाक्य कहिए', text: 'जैसे: “turn on the lights” या “water the plants”।', icon: 'voice' },
         { title: 'गाँव जाँचता है', text: 'जो सुना, वह दोहराता है। अगर पक्का न हो, तो कुछ नहीं करता।', icon: 'help' },
       ],
@@ -458,7 +466,9 @@ const HI: LiaCopy = {
 
 export const LIA_COPY: Record<LiaLanguage, LiaCopy> = { en: EN, ml: ML, hi: HI };
 
-export const LIA_TOPIC_ORDER: LiaTopicId[] = ['around', 'water', 'lights', 'waste', 'voice', 'help'];
+// 'around' is deliberately absent: it is the first quick choice, and a second
+// entry called "Show me the model" in the long list was a duplicate.
+export const LIA_TOPIC_ORDER: LiaTopicId[] = ['water', 'lights', 'waste', 'voice', 'help'];
 
 const LIVE: Record<LiaLanguage, LiveCopy> = {
   en: {

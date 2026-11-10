@@ -242,6 +242,8 @@ export interface CommandResponse {
 
 export interface ActivityEvent {
   id?: number | string;
+  /** The backend's own field name; `at` / `created_at` are tolerated aliases. */
+  ts?: string;
   at?: string;
   created_at?: string;
   timestamp?: string;

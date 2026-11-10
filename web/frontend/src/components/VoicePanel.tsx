@@ -7,16 +7,12 @@ import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking } from '../lib/speech';
 import { useVillage } from '../lib/village';
-import { useVoiceUi } from '../lib/voiceUi';
+import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
 import type { VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
 import { IconClose, IconMic, IconPlug, IconSpeaker, IconSparkle } from './Icons';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'ml', label: 'മലയാളം' },
-  { code: 'hi', label: 'हिन्दी' },
-] as const;
+import { LanguagePicker } from './LanguagePicker';
+import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
 
 const ALLOWED_COMMANDS = new Set([
   'LIGHTS_ON',
@@ -38,15 +34,6 @@ const BLOCKED_INTENTS = new Set(['UNKNOWN', 'NEGATED', 'AMBIGUOUS', 'NO_SPEECH']
 const BLOCKED_STATUS = new Set(['unknown', 'negated', 'ambiguous', 'no_speech', 'no-speech']);
 
 const MAX_SECONDS = 10;
-
-// Shown when the intent catalogue cannot be read: the demonstration still has
-// something to say even with the service offline.
-const LOCAL_EXAMPLES = [
-  { label: 'Lights on', phrase: 'turn on the lights' },
-  { label: 'Lights off', phrase: 'turn off the lights' },
-  { label: 'Water the plants', phrase: 'water the plants' },
-  { label: 'Stop watering', phrase: 'stop watering' },
-];
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'success' | 'rejected' | 'disconnected';
 
@@ -74,12 +61,11 @@ function orderedIntents(data: VoiceIntentsResponse | null): VoiceIntent[] {
 }
 
 export function VoicePanel() {
-  const { open, closePanel } = useVoiceUi();
+  const { open, closePanel, language, setLanguage } = useVoiceUi();
   const { demo } = useDemo();
   const { send } = useCommands();
-  const { connected } = useVillage();
+  const { connected, loading: villageLoading } = useVillage();
 
-  const [language, setLanguage] = useState<string>('en');
   const [state, setState] = useState<VoiceState>('idle');
   const [elapsed, setElapsed] = useState(0);
   const [message, setMessage] = useState('');
@@ -90,6 +76,7 @@ export function VoicePanel() {
   const [ttsNote, setTtsNote] = useState('');
   const [micError, setMicError] = useState('');
 
+  const panelRef = useRef<HTMLElement | null>(null);
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(0);
@@ -118,6 +105,23 @@ export function VoicePanel() {
       stopSpeaking();
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        closePanel();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      previous?.focus();
+    };
+  }, [open, closePanel]);
 
   useEffect(() => {
     if (!open) {
@@ -198,7 +202,7 @@ export function VoicePanel() {
     }
     if (!blob || blob.size === 0) {
       setState('rejected');
-      setMessage('No speech was detected. Press start again and speak clearly.');
+      setMessage('No speech was detected. Press Start Speaking again and speak clearly.');
       return;
     }
 
@@ -269,10 +273,37 @@ export function VoicePanel() {
     }
   }
 
-  const supported = recordingSupported() && connected;
+  const micSupported = recordingSupported();
+  const speechState: 'checking' | 'ready' | 'off' | 'unknown' = readiness.error
+    ? 'unknown'
+    : readiness.loading
+      ? 'checking'
+      : readiness.data?.whisper?.ready === false
+        ? 'off'
+        : 'ready';
+
+  const blocker = !micSupported
+    ? 'This browser cannot record audio, so spoken commands are unavailable here. Use the buttons on the cards instead.'
+    : !connected
+      ? 'The board is disconnected, so a spoken command cannot be carried out. Reconnect the board and try again.'
+      : speechState === 'off'
+        ? `The speech service is not available on this laptop: ${readiness.data?.whisper?.message ?? 'the local model is missing.'}`
+        : speechState === 'unknown'
+          ? 'The speech service could not be checked, so recording is paused. The cards still work.'
+          : '';
+
+  const supported = micSupported && connected && speechState !== 'off' && speechState !== 'unknown';
   const disabled = speaking || state === 'processing' || !supported;
   const helpIntents = orderedIntents(intents.data);
   const unavailable = new Set(readiness.data?.unavailable_languages ?? []);
+  // Prose uses the English name (the pills already show each language naming
+  // itself), so a sentence does not switch script halfway through.
+  const languageLabel = VOICE_LANGUAGE_NAMES[language] ?? 'English';
+  const examples = VOICE_EXAMPLES[language] ?? VOICE_EXAMPLES.en;
+  // Four phrases fit beside the microphone on a 768 px laptop; the rest are a
+  // folded list rather than a scrollbar inside a panel.
+  const visibleIntents = helpIntents.slice(0, 4);
+  const moreIntents = helpIntents.slice(4);
 
   if (!open) return null;
 
@@ -280,68 +311,79 @@ export function VoicePanel() {
     <section
       className="voice-panel"
       role="dialog"
+      aria-modal="true"
       aria-label="Voice command"
+      tabIndex={-1}
+      ref={panelRef}
       data-testid="voice-panel"
     >
       <header className="voice-head">
-        <div className="voice-head-title">
-          <span className="voice-emblem">
-            <IconMic size={20} />
+        <div className="voice-title-block">
+          <span className="voice-emblem" aria-hidden="true">
+            <IconMic size={18} />
           </span>
           <div>
-            <p className="eyebrow">English · മലയാളം · हिन्दी</p>
-            <h2>Talk to the village</h2>
+            <h2 className="voice-title">Talk to the village</h2>
+            <p className="voice-subtitle">
+              Say one short command in {languageLabel}. Speech is recognised on this laptop.
+            </p>
           </div>
         </div>
-        <div className="voice-head-actions">
-          <span
-            className={cx(
-              'chip',
-              demo
-                ? 'chip--warn'
-                : !connected
-                  ? 'chip--bad'
-                  : readiness.data?.whisper?.ready === false
-                    ? 'chip--warn'
-                    : 'chip--live',
-            )}
-            title={
-              !connected
-                ? 'The controller is offline, so a command cannot be acted on.'
-                : readiness.data?.whisper?.message ?? 'The local speech service is ready.'
-            }
-          >
-            {demo
-              ? 'Simulation'
-              : !connected
-                ? 'Controller offline'
-                : readiness.data?.whisper?.ready === false
-                  ? 'Speech not ready'
-                  : readiness.loading
-                    ? 'Checking speech…'
-                    : 'Speech ready'}
-          </span>
-          <button className="icon-btn" type="button" onClick={closePanel} aria-label="Close voice panel">
-            <IconClose size={18} />
-          </button>
-        </div>
+        <button
+          className="icon-btn"
+          type="button"
+          onClick={closePanel}
+          aria-label="Close voice panel"
+        >
+          <IconClose size={18} />
+        </button>
       </header>
 
-      <div className="voice-langs" role="group" aria-label="Spoken language">
-        {LANGUAGES.map((entry) => (
-          <button
-            key={entry.code}
-            type="button"
-            className={cx('segment', language === entry.code && 'is-active')}
-            aria-pressed={language === entry.code}
-            onClick={() => setLanguage(entry.code)}
-            disabled={state === 'listening' || state === 'processing'}
-          >
-            {entry.label}
-            {unavailable.has(entry.code) && <span className="lang-note">text only</span>}
-          </button>
-        ))}
+      <div className="voice-readiness" data-testid="voice-readiness">
+        <span
+          className={cx(
+            'chip',
+            demo
+              ? 'chip--warn'
+              : blocker
+                ? 'chip--bad'
+                : speechState === 'checking'
+                  ? 'chip--neutral'
+                  : 'chip--live',
+          )}
+        >
+          {demo
+            ? 'Simulation'
+            : !micSupported
+              ? 'No microphone'
+              : !connected
+                ? 'Board offline'
+                : speechState === 'checking'
+                  ? 'Checking speech…'
+                  : speechState === 'unknown'
+                    ? 'Speech not checked'
+                    : speechState === 'off'
+                      ? 'Speech service unavailable'
+                      : 'Speech ready'}
+        </span>
+        {blocker && <p className="voice-blocker">{blocker}</p>}
+        {!blocker && villageLoading && (
+          <p className="voice-blocker">Waiting for the first reading from the board…</p>
+        )}
       </div>
+
+      <LanguagePicker
+        options={VOICE_LANGUAGES.map((entry) => ({
+          code: entry.code,
+          label: entry.label,
+          note: unavailable.has(entry.code) ? 'understood, not spoken' : undefined,
+        }))}
+        value={language}
+        onChange={(code) => setLanguage(code as VoiceLanguage)}
+        label="Spoken language"
+        disabled={state === 'listening' || state === 'processing'}
+        testId="voice-lang"
+      />
 
       <div className={cx('voice-stage', state === 'listening' && 'is-listening')}>
         <button
@@ -353,40 +395,40 @@ export function VoicePanel() {
           }}
           disabled={disabled && state !== 'listening'}
           aria-label={state === 'listening' ? 'Stop Recording' : 'Start Speaking'}
+          data-testid="voice-start"
         >
-          <span className="ptt-ring" />
-          {state === 'listening' ? (
-            <>
-              <IconPlug size={26} />
-              <span>Stop Recording · {Math.max(0, Math.ceil(MAX_SECONDS - elapsed))}s</span>
-            </>
-          ) : speaking ? (
-            <>
-              <IconSpeaker size={26} />
-              <span>Playing the reply…</span>
-            </>
-          ) : (
-            <>
-              <IconMic size={26} />
-              <span>Start Speaking</span>
-            </>
-          )}
+          <span className="ptt-icon" aria-hidden="true">
+            {state === 'listening' ? (
+              <IconPlug size={24} />
+            ) : speaking ? (
+              <IconSpeaker size={24} />
+            ) : (
+              <IconMic size={24} />
+            )}
+          </span>
+          <span className="ptt-copy">
+            <span className="ptt-label">
+              {state === 'listening'
+                ? 'Stop Recording'
+                : speaking
+                  ? 'Playing the reply…'
+                  : 'Start Speaking'}
+            </span>
+            <span className="ptt-hint">
+              {state === 'listening'
+                ? `${elapsed.toFixed(1)}s of ${MAX_SECONDS}s — press to finish`
+                : `Up to ${MAX_SECONDS} seconds, then it stops by itself.`}
+            </span>
+          </span>
         </button>
 
         <div className="voice-state" aria-live="polite">
-          {state === 'idle' && !micError && (
-            <p>
-              Press Start Speaking, say one short command, then press Stop Recording. Recording
-              stops automatically after {MAX_SECONDS} seconds.{' '}
-              {supported ? '' : 'The microphone or the controller is not available here.'}
-            </p>
-          )}
           {state === 'listening' && (
             <p className="voice-listening">
               <span className="wave" aria-hidden="true">
                 <i /> <i /> <i /> <i />
               </span>
-              Listening — {elapsed.toFixed(1)}s of {MAX_SECONDS}s
+              Listening — speak one short command.
             </p>
           )}
           {state === 'processing' && <p>Understanding your words…</p>}
@@ -435,40 +477,62 @@ export function VoicePanel() {
 
       <div className="voice-help">
         <div className="voice-help-head">
-          <p className="eyebrow">Say one of these</p>
-          <span className="hint">
-            {helpIntents.length > 0 ? `${helpIntents.length} supported commands` : 'Example commands'}
-          </span>
+          <div>
+            <p className="eyebrow">Say one of these</p>
+            <p className="voice-help-note">
+              {helpIntents.length > 0
+                ? `${helpIntents.length} commands are understood in ${languageLabel}.`
+                : `Example commands in ${languageLabel}.`}
+            </p>
+          </div>
         </div>
-        <ul>
-          {helpIntents.length > 0
-            ? helpIntents.slice(0, 10).map((intent) => {
-                const phrases = intentPhrases(intent, language);
-                return (
-                  <li key={intent.id}>
-                    <span className="help-label">{intentLabel(intent, language)}</span>
-                    <span className="help-phrase">
-                      {phrases[0] ? `“${phrases[0]}”` : intent.id}
-                      {intent.command ? <em> · sends {intent.command}</em> : <em> · answer only</em>}
-                    </span>
-                  </li>
-                );
-              })
-            : LOCAL_EXAMPLES.map((example) => (
-                <li key={example.label}>
-                  <span className="help-label">{example.label}</span>
-                  <span className="help-phrase">“{example.phrase}”</span>
+        {helpIntents.length > 0 ? (
+          <>
+            <ul>
+              {visibleIntents.map((intent) => (
+                <li key={intent.id}>
+                  <span className="help-label">{intentLabel(intent, language)}</span>
+                  <span className="help-phrase">
+                    {intentPhrases(intent, language)[0]
+                      ? `“${intentPhrases(intent, language)[0]}”`
+                      : intent.id}
+                    {intent.command ? <em> · sends {intent.command}</em> : <em> · answer only</em>}
+                  </span>
                 </li>
               ))}
-        </ul>
+            </ul>
+            {moreIntents.length > 0 && (
+              <details className="voice-more">
+                <summary>More phrases ({moreIntents.length})</summary>
+                <ul>
+                  {moreIntents.map((intent) => (
+                    <li key={intent.id}>
+                      <span className="help-label">{intentLabel(intent, language)}</span>
+                      <span className="help-phrase">
+                        {intentPhrases(intent, language)[0]
+                          ? `“${intentPhrases(intent, language)[0]}”`
+                          : intent.id}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
+        ) : (
+          <ul>
+            {examples.map((example) => (
+              <li key={example.label}>
+                <span className="help-label">{example.label}</span>
+                <span className="help-phrase">“{example.phrase}”</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {helpIntents.length === 0 && (
           <p className="hint">
-            The full phrase list needs the local service. These examples work on the demonstration.
-          </p>
-        )}
-        {readiness.data?.whisper && readiness.data.whisper.ready === false && (
-          <p className="notice notice--warn">
-            Speech recognition is not ready: {readiness.data.whisper.message ?? 'the local model is missing.'}
+            The full phrase list needs the local service. These examples are the words the parser
+            accepts, so they work when it returns.
           </p>
         )}
       </div>

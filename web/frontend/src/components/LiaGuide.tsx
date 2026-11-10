@@ -17,6 +17,8 @@ import {
 import { speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
 import { subscribeOpenLia } from '../lib/liaUi';
+import { useVoiceUi } from '../lib/voiceUi';
+import { LanguagePicker } from './LanguagePicker';
 import { LiaAvatar } from './LiaAvatar';
 import {
   IconActivity,
@@ -92,6 +94,7 @@ type LiaView =
 
 export function LiaGuide() {
   const navigate = useNavigate();
+  const { openPanel } = useVoiceUi();
   const { status, connected, stale, ageMs, demo } = useVillage();
 
   const [prefs, setPrefs] = useState<LiaPrefs>(() => loadLiaPrefs());
@@ -285,27 +288,40 @@ export function LiaGuide() {
           <span>{copy.quickEvents}</span>
         </button>
       </div>
-      <p className="lia-more-label">More topics</p>
-      <div className="lia-topics">
-        {LIA_TOPIC_ORDER.map((id) => {
-          const topic = copy.topics[id];
-          return (
-            <button
-              key={id}
-              type="button"
-              className="lia-topic"
-              onClick={() => chooseTopic(id)}
-              data-testid={`lia-topic-${id}`}
-            >
-              <LiaPicture icon={topic.icon} size={44} />
-              <span className="lia-topic-copy">
-                <span className="lia-topic-label">{topic.label}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <details className="lia-more">
+        <summary>{copy.moreTopics}</summary>
+        <div className="lia-topics">
+          {LIA_TOPIC_ORDER.map((id) => {
+            const topic = copy.topics[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                className="lia-topic"
+                onClick={() => chooseTopic(id)}
+                data-testid={`lia-topic-${id}`}
+              >
+                <LiaPicture icon={topic.icon} size={44} />
+                <span className="lia-topic-copy">
+                  <span className="lia-topic-label">{topic.label}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </details>
       <div className="lia-foot">
+        <button
+          type="button"
+          className="btn btn--gold"
+          onClick={() => {
+            close();
+            openPanel();
+          }}
+          data-testid="lia-start-speaking"
+        >
+          <IconMic size={16} /> {copy.startSpeaking}
+        </button>
         <button type="button" className="btn btn--ghost" onClick={close}>
           {copy.maybeLater}
         </button>
@@ -479,20 +495,14 @@ export function LiaGuide() {
             </header>
 
             <div className="lia-toolbar">
-              <div className="lia-langs" role="group" aria-label="Language">
-                {LIA_LANGUAGES.map((entry) => (
-                  <button
-                    key={entry.code}
-                    type="button"
-                    className={cx('lia-lang', prefs.language === entry.code && 'is-on')}
-                    aria-pressed={prefs.language === entry.code}
-                    onClick={() => setLanguage(entry.code)}
-                    data-testid={`lia-lang-${entry.code}`}
-                  >
-                    {entry.label}
-                  </button>
-                ))}
-              </div>
+              <LanguagePicker
+                options={LIA_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
+                value={prefs.language}
+                onChange={(code) => setLanguage(code as LiaLanguage)}
+                label="Language"
+                testId="lia-lang"
+                className="lia-langs"
+              />
               <button
                 type="button"
                 className={cx('lia-read', prefs.readAloud && 'is-on', speaking && 'is-speaking')}

@@ -56,6 +56,15 @@ export function SortWaste() {
   const acceptingRef = useRef(false);
 
   const installed = modelInstalled(modelStatus.data);
+  // Three different facts: the browser can open a camera, the model status is
+  // known, and the model is installed.  Collapsing them into one boolean is
+  // what produced "the camera can still be used" next to a disabled button.
+  const cameraSupported =
+    typeof navigator !== 'undefined' &&
+    Boolean(navigator.mediaDevices) &&
+    typeof navigator.mediaDevices.getUserMedia === 'function';
+  const modelKnown = !modelStatus.loading && !modelStatus.error;
+  const previewOnly = !installed;
   const base = modelBase(settings.data?.waste_model_path);
   const confidence = settings.data?.waste_confidence ?? 0.62;
   const stabilityFrames = settings.data?.waste_stability_frames ?? 4;
@@ -254,18 +263,31 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void startCamera()}
-                disabled={!installed}
-                title={!installed ? 'Start Camera needs the recognition model. A presenter can install it in Setup.' : 'Open the camera preview.'}
+                disabled={!cameraSupported}
+                title={
+                  !cameraSupported
+                    ? 'This browser cannot open a camera in this tab.'
+                    : installed
+                      ? 'Open the camera preview.'
+                      : 'Open the camera preview. Recognition stays off until a model is installed.'
+                }
+                data-testid="start-camera"
               >
                 <IconCamera size={18} /> Start Camera
               </button>
             )}
             <p className="camera-prompt">
-              {!installed
-                ? 'The camera stays off until the recognition model is installed.'
-                : cameraOn
-                  ? 'Show one item to the camera. Hold it still.'
-                  : 'Start the camera to begin.'}
+              {!cameraSupported
+                ? 'This browser cannot open a camera in this tab, so Start Camera is disabled.'
+                : !modelKnown
+                  ? 'The camera can be previewed, but recognition cannot be checked right now.'
+                  : installed
+                    ? cameraOn
+                      ? 'Show one item to the camera. Hold it still.'
+                      : 'Start the camera to begin.'
+                    : cameraOn
+                      ? 'Preview only — the recognition model is not installed.'
+                      : 'Start the camera for a preview. Recognition needs the model.'}
             </p>
           </div>
 
@@ -307,6 +329,11 @@ export function SortWaste() {
                     : 'Not sure yet — move the item a little and hold it still.'
                   : 'Waiting for the camera to see something.'}
               </p>
+            ) : cameraOn && previewOnly ? (
+              <p className="result-sub" data-testid="waste-preview-only">
+                Preview only — no bin is suggested because the recognition model is not available.
+                A presenter can install it from Setup → Voice &amp; Camera.
+              </p>
             ) : (
               <p className="result-sub">Start the camera, then show one clean item.</p>
             )}
@@ -347,14 +374,19 @@ export function SortWaste() {
           </Card>
 
           {modelStatus.error ? (
-            <Notice tone="warn" title="Recognition service unavailable">
-              The model status could not be read: {errorMessage(modelStatus.error)}. The camera can
-              still be used, but no category will be recorded.
+            <Notice tone="warn" title="Model status could not be checked">
+              {errorMessage(modelStatus.error)}. The camera preview still works; recognition stays
+              off until the model can be confirmed.
             </Notice>
-          ) : !modelStatus.loading && !installed ? (
+          ) : modelStatus.loading ? (
+            <Notice tone="info" title="Checking the recognition model…">
+              The camera preview is available. Recognition starts only after the model is confirmed.
+            </Notice>
+          ) : !installed ? (
             <Notice tone="warn" title="Recognition model is missing">
-              No waste model is installed, so the camera will not guess. A presenter can install it
-              from <Link to="/setup#voice-camera">Setup → Voice &amp; Camera</Link>.
+              No waste model is installed, so the camera will not guess. The preview is still
+              available. A presenter can install it from{' '}
+              <Link to="/setup#voice-camera">Setup → Voice &amp; Camera</Link>.
             </Notice>
           ) : modelError ? (
             <Notice tone="bad" title="The model could not be loaded">

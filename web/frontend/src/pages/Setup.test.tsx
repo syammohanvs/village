@@ -121,3 +121,44 @@ describe('Setup', () => {
     );
   });
 });
+
+describe('setup with an unavailable service', () => {
+  it('does not claim the settings are saved when they could not be read', async () => {
+    vi.mocked(api.settings).mockRejectedValue(new Error('backend down'));
+    window.history.pushState({}, '', '/setup');
+    render(<App />);
+
+    expect(await screen.findByText(/Something did not answer/i)).toBeInTheDocument();
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-state')).toHaveTextContent('Unavailable');
+  });
+
+  it('offers a local checklist when the service cannot confirm one', async () => {
+    vi.mocked(api.setupChecklist).mockRejectedValue(new Error('backend down'));
+    window.history.pushState({}, '', '/setup');
+    render(<App />);
+
+    expect(await screen.findByText(/Local checks \(not confirmed by the service\)/i)).toBeInTheDocument();
+  });
+});
+
+describe('setup save conflicts', () => {
+  it('turns a 409 into words a presenter can act on', async () => {
+    const { ApiError } = await import('../lib/api');
+    vi.mocked(api.putSettings).mockRejectedValue(
+      new ApiError(409, 'HTTP 409 Conflict: config_revision is stale', { code: 'CONFLICT' }),
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const model = await screen.findByLabelText('Waste model folder');
+    await user.clear(model);
+    await user.type(model, '/models/waste-v2/');
+    await user.click(screen.getByTestId('save-settings'));
+
+    expect(
+      await screen.findByText('Settings changed elsewhere. Reload before saving.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/HTTP 409/)).not.toBeInTheDocument();
+  });
+});

@@ -11,16 +11,18 @@ import {
   IconPump,
   IconStop,
 } from '../components/Icons';
+import { LanguagePicker } from '../components/LanguagePicker';
 import { Card, Chip, Notice } from '../components/ui';
 import { api } from '../lib/api';
 import { useCommands } from '../lib/commands';
 import { binLabel, lightModeLabel, reservoirLabel, soilLabel } from '../lib/explain';
-import { cx, formatAge, formatPercent } from '../lib/format';
+import { cx, formatPercent } from '../lib/format';
 import { openLia } from '../lib/liaUi';
 import { friendlyEvent } from '../lib/timeline';
 import { useApi } from '../lib/useApi';
 import { useVillage } from '../lib/village';
-import { useVoiceUi } from '../lib/voiceUi';
+import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
+import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
 import type { BinReading } from '../types';
 
 type CardKey = 'plants' | 'lights';
@@ -40,15 +42,12 @@ export function OurVillage() {
     loading,
     error,
     reload,
-    live,
     connected,
-    stale,
-    ageMs,
     demo,
     simulator,
   } = useVillage();
   const { send, entries } = useCommands();
-  const { openPanel } = useVoiceUi();
+  const { openPanel, language, setLanguage } = useVoiceUi();
   const navigate = useNavigate();
 
   const [busy, setBusy] = useState<string | null>(null);
@@ -67,12 +66,18 @@ export function OurVillage() {
   const waste = status?.actuators?.waste_indicator;
   const bins = sensors?.bins ?? [];
 
+  // "Known" is a fact about the frame we hold, not about the hardware.  A
+  // missing frame must not be turned into "Idle", "Off" or "not commissioned".
+  const hasStatus = Boolean(status);
   const watering = irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
   const physicalDisabled = !connected && !demo;
-  const pumpCommissioned = Boolean(pump?.commissioned);
+
+  const pumpCommissioned = typeof pump?.commissioned === 'boolean' ? pump.commissioned : null;
   const lightWired = light?.installed !== false;
-  const lightMode = lights?.mode === 'auto' ? 'auto' : lights?.commanded ? 'on' : 'off';
-  const lightWord = !lightWired ? 'Unknown' : light?.brightness === 'dark' ? 'Dark' : light?.brightness === 'bright' ? 'Bright' : 'Unknown';
+  const lightMode: 'auto' | 'on' | 'off' | null =
+    lights?.mode === 'auto' ? 'auto' : typeof lights?.commanded === 'boolean' ? (lights.commanded ? 'on' : 'off') : null;
+  const lightWord =
+    light?.brightness === 'dark' ? 'Dark' : light?.brightness === 'bright' ? 'Bright' : 'Unknown';
 
   const soilPercent = soil?.calibrated && soil.percent !== null ? formatPercent(soil.percent, 0) : null;
 
@@ -82,13 +87,17 @@ export function OurVillage() {
     return raw.includes('recogn') || raw.includes('waste');
   });
   const recent = rows.slice(0, 3);
+  const eventTime = (event: { ts?: string; at?: string; created_at?: string; timestamp?: string }) =>
+    event.ts ?? event.at ?? event.created_at ?? event.timestamp ?? '';
 
   const modelInstalled = model.data?.installed ?? model.data?.available ?? model.data?.present;
   const modelChip = model.error
-    ? levelChip('Status unknown', 'neutral')
-    : modelInstalled
-      ? levelChip('Model ready', 'live')
-      : levelChip('Model missing', 'warn');
+    ? levelChip('Model status unknown', 'neutral')
+    : model.loading
+      ? levelChip('Checking model…', 'neutral')
+      : modelInstalled
+        ? levelChip('Model ready', 'live')
+        : levelChip('Model missing', 'warn');
 
   const run = async (key: string, card: CardKey, type: string) => {
     setBusy(key);
@@ -101,45 +110,60 @@ export function OurVillage() {
   };
 
   // The firmware refuses these too; disabling here explains why instead of
-  // letting a visitor press a button that can only be refused.
-  const waterBlocked = !pumpCommissioned
-    ? 'The pump is not commissioned, so watering is disabled.'
-    : reservoir?.state === 'low'
-      ? 'The tank water is low. Refill the reservoir before watering.'
-      : reservoir?.state !== 'available'
-        ? 'The tank reading is not available, so watering is disabled.'
-        : soil?.state === 'wet' || soil?.state === 'adequate'
-          ? 'The soil is already moist, so watering is not needed.'
-          : !soil?.calibrated
-            ? 'The soil probe is not calibrated, so the controller will refuse to water.'
-            : physicalDisabled
-              ? 'The controller is offline. Actions are disabled.'
-              : '';
+  // letting a visitor press a button that can only be refused.  With no frame
+  // at all, the honest answer is that readiness is unknown.
+  const waterBlocked = !hasStatus && !demo
+    ? 'Connect the board to check watering readiness.'
+    : pumpCommissioned === false
+      ? 'The pump is not commissioned, so watering is disabled.'
+      : reservoir?.state === 'low'
+        ? 'The tank water is low. Refill the reservoir before watering.'
+        : reservoir?.state !== 'available'
+          ? 'The tank reading is unavailable, so watering is disabled.'
+          : soil?.state === 'wet' || soil?.state === 'adequate'
+            ? 'The soil is already moist, so watering is not needed.'
+            : soil?.calibrated === false
+              ? 'The soil probe is not calibrated, so the controller will refuse to water.'
+              : physicalDisabled
+                ? 'The controller is offline. Actions are disabled.'
+                : '';
 
   const startDisabled = busy !== null || watering || Boolean(waterBlocked);
   const stopDisabled = busy !== null;
 
-  const waterState = watering
-    ? irrigation?.state === 'pumping'
-      ? 'Watering now'
-      : 'Soaking — the pump is resting'
-    : irrigation?.state === 'cooldown'
-      ? 'Cooling down after a watering session'
-      : 'Not watering';
+  const waterState = !hasStatus
+    ? 'Watering status unknown.'
+    : watering
+      ? irrigation?.state === 'pumping'
+        ? 'Watering now.'
+        : 'Soaking — the pump is resting.'
+      : irrigation?.state === 'cooldown'
+        ? 'Cooling down after a watering session.'
+        : 'Not watering.';
 
-  const tankTone = reservoir?.state === 'available' ? 'live' : reservoir?.state === 'low' ? 'warn' : 'neutral';
-  const tankWord = reservoirLabel(reservoir?.state);
+  const tankTone = !hasStatus ? 'neutral' : reservoir?.state === 'available' ? 'live' : reservoir?.state === 'low' ? 'warn' : 'neutral';
+  const tankWord = hasStatus ? reservoirLabel(reservoir?.state) : 'Unknown';
 
-  const soilWord = soil?.calibrated ? soilLabel(soil.state) : soil?.state === 'uncalibrated' ? 'Not calibrated' : 'Unknown';
+  const soilWord = !hasStatus
+    ? 'Unknown'
+    : soil?.calibrated
+      ? soilLabel(soil.state)
+      : soil?.state === 'uncalibrated'
+        ? 'Not calibrated'
+        : 'Unknown';
+
+  const example = (VOICE_EXAMPLES[language] ?? VOICE_EXAMPLES.en)[0];
+  const languageName = VOICE_LANGUAGE_NAMES[language] ?? 'English';
 
   return (
     <div className="page village-page">
       {Boolean(error) && !envelope && (
-        <Notice tone="bad" title="The village service is not answering">
+        <Notice tone="bad" title="The village service is not answering.">
           Cards below show what is known. Readings stay “Unknown” until the backend answers.{' '}
           <button type="button" className="link-btn" onClick={reload}>
             Try again
-          </button>
+          </button>{' '}
+          A presenter can check the connection in <Link to="/setup#connections">Setup</Link>.
         </Notice>
       )}
       {!envelope && loading && (
@@ -147,14 +171,44 @@ export function OurVillage() {
           Waiting for the first frame from the controller…
         </p>
       )}
-      {envelope && !live && (
-        <p className="hint" role="status">
-          {stale
-            ? `These readings are ${formatAge(ageMs)} old, not live.`
-            : 'No live reading. The cards keep their last values and actions are disabled.'}{' '}
-          {status?.irrigation?.reason}
-        </p>
-      )}
+      {/* The status strip above already says the controller is offline or how
+          old the frame is.  Repeating it here was the duplicate connection
+          warning; the cards carry their own state. */}
+
+      <section className="voice-invite" aria-labelledby="voice-invite-title">
+        <div className="voice-invite-main">
+          <p className="eyebrow">Talk to our village</p>
+          <h2 className="voice-invite-title" id="voice-invite-title">
+            Say one short command
+          </h2>
+          <p className="voice-invite-text">
+            In {languageName}, try <em>“{example.phrase}”</em>. The board answers with its LEDs and
+            the pump.
+          </p>
+        </div>
+        <div className="voice-invite-side">
+          <LanguagePicker
+            options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
+            value={language}
+            onChange={(code) => setLanguage(code as VoiceLanguage)}
+            label="Language for the voice invitation"
+            testId="invite-lang"
+          />
+          <div className="voice-invite-actions">
+            <button
+              type="button"
+              className="btn btn--gold btn--large"
+              onClick={openPanel}
+              data-testid="start-voice"
+            >
+              <IconMic size={18} /> Start Speaking
+            </button>
+            <button type="button" className="btn btn--ghost" onClick={() => openLia('voice')}>
+              Help with voice
+            </button>
+          </div>
+        </div>
+      </section>
 
       <div className="village-grid">
         <article className="vcard" data-testid="card-plants">
@@ -163,12 +217,19 @@ export function OurVillage() {
               <IconDroplet size={20} />
             </span>
             <h2>Plants &amp; Watering</h2>
-            {levelChip(watering ? 'Watering' : 'Idle', watering ? 'live' : 'neutral')}
+            {levelChip(
+              !hasStatus ? 'Status unknown' : watering ? 'Watering' : 'Idle',
+              watering ? 'live' : 'neutral',
+            )}
           </header>
 
-          {stateLine(`${soilWord}${soilPercent ? ` · ${soilPercent} moisture` : ''}`, soil?.state === 'dry' ? 'warn' : 'neutral')}
+          {stateLine(
+            hasStatus ? `${soilWord}${soilPercent ? ` · ${soilPercent} moisture` : ''}` : 'No soil reading yet',
+            soil?.state === 'dry' ? 'warn' : 'neutral',
+          )}
           <p className="vcard-fact">
-            {waterState}. {irrigation?.reason ?? 'The controller has not reported a reason yet.'}
+            {waterState}
+            {irrigation?.reason && !waterBlocked ? ` ${irrigation.reason}` : ''}
           </p>
 
           <div className="vcard-actions">
@@ -194,23 +255,35 @@ export function OurVillage() {
             </button>
           </div>
           {waterBlocked && <p className="hint">{waterBlocked}</p>}
-          {!pumpCommissioned && (
+          {pumpCommissioned === false && (
             <p className="hint">
               A presenter can open the commissioning gate in <Link to="/setup#advanced">Setup</Link>.
             </p>
           )}
 
           <p className="vcard-try">
-            <strong>Try:</strong> press <em>Water Plants</em>. The controller runs one short pulse,
-            then waits.
+            <strong>Try:</strong> press <em>Water Plants</em>.
           </p>
           <p className="vcard-watch">
-            <strong>Watch the model:</strong> the drip outlet. An acknowledgement means the
-            controller decided — it does not prove water flowed.
+            <strong>Watch:</strong> drops coming from the irrigation tube.
           </p>
           {feedback.plants && entries.find((row) => row.id === feedback.plants) && (
             <CommandResult entry={entries.find((row) => row.id === feedback.plants)!} />
           )}
+          <details className="advanced vcard-more">
+            <summary>How it works</summary>
+            <div className="advanced-body">
+              <p>
+                The controller waters only when the soil is dry and the tank has water. It runs one
+                short pulse, waits, then decides again. The board refuses a start it cannot carry
+                out safely.
+              </p>
+              <p className="hint">
+                An acknowledgement means the controller decided. It does not prove that water
+                flowed.
+              </p>
+            </div>
+          </details>
         </article>
 
         <article className="vcard" data-testid="card-tank">
@@ -223,30 +296,41 @@ export function OurVillage() {
           </header>
 
           {stateLine(
-            reservoir?.state === 'available'
-              ? 'Water is above the minimum level.'
-              : reservoir?.state === 'low'
-                ? 'Water is at or below the minimum level.'
-                : 'No usable probe reading. The app does not guess a level.',
+            !hasStatus
+              ? 'The tank level is unknown until the board answers.'
+              : reservoir?.state === 'available'
+                ? 'Water is above the minimum level.'
+                : reservoir?.state === 'low'
+                  ? 'Water is at or below the minimum level.'
+                  : 'No usable probe reading. The app does not guess a level.',
             reservoir?.state === 'available' ? 'good' : reservoir?.state === 'low' ? 'warn' : 'neutral',
           )}
           <p className="vcard-fact">
-            Two wires report one minimum level — never a percentage or a number of litres.
+            Shows whether enough water is available for the pump.
             {reservoir?.millivolts !== null && reservoir?.millivolts !== undefined
-              ? ` Probe reading ${Math.round(reservoir.millivolts)} mV.`
+              ? ` Probe ${Math.round(reservoir.millivolts)} mV.`
               : ''}
           </p>
 
           <p className="vcard-try">
             <strong>Try:</strong>{' '}
             {reservoir?.state === 'low'
-              ? 'refill the tank until the probes are covered; the state changes after a few seconds.'
+              ? 'refill the tank; the state changes after a few seconds.'
               : 'lift the probes out of the water to see it change to “Low”.'}
           </p>
           <p className="vcard-watch">
-            <strong>Watch the model:</strong> the two probe tips and the water line. Keep the probes
-            above the pump intake.
+            <strong>Watch:</strong> the probe tips and the water line.
           </p>
+          <details className="advanced vcard-more">
+            <summary>How it works</summary>
+            <div className="advanced-body">
+              <p>
+                Two wires report one minimum level — never a percentage or a number of litres. When
+                the tips are covered, the controller allows the pump; when they are dry, it blocks
+                watering.
+              </p>
+            </div>
+          </details>
         </article>
 
         <article className="vcard" data-testid="card-lights">
@@ -255,14 +339,20 @@ export function OurVillage() {
               <IconLamp size={20} />
             </span>
             <h2>Streetlights</h2>
-            {levelChip(lightWord, light?.brightness === 'dark' ? 'gold' : 'neutral')}
+            {levelChip(hasStatus ? lightWord : 'Unknown', light?.brightness === 'dark' ? 'gold' : 'neutral')}
           </header>
 
           {stateLine(
-            !lightWired
-              ? 'No light sensor is fitted, so there is no brightness reading.'
-              : `The light sensor reads ${lightWord.toLowerCase()}. The lights are ${lights?.commanded ? 'commanded on' : 'commanded off'} (${lightModeLabel(lights?.mode)}).`,
-            lights?.commanded ? 'good' : 'neutral',
+            !hasStatus
+              ? 'Lamp mode unknown — the board has not reported it.'
+              : !lightWired
+                ? 'No light sensor is fitted, so there is no brightness reading.'
+                : lightMode === null
+                  ? 'The lamp mode is unknown right now.'
+                  : `The light sensor reads ${lightWord.toLowerCase()}. The lights are ${
+                      lightMode === 'on' ? 'on' : lightMode === 'off' ? 'off' : 'following the sensor'
+                    } (${lightModeLabel(lights?.mode)}).`,
+            lightMode === 'on' ? 'good' : 'neutral',
           )}
 
           <div className="segmented segmented--wide" role="group" aria-label="Streetlight mode">
@@ -282,16 +372,26 @@ export function OurVillage() {
               </button>
             ))}
           </div>
+          {!hasStatus && (
+            <p className="hint">No lighting mode is selected because the actual mode is unknown.</p>
+          )}
           {physicalDisabled && <p className="hint">The controller is offline, so the lights cannot be switched.</p>}
 
           <p className="vcard-try">
-            <strong>Try:</strong> choose <em>Automatic</em>, then cover the light sensor and wait
-            about four seconds.
+            <strong>Try:</strong> choose <em>Automatic</em>, then cover the light sensor.
           </p>
           <p className="vcard-watch">
-            <strong>Watch the model:</strong> the four streetlight LEDs. Automatic follows the
-            sensor; On and Off override it until you choose Automatic again.
+            <strong>Watch:</strong> the streetlight LEDs change after about four seconds.
           </p>
+          <details className="advanced vcard-more">
+            <summary>How it works</summary>
+            <div className="advanced-body">
+              <p>
+                Automatic follows the light sensor. On and Off override it until you choose
+                Automatic again. The rule runs on the board, so it does not need this page.
+              </p>
+            </div>
+          </details>
           {feedback.lights && entries.find((row) => row.id === feedback.lights) && (
             <CommandResult entry={entries.find((row) => row.id === feedback.lights)!} />
           )}
@@ -335,32 +435,24 @@ export function OurVillage() {
           </div>
 
           <p className="vcard-try">
-            <strong>Try:</strong> show one clean item to the camera. The screen suggests a bin and
-            lights that bin&apos;s LED.
+            <strong>Try:</strong> show one clean item to the camera.
           </p>
           <p className="vcard-watch">
-            <strong>Watch the model:</strong> the three bin LEDs. Recognition is a suggestion, not
-            proof that the item was put in the bin.
+            <strong>Watch:</strong> the suggested bin and its LED.
           </p>
+          <details className="advanced vcard-more">
+            <summary>How it works</summary>
+            <div className="advanced-body">
+              <p>
+                The camera suggests a bin; it does not prove that the item was put in it. Bin fill
+                comes from the distance sensors.
+              </p>
+            </div>
+          </details>
         </article>
       </div>
 
-      <div className="village-strip">
-        <Card className="voice-card" kicker="Speak to the village" title="Try a voice command">
-          <p>
-            In English, മലയാളം or हिन्दी, say <em>“turn on the lights”</em> or{' '}
-            <em>“water the plants”</em>.
-          </p>
-          <div className="village-strip-actions">
-            <button type="button" className="btn btn--gold btn--large" onClick={openPanel}>
-              <IconMic size={18} /> Start voice
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => openLia('voice')}>
-              Help me use voice
-            </button>
-          </div>
-        </Card>
-
+      <div className="village-strip village-strip--single">
         <Card
           className="recent-card"
           kicker="Just now"
@@ -371,7 +463,11 @@ export function OurVillage() {
             </Link>
           }
         >
-          {recent.length === 0 ? (
+          {events.error ? (
+            <p className="hint">Activity history unavailable. The log could not be read.</p>
+          ) : events.loading && rows.length === 0 ? (
+            <p className="hint">Reading the village diary…</p>
+          ) : recent.length === 0 ? (
             <p className="hint">Nothing has been recorded yet.</p>
           ) : (
             <ul className="mini-timeline">
@@ -380,7 +476,9 @@ export function OurVillage() {
                 return (
                   <li key={event.id ?? `${friendly.title}-${index}`}>
                     <span className="mini-time">
-                      {event.at ? new Date(event.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      {eventTime(event)
+                        ? new Date(eventTime(event)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : '—'}
                     </span>
                     <span className="mini-text">{friendly.title}</span>
                   </li>

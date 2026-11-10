@@ -320,7 +320,14 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
           }
         >
           {!draft || !saved ? (
-            <p className="hint">Reading the controller configuration…</p>
+            config.error ? (
+              <p className="hint">
+                Configuration unavailable — the controller did not answer, so nothing is shown as
+                saved.
+              </p>
+            ) : (
+              <p className="hint">Reading the controller configuration…</p>
+            )
           ) : (
             <>
               {demo && (

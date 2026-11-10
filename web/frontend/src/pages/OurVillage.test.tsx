@@ -173,3 +173,20 @@ describe('Our Village', () => {
     expect(screen.getByText(/Do not assume anything physical happened/i)).toBeInTheDocument();
   });
 });
+
+describe('unknown readings', () => {
+  it('never claims Idle, Off or "not commissioned" without a frame', async () => {
+    vi.mocked(api.state).mockRejectedValue(new Error('backend down'));
+    render(<App />);
+
+    expect(await screen.findByText(/village service is not answering/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Status unknown').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Idle$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not commissioned/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Connect the board to check watering readiness/i)).toBeInTheDocument();
+
+    for (const mode of ['auto', 'on', 'off'] as const) {
+      expect(screen.getByTestId(`lights-${mode}`)).toHaveAttribute('aria-pressed', 'false');
+    }
+  });
+});

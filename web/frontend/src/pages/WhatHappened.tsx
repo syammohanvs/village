@@ -16,7 +16,7 @@ const KINDS: { id: EventKind | 'all'; label: string }[] = [
 ];
 
 function eventTime(event: ActivityEvent): string {
-  return event.at ?? event.created_at ?? event.timestamp ?? '';
+  return event.ts ?? event.at ?? event.created_at ?? event.timestamp ?? '';
 }
 
 function eventDate(event: ActivityEvent): string {
@@ -64,15 +64,24 @@ export function WhatHappened() {
     <div className="page">
       {Boolean(events.error) && <ErrorBlock error={events.error} onRetry={events.reload} />}
 
-      {rows.length === 0 ? (
+      {!events.error && events.loading && rows.length === 0 && (
         <Card>
-          <EmptyState title={events.loading ? 'Reading the village diary…' : 'Nothing has happened yet'}>
-            {events.loading
-              ? 'The timeline appears as soon as the backend answers.'
-              : 'Watering, lights, voice commands and waste recognitions appear here after the first one is recorded.'}
+          <EmptyState title="Reading the village diary…">
+            The timeline appears as soon as the backend answers.
           </EmptyState>
         </Card>
-      ) : (
+      )}
+
+      {!events.error && !events.loading && rows.length === 0 && (
+        <Card>
+          <EmptyState title="Nothing has happened yet">
+            Watering, lights, voice commands and waste recognitions appear here after the first one
+            is recorded.
+          </EmptyState>
+        </Card>
+      )}
+
+      {!events.error && rows.length > 0 && (
         <Card
           kicker="Newest first"
           title={`${filtered.length} ${filtered.length === 1 ? 'event' : 'events'}`}
@@ -88,11 +97,7 @@ export function WhatHappened() {
                   </time>
                   <div className="timeline-body">
                     <p className="timeline-title">{friendly.title}</p>
-                    {friendly.reason ? (
-                      <p className="timeline-reason">{friendly.reason}</p>
-                    ) : (
-                      <p className="timeline-reason timeline-reason--none">No reason was recorded.</p>
-                    )}
+                    {friendly.reason && <p className="timeline-reason">{friendly.reason}</p>}
                   </div>
                   <Chip tone={friendly.kind === 'alert' ? 'warn' : friendly.kind === 'recognition' ? 'live' : 'neutral'}>
                     {friendly.kind === 'command' ? 'action' : friendly.kind}
