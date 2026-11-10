@@ -155,10 +155,11 @@ export function VoicePanel() {
     try {
       const how = await speakReply(text, language, intent);
       if (how === 'none') {
+        const ttsReady = Boolean(readiness.data?.tts?.ready);
         setTtsNote(
-          speechSupported() && !voiceAvailable(language)
+          !ttsReady && speechSupported() && !voiceAvailable(language)
             ? `This computer has no ${VOICE_LANGUAGE_NAMES[language] ?? language} voice, so the reply is shown as text.`
-            : 'Spoken replies are unavailable in this browser. The text above is the full reply.',
+            : 'The reply could not be read aloud. The text above is the full reply.',
         );
       }
     } finally {

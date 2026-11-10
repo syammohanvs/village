@@ -190,6 +190,34 @@ export const api = {
     });
   },
 
+  async speak(text: string, language: string, lengthScale = 1): Promise<Blob> {
+    const url = withMode(`${PREFIX}/voice/speak`, activeMode);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
+        body: JSON.stringify({ text, language, length_scale: lengthScale }),
+      });
+    } catch (cause) {
+      throw new ApiError(0, 'Cannot reach the village service on this laptop.', {
+        code: 'NETWORK',
+        body: cause,
+      });
+    }
+    if (!response.ok) {
+      let message = `Speech request failed with status ${response.status}`;
+      try {
+        const payload = (await response.json()) as { error?: { message?: string } };
+        message = payload.error?.message ?? message;
+      } catch {
+        /* keep the status text */
+      }
+      throw new ApiError(response.status, message);
+    }
+    return response.blob();
+  },
+
   deviceConfig(mode: Mode = activeMode): Promise<DeviceConfigDocument> {
     // The mode is passed explicitly by the caller as well as defaulting here:
     // when the Simulation switch flips, the child's fetch and the provider's

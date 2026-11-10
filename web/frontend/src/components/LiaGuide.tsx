@@ -16,7 +16,9 @@ import {
 } from '../lib/lia';
 import { primeVoices, speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
+import { api } from '../lib/api';
 import { subscribeOpenLia } from '../lib/liaUi';
+import { useApi } from '../lib/useApi';
 import { useVoiceUi } from '../lib/voiceUi';
 import { LanguagePicker } from './LanguagePicker';
 import { LiaAvatar } from './LiaAvatar';
@@ -103,6 +105,7 @@ export function LiaGuide() {
   const [speaking, setSpeaking] = useState(false);
   const [voiceTick, setVoiceTick] = useState(0);
   const [voiceNote, setVoiceNote] = useState('');
+  const tts = useApi(['voice-readiness'], () => api.voiceReadiness(), {});
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const copy = LIA_COPY[prefs.language];
@@ -176,10 +179,16 @@ export function LiaGuide() {
   }, [copy, liveItems, messages, view]);
 
   const audioSupported = speechSupported();
-  const missingVoice = useMemo(() => {
-    if (!audioSupported) return false;
-    return !voiceAvailable(prefs.language);
-  }, [audioSupported, prefs.language, voiceTick]);
+  // Piper (the local neural voice) speaks all three languages, so a missing
+  // browser voice is only a problem when Piper is not installed either.
+  const piperReady = Boolean(tts.data?.tts?.ready);
+  // voiceTick re-runs this when Chrome finally publishes its voice list.
+  const browserVoice = useMemo(
+    () => audioSupported && voiceAvailable(prefs.language),
+    [audioSupported, prefs.language, voiceTick],
+  );
+  const canSpeak = piperReady || browserVoice;
+  const missingVoice = !canSpeak;
   const languageLabel =
     LIA_LANGUAGES.find((entry) => entry.code === prefs.language)?.label ?? prefs.language;
 
@@ -524,13 +533,13 @@ export function LiaGuide() {
                 aria-pressed={prefs.readAloud}
                 aria-busy={speaking}
                 onClick={toggleReadAloud}
-                disabled={!audioSupported || missingVoice}
+                disabled={!canSpeak}
                 title={
-                  !audioSupported
-                    ? copy.speechUnavailable
-                    : missingVoice
+                  !canSpeak
+                    ? audioSupported
                       ? copy.voiceMissing(languageLabel)
-                      : copy.readAloud
+                      : copy.speechUnavailable
+                    : copy.readAloud
                 }
                 data-testid="lia-read-aloud"
               >
@@ -538,11 +547,12 @@ export function LiaGuide() {
               </button>
             </div>
 
-            {!audioSupported && <p className="lia-note">{copy.speechUnavailable}</p>}
-            {audioSupported && missingVoice && (
-              <p className="lia-note">{copy.voiceMissing(languageLabel)}</p>
+            {!canSpeak && (
+              <p className="lia-note">
+                {audioSupported ? copy.voiceMissing(languageLabel) : copy.speechUnavailable}
+              </p>
             )}
-            {audioSupported && !missingVoice && voiceNote && <p className="lia-note">{voiceNote}</p>}
+            {canSpeak && voiceNote && <p className="lia-note">{voiceNote}</p>}
 
             {view.kind === 'home' && renderHome()}
             {view.kind === 'topic' && renderTopic(view.id, view.step)}

@@ -53,6 +53,9 @@ class Settings:
     sample_loop_enabled: bool
     voice_max_bytes: int
     voice_max_seconds: float
+    piper_bin: Path
+    piper_voices_dir: Path
+    piper_cache_dir: Path
 
     @property
     def device_is_simulator(self) -> bool:
@@ -105,4 +108,16 @@ class Settings:
             sample_loop_enabled=_bool("VILLAGE_SAMPLE_LOOP", True),
             voice_max_bytes=_int("VILLAGE_VOICE_MAX_BYTES", 5 * 1024 * 1024),
             voice_max_seconds=_float("VILLAGE_VOICE_MAX_SECONDS", 12.0),
+            piper_bin=Path(os.getenv("VILLAGE_PIPER_BIN", models / "piper" / "piper")),
+            piper_voices_dir=Path(
+                os.getenv("VILLAGE_PIPER_VOICES", models / "piper" / "voices")
+            ),
+            piper_cache_dir=Path(
+                os.getenv(
+                    "VILLAGE_PIPER_CACHE",
+                    Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")).parent
+                    / "cache"
+                    / "tts",
+                )
+            ),
         )

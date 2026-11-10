@@ -77,3 +77,61 @@ describe('speech voice choice', () => {
     expect(spoken[0]?.voice).toMatch(/Google हिन्दी/);
   });
 });
+
+describe('local neural voice', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('uses the backend voice before the browser one', async () => {
+    installSpeech(VOICES);
+    const blob = new Blob(['wav'], { type: 'audio/wav' });
+    const speak = vi.fn(async () => blob);
+    vi.doMock('./api', () => ({ api: { speak } }));
+    const played: string[] = [];
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        played.push(this.src);
+        queueMicrotask(() => this.onended?.());
+        return Promise.resolve();
+      }
+      pause() {}
+    };
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+
+    const speech = await import('./speech');
+    const ok = await speech.speakText('Hello', 'ml', 0.92);
+
+    expect(ok).toBe(true);
+    expect(speak).toHaveBeenCalledWith('Hello', 'ml', expect.closeTo(1.065, 3));
+    expect(played).toEqual(['blob:tts']);
+    vi.doUnmock('./api');
+  });
+
+  it('falls back to the browser voice when the local engine is missing', async () => {
+    installSpeech(VOICES);
+    vi.doMock('./api', () => ({
+      api: { speak: vi.fn(async () => Promise.reject(new Error('503'))) },
+    }));
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    const speech = await import('./speech');
+    const spoken: { voice: string | undefined }[] = [];
+    window.speechSynthesis.speak = vi.fn((u: SpeechSynthesisUtterance) => {
+      spoken.push({ voice: u.voice?.name });
+      u.onend?.(new Event('end') as SpeechSynthesisEvent);
+    }) as unknown as typeof window.speechSynthesis.speak;
+
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(spoken[0]?.voice).toMatch(/Zira/);
+    vi.doUnmock('./api');
+  });
+});

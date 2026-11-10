@@ -345,6 +345,13 @@ export interface VoiceTranscribeResponse {
   available?: boolean;
 }
 
+export interface VoiceTts {
+  ready?: boolean;
+  engine?: string;
+  languages?: string[];
+  message?: string;
+}
+
 export interface VoiceReadiness {
   ready?: boolean;
   whisper?: {
@@ -354,6 +361,7 @@ export interface VoiceReadiness {
     message?: string;
     installed?: boolean;
   };
+  tts?: VoiceTts;
   audio_assets?: { ready?: boolean; languages?: string[]; missing?: string[] };
   languages?: VoiceLanguage[];
   unavailable_languages?: string[];

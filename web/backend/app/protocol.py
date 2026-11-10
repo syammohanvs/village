@@ -114,3 +114,13 @@ class ScenarioRequest(BaseModel):
     sensor_fault: str | None = Field(default=None, max_length=40)
     pump_enabled: bool | None = None
     auto_enabled: bool | None = None
+
+
+class SpeakRequest(BaseModel):
+    """Text to read aloud with the local neural voice."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=1200)
+    language: Literal["en", "ml", "hi"] = "en"
+    length_scale: float = Field(default=1.0, ge=0.5, le=2.0)

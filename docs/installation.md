@@ -294,3 +294,46 @@ The Python and Node commands are the same. Use PowerShell equivalents for the
 shell scripts, or run them inside WSL2. The camera/microphone permissions are
 managed by Windows Settings → Privacy. PlatformIO installs a USB-serial driver
 for the board's CP2102/CH340 chip; install it if the port does not appear.
+
+## Spoken replies (local neural voice)
+
+Lia and the voice panel read replies aloud with **Piper**, a local neural
+text-to-speech engine. It replaces the browser's own speech synthesis, which
+varies by machine — Windows, for example, has no Malayalam voice at all, so the
+dashboard would have gone silent in Malayalam while English and Hindi worked.
+
+One command installs everything (about 230 MB into `models/piper/`, which is
+git-ignored like the Whisper model):
+
+```bash
+./scripts/install_piper.sh
+```
+
+| Language | Voice | Size |
+| --- | --- | --- |
+| English | `en_US-lessac-medium` (female) | 61 MB |
+| Hindi | `hi_IN-priyamvada-medium` (female) | 61 MB |
+| Malayalam | `ml_IN-meera-medium` (female) | 61 MB |
+
+All three are 22,050 Hz "medium" models, so the village sounds like one
+speaker family. Synthesis is far faster than real time (a five-second sentence
+takes about 0.2 s), needs no internet at runtime, and results are cached in
+`data/cache/tts/`, so a repeated reply is instant.
+
+If the models are missing the dashboard still works: replies fall back to the
+browser's own voices, and a language with neither a Piper voice nor a browser
+voice is shown as text with a note instead of failing silently.
+
+**Licences:** the Piper engine is MIT (the standalone release used here bundles
+its own `onnxruntime` and `espeak-ng`, so no system packages are needed); the
+`rhasspy/piper-voices` repository is MIT. The Meera model card attributes its
+training data to the Kaggle *Indic TTS Malayalam speech corpus* and says to see
+that page's licence — check it before publishing this beyond the exhibition.
+
+`.env` overrides, if you keep the models somewhere else:
+
+```bash
+VILLAGE_PIPER_BIN=/opt/piper/piper
+VILLAGE_PIPER_VOICES=/opt/piper/voices
+VILLAGE_PIPER_CACHE=data/cache/tts
+```

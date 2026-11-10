@@ -1,3 +1,5 @@
+import { api } from './api';
+
 const SPEECH_LANG: Record<string, string> = {
   en: 'en-IN',
   ml: 'ml-IN',
@@ -42,6 +44,8 @@ const FEMALE_NAMES = [
 const MALE_NAMES = ['male', 'david', 'mark', 'daniel', 'alex', 'fred', 'rishi', 'hemant', 'ravi', 'george'];
 
 let cachedVoices: SpeechSynthesisVoice[] = [];
+let currentAudio: HTMLAudioElement | null = null;
+let currentUrl: string | null = null;
 
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -144,13 +148,73 @@ function playAudioFile(url: string): Promise<boolean> {
   });
 }
 
+function stopPlayback(): void {
+  if (currentAudio) {
+    try {
+      currentAudio.pause();
+    } catch {
+      /* ignore */
+    }
+    currentAudio = null;
+  }
+  if (currentUrl) {
+    URL.revokeObjectURL(currentUrl);
+    currentUrl = null;
+  }
+}
+
+function playBlob(blob: Blob): Promise<boolean> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    try {
+      stopPlayback();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudio = audio;
+      currentUrl = url;
+      audio.onended = () => {
+        finish(true);
+        stopPlayback();
+      };
+      audio.onerror = () => {
+        finish(false);
+        stopPlayback();
+      };
+      const played = audio.play();
+      if (played && typeof played.catch === 'function') {
+        played.catch(() => finish(false));
+      }
+      // A browser that never starts playback must not leave the button busy.
+      window.setTimeout(() => finish(false), 1500);
+    } catch {
+      finish(false);
+    }
+  });
+}
+
 /**
- * Speak text with an explicitly chosen voice.  Returns false when the browser
- * has no voice for the language, so a caller can say so instead of leaving a
- * silent pause that looks like a broken button.
+ * Speak text.  The local Piper voice is used for every language so the three
+ * sound like one speaker; the browser's own synthesis is only a fallback for
+ * a machine without the Piper models.  Returns false when neither produced
+ * sound, so a caller can say so instead of leaving a silent pause.
  */
 export async function speakText(text: string, language: string, rate = 0.98): Promise<boolean> {
-  if (!text || !speechSupported()) return false;
+  if (!text) return false;
+  // Piper's --length_scale is the inverse of a rate: >1 is slower.
+  const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
+  try {
+    const blob = await api.speak(text, language, Number(lengthScale.toFixed(3)));
+    if (await playBlob(blob)) return true;
+  } catch {
+    /* fall through to the browser voice */
+  }
+
+  if (!speechSupported()) return false;
   await primeVoices();
   const voice = pickVoice(language);
   if (!voice) return false;
@@ -168,13 +232,13 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
     utterance.rate = rate;
     utterance.onend = () => finish(true);
     utterance.onerror = () => finish(false);
-    // Safety net: a voice that never starts must not leave the button busy.
     window.setTimeout(() => finish(false), 2500 + Math.min(60000, text.length * 90));
     window.speechSynthesis.speak(utterance);
   });
 }
 
 export function stopSpeaking(): void {
+  stopPlayback();
   if (speechSupported()) window.speechSynthesis.cancel();
 }
 

@@ -34,9 +34,11 @@ from .protocol import (
     RecognitionRequest,
     ReservoirCalibrationRequest,
     ScenarioRequest,
+    SpeakRequest,
     SoilCalibrationRequest,
 )
 from .simulator import SimulatorError
+from .tts import PiperTts, TtsError
 from .voice import VoiceError, WhisperClient, audio_assets
 
 log = logging.getLogger("village")
@@ -63,6 +65,10 @@ def get_gateway(request: Request) -> DeviceGateway:
 
 def get_voice(request: Request) -> WhisperClient:
     return request.app.state.voice
+
+
+def get_tts(request: Request) -> PiperTts:
+    return request.app.state.tts
 
 
 def get_matcher(request: Request) -> IntentMatcher:
@@ -169,6 +175,7 @@ def create_app(
     gateway: DeviceGateway | None = None,
     database: Database | None = None,
     voice: WhisperClient | None = None,
+    tts: PiperTts | None = None,
 ) -> FastAPI:
     settings = settings or Settings.load()
     database = database or Database(settings.db_path)
@@ -181,6 +188,7 @@ def create_app(
     app.state.db = database
     app.state.gateway = gateway
     app.state.voice = voice
+    app.state.tts = tts or PiperTts(settings)
     app.state.matcher = matcher
 
     app.add_middleware(
@@ -522,13 +530,35 @@ def create_app(
     async def voice_readiness(
         voice: WhisperClient = Depends(get_voice),
         settings: Settings = Depends(get_settings),
+        request_tts: PiperTts = Depends(get_tts),
     ):
         readiness = await voice.readiness()
         return {
             **readiness,
             "audio_assets": audio_assets(settings),
+            "tts": request_tts.readiness(),
             "languages": ["en", "ml", "hi"],
         }
+
+    @app.post("/api/v1/voice/speak")
+    async def voice_speak(
+        body: SpeakRequest,
+        tts: PiperTts = Depends(get_tts),
+    ):
+        if body.language not in {"en", "ml", "hi"}:
+            raise HTTPException(status_code=422, detail="language must be en, ml or hi")
+        try:
+            audio_path = await tts.synthesize(body.text, body.language, body.length_scale)
+        except TtsError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        return FileResponse(
+            audio_path,
+            media_type="audio/wav",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
 
     @app.post("/api/v1/voice/transcribe")
     async def voice_transcribe(

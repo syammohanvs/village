@@ -91,6 +91,7 @@ async def client_for(
     *,
     device: Any | None = None,
     voice: Any | None = None,
+    tts: Any | None = None,
 ):
     gateway = DeviceGateway(
         settings,
@@ -102,6 +103,7 @@ async def client_for(
         gateway=gateway,
         database=Database(settings.db_path),
         voice=voice or WhisperClient(settings),
+        tts=tts,
     )
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
