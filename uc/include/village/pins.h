@@ -26,7 +26,7 @@ namespace pins {
 inline constexpr const char* kBoardProfile = "esp32doit-devkit-v1";
 inline constexpr const char* kBoardDescription =
     "30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1";
-inline constexpr const char* kPinMapVersion = "1.3.0-30pin";
+inline constexpr const char* kPinMapVersion = "1.4.0-30pin";
 inline constexpr std::size_t kHeaderPins = 30;
 
 inline constexpr bool isAdc1(int gpio) {
@@ -157,10 +157,9 @@ inline constexpr int LDR_ADC = 32;             // ADC1_CH4, analogue or digital
 inline constexpr int RESERVOIR_EXCITE = 25;
 
 // Pump MOSFET gate.  The pump itself is powered from the 5 V rail through
-// the driver; this GPIO only carries the logic signal.  D19 sits on the free
-// header side beside the waste LEDs, so the low-current signals leave the
-// board on one edge and the lamp loom on the other.
-inline constexpr int PUMP_GATE = 19;
+// the driver; this GPIO only carries the logic signal.  D26 is used here
+// because the driver sits on that side of the board; it is boot-low.
+inline constexpr int PUMP_GATE = 26;
 
 // Four streetlight LEDs, one per pin, each with its own series resistor.
 // These four are consecutive on the 30-pin header (D13, D12, D14, D27), which
@@ -183,10 +182,10 @@ inline constexpr int WASTE_LED_PAPER = 23;
 inline constexpr int BIN_TRIG[3] = {4, 16, 17};
 inline constexpr int BIN_ECHO[3] = {36, 39, 18};
 
-// Left free on purpose.  GPIO 26 became the named spare when the pump gate
-// moved to 19; the waste LEDs took 21/22/23.  GPIO 2/5/15 are strapping pins
-// and stay unused.  GPIO 1/3 remain the USB serial console.
-inline constexpr int SPARE_SAFE_OUTPUT = 26;
+// Left free on purpose.  GPIO 19 is the named spare; the waste LEDs took
+// 21/22/23 and the pump gate stays on 26.  GPIO 2/5/15 are strapping pins and
+// stay unused.  GPIO 1/3 remain the USB serial console.
+inline constexpr int SPARE_SAFE_OUTPUT = 19;
 
 // ---------------------------------------------------------------------------
 // Compile-time checks.  A bad edit fails the build rather than the exhibit.

@@ -67,6 +67,9 @@ void setup() {
   if (VILLAGE_PUMP_BENCH_DRIVE == 1) {
     Serial.println("[boot] BENCH DRIVE is on: the pump gate is HIGH with no "
                    "commissioning. The pump must be disconnected.");
+  } else if (VILLAGE_PUMP_DRIVE_INVERTED == 1) {
+    Serial.println("[boot] pump drive INVERTED for the NPN demo driver: "
+                   "GPIO HIGH = pump off, GPIO LOW = pump on.");
   } else {
     Serial.printf("[boot] pump output is LOW; config revision %lu\n",
                   static_cast<unsigned long>(rt.config.revision));

@@ -99,7 +99,7 @@ with a **2N3904** small-signal NPN also available.
 - [ ] Driver tested with a **dummy load** (5 V lamp or 47 Ω / 1 W resistor)
       before the pump, gate tied to 3V3.
 - [ ] Alternatively, build with `VILLAGE_PUMP_BENCH_DRIVE 1` to have the
-      firmware drive D19 HIGH at boot (`board.pump_bench_drive` in
+      firmware drive D26 HIGH at boot (`board.pump_bench_drive` in
       `/api/v1/health`). That build bypasses both pump gates: the pump must be
       disconnected, and it must be reflashed with the flag back at `0`.
 - [ ] Measured Vds: __________ (record it; see the table above).

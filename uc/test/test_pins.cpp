@@ -54,11 +54,10 @@ TEST(waste_leds_share_the_free_header_side) {
 }
 
 TEST(pump_gate_shares_the_free_header_side) {
-  // The pump gate moved to the free edge so its signal wire leaves the board
-  // beside the waste indicators instead of crossing the lamp loom.
-  CHECK(pins::PUMP_GATE == 19);
-  CHECK(pins::SPARE_SAFE_OUTPUT == 26);
-  CHECK(pins::PUMP_GATE != 26);
+  // The pump driver sits on the D26 side of the board.
+  CHECK(pins::PUMP_GATE == 26);
+  CHECK(pins::SPARE_SAFE_OUTPUT == 19);
+  CHECK(pins::PUMP_GATE != 19);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_ORGANIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PLASTIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PAPER);

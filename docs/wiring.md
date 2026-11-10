@@ -47,7 +47,7 @@ logical order.
 | Reservoir probe sense | **35** | D35 | ADC input | ADC1_CH7, input-only |
 | Reservoir probe excitation | **25** | D25 | Digital output | Safe output; high-Z between reads |
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
-| Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
+| Pump MOSFET gate | **26** | D26 | Digital output | Safe output, boot-low |
 | Streetlight LED 1 | **13** | D13 | Digital output | Safe output |
 | Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
 | Streetlight LED 3 | **14** | D14 | Digital output | Safe output |
@@ -61,7 +61,7 @@ logical order.
 | Bin 2 echo | **39** | VN | Digital input | Input-only; **needs divider** |
 | Bin 3 trigger (paper) | **17** | D17 | Digital output | Safe output (WROOM only) |
 | Bin 3 echo | **18** | D18 | Digital input | Safe input; **needs divider** |
-| Spare | 26 | D26 | — | One safe output left free |
+| Spare | 19 | D19 | — | One safe output left free |
 
 ### Why not other pins
 
@@ -128,7 +128,7 @@ Required driver interface:
 | Type | Logic-level N-channel MOSFET (preferred) or a driver module with a transistor/optocoupler. |
 | Gate threshold | Must switch fully on at **Vgs ≤ 3.3 V** — for the IRFZ44N that is a measurement, not an assumption. |
 | Current | Rated above the pump's measured stall current, with margin. |
-| Gate resistor | 220 Ω–1 kΩ in series from GPIO 19. |
+| Gate resistor | 220 Ω–1 kΩ in series from GPIO 26. |
 | Gate pull-down | 10 kΩ from gate to GND, so the pump is off while the ESP32 boots. |
 | Flyback | Diode across the pump, cathode to +5 V. |
 | Ground | MOSFET source to the common ground. |
@@ -140,7 +140,7 @@ Use a dummy load (5 V lamp, or 47 Ω / 1 W resistor), **not** the pump:
 ```
 VIN (+5 V) ── dummy load ──┬── IRFZ44N drain (middle leg / tab)
                            │
-GPIO 19 / 3V3 ──[220 Ω]── gate
+GPIO 26 / 3V3 ──[220 Ω]── gate
                            │
                        [10 kΩ]
                            │
@@ -167,7 +167,7 @@ VIN (+5 V) ──┬──────── pump +
              │
           [1N4007]   cathode → +5 V, anode → drain
              │
-GPIO 19 ──[220 Ω]── gate
+GPIO 26 ──[220 Ω]── gate
              │
          [10 kΩ]
              │

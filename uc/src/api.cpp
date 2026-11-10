@@ -227,6 +227,7 @@ void buildHealth(JsonDocument& doc) {
   board["pin_map_version"] = pins::kPinMapVersion;
   board["waste_leds_always_on"] = VILLAGE_WASTE_LEDS_ALWAYS_ON == 1;
   board["pump_bench_drive"] = VILLAGE_PUMP_BENCH_DRIVE == 1;
+  board["pump_drive_inverted"] = VILLAGE_PUMP_DRIVE_INVERTED == 1;
 
   JsonObject wifi = root["wifi"].to<JsonObject>();
   wifi["mode"] = networkMode();

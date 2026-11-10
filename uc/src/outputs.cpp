@@ -21,7 +21,9 @@ inline int wasteLedLevel(bool on) {
 // bench-drive build (VILLAGE_PUMP_BENCH_DRIVE) holds it HIGH so the MOSFET can
 // be measured with a dummy load; that build must never see a real pump.
 inline int pumpGateLevel(bool on) {
-  return (VILLAGE_PUMP_BENCH_DRIVE == 1 || on) ? HIGH : LOW;
+  const bool active = VILLAGE_PUMP_BENCH_DRIVE == 1 || on;
+  const bool level = VILLAGE_PUMP_DRIVE_INVERTED == 1 ? !active : active;
+  return level ? HIGH : LOW;
 }
 }  // namespace
 
@@ -65,7 +67,7 @@ void applyPump(bool on) {
   const bool allowed =
       VILLAGE_PUMP_BENCH_DRIVE == 1 ||
       (on && VILLAGE_PUMP_COMMISSIONED == 1 && rt.config.irrigation.pump_enabled);
-  digitalWrite(pins::PUMP_GATE, allowed ? HIGH : LOW);
+  digitalWrite(pins::PUMP_GATE, pumpGateLevel(allowed));
 }
 
 void applyStreetlights(bool on) {

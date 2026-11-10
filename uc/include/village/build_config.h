@@ -44,6 +44,24 @@
 static_assert(VILLAGE_PUMP_BENCH_DRIVE == 0 || VILLAGE_PUMP_BENCH_DRIVE == 1,
               "VILLAGE_PUMP_BENCH_DRIVE must be 0 or 1");
 
+// DEMO-ONLY: invert the pump gate level.
+//
+// A single NPN between the GPIO and the gate is an inverting driver: GPIO
+// HIGH pulls the gate LOW. This flag makes the firmware drive the pin the
+// other way round so "pump on" still means "pump on" from the UI.
+//
+// It is a bench/demo concession, not a design: while the gate is inverted, a
+// reset leaves the pin floating, so the gate is pulled HIGH and the pump runs
+// for the few hundred milliseconds before setupOutputs() runs. The pump must
+// stay submerged for the whole demo, and this flag goes back to 0 with a
+// proper logic-level MOSFET.
+#ifndef VILLAGE_PUMP_DRIVE_INVERTED
+#define VILLAGE_PUMP_DRIVE_INVERTED 0
+#endif
+static_assert(VILLAGE_PUMP_DRIVE_INVERTED == 0 ||
+                  VILLAGE_PUMP_DRIVE_INVERTED == 1,
+              "VILLAGE_PUMP_DRIVE_INVERTED must be 0 or 1");
+
 // BENCH-TEST OVERRIDE — all three waste indicator LEDs held lit.
 //
 // Set to 1 while the three indicator LEDs are being wired: the pins are
