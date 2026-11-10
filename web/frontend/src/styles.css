@@ -506,9 +506,17 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .conn-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .conn-pill--live { color: var(--success); border-color: rgba(108, 197, 150, .4); }
+.conn-pill--live .dot { animation: conn-pulse 1.8s ease-in-out infinite; }
 .conn-pill--stale { color: var(--warn); border-color: rgba(227, 176, 75, .4); }
 .conn-pill--offline { color: var(--danger); border-color: rgba(224, 91, 103, .4); }
-.conn-age { color: var(--muted); }
+.conn-age { color: var(--muted); font-variant-numeric: tabular-nums; }
+@keyframes conn-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(108, 197, 150, .45); }
+  50% { opacity: .55; box-shadow: 0 0 0 5px rgba(108, 197, 150, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conn-pill--live .dot { animation: none; }
+}
 .demo-switch {
   display: inline-flex;
   align-items: center;

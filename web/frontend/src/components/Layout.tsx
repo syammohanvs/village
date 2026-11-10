@@ -25,26 +25,51 @@ const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
   '/setup': IconSettings,
 };
 
+function clockOf(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  return at.toLocaleTimeString(undefined, { hour12: false });
+}
+
 function ConnectionPill() {
   const { connected, stale, connection, ageMs } = useVillage();
+  // A clock that advances once a second is the cheapest honest proof that the
+  // page is still being fed.  A relative "N ms ago" flickers between 0 and
+  // 1000 because the backend polls every second, which reads as a frozen
+  // counter rather than a live one.
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const label = !connected ? 'Offline' : stale ? 'Stale' : 'Live';
   const tone = !connected ? 'offline' : stale ? 'stale' : 'live';
+  const lastSuccess = connection?.last_success_at ?? null;
+  const clock = clockOf(lastSuccess);
+  const sinceLast = lastSuccess ? Math.max(0, now - Date.parse(lastSuccess)) : null;
   return (
     <span
       className={cx('conn-pill', `conn-pill--${tone}`)}
       title={
         connected
-          ? `Last successful frame ${formatAge(ageMs)}${connection?.last_success_at ? ` at ${connection.last_success_at}` : ''}`
+          ? `Last frame from the controller: ${
+              Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
+            }${lastSuccess ? ` (${lastSuccess})` : ''}`
           : connection?.last_error ?? 'No live frame from the controller.'
       }
       data-testid="connection-pill"
     >
       <span className="dot" aria-hidden="true" />
       {label}
-      {connected && !stale && ageMs !== null && <span className="conn-age">{formatAge(ageMs)}</span>}
+      {connected && !stale && clock && <span className="conn-age">{clock}</span>}
+      {connected && stale && <span className="conn-age">{formatAge(ageMs)}</span>}
     </span>
   );
 }
+
 
 function TalkToLia({ compact = false }: { compact?: boolean }) {
   return (

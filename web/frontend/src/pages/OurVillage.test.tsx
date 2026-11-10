@@ -88,6 +88,19 @@ describe('Our Village', () => {
     expect(screen.getByTestId('connection-pill')).toHaveTextContent('Stale');
   });
 
+  it('shows the last frame time while live instead of a flickering millisecond count', async () => {
+    render(<App />);
+
+    const pill = await screen.findByTestId('connection-pill');
+    expect(pill).toHaveTextContent('Live');
+    // The backend polls once a second, so a relative "N ms ago" swung between
+    // 0 and 1000 and read as a frozen counter.  A clock of the last frame is
+    // both honest and visibly moving.
+    expect(pill.textContent ?? '').toMatch(/\d{1,2}:\d{2}:\d{2}/);
+    expect(pill.textContent ?? '').not.toMatch(/\d+\s*ms ago/);
+    expect(pill.getAttribute('title') ?? '').toMatch(/Last frame/i);
+  });
+
   it('keeps the cards visible and disables actions when the controller is offline', async () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ connected: false, stale: false, ageMs: 15000, lastError: 'Timed out contacting the controller.' }),
