@@ -387,6 +387,8 @@ export interface SetupChecklist {
 }
 
 export interface HealthResponse {
+  /** The backend reports the clock as `time`. */
+  time?: string;
   ok?: boolean;
   status?: string;
   app_version?: string;

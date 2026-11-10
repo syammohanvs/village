@@ -183,3 +183,14 @@ describe('simulation toggle', () => {
     expect(await screen.findByTestId('demo-banner')).toBeInTheDocument();
   });
 });
+
+describe('connection health wording', () => {
+  it('does not claim a device check that never ran, and shows the server clock', async () => {
+    render(<App />);
+    expect(await screen.findByText(/not checked — press Test connection/i)).toBeInTheDocument();
+    // The backend names the clock `time`; reading only `server_time` printed a dash.
+    const row = screen.getByText('Server time').closest('.kv-row');
+    expect(row?.textContent ?? '').not.toBe('Server time—');
+    expect(row?.textContent ?? '').toMatch(/2026/);
+  });
+});

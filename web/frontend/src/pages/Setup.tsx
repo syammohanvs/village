@@ -77,7 +77,14 @@ function Connections() {
     setTestState('testing');
     setTestMessage('');
     try {
-      const response = await api.deviceHealth();
+      // The device can take a few seconds to time out; without a bound here
+      // the button can sit on "Testing…" forever if the request never settles.
+      const response = await Promise.race([
+        api.deviceHealth(),
+        new Promise<never>((_, reject) =>
+          window.setTimeout(() => reject(new Error('no answer within 12 seconds')), 12000),
+        ),
+      ]);
       setTestState('ok');
       setTestMessage(
         [
@@ -126,8 +133,11 @@ function Connections() {
             { label: 'App version', value: health.data?.app_version ?? health.data?.version ?? '—' },
             { label: 'Device URL', value: <code>{deviceUrl}</code> },
             { label: 'Device mode', value: titleCase(deviceMode) },
-            { label: 'Device reachable', value: reachable === undefined ? 'not reported' : reachable ? 'yes' : 'no' },
-            { label: 'Server time', value: formatDateTime(health.data?.server_time) },
+            {
+              label: 'Device reachable',
+              value: reachable === undefined ? 'not checked — press Test connection' : reachable ? 'yes' : 'no',
+            },
+            { label: 'Server time', value: formatDateTime(health.data?.server_time ?? health.data?.time) },
           ]}
         />
         {testState !== 'idle' && testState !== 'testing' && (

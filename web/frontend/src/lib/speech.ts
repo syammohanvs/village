@@ -46,6 +46,9 @@ const MALE_NAMES = ['male', 'david', 'mark', 'daniel', 'alex', 'fred', 'rishi', 
 let cachedVoices: SpeechSynthesisVoice[] = [];
 let currentAudio: HTMLAudioElement | null = null;
 let currentUrl: string | null = null;
+// Every speak call takes a ticket.  A slow synthesis for a language the reader
+// has already left must not start playing over the one they are on.
+let speakSeq = 0;
 
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -205,14 +208,18 @@ function playBlob(blob: Blob): Promise<boolean> {
  */
 export async function speakText(text: string, language: string, rate = 0.98): Promise<boolean> {
   if (!text) return false;
+  const ticket = ++speakSeq;
   // Piper's --length_scale is the inverse of a rate: >1 is slower.
   const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
   try {
     const blob = await api.speak(text, language, Number(lengthScale.toFixed(3)));
+    // A newer call (another language, another view) owns the speakers now.
+    if (ticket !== speakSeq) return false;
     if (await playBlob(blob)) return true;
   } catch {
     /* fall through to the browser voice */
   }
+  if (ticket !== speakSeq) return false;
 
   if (!speechSupported()) return false;
   await primeVoices();
@@ -238,6 +245,8 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
 }
 
 export function stopSpeaking(): void {
+  // Invalidate anything still being synthesised.
+  speakSeq += 1;
   stopPlayback();
   if (speechSupported()) window.speechSynthesis.cancel();
 }

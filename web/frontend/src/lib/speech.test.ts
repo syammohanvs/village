@@ -135,3 +135,50 @@ describe('local neural voice', () => {
     vi.doUnmock('./api');
   });
 });
+
+describe('overlapping speech', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('does not let an older language start over the one now selected', async () => {
+    installSpeech(VOICES);
+    const played: string[] = [];
+    let releaseSlow: (blob: Blob) => void = () => undefined;
+    const slow = new Promise<Blob>((resolve) => {
+      releaseSlow = resolve;
+    });
+    const speak = vi
+      .fn()
+      .mockImplementationOnce(() => slow)
+      .mockImplementationOnce(async () => new Blob(['ml'], { type: 'audio/wav' }));
+    vi.doMock('./api', () => ({ api: { speak } }));
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        played.push(this.src);
+        queueMicrotask(() => this.onended?.());
+        return Promise.resolve();
+      }
+      pause() {}
+    };
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+
+    const speech = await import('./speech');
+    const english = speech.speakText('Hello', 'en');
+    await speech.speakText('നമസ്കാരം', 'ml');
+    // The English synthesis now finishes, after Malayalam already started.
+    releaseSlow(new Blob(['en'], { type: 'audio/wav' }));
+    const englishResult = await english;
+
+    expect(englishResult).toBe(false);
+    expect(played).toHaveLength(1);
+    vi.doUnmock('./api');
+  });
+});
