@@ -1255,7 +1255,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .village-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  /* Same two columns as the cards above, so the lower pair lines up with the
+     upper pair instead of being a wider/narrower split. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .village-strip-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
