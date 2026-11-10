@@ -6,6 +6,7 @@
 #include "village/device_state.h"
 #include "village/net.h"
 #include "village/outputs.h"
+#include "village/pins.h"
 #include "village/sensors.h"
 #include "village/config_store.h"
 
@@ -87,6 +88,21 @@ void loop() {
   const IrrigationInputs inputs = buildIrrigationInputs(now);
   rt.irrigation.tick(now, inputs);
   applyPump(rt.irrigation.pumpOn());
+
+#if VILLAGE_PUMP_BENCH_DRIVE == 1
+  // Bench diagnostic.  The latch and the pad are two different facts: the code
+  // can write HIGH on every pass while the pin reads LOW because the header
+  // hole is not the one being written, or because the driver is damaged.  Only
+  // a readback separates those, so the bench build prints both every 2 s.
+  static uint32_t bench_report_ms = 0;
+  if (now - bench_report_ms >= 2000) {
+    bench_report_ms = now;
+    applyPump(true);
+    const int readback = digitalRead(pins::PUMP_GATE);
+    Serial.printf("[bench] pump gate GPIO %d: latch HIGH, pad %s (%d)\n",
+                  pins::PUMP_GATE, readback == HIGH ? "HIGH" : "LOW", readback);
+  }
+#endif
 
   const LightOutput lights = rt.lights.output(rt.config, now);
   applyStreetlights(lights.on);

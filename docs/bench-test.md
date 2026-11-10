@@ -79,14 +79,28 @@ until step 8.
 
 ## G. Pump driver and pump
 
-**Part in hand: IRFZ44N** (standard-level N-channel MOSFET, TO-220, G-D-S),
-with a **2N3904** small-signal NPN also available.
+**Parts measured on the real pump** (2026-11-10):
+
+| Part | Type | Result |
+| --- | --- | --- |
+| **2N7000** | logic-level N-channel MOSFET, TO-92, **S · G · D** | **used** — gate 3.27 V, Vds 1.3 V at 157 mA, pump runs |
+| 2N2222A | NPN BJT, TO-92, **E · B · C**, 800 mA | spare — use if a motor's surge needs more than the 2N7000 |
+| IRFZ44N | standard-level MOSFET, TO-220, G · D · S | needs a 5 V gate driver; not used with the 2N7000 fitted |
+| 2N3904 | small-signal NPN, 200 mA | **not** a pump switch |
 
 - The pump is a **DC 3–6 V mini submersible**, rated **130–220 mA**, maximum
   lift **40–110 mm**. Its outlet must sit within about 10 cm of the water
-  surface; above that it stalls.
-- The **2N3904 is not used as the pump switch**: its 200 mA rating is below the
-  pump's running current and its start-up surge.
+  surface; above that it stalls. Its winding measures **28 Ω** cold.
+- **A resistor dummy load is not a motor test.** Two 47 Ω resistors in
+  parallel (23.5 Ω) draw a steady 171 mA and pass at 4.0 V on the same wiring
+  where the pump gets 1.3 V. A motor wants several times its running current
+  for a fraction of a second while it spins up, so the supply must be sized for
+  the **start-up surge**, not the running current.
+- **The pump must not be powered from the PC's USB port.** Measured: with the
+  pump on the board's `VIN` fed by USB, the rail collapses and the pump sees
+  **1.3 V**, which looks exactly like a dead transistor. On the 5 V 2 A bank
+  the same circuit runs normally. Always use the bank, and keep the bank's
+  ground common with the ESP32.
 - The IRFZ44N is specified at **Vgs = 10 V**, so it has to be measured at
   3.3 V before it is trusted:
 
@@ -99,11 +113,12 @@ with a **2N3904** small-signal NPN also available.
 - [ ] Driver tested with a **dummy load** (5 V lamp or 47 Ω / 1 W resistor)
       before the pump, gate tied to 3V3.
 - [ ] Alternatively, build with `VILLAGE_PUMP_BENCH_DRIVE 1` to have the
-      firmware drive D26 HIGH at boot (`board.pump_bench_drive` in
+      firmware drive D19 HIGH at boot (`board.pump_bench_drive` in
       `/api/v1/health`). That build bypasses both pump gates: the pump must be
       disconnected, and it must be reflashed with the flag back at `0`.
 - [ ] Measured Vds: __________ (record it; see the table above).
-- [ ] Gate resistor **220 Ω**; gate pull-down **10 kΩ**.
+- [ ] Gate resistor **220 Ω**; gate pull-down **10 kΩ** (2N7000: gate is
+      the **middle** leg, source the **left**, drain the **right**).
 - [ ] Flyback diode (**1N4007**) across the pump, cathode to +5 V.
 - [ ] Pump powered from **VIN** with the 5 V 2 A power bank, USB unplugged;
       the board's 3.3 V regulator is not in the pump path.

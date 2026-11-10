@@ -47,7 +47,7 @@ logical order.
 | Reservoir probe sense | **35** | D35 | ADC input | ADC1_CH7, input-only |
 | Reservoir probe excitation | **25** | D25 | Digital output | Safe output; high-Z between reads |
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
-| Pump MOSFET gate | **26** | D26 | Digital output | Safe output, boot-low |
+| Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
 | Streetlight LED 1 | **13** | D13 | Digital output | Safe output |
 | Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
 | Streetlight LED 3 | **14** | D14 | Digital output | Safe output |
@@ -61,7 +61,7 @@ logical order.
 | Bin 2 echo | **39** | VN | Digital input | Input-only; **needs divider** |
 | Bin 3 trigger (paper) | **17** | D17 | Digital output | Safe output (WROOM only) |
 | Bin 3 echo | **18** | D18 | Digital input | Safe input; **needs divider** |
-| Spare | 19 | D19 | — | One safe output left free |
+| Spare | 26 | D26 | — | One safe output left free |
 
 ### Why not other pins
 
@@ -109,17 +109,37 @@ avoided. There is no shortage for this build.
   board documentation explicitly allows it. Powering through USB is the
   simplest safe arrangement for the exhibit.
 
-## 4. Pump driver — IRFZ44N (measure before trusting)
+## 4. Pump driver — 2N7000 (measured), IRFZ44N as the fallback
 
 The pump is a **DC 3–6 V mini submersible** rated **130–220 mA**, maximum lift
 **40–110 mm**. It is powered from **VIN** with the 5 V 2 A power bank; the GPIO
-only drives the gate.
+only drives the gate. Its winding measures **28 Ω** cold.
 
-The part in hand is an **IRFZ44N** — a standard-level N-channel MOSFET (TO-220,
-G-D-S, tab = drain). Its on-resistance is specified at **Vgs = 10 V**, not
-3.3 V, so it must be measured at 3.3 V before it is used. A 2N3904 is also in
-the kit and is **not** a suitable pump switch: 200 mA is below the pump's
-running current and its start-up surge.
+**Measured on the real pump, 2026-11-10** — the fitted part is a **2N7000**
+(TO-92, **S · G · D** left→right, flat face towards you):
+
+| Measurement | Value |
+| --- | --- |
+| D19 ↔ GND (gate driven) | 3.30 V |
+| Gate ↔ source | 3.27 V |
+| Vds, 23.5 Ω dummy load (157 mA) | 1.3 V |
+| Pump from the 5 V 2 A bank | runs; Vds ≈ 1.3 V |
+
+The **IRFZ44N** (TO-220, G-D-S, tab = drain) is the fallback. Its on-resistance
+is specified at **Vgs = 10 V**, not 3.3 V, so it must be measured at 3.3 V
+before it is used; in practice it needs a 5 V gate driver (a 2N2222A as an
+inverting level shifter). A 2N3904 is also in the kit and is **not** a suitable
+pump switch: 200 mA is below the pump's running current and its start-up surge.
+
+**Two traps found the hard way — neither is a transistor fault:**
+
+1. **A resistor dummy load is not a motor test.** A 23.5 Ω resistor draws a
+   steady 171 mA and works where the pump gets 1.3 V on identical wiring,
+   because a motor wants several times its running current for a fraction of a
+   second while it spins up. Size the supply for the **surge**.
+2. **Never power the pump from the PC's USB port.** Measured: on USB the rail
+   collapses and the pump sees **1.3 V**, which reads as a dead MOSFET. On the
+   5 V 2 A bank the same circuit runs normally. Grounds must be common.
 
 Required driver interface:
 
@@ -128,23 +148,23 @@ Required driver interface:
 | Type | Logic-level N-channel MOSFET (preferred) or a driver module with a transistor/optocoupler. |
 | Gate threshold | Must switch fully on at **Vgs ≤ 3.3 V** — for the IRFZ44N that is a measurement, not an assumption. |
 | Current | Rated above the pump's measured stall current, with margin. |
-| Gate resistor | 220 Ω–1 kΩ in series from GPIO 26. |
+| Gate resistor | 220 Ω–1 kΩ in series from GPIO 19. |
 | Gate pull-down | 10 kΩ from gate to GND, so the pump is off while the ESP32 boots. |
 | Flyback | Diode across the pump, cathode to +5 V. |
 | Ground | MOSFET source to the common ground. |
 
-### Measure the IRFZ44N before trusting it
+### Measure the driver before trusting it
 
 Use a dummy load (5 V lamp, or 47 Ω / 1 W resistor), **not** the pump:
 
 ```
-VIN (+5 V) ── dummy load ──┬── IRFZ44N drain (middle leg / tab)
+VIN (+5 V) ── dummy load ──┬── drain   (2N7000: right leg · IRFZ44N: middle/tab)
                            │
-GPIO 26 / 3V3 ──[220 Ω]── gate
+GPIO 19 / 3V3 ──[220 Ω]── gate     (2N7000: middle · IRFZ44N: left)
                            │
                        [10 kΩ]
                            │
-GND ───────────────────── source (right leg)
+GND ───────────────────── source   (2N7000: left · IRFZ44N: right)
 ```
 
 With the gate held at **3.3 V**, measure Vds across the load-on MOSFET:
@@ -152,13 +172,20 @@ With the gate held at **3.3 V**, measure Vds across the load-on MOSFET:
 | Vds | Decision |
 | --- | --- |
 | < 0.3 V | fully on — use it |
-| 0.3–0.8 V | usable at ~200 mA, it will warm slightly |
-| > 1 V, or a dim lamp | not switching at 3.3 V — replace it |
+| 0.3–1.4 V | usable at ~200 mA with the pump on the 2 A bank (the 2N7000 measures 1.3 V at 157 mA and runs the pump); it will warm |
+| > 1.5 V, or a dim lamp | not switching at 3.3 V — use a logic-level part |
 
-If it fails, use a **logic-level** part: IRLZ44N (same G-D-S pinout, drop-in) or
-an AO3400/IRLML2502 module. **Do not** use the 2N3904 as the switch, and **do
-not** pull the gate up to 5 V: at reset the GPIO is an input, so a 5 V pull-up
-would turn the pump on during boot and put 5 V on a 3.3 V pin.
+**Beware the dummy load passing while the pump fails.** The resistor draws a
+steady 171 mA; the pump's start-up surge is several times that, so a supply
+that is marginal on USB passes the resistor test and collapses on the motor.
+That is a supply problem, not a transistor one — measured: 4.0 V on the
+resistors, 1.3 V on the pump, same wiring, USB feed.
+
+If the driver fails at 3.3 V, use a **logic-level** part (IRLZ44N drop-in, or
+an AO3400/IRLML2502 module), or drive an IRFZ44N's gate from 5 V through a
+2N2222A. **Do not** use the 2N3904 as the switch, and **do not** pull the gate
+up to 5 V directly: at reset the GPIO is an input, so a 5 V pull-up would turn
+the pump on during boot and put 5 V on a 3.3 V pin.
 
 ### Wiring once Vds passes
 
@@ -167,7 +194,7 @@ VIN (+5 V) ──┬──────── pump +
              │
           [1N4007]   cathode → +5 V, anode → drain
              │
-GPIO 26 ──[220 Ω]── gate
+GPIO 19 ──[220 Ω]── gate
              │
          [10 kΩ]
              │
@@ -175,8 +202,9 @@ GND ─────────┴── source ─── pump −
 ```
 
 - Pump **+** to VIN, pump **−** to the drain; source to the common ground.
-- 1N4007 across the pump is mandatory; 100 µF across the pump terminals is
-  optional and tames the start-up surge.
+- 1N4007 across the pump is mandatory (band/cathode to **+5 V**, plain end to
+  the drain); 100 µF across the pump terminals is optional and tames the
+  start-up surge.
 - Power bank into **VIN** with USB unplugged. OTA is used for firmware, so the
   cable never has to be connected while the pump is powered.
 - Keep the intake above the sludge line and **below** the reservoir probes'

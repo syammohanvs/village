@@ -45,6 +45,27 @@ The controller refuses with a reason. Check, in order:
   no-rise failure it is 30 minutes. Fix the probe and/or wet the soil to clear
   the failure lockout.
 
+### The dashboard says it started, but the pump does not turn
+
+That is electrical, not the controller — the reason line would say otherwise.
+Measure, in this order:
+
+1. **D19 to GND** with the pump requested: **3.3 V**? If it stays at 0 V the
+   request never reached the driver (check the reason line first).
+2. **Gate to source**: should be about the same 3.3 V. Much less means a
+   pulled-off gate wire or the 10 kΩ in the wrong row.
+3. **Voltage across the pump**: 4–5 V while running. **About 1.3 V is the
+   signature of a collapsed supply**, not a bad transistor — the pump's
+   start-up surge is several times its running current and a USB port cannot
+   deliver it. Power the pump from the **5 V 2 A bank** with the grounds
+   joined.
+4. **Drain to source**: under ~1.5 V is on. If it is 3–4 V the transistor is
+   not being switched at 3.3 V; see `docs/wiring.md` §4.
+
+A resistor or lamp dummy load passing does **not** prove the pump will: it
+draws a steady 171 mA, while the motor wants several times that for a fraction
+of a second. Measure with the real pump on the real supply.
+
 ## Pump stops immediately
 
 Look at the last stop reason: low water, invalid sensor, maximum runtime,

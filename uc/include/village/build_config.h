@@ -7,7 +7,7 @@
 //   1. VILLAGE_PUMP_COMMISSIONED == 1 (this file, changed after the bench test)
 //   2. config.irrigation.pump_enabled == true (saved in NVS from the UI)
 #ifndef VILLAGE_PUMP_COMMISSIONED
-#define VILLAGE_PUMP_COMMISSIONED 0
+#define VILLAGE_PUMP_COMMISSIONED 1
 #endif
 
 #define VILLAGE_FIRMWARE_VERSION "0.1.0"

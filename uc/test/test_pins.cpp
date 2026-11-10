@@ -54,10 +54,10 @@ TEST(waste_leds_share_the_free_header_side) {
 }
 
 TEST(pump_gate_shares_the_free_header_side) {
-  // The pump driver sits on the D26 side of the board.
-  CHECK(pins::PUMP_GATE == 26);
-  CHECK(pins::SPARE_SAFE_OUTPUT == 19);
-  CHECK(pins::PUMP_GATE != 19);
+  // The pump gate sits on the free header side, beside the waste LEDs.
+  CHECK(pins::PUMP_GATE == 19);
+  CHECK(pins::SPARE_SAFE_OUTPUT == 26);
+  CHECK(pins::PUMP_GATE != 26);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_ORGANIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PLASTIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PAPER);
