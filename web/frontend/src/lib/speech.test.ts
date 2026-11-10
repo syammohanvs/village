@@ -182,3 +182,38 @@ describe('overlapping speech', () => {
     vi.doUnmock('./api');
   });
 });
+
+describe('one voice at a time', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it('does not also start the browser voice while the local clip is still playing', async () => {
+    // A long clip: onended has not fired when speakText resolves.
+    const speechSynth = installSpeech(VOICES);
+    const speakBrowser = speechSynth.synth.speak as unknown as ReturnType<typeof vi.fn>;
+    const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
+    vi.doMock('./api', () => ({ api: { speak } }));
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        return Promise.resolve();
+      }
+      pause() {}
+    };
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+
+    const speech = await import('./speech');
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(speakBrowser).not.toHaveBeenCalled();
+    vi.doUnmock('./api');
+  });
+});

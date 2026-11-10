@@ -132,19 +132,14 @@ function playAudioFile(url: string): Promise<boolean> {
       audio.onended = () => finish(true);
       audio.onerror = () => finish(false);
       const played = audio.play();
-      if (played && typeof played.catch === 'function') {
-        played.catch(() => finish(false));
+      // A resolved play() means the recording has started.  Waiting for
+      // "ended" here (or timing it out) used to report failure while it was
+      // still playing, and the caller then spoke the same words again.
+      if (played && typeof played.then === 'function') {
+        played.then(() => finish(true)).catch(() => finish(false));
+      } else {
+        finish(true);
       }
-      window.setTimeout(() => {
-        if (!settled) {
-          try {
-            audio.pause();
-          } catch {
-            /* ignore */
-          }
-          finish(false);
-        }
-      }, 1200);
     } catch {
       finish(false);
     }
@@ -189,11 +184,15 @@ function playBlob(blob: Blob): Promise<boolean> {
         stopPlayback();
       };
       const played = audio.play();
-      if (played && typeof played.catch === 'function') {
-        played.catch(() => finish(false));
+      // Success is "playback started", not "playback finished": a sentence is
+      // seconds long, and treating a still-playing clip as a failure made the
+      // caller speak the same text with the browser voice on top of it —
+      // two women reading one sentence at once.
+      if (played && typeof played.then === 'function') {
+        played.then(() => finish(true)).catch(() => finish(false));
+      } else {
+        finish(true);
       }
-      // A browser that never starts playback must not leave the button busy.
-      window.setTimeout(() => finish(false), 1500);
     } catch {
       finish(false);
     }
