@@ -30,6 +30,20 @@
 #define VILLAGE_ENABLE_OTA 1
 #endif
 
+// BENCH-ONLY: force the board into its access-point mode at boot.
+//
+// Normally the AP is a boot-time rescue only, started when station mode
+// fails within VILLAGE_AP_FALLBACK_AFTER_MS.  With this flag set the board
+// never tries station mode at all, which is useful for bench work on a laptop
+// that is on a different network from the configured router.
+//
+// Set back to 0 for normal operation.
+#ifndef VILLAGE_FORCE_AP
+#define VILLAGE_FORCE_AP 0
+#endif
+static_assert(VILLAGE_FORCE_AP == 0 || VILLAGE_FORCE_AP == 1,
+              "VILLAGE_FORCE_AP must be 0 or 1");
+
 // BENCH-ONLY: drive the pump gate HIGH at boot with no commissioning.
 //
 // This exists so the MOSFET can be measured with a dummy load while the pump

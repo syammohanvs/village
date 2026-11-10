@@ -116,15 +116,56 @@ void startNetwork() {
   }
 #endif
 
+#if VILLAGE_FORCE_AP
+  // Skip station mode entirely: start the rescue AP immediately.
+  startAccessPoint();
+  return;
+#else
   WiFi.begin(VILLAGE_WIFI_SSID, VILLAGE_WIFI_PASS);
   g_sta_started_ms = millis();
+#endif
   g_sta_started = true;
   rt.network_started = true;
   Serial.printf("[net] connecting to '%s'...\n", VILLAGE_WIFI_SSID);
 }
 
 void networkLoop(uint32_t now) {
-  if (!g_sta_started || rt.ap_mode) return;
+  // In AP mode, retry station mode periodically when no client is connected.
+  // This prevents a transient boot-time failure from trapping the board in AP
+  // mode forever — a single bad join at boot must not require a power cycle.
+  if (rt.ap_mode) {
+    if (WiFi.softAPgetStationNum() > 0) return;  // a client is using the AP
+    static uint32_t g_last_retry_ms = 0;
+    if (static_cast<uint32_t>(now - g_last_retry_ms) < 60000) return;
+    g_last_retry_ms = now;
+    Serial.printf("[net] AP mode: retrying station mode ('%s')...\n", VILLAGE_WIFI_SSID);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(VILLAGE_WIFI_SSID, VILLAGE_WIFI_PASS);
+    const uint32_t start = millis();
+    while (WiFi.status() != WL_CONNECTED &&
+           static_cast<uint32_t>(millis() - start) < 15000) {
+      delay(100);
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+      WiFi.softAPdisconnect(true);
+      rt.ap_mode = false;
+      g_sta_started = true;
+      g_sta_was_connected = true;
+      g_fallback_done = false;
+      g_sta_started_ms = millis();
+      Serial.printf("[net] reconnected: IP %s, RSSI %d dBm\n",
+                    WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      startMdns();
+      startOta();
+    } else {
+      WiFi.mode(WIFI_AP);
+      WiFi.softAP(VILLAGE_AP_SSID, VILLAGE_AP_PASS);
+      Serial.println("[net] station retry failed; AP restored");
+    }
+    return;
+  }
+
+  if (!g_sta_started) return;
 
   if (WiFi.status() == WL_CONNECTED) {
     if (!g_sta_was_connected) {
