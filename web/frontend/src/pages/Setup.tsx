@@ -11,6 +11,9 @@ import { validateSettings } from '../lib/validation';
 import { CommandResult } from '../components/CommandResult';
 import { Sensors } from './Sensors';
 import { Card, Chip, EmptyState, ErrorBlock, KeyValue, Notice } from '../components/ui';
+import { LanguagePicker } from '../components/LanguagePicker';
+import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
+import { loadLiaPrefs, saveLiaPrefs } from '../lib/lia';
 import { IconAlert, IconCheck, IconPlug, IconRefresh, IconWaste } from '../components/Icons';
 import type {
   AppSettings,
@@ -180,6 +183,8 @@ function Preferences() {
   const settings = useApi<AppSettings>(['settings'], () => api.settings(), {});
   const voice = useApi(['voice-readiness'], () => api.voiceReadiness(), { intervalMs: 30000 });
   const model = useApi(['waste-model-setup'], () => api.wasteModelStatus(), { intervalMs: 30000 });
+  const { language, setLanguage: setVoiceLanguage } = useVoiceUi();
+  const [autoRead, setAutoRead] = useState(() => loadLiaPrefs().autoRead);
   const [saved, setSaved] = useState<AppSettings | null>(null);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saveError, setSaveError] = useState('');
@@ -299,18 +304,6 @@ function Preferences() {
         ) : (
           <div className="settings-form">
             <div className="field-grid">
-              <label className="field">
-                <span>Spoken language</span>
-                <select
-                  className="select"
-                  value={draft.language}
-                  onChange={(event) => update({ language: event.target.value })}
-                >
-                  <option value="en">English</option>
-                  <option value="ml">മലയാളം</option>
-                  <option value="hi">हिन्दी</option>
-                </select>
-              </label>
               <div className="setting-row setting-row--compact">
                 <div>
                   <p className="setting-name">Spoken replies</p>
@@ -417,6 +410,43 @@ function Preferences() {
             </p>
           </div>
         )}
+      </Card>
+
+      <Card kicker="Lia" title="Spoken language">
+        <p className="hint">
+          The language Lia speaks and reads in. The voice panel and the invitation on the home
+          page use the same choice, so there is only one setting to change.
+        </p>
+        <LanguagePicker
+          options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
+          value={language}
+          onChange={(code) => {
+            setVoiceLanguage(code as VoiceLanguage);
+            // Keep the saved copy in step, so the backend's default agrees
+            // with the one the screens actually use.
+            setDraft((previous) => (previous ? { ...previous, language: code } : previous));
+          }}
+          label="Default spoken language"
+          testId="setup-lang"
+        />
+        <div className="setting-row">
+          <div>
+            <p className="setting-name">Read aloud as soon as Lia opens</p>
+            <p className="hint">
+              On: the page is read in the language above the moment Lia opens, and again when the
+              topic changes. Visitors can still switch language or stop the reading inside Lia.
+            </p>
+          </div>
+          <Toggle
+            id="lia-auto-read"
+            label="Read aloud as soon as Lia opens"
+            checked={autoRead}
+            onChange={(next) => {
+              setAutoRead(next);
+              saveLiaPrefs({ ...loadLiaPrefs(), autoRead: next });
+            }}
+          />
+        </div>
       </Card>
 
       <Card kicker="Readiness" title="Speech and camera services">

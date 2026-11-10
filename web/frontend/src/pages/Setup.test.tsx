@@ -194,3 +194,22 @@ describe('connection health wording', () => {
     expect(row?.textContent ?? '').toMatch(/2026/);
   });
 });
+
+describe('spoken language setting', () => {
+  it('changes the language every screen uses, and remembers whether Lia reads on open', async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    render(<App />);
+
+    const malayalam = await screen.findByTestId('setup-lang-ml');
+    await user.click(malayalam);
+    expect(window.localStorage.getItem('village.voiceLanguage')).toBe('ml');
+    expect(malayalam).toHaveAttribute('aria-pressed', 'true');
+
+    const toggle = await screen.findByRole('switch', { name: /read aloud as soon as lia opens/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(JSON.parse(window.localStorage.getItem('village.lia.v1') ?? '{}').autoRead).toBe(false);
+  });
+});

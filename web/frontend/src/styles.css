@@ -773,10 +773,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .lang-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .lang-pill {
   display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
+  /* The label (and its small qualifier) sits centred in the pill: a pill that
+     is wider than its word read as though the text was left behind. */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
   min-height: 38px;
-  padding: 6px 13px;
+  padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: transparent;
@@ -793,7 +798,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .lang-pill:disabled { opacity: .6; cursor: not-allowed; }
 .lang-pill-label { line-height: 1.2; }
-.lang-pill-note { font-size: 10.5px; font-weight: 500; color: var(--muted); }
+.lang-pill-note { font-size: 10.5px; font-weight: 500; color: var(--muted); line-height: 1.2; }
 
 .voice-stage { display: flex; flex-direction: column; gap: 8px; }
 .ptt {

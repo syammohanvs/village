@@ -11,7 +11,6 @@ import {
   saveLiaPrefs,
   type LiaIconKey,
   type LiaLanguage,
-  type LiaPrefs,
   type LiaTopicId,
 } from '../lib/lia';
 import { primeVoices, speakText, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
@@ -96,63 +95,56 @@ type LiaView =
 
 export function LiaGuide() {
   const navigate = useNavigate();
-  const { openPanel } = useVoiceUi();
+  const { openPanel, language, setLanguage: setSharedLanguage } = useVoiceUi();
   const { status, connected, stale, ageMs, demo } = useVillage();
 
-  const [prefs, setPrefs] = useState<LiaPrefs>(() => loadLiaPrefs());
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<LiaView>({ kind: 'home' });
   const [speaking, setSpeaking] = useState(false);
+  // Whether this visit is being read aloud.  It starts from the preference so
+  // opening Lia speaks straight away, and the button keeps it in step.
+  const [reading, setReading] = useState(() => loadLiaPrefs().autoRead);
   const [voiceTick, setVoiceTick] = useState(0);
   const [voiceNote, setVoiceNote] = useState('');
   const tts = useApi(['voice-readiness'], () => api.voiceReadiness(), {});
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const copy = LIA_COPY[prefs.language];
+  const copy = LIA_COPY[language];
 
   const liveItems = useMemo(
-    () => describeVillage({ status, connected, stale, ageMs, demo }, prefs.language),
-    [status, connected, stale, ageMs, demo, prefs.language],
+    () => describeVillage({ status, connected, stale, ageMs, demo, }, language),
+    [status, connected, stale, ageMs, demo, language],
   );
-  const messages = useMemo(
-    () => recentVillageMessages(status, prefs.language),
-    [status, prefs.language],
-  );
+  const messages = useMemo(() => recentVillageMessages(status, language), [status, language]);
 
-  const commit = useCallback((patch: Partial<LiaPrefs>) => {
-    setPrefs((previous) => {
-      const next = { ...previous, ...patch };
-      saveLiaPrefs(next);
-      return next;
-    });
+  /** Lia has been opened once, so the home page stops asking. */
+  const rememberOpened = useCallback(() => {
+    const stored = loadLiaPrefs();
+    if (stored.dismissed) return;
+    saveLiaPrefs({ ...stored, dismissed: true });
   }, []);
 
   const close = useCallback(() => {
     stopSpeaking();
     setSpeaking(false);
     setOpen(false);
-    setPrefs((previous) => {
-      if (previous.dismissed) return previous;
-      const next = { ...previous, dismissed: true };
-      saveLiaPrefs(next);
-      return next;
-    });
-  }, []);
+    rememberOpened();
+  }, [rememberOpened]);
 
   const chooseTopic = useCallback(
     (id: LiaTopicId) => {
-      commit({ dismissed: true });
+      rememberOpened();
       setView({ kind: 'topic', id, step: 0 });
       setOpen(true);
     },
-    [commit],
+    [rememberOpened],
   );
 
   const openLive = useCallback(() => {
-    commit({ dismissed: true });
+    rememberOpened();
     setView({ kind: 'live' });
     setOpen(true);
-  }, [commit]);
+  }, [rememberOpened]);
 
   const go = useCallback(
     (page: string) => {
@@ -197,33 +189,45 @@ export function LiaGuide() {
   // Piper (the local neural voice) speaks all three languages, so a missing
   // browser voice is only a problem when Piper is not installed either.
   const piperReady = Boolean(tts.data?.tts?.ready);
+  // Until the readiness answer arrives, "no voice" is not known — and a button
+  // that refuses the first press because a request is still in flight is
+  // exactly the "nothing happened" the reader sees.  Attempt, then report.
+  const readabilityKnown = tts.data !== undefined;
   // voiceTick re-runs this when Chrome finally publishes its voice list.
   const browserVoice = useMemo(
-    () => audioSupported && voiceAvailable(prefs.language),
-    [audioSupported, prefs.language, voiceTick],
+    () => audioSupported && voiceAvailable(language),
+    [audioSupported, language, voiceTick],
   );
-  const canSpeak = piperReady || browserVoice;
-  const missingVoice = !canSpeak;
-  const languageLabel =
-    LIA_LANGUAGES.find((entry) => entry.code === prefs.language)?.label ?? prefs.language;
+  const missingVoice = readabilityKnown && !piperReady && !browserVoice;
+  const canSpeak = !missingVoice;
 
-  const speakNow = useCallback((language: LiaLanguage = prefs.language) => {
-    const text = textFor(language);
-    if (!text) return;
-    // No voice for this language means silence, not a slow browser: say so
-    // rather than leaving the button looking broken.
-    if (missingVoice) {
-      setVoiceNote(copy.voiceMissing(languageLabel));
-      return;
-    }
-    setSpeaking(true);
-    setVoiceNote('');
-    void speakText(text, language, 0.92)
-      .then((ok) => {
-        if (!ok) setVoiceNote(copy.voiceMissing(languageLabel));
-      })
-      .finally(() => setSpeaking(false));
-  }, [textFor, prefs.language, missingVoice, languageLabel, copy]);
+  const labelFor = useCallback(
+    (code: string) => LIA_LANGUAGES.find((entry) => entry.code === code)?.label ?? code,
+    [],
+  );
+
+  const speakNow = useCallback(
+    async (code: LiaLanguage = language): Promise<boolean> => {
+      const text = textFor(code);
+      if (!text) return false;
+      // No voice for this language means silence, not a slow browser: say so
+      // rather than leaving the button looking broken.
+      if (missingVoice) {
+        setVoiceNote(copy.voiceMissing(labelFor(code)));
+        return false;
+      }
+      setSpeaking(true);
+      setVoiceNote('');
+      try {
+        const ok = await speakText(text, code, 0.92);
+        if (!ok) setVoiceNote(copy.voiceMissing(labelFor(code)));
+        return ok;
+      } finally {
+        setSpeaking(false);
+      }
+    },
+    [textFor, language, missingVoice, labelFor, copy],
+  );
 
   useEffect(() => {
     return subscribeOpenLia((entry) => {
@@ -291,26 +295,55 @@ export function LiaGuide() {
     return () => synth.removeEventListener?.('voiceschanged', handler);
   }, []);
 
+  const viewKey = view.kind === 'topic' ? `topic:${view.id}:${view.step}` : view.kind;
+  // The last page actually read, so a re-render (a status refresh, a new voice
+  // list) does not start the same sentence again.
+  const lastRead = useRef('');
+
+  useEffect(() => {
+    if (!open) return;
+    // Read the preference when Lia opens rather than when this component
+    // mounted: it lives in Settings, which can be changed in another tab of
+    // the same visit.
+    setReading(loadLiaPrefs().autoRead);
+    lastRead.current = '';
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !reading) return;
+    const key = `${language}|${viewKey}`;
+    if (lastRead.current === key) return;
+    // A short pause lets the panel paint before the voice starts.
+    const timer = window.setTimeout(() => {
+      lastRead.current = key;
+      void speakNow(language);
+    }, 260);
+    return () => window.clearTimeout(timer);
+  }, [open, reading, language, viewKey, speakNow]);
+
   const toggleReadAloud = () => {
-    const next = !prefs.readAloud;
-    commit({ readAloud: next });
-    if (next) {
-      speakNow();
-    } else {
+    if (reading) {
+      setReading(false);
       stopSpeaking();
       setSpeaking(false);
+      return;
     }
+    setReading(true);
+    // Claim the page so the effect above does not read it twice.
+    lastRead.current = `${language}|${viewKey}`;
+    void speakNow(language).then((ok) => {
+      // A button that stays lit while nothing is heard is the bug being fixed.
+      if (!ok) setReading(false);
+    });
   };
 
-  const setLanguage = (language: LiaLanguage) => {
-    if (language === prefs.language) return;
+  const setLanguage = (next: LiaLanguage) => {
+    if (next === language) return;
     stopSpeaking();
     setSpeaking(false);
-    commit({ language });
-    // Read-aloud follows the language: pressing Malayalam with it on should
-    // read Malayalam, not leave the button to be pressed again (which would
-    // simply switch read-aloud off).
-    if (prefs.readAloud) speakNow(language);
+    setSharedLanguage(next);
+    // Read-aloud follows the language: the effect above reads the same page in
+    // the newly chosen language and leaves the button on.
   };
 
   const renderHome = () => (
@@ -540,7 +573,7 @@ export function LiaGuide() {
             <div className="lia-toolbar">
               <LanguagePicker
                 options={LIA_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
-                value={prefs.language}
+                value={language}
                 onChange={(code) => setLanguage(code as LiaLanguage)}
                 label="Language"
                 testId="lia-lang"
@@ -548,15 +581,15 @@ export function LiaGuide() {
               />
               <button
                 type="button"
-                className={cx('lia-read', prefs.readAloud && 'is-on', speaking && 'is-speaking')}
-                aria-pressed={prefs.readAloud}
+                className={cx('lia-read', reading && 'is-on', speaking && 'is-speaking')}
+                aria-pressed={reading}
                 aria-busy={speaking}
                 onClick={toggleReadAloud}
                 disabled={!canSpeak}
                 title={
                   !canSpeak
                     ? audioSupported
-                      ? copy.voiceMissing(languageLabel)
+                      ? copy.voiceMissing(labelFor(language))
                       : copy.speechUnavailable
                     : copy.readAloud
                 }
@@ -568,7 +601,7 @@ export function LiaGuide() {
 
             {!canSpeak && (
               <p className="lia-note">
-                {audioSupported ? copy.voiceMissing(languageLabel) : copy.speechUnavailable}
+                {audioSupported ? copy.voiceMissing(labelFor(language)) : copy.speechUnavailable}
               </p>
             )}
             {canSpeak && voiceNote && <p className="lia-note">{voiceNote}</p>}

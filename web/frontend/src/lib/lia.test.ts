@@ -53,9 +53,18 @@ describe('Lia preferences', () => {
   });
 
   it('round-trips the language, the read-aloud choice and dismissal', () => {
-    saveLiaPrefs({ dismissed: true, language: 'ml', readAloud: true });
-    expect(loadLiaPrefs()).toEqual({ dismissed: true, language: 'ml', readAloud: true });
+    saveLiaPrefs({ dismissed: true, language: 'ml', readAloud: true, autoRead: false });
+    expect(loadLiaPrefs()).toEqual({ dismissed: true, language: 'ml', readAloud: true, autoRead: false });
     expect(window.localStorage.getItem(LIA_STORAGE_KEY)).toContain('"language":"ml"');
+  });
+
+  it('reads Lia aloud automatically unless that has been turned off', () => {
+    expect(loadLiaPrefs().autoRead).toBe(true);
+    // A copy written before the preference existed is treated as "on".
+    window.localStorage.setItem(LIA_STORAGE_KEY, '{"language":"en","readAloud":false}');
+    expect(loadLiaPrefs().autoRead).toBe(true);
+    saveLiaPrefs({ ...loadLiaPrefs(), autoRead: false });
+    expect(loadLiaPrefs().autoRead).toBe(false);
   });
 
   it('falls back to safe defaults when the stored value is junk', () => {

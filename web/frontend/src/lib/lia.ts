@@ -684,14 +684,22 @@ export const LIA_STORAGE_KEY = 'village.lia.v1';
 
 export interface LiaPrefs {
   dismissed: boolean;
+  /** Kept for stored copies written before the language became one setting. */
   language: LiaLanguage;
   readAloud: boolean;
+  /**
+   * Read the page aloud as soon as Lia opens, and again when the topic
+   * changes.  On by default: at the exhibition a visitor presses "Talk to
+   * Lia" and should hear her, not have to find a second button.
+   */
+  autoRead: boolean;
 }
 
 export const LIA_DEFAULT_PREFS: LiaPrefs = {
   dismissed: false,
   language: 'en',
   readAloud: false,
+  autoRead: true,
 };
 
 function isLanguage(value: unknown): value is LiaLanguage {
@@ -708,6 +716,9 @@ export function loadLiaPrefs(): LiaPrefs {
       dismissed: Boolean(parsed?.dismissed),
       language: isLanguage(parsed?.language) ? parsed.language : 'en',
       readAloud: Boolean(parsed?.readAloud),
+      // A stored copy from before this preference existed reads as "on", which
+      // is the behaviour being asked for.
+      autoRead: parsed?.autoRead === undefined ? true : Boolean(parsed?.autoRead),
     };
   } catch {
     return { ...LIA_DEFAULT_PREFS };

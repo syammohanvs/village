@@ -64,7 +64,7 @@ export function speechLanguage(language: string): string {
  * produced silence.  Wait for `voiceschanged`, with a timeout for browsers
  * that never fire it.
  */
-export function primeVoices(): Promise<SpeechSynthesisVoice[]> {
+export function primeVoices(timeoutMs = 1500): Promise<SpeechSynthesisVoice[]> {
   if (!speechSupported()) return Promise.resolve([]);
   const synth = window.speechSynthesis;
   const immediate = synth.getVoices();
@@ -82,7 +82,7 @@ export function primeVoices(): Promise<SpeechSynthesisVoice[]> {
       resolve(cachedVoices);
     };
     synth.addEventListener?.('voiceschanged', finish);
-    window.setTimeout(finish, 1500);
+    window.setTimeout(finish, timeoutMs);
   });
 }
 
@@ -244,8 +244,10 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   stopPlayback();
 
   // English first: use an Indian voice from this device if one is installed.
+  // The wait is short on purpose — holding the first press for the voice list
+  // is what made a press look like it did nothing.
   if (language === 'en' && speechSupported()) {
-    await primeVoices();
+    await primeVoices(600);
     const indian = pickIndianEnglishVoice();
     if (indian) {
       const spoken = await speakWithVoice(text, indian, rate, ticket);
@@ -303,6 +305,18 @@ function speakWithVoice(
     // would make the caller read the same sentence again with the other
     // engine, which is exactly two voices at once.
     window.setTimeout(() => finish(started), 5000 + Math.min(120000, text.length * 160));
+    // A voice that never begins (an offline "natural" voice is the usual one)
+    // would otherwise leave the reader with silence.  Cancel it and report
+    // failure so the caller can use the local engine.
+    window.setTimeout(() => {
+      if (started || settled) return;
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        /* ignore */
+      }
+      finish(false);
+    }, 1400);
     window.speechSynthesis.speak(utterance);
   });
 }

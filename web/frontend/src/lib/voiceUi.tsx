@@ -21,6 +21,13 @@ function readLanguage(): VoiceLanguage {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === 'en' || stored === 'ml' || stored === 'hi') return stored;
+    // Before this was one setting, Lia kept its own copy.  Adopt it so a
+    // visitor who chose Malayalam there does not silently get English.
+    const legacy = window.localStorage.getItem('village.lia.v1');
+    if (legacy) {
+      const language = (JSON.parse(legacy) as { language?: unknown } | null)?.language;
+      if (language === 'en' || language === 'ml' || language === 'hi') return language;
+    }
   } catch {
     /* storage can be unavailable in private modes */
   }

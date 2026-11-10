@@ -140,9 +140,14 @@ session; local automatic watering continues if the laptop disappears.
 
 ## Lia does not read aloud
 
-- **Read aloud** is a switch on the Lia card; it is off by default.
+- Lia reads aloud as soon as she opens. **Setup → Voice & Camera → Read aloud
+  as soon as Lia opens** turns that off; the **Read aloud** switch on the Lia
+  card stops or restarts the reading for that visit.
 - If the card says the browser cannot read aloud, use Chrome or Edge. Firefox
   may have no speech synthesis.
+- English prefers an Indian English voice installed on the device, and falls
+  back to the bundled local voice; Malayalam and Hindi always use the bundled
+  local voices.
 - If it says the device has no voice for Malayalam or Hindi, install that
   language's voice in the operating system. The words are still displayed.
 - Nothing is downloaded: speech is generated locally by the browser.

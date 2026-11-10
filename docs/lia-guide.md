@@ -25,13 +25,22 @@ large choices:
 - Talk to the village
 - Help me with a problem
 
-The card also offers **English / മലയാളം / हिन्दी**, a **Read aloud** switch and
-**Maybe later**. Choosing a topic counts as seeing the welcome, so it does not
-appear again on that browser.
+The language is chosen once, in **Setup → Voice & Camera → Spoken language**,
+and the same choice is used by Lia, the voice panel and the invitation on the
+home page. Inside Lia a visitor can still switch language at any time.
 
-The choice is remembered in `localStorage` under `village.lia.v1`. Clearing the
-site's storage brings the welcome back. The chosen language and the read-aloud
-setting are remembered too.
+The card also offers a **Read aloud** switch and **Maybe later**. Choosing a
+topic counts as seeing the welcome, so it does not appear again on that
+browser.
+
+Lia is read aloud as soon as she opens, and again when the topic changes —
+**Setup → Voice & Camera → Read aloud as soon as Lia opens** turns that off for
+a quiet screen. The reading can always be stopped with the **Read aloud**
+switch on the card.
+
+The choices are remembered in `localStorage` (`village.lia.v1` for the guide,
+`village.voiceLanguage` for the language). Clearing the site's storage brings
+the welcome back.
 
 ## The Talk to Lia button
 

@@ -141,23 +141,41 @@ describe('Lia guide', () => {
     expect(screen.getByRole('button', { name: 'Back to topics' })).toBeInTheDocument();
   });
 
-  it('reads aloud only when asked, in the selected language', async () => {
-    const user = userEvent.setup();
+  it('starts reading as soon as it opens, in the chosen language', async () => {
     renderGuide();
     openGuide();
 
-    expect(speech.speakText).not.toHaveBeenCalled();
-    await user.click(screen.getByTestId('lia-read-aloud'));
-    await waitFor(() => expect(speech.speakText).toHaveBeenCalled());
-    expect(speech.speakText.mock.calls.at(-1)?.[0]).toContain('Hello! I’m Lia');
-    expect(speech.speakText.mock.calls.at(-1)?.[1]).toBe('en');
+    // No second press: opening Lia is the invitation, and at the exhibition a
+    // visitor should hear her immediately.
+    await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(1));
+    expect(speech.speakText.mock.calls[0][0]).toContain('Hello! I’m Lia');
+    expect(speech.speakText.mock.calls[0][1]).toBe('en');
+    expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('stops when pressed, and reads again when pressed a second time', async () => {
+    const user = userEvent.setup();
+    renderGuide();
+    openGuide();
+    await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(1));
 
     await user.click(screen.getByTestId('lia-read-aloud'));
-    await user.click(screen.getByTestId('lia-lang-hi'));
+    expect(speech.stopSpeaking).toHaveBeenCalled();
+    expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'false');
+
     const before = speech.speakText.mock.calls.length;
     await user.click(screen.getByTestId('lia-read-aloud'));
     await waitFor(() => expect(speech.speakText.mock.calls.length).toBeGreaterThan(before));
-    expect(speech.speakText.mock.calls.at(-1)?.[0]).toContain('नमस्ते');
+    expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('stays silent on open when the preference says so', async () => {
+    window.localStorage.setItem(LIA_STORAGE_KEY, JSON.stringify({ autoRead: false }));
+    renderGuide();
+    openGuide();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(speech.speakText).not.toHaveBeenCalled();
+    expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('opens the live explanation from the quick choice and keeps volume claims out', async () => {
@@ -209,7 +227,6 @@ describe('read-aloud follows the language', () => {
     renderGuide();
     openGuide();
 
-    await user.click(screen.getByTestId('lia-read-aloud'));
     await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(1));
     expect(speech.speakText.mock.calls[0][1]).toBe('en');
 
