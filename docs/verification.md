@@ -509,8 +509,12 @@ USB feed), and the pump must run from the bank, never the PC's USB port.
   measured at 100 Ω (Vf 2.93 V). The reservoir probe was exercised by shorting
   it (142 mV → available) and by leaving it open (3145 mV → low); the soil probe
   has only been seen open (4095 raw → 0 %).
-- A physical Stop **while water is flowing** at the pump's full 8 s pulse —
-  the stop above landed after the 4 s pulse had already ended.
+- Nothing on the pump path. A **Stop while water is flowing** was measured on
+  2026-11-10: the pump was started, left running, and stopped at **3.5 s** of an
+  8 s pulse (`pulse_remaining_ms` still 5 875 when Stop was pressed) with the
+  session recording `pumped_ms: 3514` and `IRRIGATION_STOPPED_USER`. The gate
+  shuts when the command lands, so on this link the stop took ~1.7 s to reach
+  the board — the delay is the Wi-Fi round trip, not the firmware.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera
   classification in this build.
