@@ -495,6 +495,9 @@ An end-to-end watering was run from the app on 2026-11-10:
 - `IRRIGATION_STOP` → **ACCEPTED**, "Irrigation stopped by the operator", and
   the session recorded `pumped_ms: 4000` with reason
   `IRRIGATION_STOPPED_USER`.
+- A second run at the restored **8 s** pulse was commanded for exactly
+  **8000 ms** (`cumulative_pump_ms: 8000`, `pulse_remaining_ms` counting 7914 →
+  0) and lifted water for the whole pulse.
 
 Two traps found here are now fixed and documented: a **resistor dummy load is
 not a motor test** (23.5 Ω passes where the pump's start-up surge collapses a
