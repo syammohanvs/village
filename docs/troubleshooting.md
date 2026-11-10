@@ -188,9 +188,16 @@ reload. The app never substitutes random predictions. See
 ## Demo mode
 
 Demo mode uses a separate simulator. Its commands can never reach the ESP32.
-The banner and the “Simulator” badge make this visible. If you see simulated
-data during the real part of the talk, turn Demo mode off and confirm the
-source badge changes.
+Three things say so: the gold **Simulation** pill where the live clock normally
+sits, the banner sentence *the physical board will not respond*, and the
+**Simulator** source badge on Setup.
+
+If the cards show moisture and a full tank while the probes are out of the
+soil and the tank — that is the signature of Demo mode, not a broken sensor.
+The simulator reports about 28 % soil and an available tank on purpose.
+Press **Back to live readings** on the banner (or the Simulation pill) and the
+pill should change to **Live** with a ticking clock; only then does the page
+show what the board measured.
 
 ## Logs and data
 

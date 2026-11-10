@@ -90,8 +90,10 @@ water physically flowed. The dashboard keeps the two statements separate.
 6. **What Happened.** Show the command log and the recognition event.
 7. **Demo mode (optional).** Turn it on for a fast scenario demonstration:
    Dry soil, Low water, Night, Fill a bin. The banner says simulated data and
-   physical controls are disabled. Never leave Demo mode on for the real
-   hardware part of the talk.
+   physical controls are disabled, and the connection pill reads **Simulation**
+   instead of Live — a simulated page never claims the board is answering.
+   Press **Back to live readings** on the banner, or the pill itself, to leave.
+   Never leave Demo mode on for the real hardware part of the talk.
 
 ## Buttons and what they mean
 
