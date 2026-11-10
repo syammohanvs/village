@@ -162,21 +162,36 @@ export function LiaGuide() {
     [close, navigate],
   );
 
-  const currentText = useCallback((): string => {
-    if (view.kind === 'home') return copy.welcome;
-    if (view.kind === 'live') {
-      return [copy.liveIntro, ...liveItems.map((item) => item.text), ...messages]
+  const textFor = useCallback(
+    (language: LiaLanguage): string => {
+      const local = LIA_COPY[language];
+      if (view.kind === 'home') return local.welcome;
+      if (view.kind === 'live') {
+        const items = describeVillage({ status, connected, stale, ageMs, demo }, language);
+        return [
+          local.liveIntro,
+          ...items.map((item) => item.text),
+          ...recentVillageMessages(status, language),
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
+      const topic = local.topics[view.id];
+      const step = topic.steps[view.step];
+      if (!step) return topic.intro;
+      const last = view.step === topic.steps.length - 1;
+      return [
+        topic.intro,
+        `${step.title}.`,
+        step.text,
+        topic.adultNote ?? '',
+        last ? topic.physical ?? '' : '',
+      ]
         .filter(Boolean)
         .join(' ');
-    }
-    const topic = copy.topics[view.id];
-    const step = topic.steps[view.step];
-    if (!step) return topic.intro;
-    const last = view.step === topic.steps.length - 1;
-    return [topic.intro, `${step.title}.`, step.text, topic.adultNote ?? '', last ? topic.physical ?? '' : '']
-      .filter(Boolean)
-      .join(' ');
-  }, [copy, liveItems, messages, view]);
+    },
+    [view, status, connected, stale, ageMs, demo],
+  );
 
   const audioSupported = speechSupported();
   // Piper (the local neural voice) speaks all three languages, so a missing
@@ -192,8 +207,8 @@ export function LiaGuide() {
   const languageLabel =
     LIA_LANGUAGES.find((entry) => entry.code === prefs.language)?.label ?? prefs.language;
 
-  const speakNow = useCallback(() => {
-    const text = currentText();
+  const speakNow = useCallback((language: LiaLanguage = prefs.language) => {
+    const text = textFor(language);
     if (!text) return;
     // No voice for this language means silence, not a slow browser: say so
     // rather than leaving the button looking broken.
@@ -203,12 +218,12 @@ export function LiaGuide() {
     }
     setSpeaking(true);
     setVoiceNote('');
-    void speakText(text, prefs.language, 0.92)
+    void speakText(text, language, 0.92)
       .then((ok) => {
         if (!ok) setVoiceNote(copy.voiceMissing(languageLabel));
       })
       .finally(() => setSpeaking(false));
-  }, [currentText, prefs.language, missingVoice, languageLabel, copy]);
+  }, [textFor, prefs.language, missingVoice, languageLabel, copy]);
 
   useEffect(() => {
     return subscribeOpenLia((entry) => {
@@ -292,6 +307,10 @@ export function LiaGuide() {
     stopSpeaking();
     setSpeaking(false);
     commit({ language });
+    // Read-aloud follows the language: pressing Malayalam with it on should
+    // read Malayalam, not leave the button to be pressed again (which would
+    // simply switch read-aloud off).
+    if (prefs.readAloud) speakNow(language);
   };
 
   const renderHome = () => (
@@ -467,7 +486,7 @@ export function LiaGuide() {
         )}
       </div>
       <div className="lia-actions">
-        <button type="button" className="btn" onClick={speakNow} disabled={!audioSupported}>
+        <button type="button" className="btn" onClick={() => speakNow()} disabled={!canSpeak}>
           <IconSpeaker size={16} /> {copy.refresh}
         </button>
         <button type="button" className="btn btn--primary" onClick={() => go('/activity')}>

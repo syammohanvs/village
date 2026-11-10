@@ -202,3 +202,24 @@ describe('Lia guide', () => {
     expect(screen.queryByText(/soil is dry/)).not.toBeInTheDocument();
   });
 });
+
+describe('read-aloud follows the language', () => {
+  it('reads the same view in Malayalam when the language changes with read-aloud on', async () => {
+    const user = userEvent.setup();
+    renderGuide();
+    openGuide();
+
+    await user.click(screen.getByTestId('lia-read-aloud'));
+    await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(1));
+    expect(speech.speakText.mock.calls[0][1]).toBe('en');
+
+    await user.click(screen.getByTestId('lia-lang-ml'));
+
+    await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(2));
+    expect(speech.speakText.mock.calls[1][1]).toBe('ml');
+    expect(String(speech.speakText.mock.calls[1][0])).toMatch(/ഹലോ|ലിയ/);
+    // The button stays ON: it must not need a second press (which would turn
+    // read-aloud off).
+    expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'true');
+  });
+});

@@ -6,6 +6,7 @@ import { useDemo } from '../lib/demo';
 import { cx, formatDateTime, formatUptime, titleCase } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { useVillage } from '../lib/village';
+import { buildLabel } from '../build';
 import { validateSettings } from '../lib/validation';
 import { CommandResult } from '../components/CommandResult';
 import { Sensors } from './Sensors';
@@ -707,6 +708,10 @@ function Diagnostics() {
   const health = useApi<HealthResponse>(['system-health'], () => api.systemHealth(), { intervalMs: 15000 });
   return (
     <Card kicker="Technical" title="Connection diagnostics">
+      <p className="hint" data-testid="build-stamp">
+        Dashboard build: <strong>{buildLabel()}</strong>. If this is older than the last rebuild,
+        this tab is still running the previous page — reload it with Ctrl+Shift+R.
+      </p>
       <details className="advanced">
         <summary>Raw health response</summary>
         <div className="advanced-body">
