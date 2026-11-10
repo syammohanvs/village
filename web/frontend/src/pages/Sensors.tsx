@@ -56,7 +56,11 @@ function validate(config: DeviceConfig): string | null {
 export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
   const { status, live, simulator } = useVillage();
   const { demo } = useDemo();
-  const config = useApi<DeviceConfigDocument>(['device-config'], () => api.deviceConfig(), {});
+  const config = useApi<DeviceConfigDocument>(
+    ['device-config', demo ? 'demo' : 'live'],
+    () => api.deviceConfig(demo ? 'demo' : 'live'),
+    {},
+  );
   const [saved, setSaved] = useState<DeviceConfigDocument | null>(null);
   const [draft, setDraft] = useState<DeviceConfig | null>(null);
   const [error, setError] = useState('');

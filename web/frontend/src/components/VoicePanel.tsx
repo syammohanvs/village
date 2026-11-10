@@ -7,6 +7,7 @@ import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking } from '../lib/speech';
 import { useVillage } from '../lib/village';
+import { describeVillage } from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
 import type { VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
@@ -64,7 +65,16 @@ export function VoicePanel() {
   const { open, closePanel, language, setLanguage } = useVoiceUi();
   const { demo } = useDemo();
   const { send } = useCommands();
-  const { connected, loading: villageLoading } = useVillage();
+  // `status` is also a local name inside finish() (the intent status), so the
+  // frame is read as villageStatus here.
+  const {
+    status: villageStatus,
+    connected,
+    stale,
+    ageMs,
+    demo: villageDemo,
+    loading: villageLoading,
+  } = useVillage();
 
   const [state, setState] = useState<VoiceState>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -232,15 +242,36 @@ export function VoicePanel() {
 
       if (!canAct) {
         setState('success');
-        const reply =
-          response.message ?? 'Status request understood. This one does not move anything.';
+        // The catalogue carries the answer in `response_text`; `message` is
+        // only set for a refusal.  Reading `message` alone threw every
+        // answer-only reply away, which is why "village status" looked inert.
+        let reply =
+          response.response_text ??
+          response.message ??
+          'That one does not move anything. It only answers.';
+        // A status question is better answered from the frame on screen than
+        // from a canned sentence: this reads the current soil, water, light
+        // and pump state aloud in the selected language.
+        if (intent === 'VILLAGE_STATUS' && villageStatus) {
+          const live = describeVillage(
+            { status: villageStatus, connected, stale, ageMs, demo: villageDemo },
+            language as 'en' | 'ml' | 'hi',
+          )
+            .map((item) => item.text)
+            .join(' ');
+          if (live) reply = live;
+        }
         setMessage(reply);
         void speak(reply, intent);
         return;
       }
 
       setState('success');
-      setMessage(response.message ?? 'Command understood. Sending it to the village controller.');
+      setMessage(
+        response.pending_text ??
+          response.message ??
+          'Command understood. Sending it to the village controller.',
+      );
       const commandOutcome = await send(command as string, {}, 'voice');
       setOutcome(commandOutcome);
       if (commandOutcome.status === 'rejected') {
@@ -260,7 +291,14 @@ export function VoicePanel() {
           commandOutcome.reason ?? 'This command was already processed. The original decision stands.',
         );
       }
-      void speak(commandOutcome.reason ?? response.message ?? 'Command sent.', intent);
+      const done =
+        commandOutcome.status === 'confirmed'
+          ? response.done_text || response.response_text
+          : undefined;
+      void speak(
+        commandOutcome.reason ?? done ?? response.message ?? 'Command sent.',
+        intent,
+      );
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;

@@ -335,6 +335,10 @@ export interface VoiceTranscribeResponse {
   text?: string;
   transcript?: string;
   message?: string;
+  /** The answer-only reply the intent catalogue carries. */
+  response_text?: string;
+  pending_text?: string;
+  done_text?: string;
   confidence?: number;
   language?: string;
   matched_phrase?: string;

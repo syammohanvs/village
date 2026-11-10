@@ -190,14 +190,18 @@ export const api = {
     });
   },
 
-  deviceConfig(): Promise<DeviceConfigDocument> {
-    return request<DeviceConfigDocument>('/device/config');
+  deviceConfig(mode: Mode = activeMode): Promise<DeviceConfigDocument> {
+    // The mode is passed explicitly by the caller as well as defaulting here:
+    // when the Simulation switch flips, the child's fetch and the provider's
+    // setApiMode happen in the same commit, so the explicit value is the only
+    // one that cannot race.
+    return request<DeviceConfigDocument>('/device/config', { mode });
   },
 
-  putDeviceConfig(revision: number, config: DeviceConfig): Promise<DeviceConfigDocument> {
+  putDeviceConfig(revision: number, config: DeviceConfig, mode: Mode = activeMode): Promise<DeviceConfigDocument> {
     return request<DeviceConfigDocument>('/device/config', {
       method: 'PUT',
-      body: { mode: activeMode, config_revision: revision, config },
+      body: { mode, config_revision: revision, config },
     });
   },
 

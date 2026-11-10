@@ -118,6 +118,7 @@ describe('Setup', () => {
     expect(api.putDeviceConfig).toHaveBeenCalledWith(
       expect.any(Number),
       expect.objectContaining({ irrigation: expect.objectContaining({ pump_enabled: true }) }),
+      'live',
     );
   });
 });
@@ -160,5 +161,25 @@ describe('setup save conflicts', () => {
       await screen.findByText('Settings changed elsewhere. Reload before saving.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/HTTP 409/)).not.toBeInTheDocument();
+  });
+});
+
+describe('simulation toggle', () => {
+  it('moves the slider, not just the word', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const toggle = await screen.findByRole('switch', { name: 'Simulation mode' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('simulation-track').className).not.toContain('is-on');
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).toHaveTextContent('On');
+    // The class the CSS selector needs lives on the track; on the button alone
+    // the knob stayed left while the text said On.
+    expect(screen.getByTestId('simulation-track').className).toContain('is-on');
+    expect(await screen.findByTestId('demo-banner')).toBeInTheDocument();
   });
 });

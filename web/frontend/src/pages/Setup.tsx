@@ -50,7 +50,7 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >
-      <span className="toggle-track" aria-hidden="true">
+      <span className={cx('toggle-track', checked && 'is-on')} aria-hidden="true" data-testid={`${id}-track`}>
         <span className="toggle-knob" />
       </span>
       <span className="toggle-text">{checked ? 'On' : 'Off'}</span>
@@ -448,7 +448,11 @@ function Preferences() {
 function Irrigation() {
   const { status, live, connected, reload: reloadVillage } = useVillage();
   const { demo } = useDemo();
-  const config = useApi<DeviceConfigDocument>(['device-config'], () => api.deviceConfig(), {});
+  const config = useApi<DeviceConfigDocument>(
+    ['device-config', demo ? 'demo' : 'live'],
+    () => api.deviceConfig(demo ? 'demo' : 'live'),
+    {},
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
@@ -465,7 +469,7 @@ function Irrigation() {
     try {
       const next: DeviceConfig = clone(config.data.config);
       next.irrigation = { ...next.irrigation, ...patch };
-      const response = await api.putDeviceConfig(config.data.config_revision, next);
+      const response = await api.putDeviceConfig(config.data.config_revision, next, demo ? 'demo' : 'live');
       const revision = response?.config_revision ?? config.data.config_revision + 1;
       setNote(`${label} saved. Controller configuration revision ${revision}.`);
       config.reload();

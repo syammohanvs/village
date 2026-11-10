@@ -191,3 +191,69 @@ describe('Voice panel keyboard behaviour', () => {
     expect(trigger).toHaveFocus();
   });
 });
+
+describe('voice replies', () => {
+  beforeEach(() => {
+    vi.mocked(api.voiceIntents).mockResolvedValue({
+      intents: [
+        {
+          id: 'VILLAGE_STATUS',
+          command: null,
+          actuation: false,
+          label: { en: 'Village status' },
+          phrases: { en: ['village status'] },
+        },
+      ],
+      help_order: ['VILLAGE_STATUS'],
+    });
+  });
+
+  it('reads the catalogue answer for an answer-only intent instead of a shrug', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'ok',
+      intent: 'VILLAGE_STATUS',
+      command: null,
+      actuation: false,
+      text: 'village status',
+      response_text: 'The village is running. The screen shows the current readings.',
+    });
+
+    const { user } = await openPanel();
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+
+    // The frame is available in this test, so the live summary replaces the
+    // canned sentence — either way it must not be the generic "does not move
+    // anything" line.
+    expect(await screen.findByText(/The soil|The tank|The village is running/)).toBeInTheDocument();
+    expect(screen.queryByText(/does not move anything/)).not.toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('speaks the done text once the controller confirms a command', async () => {
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'ok',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      text: 'lights off',
+      pending_text: 'Turning the streetlights off.',
+      done_text: 'The streetlights are off.',
+    });
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+
+    const { user } = await openPanel();
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+
+    await waitFor(() =>
+      expect(speech.speakReply).toHaveBeenCalledWith(
+        expect.stringMatching(/streetlights are off|The lights were switched off/i),
+        expect.anything(),
+        expect.anything(),
+      ),
+    );
+  });
+});
