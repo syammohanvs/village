@@ -373,3 +373,32 @@ TEST(irrigation_reports_pulse_and_soak_countdowns) {
   CHECK(s.soak_remaining_ms == 1000);
   CHECK(!s.pump_on);
 }
+
+// A request handler stamps the contact time with a later millis() than the
+// value the loop sampled at the top of the same pass.  The unsigned difference
+// then reads as ~49 days, which is longer than any timeout, and every manual
+// session died on its first tick as "laptop communication lost".
+TEST(age_ms_treats_a_stamp_ahead_of_now_as_zero) {
+  CHECK(ageMs(1000, 1000) == 0);
+  CHECK(ageMs(1500, 1000) == 500);
+  CHECK(ageMs(1000, 1006) == 0);
+  // A genuine wrap of millis() is still measured correctly.
+  CHECK(ageMs(10, 0xFFFFFFF0u) == 26);
+}
+
+TEST(irrigation_survives_a_contact_stamp_from_the_same_tick) {
+  IrrigationController c;
+  c.begin(0, manualCfg(), true);
+  CHECK(c.requestManual(6000, dryInputs()).result == CommandResult::Accepted);
+  CHECK(c.pumpOn());
+
+  IrrigationInputs in = dryInputs();
+  in.link_age_ms = ageMs(5994, 6000);  // the handler ran 6 ms after `now`
+  CHECK(in.link_age_ms == 0);
+
+  c.tick(5994, in);
+  CHECK(c.pumpOn());
+  const IrrigationStatus s = c.status(5994);
+  CHECK(s.state == IrrigationState::Pumping);
+  CHECK(!s.last.present);
+}

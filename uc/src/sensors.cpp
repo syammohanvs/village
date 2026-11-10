@@ -158,9 +158,11 @@ IrrigationInputs buildIrrigationInputs(uint32_t now) {
   in.soil_percent = soil.percent;
   in.reservoir_valid = reservoir.valid;
   in.reservoir_available = reservoir.state == ReservoirState::Available;
-  in.link_age_ms = rt.ever_contacted
-                       ? static_cast<uint32_t>(now - rt.last_contact_ms)
-                       : UINT32_MAX;
+  // ageMs, not a raw subtraction: a command handler stamps the contact time
+  // with a later millis() than the `now` this loop sampled, and the unsigned
+  // difference would read as ~49 days - which stopped every manual session on
+  // its first tick as "laptop communication lost".
+  in.link_age_ms = rt.ever_contacted ? ageMs(now, rt.last_contact_ms) : UINT32_MAX;
   return in;
 }
 

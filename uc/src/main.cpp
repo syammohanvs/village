@@ -78,11 +78,15 @@ void setup() {
 }
 
 void loop() {
-  const uint32_t now = millis();
+  uint32_t now = millis();
 
   networkLoop(now);
   otaLoop();
   handleApi();
+  // Re-read the clock: a handler may have stamped `last_contact_ms` or a
+  // pulse start with a later millis() than the value sampled above, and every
+  // age computed against the older stamp would look like a wrap.
+  now = millis();
   sampleSensors(now);
 
   const IrrigationInputs inputs = buildIrrigationInputs(now);

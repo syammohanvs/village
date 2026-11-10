@@ -161,7 +161,7 @@ class IrrigationController {
       }
 
       if (state_ == IrrigationState::Pumping) {
-        const uint32_t elapsed = elapsedMs(now, pulse_start_ms_);
+        const uint32_t elapsed = ageMs(now, pulse_start_ms_);
         // A config change can lower the cumulative limit mid-session.  Act on
         // it immediately instead of waiting for the pulse to end.
         if (cumulative_ms_ + elapsed >= cfg_.max_cumulative_ms) {
@@ -192,7 +192,7 @@ class IrrigationController {
 
       if (state_ == IrrigationState::Soaking) {
         pump_on_ = false;
-        if (elapsedMs(now, soak_start_ms_) >= active_soak_ms_) {
+        if (ageMs(now, soak_start_ms_) >= active_soak_ms_) {
           if (in.soil_percent >= static_cast<float>(cfg_.stop_pct)) {
             finish(now, reasons::kCompleteMoisture, cfg_.cooldown_ms);
             return;
@@ -237,13 +237,13 @@ class IrrigationController {
     s.max_cumulative_pump_ms = cfg_.max_cumulative_ms;
     s.cooldown_remaining_ms = cooldownRemaining(now);
     s.session_elapsed_ms =
-        active() ? elapsedMs(now, session_start_ms_) : 0;
+        active() ? ageMs(now, session_start_ms_) : 0;
     if (state_ == IrrigationState::Pumping) {
-      const uint32_t used = elapsedMs(now, pulse_start_ms_);
+      const uint32_t used = ageMs(now, pulse_start_ms_);
       s.pulse_remaining_ms = used >= active_pulse_ms_ ? 0 : active_pulse_ms_ - used;
     }
     if (state_ == IrrigationState::Soaking) {
-      const uint32_t used = elapsedMs(now, soak_start_ms_);
+      const uint32_t used = ageMs(now, soak_start_ms_);
       s.soak_remaining_ms = used >= active_soak_ms_ ? 0 : active_soak_ms_ - used;
     }
     s.reason = reason_;
@@ -317,7 +317,7 @@ class IrrigationController {
 
   void stopInternal(uint32_t now, const Reason& why, uint32_t cooldown_ms) {
     if (state_ == IrrigationState::Pumping) {
-      cumulative_ms_ += elapsedMs(now, pulse_start_ms_);
+      cumulative_ms_ += ageMs(now, pulse_start_ms_);
     }
     pump_on_ = false;
     last_.present = true;
