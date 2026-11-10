@@ -478,15 +478,36 @@ behaviour was tested for this change. The waste model is still absent, so Sort
 Waste says the model is missing and keeps the camera off. The simulation path
 was exercised; the physical path was not.
 
+## Verified on the physical pump (2026-11-10)
+
+The pump driver is a **2N7000** on **D19** (pin map `1.5.0-30pin`): 220 Ω in
+series with the gate, 10 kΩ gate to ground, 1N4007 with its band to +5 V across
+the motor, source to the common ground. Measured: D19 3.30 V, gate 3.27 V,
+Vds 1.3 V at 157 mA, and the pump runs from the **5 V 2 A bank**.
+
+An end-to-end watering was run from the app on 2026-11-10:
+
+- `IRRIGATION_REQUEST` → **ACCEPTED**, "Soil is dry and water is available.
+  Watering for a short pulse."
+- The card showed **Watering** for **4.00 s** and the log recorded
+  `Irrigation Request · ACCEPTED`; the pulse cap was lowered to 4 s for this
+  test and restored to 8 s afterwards.
+- `IRRIGATION_STOP` → **ACCEPTED**, "Irrigation stopped by the operator", and
+  the session recorded `pumped_ms: 4000` with reason
+  `IRRIGATION_STOPPED_USER`.
+
+Two traps found here are now fixed and documented: a **resistor dummy load is
+not a motor test** (23.5 Ω passes where the pump's start-up surge collapses a
+USB feed), and the pump must run from the bank, never the PC's USB port.
+
 ## Not verified
 
-- Physical soil, reservoir, pump and ultrasonic-bin behaviour,
-  except the three waste indicator LEDs above (2026-11-09). The ESP32 is
-  flashed, joins the home Wi-Fi and serves the API over the LAN. One
-  streetlight LED was measured at 100 Ω (Vf 2.93 V) and the LDR module was
-  tested end to end, but the other three lamps were only exercised as GPIO
-  outputs, not measured individually.
-- A physical Stop while water is flowing.
+- Physical soil and ultrasonic-bin behaviour, and the four lamps beyond the one
+  measured at 100 Ω (Vf 2.93 V). The reservoir probe was exercised by shorting
+  it (142 mV → available) and by leaving it open (3145 mV → low); the soil probe
+  has only been seen open (4095 raw → 0 %).
+- A physical Stop **while water is flowing** at the pump's full 8 s pulse —
+  the stop above landed after the 4 s pulse had already ended.
 - Malayalam or Hindi recognition with the child's voice.
 - The Teachable Machine model (not supplied), and therefore live camera
   classification in this build.
