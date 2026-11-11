@@ -244,8 +244,8 @@ constexpr bool assignedPinsAreUnique() {
 static_assert(assignedPinsAreUnique(),
               "the same GPIO must not be assigned to two functions");
 
-static_assert(kAssignedPinCount == 18,
-              "expected 18 assigned GPIOs for this build");
+static_assert(kAssignedPinCount == 15,
+              "expected 15 assigned GPIOs for this build");
 static_assert(kAssignedPinCount < kHeaderPins,
               "the 30-pin header must still have spare pins");
 

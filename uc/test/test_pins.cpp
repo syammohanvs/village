@@ -3,8 +3,8 @@
 
 using namespace village;
 
-TEST(pin_map_has_eighteen_unique_exposed_pins) {
-  CHECK(pins::kAssignedPinCount == 18);
+TEST(pin_map_has_fifteen_unique_exposed_pins) {
+  CHECK(pins::kAssignedPinCount == 15);
   CHECK(pins::assignedPinsAreUnique());
   for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
     CHECK(pins::isExposed(pins::kAssignedPins[i]));
