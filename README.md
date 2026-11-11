@@ -75,8 +75,9 @@ Stop only this project:
 - **Voice** — push-to-talk, English/Malayalam/Hindi, local Whisper, deterministic
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
 - **Sort Waste** — local Teachable Machine model behind a large camera preview,
-  stable predictions, one event per item, the correct bin LED, and a full-bin
-  warning without redirecting.
+  stable predictions, one event per item, and the camera stops itself once the
+  item is accepted (start it again for the next one), the correct bin LED, and
+  a full-bin warning without redirecting.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
 - **What Happened** — one timeline of actions and reasons; raw codes, filters

@@ -169,6 +169,7 @@ export function SortWaste() {
     setDisposalMessage('');
     setDisposalError('');
     setNote('');
+    let sorted = false;
     try {
       const result = await api.postRecognition({
         category: event.category,
@@ -176,6 +177,7 @@ export function SortWaste() {
         model: 'teachable-machine',
       });
       setRecognition(result);
+      sorted = true;
       const binState = result.bin?.state;
       setAlert(
         result.alert ??
@@ -189,8 +191,12 @@ export function SortWaste() {
       setRecognitionError(errorMessage(cause));
     } finally {
       acceptingRef.current = false;
+      // One item per camera session, but only once the backend actually
+      // accepted it.  A refused request leaves the camera running so the
+      // operator can remove the item and try again without a restart.
+      if (sorted) stopCamera();
     }
-  }, []);
+  }, [stopCamera]);
 
   useEffect(() => {
     if (!cameraOn || modelState !== 'ready') return;
@@ -304,7 +310,8 @@ export function SortWaste() {
               <strong>Hold it still</strong> for a few seconds.
             </p>
             <p>
-              <strong>One item only.</strong> Remove this item before showing another.
+              <strong>One item at a time.</strong> The camera stops by itself after an item is
+              recognised; start it again for the next one.
             </p>
           </div>
         </div>
@@ -324,6 +331,11 @@ export function SortWaste() {
                 <p className="hint">
                   This is a camera suggestion, not proof that the item was put in the bin.
                 </p>
+                {!cameraOn && (
+                  <p className="hint" data-testid="waste-camera-stopped">
+                    The camera stopped after this item. Start it again for the next one.
+                  </p>
+                )}
               </>
             ) : removing ? (
               <p className="result-sub" data-testid="waste-remove">
@@ -471,8 +483,8 @@ export function SortWaste() {
             <div className="advanced-body">
               <p>
                 A label must clear the confidence threshold for several consecutive frames before it
-                is accepted. After one event the classifier waits for the item to be removed and for
-                the cooldown to pass, so one bottle is not counted on every frame.
+                is accepted. The camera then stops itself, so one bottle is not counted on every
+                frame and the next item gets a fresh session when the operator starts it again.
               </p>
               <p className="hint">
                 The camera recognises waste; it does not identify people, measure weight, or prove

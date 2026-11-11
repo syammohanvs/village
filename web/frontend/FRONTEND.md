@@ -32,7 +32,7 @@ the pinned `4.22.0` runtime works. The committed `.npmrc` sets
 | `/` | Dashboard | live reason panel, four KPI cards, bins, connection, AI readiness, recent controller events, manual controls, demo scenarios |
 | `/sensors` | Sensors & calibration | raw/calibrated values, soil two-point calibration, reservoir thresholds, bin distances, LDR thresholds, save with `config_revision` |
 | `/controls` | Controls | irrigation auto toggle, pump commissioning gate, light modes, waste indicator tests, emergency stop, command log |
-| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions ranked by confidence (Background included), stabiliser, recognition record, separate deposit confirmation |
+| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions ranked by confidence (Background included), stabiliser, one accepted item per camera session (auto-stop), recognition record, separate deposit confirmation |
 | `/activity` | Activity | live/demo events, kind filters, client-side CSV, retention note |
 | `/settings` | Settings | device URL/mode, `/device/health` test, app preferences with draft/validation, setup checklist, first-run order |
 | `/villagers` | Villagers | clearly fictional sample profiles; 3/2/1 points for organic/plastic/paper; no consumption or savings metrics |

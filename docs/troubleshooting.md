@@ -187,7 +187,9 @@ reload. The app never substitutes random predictions. See
 - Train with the same lighting and backgrounds used at the exhibition.
 - Include a real `Background` class with empty scenes, hands and the table.
 - Increase the confidence threshold and the stable-frame count.
-- One item is counted once; remove it (show background) before the next item.
+- One item is counted once; the camera stops after an accepted item. Press
+  Start Camera again for the next one. A refused request leaves the camera
+  running so the item can be removed and shown again.
 - The camera identifies waste, not people, and does not prove deposition.
 
 ## Demo mode

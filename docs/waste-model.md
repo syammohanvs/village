@@ -114,9 +114,12 @@ installed**. It never substitutes random predictions.
 - A class must exceed the confidence threshold (default 0.75) and be stable for
   several consecutive frames (default 5).
 - `Background`/unknown is ignored.
-- After an accepted event, the app requires a short background/absence period
-  and a cooldown before it can count another item. Repeated frames of the same
-  bottle do not become multiple items.
+- After an accepted event the **camera stops itself**, so repeated frames of
+  the same bottle cannot become multiple items and the next item gets a fresh
+  session when the operator presses Start Camera again.
+- The background/cooldown rules still protect a session that stays open — for
+  example when the backend refuses a recognition and the camera is left
+  running so the item can be shown again.
 - One accepted event sends `INDICATE_WASTE` through the backend. The correct
   category LED lights for a bounded time. Unknown categories activate nothing.
 - If the target bin is **full**, the app still indicates the correct category
@@ -125,8 +128,8 @@ installed**. It never substitutes random predictions.
   “Confirm deposited” creates a deliberate confirmation record. A photo of an
   item is not proof that it went into the bin.
 
-The threshold, stable-frame count and cooldown are adjustable in
-Setup → Voice & Camera.
+The threshold and stable-frame count are adjustable in
+Setup → Voice & Camera; the cooldown applies to a session that stays open.
 
 ## 5. Class mapping
 

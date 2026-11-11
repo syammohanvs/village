@@ -539,6 +539,12 @@ command could reach the board:
 Zero page errors in all four runs. `model.json`, `weights.bin` and
 `metadata.json` were all served with 200 and the recognition POST answered 200.
 
+**One item per camera session** was checked separately: after the plastic
+recognition the video track ended (`video.srcObject` became null), the
+**Start Camera** button returned, the Stop button disappeared, and the result
+and its explanation stayed on screen. A background frame produced no event and
+left the camera running, which is the intended contrast.
+
 **A real defect was found by this run and fixed.** The page called
 `classifier.predict(video, 3)`, but the library's second argument is
 `flipped`, not a result count — so every frame was horizontally mirrored.

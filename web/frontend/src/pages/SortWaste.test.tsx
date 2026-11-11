@@ -90,7 +90,8 @@ describe('Sort Waste', () => {
       recognition: { id: 7, category: 'plastic', confidence: 0.95 },
       bin: { id: 'plastic', state: 'available' },
     });
-    const stream = { getTracks: () => [] };
+    const stopTrack = vi.fn();
+    const stream = { getTracks: () => [{ stop: stopTrack }] };
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
@@ -130,5 +131,14 @@ describe('Sort Waste', () => {
       confidence: 0.95,
     });
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Plastic');
+
+    // One item per camera session: the track is stopped and the page offers a
+    // fresh Start Camera while the result stays on screen.
+    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
+    expect(screen.getByTestId('start-camera')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /stop camera/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('waste-camera-stopped')).toHaveTextContent(
+      /camera stopped after this item/i,
+    );
   }, 15000);
 });
