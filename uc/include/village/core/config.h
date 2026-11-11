@@ -26,7 +26,7 @@ struct ReservoirConfig {
 
 struct LightConfig {
   // Two independent hardware facts, deliberately separate:
-  //   installed      - the four streetlight lamps are wired
+  //   installed      - the five streetlight lamps are wired
   //   sensor_fitted  - the LDR is wired
   // A board with no LDR must not report a brightness (a floating ADC pin reads
   // plausible noise), and a board with no lamps must not drive the outputs.

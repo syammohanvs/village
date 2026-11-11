@@ -375,45 +375,50 @@ Each LED needs its own series resistor:
  GPIO ──[ 220 Ω ]──▶|── GND        (3.3 V LED, ~6 mA)
 ```
 
-- **Streetlights: one LED per pin — GPIO 13, 12, 14 and 27 — with 100 Ω in
-  series with each lamp.** These four are consecutive on the 30-pin header
-  (`D13 D12 D14 D27`, between D26 and GND), which keeps the wiring tidy.
+- **Streetlights: all five lamps are driven from one GPIO — GPIO 13 (D13) —
+  with a separate 220 Ω resistor in series with each lamp.** One pin carries
+  the combined current (about 1.8 mA per white LED, ~9 mA total), which is
+  inside the ESP32's 20 mA per-pin recommendation, so a single pin is
+  enough and D12/D14/D27 stay free. Each lamp still gets its own resistor
+  so one shorted LED cannot take the others down.
 
 ```
- GPIO 13 ──[ 100 Ω ]──▶|── GND      lamp 1
- GPIO 12 ──[ 100 Ω ]──▶|── GND      lamp 2   <- boot-sensitive, see below
- GPIO 14 ──[ 100 Ω ]──▶|── GND      lamp 3
- GPIO 27 ──[ 100 Ω ]──▶|── GND      lamp 4
+ GPIO 13 ──┬──[ 220 Ω ]──▶|── GND      lamp 1
+           ├──[ 220 Ω ]──▶|── GND      lamp 2
+           ├──[ 220 Ω ]──▶|── GND      lamp 3
+           ├──[ 220 Ω ]──▶|── GND      lamp 4
+           └──[ 220 Ω ]──▶|── GND      lamp 5
 ```
 
   One resistor per LED, never one shared resistor for lamps wired in parallel.
 
-- **GPIO12 (D12) must be wired exactly as drawn: pin → resistor → LED anode →
-  cathode → GND.** It is a boot strapping pin (MTDI) and must be **LOW when the
-  board starts**. In this direction the pin is high-impedance at reset and the
-  resistor/LED path pulls it low, which is the required level. Wiring it the
-  other way round (3V3 → LED → pin, i.e. sinking) pulls it **high at boot** and
-  the board may fail to start until that lamp is disconnected. If the board
-  ever stops booting after a lamp change, disconnect D12 first.
+  **Colour matters for 220 Ω:** it suits white/blue LEDs (Vf ~2.9-3.0 V,
+  ~1.4-1.8 mA each). For red/yellow/green (Vf ~1.8-2.2 V) the same
+  resistor would push ~5-7 mA per lamp (~25-35 mA total) and exceed the
+  pin's limit — use 330 Ω for those colours instead.
 
-- **Current with 100 Ω** at a 3.3 V GPIO: `I = (3.3 − Vf) / 100`, about
-  **2–3.5 mA** for the measured white LEDs here (Vf ≈ 2.93 V). That is a good
-  indicator brightness and well inside the ~10 mA per-pin target.
+- **Current with 220 Ω** at a 3.3 V GPIO: `I = (3.3 − Vf) / 220`, about
+  **1.4–1.8 mA** per white/blue LED here (Vf ≈ 2.9–3.0 V), so five lamps
+  draw roughly **7–9 mA** in total — inside the ESP32's 20 mA per-pin
+  recommendation with margin to spare. That is a comfortable indicator
+  brightness for a 5 mm LED.
 
-  | LED colour | Vf (approx) | Current at 100 Ω |
-  | --- | ---: | ---: |
-  | Red | 1.8 V | ~15 mA (**too high**) |
-  | Yellow | 2.1 V | ~12 mA (**too high**) |
-  | Green | 2.2 V | ~11 mA (**too high**) |
-  | White | 2.9 V | ~3 mA ✔ |
-  | Blue | 3.0 V | ~2.5 mA ✔ |
+  | LED colour | Vf (approx) | Current at 220 Ω | 5 lamps total |
+  | --- | ---: | ---: | ---: |
+  | White | 2.9 V | ~1.8 mA | ~9.0 mA ✔ |
+  | Blue | 3.0 V | ~1.4 mA | ~7.0 mA ✔ |
+  | Green | 2.2 V | ~5.0 mA | ~25 mA (**too high**) |
+  | Yellow | 2.1 V | ~5.5 mA | ~27.5 mA (**too high**) |
+  | Red | 1.8 V | ~6.8 mA | ~34 mA (**too high**) |
 
-  100 Ω suits **white or blue** LEDs. For red/yellow/green use 330 Ω, which
-  gives 3–4.5 mA. This build was measured with white LEDs at Vf ≈ 2.93 V.
+  220 Ω suits **white or blue** LEDs. For red/yellow/green use 330 Ω, which
+  gives ~3–4.5 mA per lamp. This build is measured with white LEDs at
+  Vf ≈ 2.93 V.
 
-- **Current budget:** each pin drives exactly one lamp, so every pin carries
-  only ~2–3 mA here. The ESP32's recommended continuous limit is 20 mA per
-  pin, so there is a wide margin on all four.
+- **Current budget:** one pin carries all five lamps, so the combined
+  current (~9 mA for white) is the number to watch. Stay under 20 mA per
+  pin; if a lamp is ever swapped for a lower-Vf colour, raise the resistor
+  (330 Ω or higher) rather than adding a second pin.
 - The GPIO is the only supply: each LED's current returns through the board's
   ground, so keep the ground wire short and common with the board.
 - Organic = GPIO **21** (green), plastic = GPIO **22** (red), paper = GPIO

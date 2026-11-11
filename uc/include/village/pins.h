@@ -162,12 +162,12 @@ inline constexpr int RESERVOIR_EXCITE = 25;
 // board on one edge.
 inline constexpr int PUMP_GATE = 19;
 
-// Four streetlight LEDs, one per pin, each with its own series resistor.
-// These four are consecutive on the 30-pin header (D13, D12, D14, D27), which
-// keeps the lamp loom tidy.  GPIO12 is a strapping pin: see isSafeLampOutput
-// and docs/wiring.md before changing how a lamp is wired.
-inline constexpr int STREETLIGHT_LEDS[4] = {13, 12, 14, 27};
-inline constexpr int STREETLIGHT_LAMP_COUNT = 4;
+// All five streetlight lamps are driven from ONE GPIO (D13), each with its
+// own series resistor.  One pin carries the combined current (about 9 mA for
+// white LEDs at 220 Ohm each), which is inside the ESP32's 20 mA per-pin
+// recommendation, so a single pin is enough and D12/D14/D27 stay free.
+inline constexpr int STREETLIGHT_LED_PIN = 13;
+inline constexpr int STREETLIGHT_LAMP_COUNT = 5;
 
 // Three waste-category indicator LEDs.
 //
@@ -205,16 +205,8 @@ static_assert(isSafeOutput(WASTE_LED_PLASTIC), "plastic LED must be a safe outpu
 static_assert(isSafeOutput(WASTE_LED_PAPER), "paper LED must be a safe output");
 static_assert(isSafeOutput(SPARE_SAFE_OUTPUT), "spare pin must be a safe output");
 
-static_assert(isSafeLampOutput(STREETLIGHT_LEDS[0]) &&
-                  isSafeLampOutput(STREETLIGHT_LEDS[1]) &&
-                  isSafeLampOutput(STREETLIGHT_LEDS[2]) &&
-                  isSafeLampOutput(STREETLIGHT_LEDS[3]),
-              "every streetlight LED pin must be a safe lamp output");
-
-// The only strapping pin a lamp may use is GPIO12, and it must stay the one at
-// index 1 in the array so the wiring note above keeps matching the code.
-static_assert(isStrappingPin(STREETLIGHT_LEDS[1]) && STREETLIGHT_LEDS[1] == 12,
-              "the strapping lamp pin must be GPIO12");
+static_assert(isSafeLampOutput(STREETLIGHT_LED_PIN),
+              "the streetlight LED pin must be a safe lamp output");
 
 static_assert(isSafeOutput(BIN_TRIG[0]) && isSafeOutput(BIN_TRIG[1]) &&
                   isSafeOutput(BIN_TRIG[2]),
@@ -233,8 +225,7 @@ static_assert(isExposed(BIN_ECHO[2]) && !isFlashPin(BIN_ECHO[2]),
 inline constexpr int kAssignedPins[] = {
     SOIL_MOISTURE_ADC, RESERVOIR_SENSE_ADC, LDR_ADC,
     RESERVOIR_EXCITE,  PUMP_GATE,
-    STREETLIGHT_LEDS[0], STREETLIGHT_LEDS[1], STREETLIGHT_LEDS[2],
-    STREETLIGHT_LEDS[3],
+    STREETLIGHT_LED_PIN,
     WASTE_LED_ORGANIC, WASTE_LED_PLASTIC, WASTE_LED_PAPER,
     BIN_TRIG[0], BIN_TRIG[1], BIN_TRIG[2],
     BIN_ECHO[0], BIN_ECHO[1], BIN_ECHO[2],

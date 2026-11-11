@@ -68,13 +68,14 @@ TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[0]));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[1]));
   CHECK(pins::isSafeOutput(pins::BIN_TRIG[2]));
-  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
-    CHECK(pins::isSafeLampOutput(pins::STREETLIGHT_LEDS[i]));
-  }
-  CHECK(pins::STREETLIGHT_LAMP_COUNT == 4);
-  CHECK(pins::STREETLIGHT_LEDS[1] == 12);
-  // GPIO12 is the documented strapping exception: banned as a general output,
-  // allowed only for a source-wired lamp.
+  // All five lamps now share one pin (D13), so there is only one pin to
+  // check rather than one per lamp.
+  CHECK(pins::isSafeLampOutput(pins::STREETLIGHT_LED_PIN));
+  CHECK(pins::STREETLIGHT_LED_PIN == 13);
+  CHECK(pins::STREETLIGHT_LAMP_COUNT == 5);
+  // GPIO12 is a strapping pin: still banned as a general output, but
+  // allowed as a lamp output when wired source-side (kept as a function
+  // check even though it is no longer used for a lamp).
   CHECK(!pins::isSafeOutput(12));
   CHECK(pins::isSafeLampOutput(12));
   CHECK(pins::isSafeLampOutput(13));

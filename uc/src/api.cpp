@@ -245,10 +245,9 @@ void buildHealth(JsonDocument& doc) {
   pm["reservoir_sense_adc"] = pins::RESERVOIR_SENSE_ADC;
   pm["ldr"] = pins::LDR_ADC;
   pm["pump_gate"] = pins::PUMP_GATE;
+  // All lamps share one pin, so there is only one pin to report.
   JsonArray street = pm["streetlight_leds"].to<JsonArray>();
-  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
-    street.add(pins::STREETLIGHT_LEDS[i]);
-  }
+  street.add(pins::STREETLIGHT_LED_PIN);
   JsonObject waste = pm["waste_leds"].to<JsonObject>();
   waste["organic"] = pins::WASTE_LED_ORGANIC;
   waste["plastic"] = pins::WASTE_LED_PLASTIC;

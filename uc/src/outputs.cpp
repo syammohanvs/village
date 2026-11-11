@@ -33,10 +33,9 @@ void setupOutputs() {
   digitalWrite(pins::PUMP_GATE, pumpGateLevel(false));
   pinMode(pins::PUMP_GATE, OUTPUT);
 
-  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
-    digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
-    pinMode(pins::STREETLIGHT_LEDS[i], OUTPUT);
-  }
+  // All five lamps share one pin, so one write drives them all.
+  digitalWrite(pins::STREETLIGHT_LED_PIN, LOW);
+  pinMode(pins::STREETLIGHT_LED_PIN, OUTPUT);
   const int waste[] = {pins::WASTE_LED_ORGANIC, pins::WASTE_LED_PLASTIC,
                        pins::WASTE_LED_PAPER};
   for (int pin : waste) {
@@ -72,9 +71,8 @@ void applyPump(bool on) {
 
 void applyStreetlights(bool on) {
   const bool allowed = on && rt.config.light.installed;
-  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
-    digitalWrite(pins::STREETLIGHT_LEDS[i], allowed ? HIGH : LOW);
-  }
+  // All five lamps share one pin, so one write drives them all.
+  digitalWrite(pins::STREETLIGHT_LED_PIN, allowed ? HIGH : LOW);
 }
 
 void applyWasteCategory(WasteCategory category) {
@@ -87,9 +85,7 @@ void applyWasteCategory(WasteCategory category) {
 
 void allOutputsOff() {
   digitalWrite(pins::PUMP_GATE, pumpGateLevel(false));
-  for (int i = 0; i < pins::STREETLIGHT_LAMP_COUNT; ++i) {
-    digitalWrite(pins::STREETLIGHT_LEDS[i], LOW);
-  }
+  digitalWrite(pins::STREETLIGHT_LED_PIN, LOW);
   digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(false));
   digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(false));
   digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(false));

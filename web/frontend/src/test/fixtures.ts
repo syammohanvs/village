@@ -136,7 +136,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
         streetlights: {
           mode: lightsMode,
           commanded: lightsCommanded,
-          led_count: 4,
+          led_count: 5,
           installed: true,
           feedback: 'none',
         },

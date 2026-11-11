@@ -469,7 +469,7 @@ class SimulatedDevice:
         return {
             "mode": self.light_mode,
             "commanded": on,
-            "led_count": 4,
+            "led_count": 5,
             "installed": self.config["light"]["installed"],
             "feedback": "none",
             "reason_code": reason(code)[0],
@@ -515,7 +515,7 @@ class SimulatedDevice:
                     "streetlights": {
                         "mode": lights["mode"],
                         "commanded": lights["commanded"],
-                        "led_count": 4,
+                        "led_count": 5,
                         "installed": lights["installed"],
                         "feedback": "none",
                     },
