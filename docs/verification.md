@@ -507,7 +507,7 @@ USB feed), and the pump must run from the bank, never the PC's USB port.
 
 The classifier is installed in `models/waste/` and the backend reports
 `installed: true` with the four expected labels. On **140 held-out photos**
-(15% of every class, never used for training) it scores **97.1% (135/140)**:
+(15% of every class, never used for training) it scores **97.1% (136/140)**:
 
 | Class | Correct | Test photos |
 | --- | --- | --- |
