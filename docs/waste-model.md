@@ -22,6 +22,38 @@ leaves the laptop and no cloud service is used.
    works on its own training photos is not ready.
 5. Export → **TensorFlow.js** → download the zip.
 
+## 1b. Or train it locally, without Teachable Machine
+
+`scripts/waste/train_waste_model.mjs` trains the same architecture Teachable
+Machine uses (a frozen truncated MobileNet v1 plus a small dense head) on this
+laptop and writes the exact three files the dashboard loads. It never talks to
+Google.
+
+```bash
+# once: the training dependencies live outside the web build
+npm install --prefix ~/.cache/village-waste @tensorflow/tfjs-node@4.22.0
+
+# train and install into models/waste/
+node scripts/waste/train_waste_model.mjs \
+  --data ~/.cache/village-waste \
+  --modules ~/.cache/village-waste \
+  --out models/waste
+```
+
+`--data` is a folder of one sub-folder per class (`Organic`, `Plastic`,
+`Paper`, `Background`), or an already-split `train/` + `val/` tree. The script
+prints held-out accuracy, refuses an export whose input shape is not 224×224,
+reloads what it saved, and only then installs it.
+
+The model currently installed on this laptop was trained this way on 850
+photos: TrashNet (MIT, paper/cardboard/plastic), the Voxel51 food-waste
+dataset (MIT, organic), and freely licensed table/room photos from Wikimedia
+Commons for `Background`. Held-out accuracy was **96.4 %**. That is a starting
+point for the exhibition, not a promise: photos from the venue's own table
+under its own lighting will do better. Put ~80–150 photos per class in
+`~/.cache/village-waste/train/<class>/` and run the command again to replace
+the model in a few minutes.
+
 ## 2. Install the exported files
 
 Copy these three files into `models/waste/`:

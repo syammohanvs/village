@@ -82,6 +82,9 @@ def make_settings(tmp_path: Path) -> Settings:
         device_mode="simulator",
         stale_after_ms=0,
         disconnect_after_ms=0,
+        # Keep the waste-model check hermetic: the repository's models/waste may
+        # hold a real trained model on a presenter's machine.
+        waste_model_dir=tmp_path / "models" / "waste",
     )
 
 

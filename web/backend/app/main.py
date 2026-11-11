@@ -96,7 +96,15 @@ def _waste_model_status(settings: Settings) -> dict[str, Any]:
     if installed:
         try:
             metadata = json.loads((folder / "metadata.json").read_text(encoding="utf-8"))
-            labels = [str(item.get("name", "")) for item in metadata.get("labels", [])]
+            # A Teachable Machine export writes labels as plain strings.  Some
+            # hand-written metadata uses objects with a "name", so accept both
+            # rather than reporting a real model as "not installed".
+            labels = []
+            for item in metadata.get("labels", []):
+                if isinstance(item, dict):
+                    labels.append(str(item.get("name", "")))
+                else:
+                    labels.append(str(item))
         except Exception as exc:  # noqa: BLE001 - surfaced to the operator
             error = f"metadata.json could not be read: {exc}"
     return {

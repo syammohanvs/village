@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -280,3 +281,37 @@ async def test_setup_checklist_and_settings(tmp_path):
 
         read_back = (await client.get("/api/v1/settings")).json()["settings"]
         assert read_back["language"] == "ml"
+
+
+@pytest.mark.asyncio
+async def test_waste_model_status_reads_a_teachable_machine_export(tmp_path):
+    """A real export writes labels as strings, not {"name": ...} objects."""
+    settings = make_settings(tmp_path)
+    folder = settings.waste_model_dir
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "model.json").write_text("{}", encoding="utf-8")
+    (folder / "weights.bin").write_bytes(b"")
+    (folder / "metadata.json").write_text(
+        json.dumps(
+            {
+                "labels": ["Organic", "Plastic", "Paper", "Background"],
+                "imageSize": 224,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    async with client_for(settings) as (client, gateway, app):
+        model = (await client.get("/api/v1/waste/model-status")).json()
+        assert model["installed"] is True
+        assert model["error"] is None
+        assert model["labels"] == ["Organic", "Plastic", "Paper", "Background"]
+        assert model["message"] == "Recognition model installed."
+
+        # Older hand-written metadata uses objects; both shapes are read.
+        (folder / "metadata.json").write_text(
+            json.dumps({"labels": [{"name": "Organic"}, {"name": "Plastic"}]}),
+            encoding="utf-8",
+        )
+        model = (await client.get("/api/v1/waste/model-status")).json()
+        assert model["labels"] == ["Organic", "Plastic"]
