@@ -36,9 +36,12 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
-const LABELS = ['Organic', 'Plastic', 'Paper', 'Background'];
+const LABELS = ['Organic', 'Plastic', 'Paper', 'Glass', 'Metal', 'Textile', 'Leather', 'Footwear', 'Thermocol', 'Ewaste', 'Background'];
 const IMAGE_SIZE = 224;
-const CHECKPOINT = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_%ALPHA%_224/model.json';
+const CHECKPOINTS = {
+  v1: 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_%ALPHA%_224/model.json',
+  v2: 'https://storage.googleapis.com/teachable-machine-models/mobilenet_v2_weights_tf_dim_ordering_tf_kernels_%ALPHA%_224_no_top/model.json',
+};
 const IMAGE_RE = /\.(jpe?g|png|bmp|gif)$/i;
 
 function parseArgs(argv) {
@@ -46,12 +49,14 @@ function parseArgs(argv) {
     data: process.env.WASTE_DATA || path.join(os.homedir(), '.cache', 'village-waste'),
     out: path.join(REPO_ROOT, 'models', 'waste'),
     modules: process.env.WASTE_TRAIN_MODULES || '',
+    backbone: 'v1',
     alpha: 1.0,
     epochs: 60,
     batch: 16,
     dense: 128,
     'learning-rate': 0.002,
     augment: 2,
+    pooling: 'gap',
     split: 0.15,
     seed: 42,
     force: false,
@@ -80,12 +85,15 @@ function parseArgs(argv) {
   args.seed = Number(args.seed);
   args.data = path.resolve(args.data.replace(/^~(?=\/|$)/, os.homedir()));
   args.out = path.resolve(args.out);
-  if (![0.25, 0.5, 0.75, 1].includes(args.alpha)) throw new Error('--alpha must be 0.25, 0.5, 0.75 or 1');
+  if (!['v1', 'v2'].includes(args.backbone)) throw new Error('--backbone must be v1 or v2');
+  const alphas = args.backbone === 'v2' ? [0.35, 0.5, 0.75, 1] : [0.25, 0.5, 0.75, 1];
+  if (!alphas.includes(args.alpha)) throw new Error(`--alpha must be ${alphas.join(', ')} for ${args.backbone}`);
   if (!Number.isInteger(args.epochs) || args.epochs < 1) throw new Error('--epochs must be a positive integer');
   if (!Number.isInteger(args.augment) || args.augment < 0) throw new Error('--augment must be 0 or more');
   if (!Number.isInteger(args.dense) || args.dense < 1) throw new Error('--dense must be a positive integer');
   if (!(args['learning-rate'] > 0)) throw new Error('--learning-rate must be positive');
   if (!(args.split > 0 && args.split < 1)) throw new Error('--split must be between 0 and 1');
+  if (!['gap', 'gapmax'].includes(args.pooling)) throw new Error('--pooling must be gap or gapmax');
   return args;
 }
 
@@ -168,6 +176,30 @@ function discoverDataset(dataDir, splitFraction, rng) {
     throw new Error(`no training images for: ${missing.join(', ')} (looked in ${dataDir})`);
   }
   return { train, val };
+}
+
+function isReadableImage(tf, file) {
+  try {
+    const buffer = fs.readFileSync(file);
+    const image = tf.node.decodeImage(buffer, 3);
+    image.dispose();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dropUnreadableImages(tf, dataset) {
+  let dropped = 0;
+  for (const label of LABELS) {
+    for (const split of ['train', 'val']) {
+      const files = dataset[split].get(label) || [];
+      const readable = files.filter((file) => isReadableImage(tf, file));
+      dropped += files.length - readable.length;
+      dataset[split].set(label, readable);
+    }
+  }
+  if (dropped > 0) console.warn(`skipped ${dropped} unreadable image file(s)`);
 }
 
 function summarise(dataset) {
@@ -265,6 +297,7 @@ async function main() {
   const rng = mulberry32(args.seed);
 
   const dataset = discoverDataset(args.data, args.split, rng);
+  dropUnreadableImages(tf, dataset);
   const counts = summarise(dataset);
   const totalTrain = counts.reduce((sum, row) => sum + row.train, 0);
   const totalVal = counts.reduce((sum, row) => sum + row.val, 0);
@@ -278,21 +311,28 @@ async function main() {
   console.log('Waste classifier training');
   console.log(`  data       ${args.data}`);
   console.log(`  output     ${args.out}`);
-  console.log(`  MobileNet  v1 alpha ${args.alpha} (frozen), image ${IMAGE_SIZE}x${IMAGE_SIZE}`);
+  console.log(`  MobileNet  ${args.backbone} alpha ${args.alpha} (frozen), image ${IMAGE_SIZE}x${IMAGE_SIZE}, pooling ${args.pooling}`);
   console.log('  classes');
   for (const row of counts) console.log(`    ${row.label.padEnd(10)} train ${String(row.train).padStart(4)}   val ${String(row.val).padStart(3)}`);
 
   console.log('\nLoading the truncated MobileNet checkpoint...');
   const alphaString = args.alpha === 1 ? '1.0' : args.alpha.toFixed(2);
-  const checkpoint = CHECKPOINT.replace('%ALPHA%', alphaString);
+  const checkpoint = CHECKPOINTS[args.backbone].replace('%ALPHA%', alphaString);
   const mobilenet = await tf.loadLayersModel(checkpoint);
-  // The pooled embedding is small (1024 values for alpha 1.0) and generalises
-  // better than flattening the 7x7xN feature map; Teachable Machine's own web
-  // export ends in the same global-average-pooling layer.
-  const pooling = mobilenet.layers.filter((layer) => layer.getClassName() === 'GlobalAveragePooling2D').pop();
-  if (!pooling) throw new Error('the checkpoint has no global average pooling layer');
-  const base = tf.sequential();
-  base.add(tf.model({ inputs: mobilenet.inputs, outputs: pooling.output }));
+  // Teachable Machine's web export ends in global average pooling.  `gapmax`
+  // appends global max pooling as well: the strongest activations carry the
+  // edges and reflections that separate a clear plastic bottle from glass.
+  const featureLayerName = args.backbone === 'v2' ? 'out_relu' : 'conv_pw_13_relu';
+  const featureLayer = mobilenet.getLayer(featureLayerName);
+  if (!featureLayer) throw new Error(`the checkpoint has no ${featureLayerName} layer`);
+  const featureMap = featureLayer.output;
+  const gap = tf.layers.globalAveragePooling2d({ name: 'vbt_gap' }).apply(featureMap);
+  let pooled = gap;
+  if (args.pooling === 'gapmax') {
+    const gmp = tf.layers.globalMaxPooling2d({ name: 'vbt_gmp' }).apply(featureMap);
+    pooled = tf.layers.concatenate({ name: 'vbt_pool_concat' }).apply([gap, gmp]);
+  }
+  const base = tf.model({ inputs: mobilenet.inputs, outputs: pooled });
   base.trainable = false;
 
   const trainEntries = LABELS.flatMap((label, index) =>
@@ -424,7 +464,7 @@ async function main() {
     timeStamp: new Date().toISOString(),
     userMetadata: {
       trainedBy: 'scripts/waste/train_waste_model.mjs',
-      base: `mobilenet_v1_${alphaString}_224`,
+      base: `mobilenet_${args.backbone}_${alphaString}_224_${args.pooling}`,
       validationAccuracy: report.accuracy,
       seed: args.seed,
     },
@@ -441,6 +481,7 @@ async function main() {
     epochs: args.epochs,
     augmentCopies: args.augment,
     denseUnits: args.dense,
+    pooling: args.pooling,
     learningRate: args['learning-rate'],
     counts,
     validation: report,

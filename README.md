@@ -22,7 +22,7 @@ and uses no paid API.
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
 | Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
-| Waste model (Teachable Machine format) | **trained and installed; 97.1% on 140 held-out photos** |
+| Waste model (Teachable Machine format) | **trained and installed; 93.4% exact class, 97.3% right action on 549 held-out photos** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
 physical part needs the commissioning checks below.
@@ -76,8 +76,10 @@ Stop only this project:
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
 - **Sort Waste** — local Teachable Machine model behind a large camera preview,
   stable predictions, one event per item, and the camera stops itself once the
-  item is accepted (start it again for the next one), the correct bin LED, and
-  a full-bin warning without redirecting.
+  item is accepted (start it again for the next one). Organic, plastic and
+  paper light the matching bin LED and warn when that bin is full. Cloth,
+  leather, footwear, glass, metal, thermocol and electronic waste say **hand it
+  to our recycling agent and contact the operator**, and light no bin LED.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
 - **What Happened** — one timeline of actions and reasons; raw codes, filters
@@ -134,10 +136,10 @@ cd web/frontend && npm run typecheck && npm test && npm run build
   duplicate commands, stale sensors, calibration polarity, LDR hysteresis,
   bin echo loss, persisted command ids).
 - ESP32 build: **SUCCESS** for `esp32doit-devkit-v1`.
-- Backend: **30 passed** (demo isolation, ack-not-assumed, retries with the same
+- Backend: **31 passed** (demo isolation, ack-not-assumed, retries with the same
   command id, stale/disconnected, config validation, waste/full-bin, voice
   rejection, settings).
-- Frontend: typecheck clean, **80 tests in 9 files**, production build succeeded.
+- Frontend: typecheck clean, **81 tests in 9 files**, production build succeeded.
 - Browser walk: **7/7 routes render, 0 console errors**; Demo toggle, demo
   scenario, confirmed Start, Lights Off and the 10-phrase voice panel were
   driven in Chromium against the running server.
@@ -167,10 +169,10 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 3. **Waste classifier** — already installed from a local training run
    (`models/waste/` is git-ignored). It uses the Teachable Machine format and
    architecture, trained from TrashNet plus organic and background photos;
-   it scores **97.1%** on 140 held-out photos. Its sources are TrashNet
-   (MIT) and the Voxel51 food-waste dataset (MIT), plus freely licensed Wikimedia
-   Commons room/table photos. Rebuild or retrain it with photos from the
-   exhibition table using
+   it scores **93.4% exact class** and **97.3% right action** on 549 held-out
+   photos. Its sources are TrashNet (MIT), the Voxel51 food-waste dataset
+   (MIT), clothing-dataset-small (CC0) and freely licensed Wikimedia Commons
+   photos. Rebuild or retrain it with photos from the exhibition table using
    [`scripts/waste/`](scripts/waste/README.md); see
    [docs/waste-model.md](docs/waste-model.md). The app reports the model as
    missing rather than inventing predictions.

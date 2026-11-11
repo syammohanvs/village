@@ -37,6 +37,23 @@ function capitalise(value: string): string {
   return value.replace(/^\w/, (c) => c.toUpperCase());
 }
 
+// The model names the recycler material so it can learn each one, but the app
+// has one outcome for all of them: hand it to the recycling agent.  Anything
+// in this set is posted to the backend as category "other" and lights no LED.
+const RECYCLING_NAMES: Record<string, string> = {
+  glass: 'Glass',
+  metal: 'Metal',
+  textile: 'Cloth or textile',
+  leather: 'Leather',
+  footwear: 'Footwear',
+  thermocol: 'Thermocol',
+  ewaste: 'Electronic waste',
+};
+
+function recyclingMaterial(label: string): string | null {
+  return RECYCLING_NAMES[label.trim().toLowerCase()] ?? null;
+}
+
 export function SortWaste() {
   const settings = useApi(['settings'], () => api.settings(), {});
   const modelStatus = useApi(['waste-model'], () => api.wasteModelStatus(), {});
@@ -50,6 +67,7 @@ export function SortWaste() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
+  const [referralLabel, setReferralLabel] = useState<string | null>(null);
   const [recognitionError, setRecognitionError] = useState('');
   const [alert, setAlert] = useState('');
   const [note, setNote] = useState('');
@@ -169,10 +187,14 @@ export function SortWaste() {
     setDisposalMessage('');
     setDisposalError('');
     setNote('');
+    const material = recyclingMaterial(event.category);
+    setReferralLabel(material);
     let sorted = false;
     try {
       const result = await api.postRecognition({
-        category: event.category,
+        // One referral category for every recycler material, so the backend
+        // records one outcome and never sends a bin command.
+        category: material ? 'other' : event.category,
         confidence: event.confidence,
         model: 'teachable-machine',
       });
@@ -251,6 +273,8 @@ export function SortWaste() {
   const removing = waitingRemoval && !recognition;
 
   const resultCategory = targetCategory ? capitalise(String(targetCategory)) : null;
+  const referred = Boolean(referralLabel) || String(targetCategory ?? '').toLowerCase() === 'other';
+  const shownCategory = referred ? (referralLabel ?? 'Recycling agent') : resultCategory;
 
   return (
     <div className="page sort-waste">
@@ -317,16 +341,31 @@ export function SortWaste() {
         </div>
 
         <div className="result-column">
-          <Card className="result-card" kicker="Suggested bin" title={resultCategory ?? (removing ? 'Remove the item' : 'Waiting for an item')}>
+          <Card
+            className="result-card"
+            kicker={referred ? 'Not one of the three bins' : 'Suggested bin'}
+            title={referred ? 'Recycling agent' : resultCategory ?? (removing ? 'Remove the item' : 'Waiting for an item')}
+          >
             {recognition ? (
               <>
                 <p className="result-big" data-testid="waste-result">
-                  {resultCategory}
+                  {shownCategory}
                 </p>
-                <p className="result-sub">
-                  Put it in the <strong>{resultCategory?.toLowerCase()}</strong> bin and watch that
-                  bin&apos;s LED.
-                </p>
+                {referred ? (
+                  <>
+                    <p className="result-sub" data-testid="waste-referral">
+                      {referralLabel ? `${referralLabel} does` : 'This item does'} not go in the
+                      organic, plastic or paper bins. Hand it to our recycling agent and contact the
+                      operator.
+                    </p>
+                    <p className="hint">No bin LED is lit for this item.</p>
+                  </>
+                ) : (
+                  <p className="result-sub">
+                    Put it in the <strong>{resultCategory?.toLowerCase()}</strong> bin and watch that
+                    bin&apos;s LED.
+                  </p>
+                )}
                 {alert && <Notice tone="warn">{alert}</Notice>}
                 <p className="hint">
                   This is a camera suggestion, not proof that the item was put in the bin.
@@ -362,7 +401,9 @@ export function SortWaste() {
 
             {recognition && (
               <details className="advanced">
-                <summary>Record that you put it in the bin</summary>
+                <summary>
+                  {referred ? 'Record that the recycling agent took it' : 'Record that you put it in the bin'}
+                </summary>
                 <div className="advanced-body">
                   <p className="hint">
                     This is a separate record. A recognition does not prove that the item was placed
@@ -384,7 +425,7 @@ export function SortWaste() {
                     onClick={() => void confirmDeposit()}
                     disabled={recognitionId === null || Boolean(disposalMessage)}
                   >
-                    <IconCheck size={15} /> Confirm deposited
+                    <IconCheck size={15} /> {referred ? 'Confirm handed over' : 'Confirm deposited'}
                   </button>
                   {disposalMessage && <p className="ok-text">{disposalMessage}</p>}
                   {disposalError && <p className="error-text">{disposalError}</p>}

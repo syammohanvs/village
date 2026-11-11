@@ -32,7 +32,7 @@ the pinned `4.22.0` runtime works. The committed `.npmrc` sets
 | `/` | Dashboard | live reason panel, four KPI cards, bins, connection, AI readiness, recent controller events, manual controls, demo scenarios |
 | `/sensors` | Sensors & calibration | raw/calibrated values, soil two-point calibration, reservoir thresholds, bin distances, LDR thresholds, save with `config_revision` |
 | `/controls` | Controls | irrigation auto toggle, pump commissioning gate, light modes, waste indicator tests, emergency stop, command log |
-| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions ranked by confidence (Background included), stabiliser, one accepted item per camera session (auto-stop), recognition record, separate deposit confirmation |
+| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions ranked by confidence (Background included), stabiliser, one accepted item per camera session (auto-stop), bin or recycling-agent outcome, recognition record, separate handover/deposit confirmation |
 | `/activity` | Activity | live/demo events, kind filters, client-side CSV, retention note |
 | `/settings` | Settings | device URL/mode, `/device/health` test, app preferences with draft/validation, setup checklist, first-run order |
 | `/villagers` | Villagers | clearly fictional sample profiles; 3/2/1 points for organic/plastic/paper; no consumption or savings metrics |
@@ -90,9 +90,12 @@ voice tests also replace `src/lib/audio` and `src/lib/speech`.
 ## Deferred / needs the hardware or models
 
 - A real ESP32 and a running whisper.cpp server. The waste model **is**
-  installed (`models/waste/`, trained locally with `scripts/waste/`); without
-  any of these the UI shows the exact missing-model / missing-service messages
-  and records nothing.
+  installed (`models/waste/`, trained locally with `scripts/waste/`). Its
+  recycler classes (glass, metal, textile, leather, footwear, thermocol,
+  e-waste) all map to one “Recycling agent” outcome and light no bin LED; only
+  Organic, Plastic and Paper light a bin. Without any of these dependencies the
+  UI shows the exact missing-model / missing-service messages and records
+  nothing.
 - Prepared TTS WAV files in `public/audio/<lang>/<intent>.wav` are optional;
   browser speech synthesis is the fallback.
 - The Villagers page is explicitly fictional sample data; the backend

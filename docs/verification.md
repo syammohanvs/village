@@ -503,56 +503,75 @@ Two traps found here are now fixed and documented: a **resistor dummy load is
 not a motor test** (23.5 Ω passes where the pump's start-up surge collapses a
 USB feed), and the pump must run from the bank, never the PC's USB port.
 
-## Verified: waste classifier in a real browser (2026-11-11)
+## Verified: waste classifier in a real browser (2026-11-12)
 
 The classifier is installed in `models/waste/` and the backend reports
-`installed: true` with the four expected labels. On **140 held-out photos**
-(15% of every class, never used for training) it scores **97.1% (136/140)**:
+`installed: true` with **11 labels**: Organic, Plastic, Paper, Glass, Metal,
+Textile, Leather, Footwear, Thermocol, Ewaste and Background. Every recycler
+class is mapped to one outcome, **Recycling agent**, with no bin LED.
 
-| Class | Correct | Test photos |
-| --- | --- | --- |
-| Organic | 27 | 27 |
-| Plastic | 45 | 48 |
-| Paper | 47 | 48 |
-| Background | 17 | 17 |
+On **549 held-out photos** (15% of every class, never used for training) the
+exact-class score is **93.4% (513/549)**. Because the seven recycler classes
+share one action, the action-level score is **97.3%**:
 
-The four misses are three plastic photos (one read as organic, two as paper) and
-one paper photo read as background. The training report beside the model records
-the counts, seed and accuracy.
+| Class | Exact | Held out | Action |
+| --- | --- | --- | --- |
+| Organic | 100.0% | 27 | Organic bin |
+| Plastic | 93.1% | 72 | Plastic bin |
+| Paper | 96.6% | 89 | Paper bin |
+| Glass | 82.7% | 75 | Recycling agent |
+| Metal | 98.4% | 62 | Recycling agent |
+| Textile | 93.7% | 126 | Recycling agent |
+| Leather | 92.9% | 28 | Recycling agent |
+| Footwear | 100.0% | 30 | Recycling agent |
+| Thermocol | 66.7% | 6 | Recycling agent |
+| Ewaste | 88.9% | 18 | Recycling agent |
+| Background | 100.0% | 16 | ignored |
 
-The installed model was trained from TrashNet's `paper` folder only. As an
-out-of-set check, **30 unseen TrashNet cardboard photos** (never trained on)
-were classified **Paper 28, Background 2**, mean confidence 0.99 — the Paper
-bin accepts cardboard without a separate class.
+**180/188 bin items kept their own bin**; **338/345 recycler items were
+referred**. The notable misses are the hard clear-glass/clear-plastic pair:
+five plastic photos were read as a recycler material and five glass photos as
+plastic. Thermocol has only 42 public photos, and two of its six held-out
+photos were not really foam (they were ignored, which is correct for those
+images). The training report beside the model records the counts, seed and
+confusion matrix.
 
-Chromium was then driven with a **fake camera** (Y4M files built from held-out
+Sources: TrashNet (MIT) for Plastic, Paper, Glass and Metal; Voxel51 food-waste
+(MIT) for Organic; clothing-dataset-small (CC0) for Textile, Leather and
+Footwear; Wikimedia Commons photos for fabric, Thermocol, Ewaste and
+Background. The images are not committed and `models/` is git-ignored.
+
+Chromium was driven with a **fake camera** (Y4M files built from held-out
 photos) against a throwaway simulator backend on `:8013`, in demo mode so no
 command could reach the board:
 
-| Video | Ranked prediction | Recognition |
-| --- | --- | --- |
-| plastic bottle | Plastic 100% | **Plastic** |
-| food waste | Organic 100% | **Organic** |
-| cardboard/paper | Paper 85% | **Paper** |
-| empty room/table | Background 100% | **none** (correctly ignored) |
+| Video | Result | Backend category | Referral |
+| --- | --- | --- | --- |
+| plastic packaging | **Plastic** | `plastic` | no |
+| glass bottle | **Glass** | `other` | yes |
+| clothing | **Cloth or textile** | `other` | yes |
+| circuit board | **Electronic waste** | `other` | yes |
+| thermocol foam | **Thermocol** | `other` | yes |
+| empty room/table | **none** | not posted | — |
 
-Zero page errors in all four runs. `model.json`, `weights.bin` and
-`metadata.json` were all served with 200 and the recognition POST answered 200.
+The referral cases showed *"… does not go in the organic, plastic or paper
+bins. Hand it to our recycling agent and contact the operator."*, sent
+`category: other`, and lit no bin. The backend test proves no `INDICATE_WASTE`
+command is sent for `other`, and a confirmed handover records zero points with
+its own *Recyclable item handed over* event rather than *Deposit confirmed*.
 
-**One item per camera session** was checked separately: after the plastic
-recognition the video track ended (`video.srcObject` became null), the
-**Start Camera** button returned, the Stop button disappeared, and the result
-and its explanation stayed on screen. A background frame produced no event and
-left the camera running, which is the intended contrast.
+**One item per camera session** was checked separately: after an accepted item
+the video track ended (`video.srcObject` became null), the **Start Camera**
+button returned, and the result and its explanation stayed on screen. A
+background frame produced no event and left the camera running.
 
-**A real defect was found by this run and fixed.** The page called
-`classifier.predict(video, 3)`, but the library's second argument is
+**A real defect was found by the earlier browser run and fixed.** The page
+called `classifier.predict(video, 3)`, but the library's second argument is
 `flipped`, not a result count — so every frame was horizontally mirrored.
 `predict()` also returns **every** class in metadata order, so `slice(0, 3)`
-silently dropped the last label (`Background`) and the page's "Looking at …"
-line always named `Organic`. Predictions are now ranked by confidence, the
-call passes no second argument, and a component test drives the camera path to
-keep both fixed.
+silently dropped the last label and the "Looking at …" line always named
+`Organic`. Predictions are now ranked by confidence and the call passes no
+second argument.
 
 ## Not verified
 

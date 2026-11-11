@@ -284,6 +284,45 @@ async def test_setup_checklist_and_settings(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_other_waste_is_referred_without_a_bin_command(tmp_path):
+    """Cloth, leather, footwear, glass, metal, thermocol and e-waste share one
+    referral outcome: recorded, no bin, and no INDICATE_WASTE command."""
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live",
+                "category": "other",
+                "confidence": 0.93,
+                "model": "test",
+                "request_id": "referral-01",
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["recognition"]["category"] == "other"
+        assert body["recognition"]["bin_state"] == "unavailable"
+        assert body["indication"] is None
+        assert body["bin_alert"] is None
+        assert "recycling agent" in body["note"]
+        # A referral must not touch the controller: no LED can light.
+        assert real.calls == []
+        events = (await client.get("/api/v1/events?mode=live")).json()["events"]
+        assert any(event["title"] == "Recyclable item recognised" for event in events)
+        # Confirming a handover records zero points and does not claim a bin deposit.
+        disposal = await client.post(
+            "/api/v1/waste/disposals",
+            json={"mode": "live", "recognition_id": body["recognition"]["id"]},
+        )
+        assert disposal.status_code == 200
+        assert disposal.json()["disposal"]["points"] == 0
+        events = (await client.get("/api/v1/events?mode=live")).json()["events"]
+        assert any(event["title"] == "Recyclable item handed over" for event in events)
+
+
+@pytest.mark.asyncio
 async def test_waste_model_status_reads_a_teachable_machine_export(tmp_path):
     """A real export writes labels as strings, not {"name": ...} objects."""
     settings = make_settings(tmp_path)

@@ -21,15 +21,39 @@ vi.mock('../lib/api', async (importOriginal) => {
   };
 });
 
-const { predictMock, loadMock } = vi.hoisted(() => {
-  const predictMock = vi.fn(async () => [
-    { className: 'Organic', probability: 0.01 },
-    { className: 'Plastic', probability: 0.95 },
-    { className: 'Paper', probability: 0.03 },
-    { className: 'Background', probability: 0.01 },
-  ]);
+const DEFAULT_PREDICTIONS = [
+  { className: 'Organic', probability: 0.01 },
+  { className: 'Plastic', probability: 0.95 },
+  { className: 'Paper', probability: 0.03 },
+  { className: 'Glass', probability: 0.001 },
+  { className: 'Metal', probability: 0.001 },
+  { className: 'Textile', probability: 0.001 },
+  { className: 'Leather', probability: 0.001 },
+  { className: 'Footwear', probability: 0.001 },
+  { className: 'Thermocol', probability: 0.001 },
+  { className: 'Ewaste', probability: 0.001 },
+  { className: 'Background', probability: 0.01 },
+];
+
+const { predictMock, loadMock, predictionState } = vi.hoisted(() => {
+  const state = {
+    current: [
+      { className: 'Organic', probability: 0.01 },
+      { className: 'Plastic', probability: 0.95 },
+      { className: 'Paper', probability: 0.03 },
+      { className: 'Glass', probability: 0.001 },
+      { className: 'Metal', probability: 0.001 },
+      { className: 'Textile', probability: 0.001 },
+      { className: 'Leather', probability: 0.001 },
+      { className: 'Footwear', probability: 0.001 },
+      { className: 'Thermocol', probability: 0.001 },
+      { className: 'Ewaste', probability: 0.001 },
+      { className: 'Background', probability: 0.01 },
+    ],
+  };
+  const predictMock = vi.fn(async () => state.current);
   const loadMock = vi.fn(async () => ({ predict: predictMock }));
-  return { predictMock, loadMock };
+  return { predictMock, loadMock, predictionState: state };
 });
 
 vi.mock('@teachablemachine/image', () => ({ load: loadMock }));
@@ -43,6 +67,7 @@ beforeEach(() => {
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: false, path: '/models/waste/' });
+  predictionState.current = DEFAULT_PREDICTIONS;
 });
 
 describe('Sort Waste', () => {
@@ -140,5 +165,60 @@ describe('Sort Waste', () => {
     expect(screen.getByTestId('waste-camera-stopped')).toHaveTextContent(
       /camera stopped after this item/i,
     );
+  }, 15000);
+
+  it('refers a recycler material to the agent instead of a bin', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'other',
+      recognition: { id: 9, category: 'other', confidence: 0.9 },
+    });
+    predictionState.current = [
+      { className: 'Organic', probability: 0.01 },
+      { className: 'Plastic', probability: 0.03 },
+      { className: 'Paper', probability: 0.01 },
+      { className: 'Glass', probability: 0.9 },
+      { className: 'Metal', probability: 0.02 },
+      { className: 'Textile', probability: 0.005 },
+      { className: 'Leather', probability: 0.005 },
+      { className: 'Footwear', probability: 0.005 },
+      { className: 'Thermocol', probability: 0.005 },
+      { className: 'Ewaste', probability: 0.005 },
+      { className: 'Background', probability: 0.01 },
+    ];
+    const stopTrack = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+      category: 'other',
+      confidence: 0.9,
+    });
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Glass');
+    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
+    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/contact the operator/i);
+    expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
   }, 15000);
 });

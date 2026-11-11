@@ -114,7 +114,10 @@ def _waste_model_status(settings: Settings) -> dict[str, Any]:
         "files": files,
         "missing": [name for name, present in files.items() if not present],
         "labels": labels,
-        "expected_labels": ["Organic", "Plastic", "Paper", "Background"],
+        "expected_labels": [
+            "Organic", "Plastic", "Paper", "Glass", "Metal", "Textile",
+            "Leather", "Footwear", "Thermocol", "Ewaste", "Background",
+        ],
         "error": error,
         "message": (
             "Recognition model installed." if installed and error is None
@@ -426,8 +429,40 @@ def create_app(
         db: Database = Depends(get_db),
     ):
         category = body.category.strip().lower()
-        if category not in WASTE_CATEGORIES:
-            raise HTTPException(status_code=422, detail="category must be organic, plastic, paper or ignored; background is not logged")
+        if category not in WASTE_CATEGORIES and category != "other":
+            raise HTTPException(
+                status_code=422,
+                detail="category must be organic, plastic, paper or other; background is not logged",
+            )
+        if category == "other":
+            # Cloth, leather, footwear, glass, metal, thermocol and electronic
+            # waste are not one of the three bins.  They are recorded and
+            # referred to the recycling agent, and no INDICATE_WASTE command is
+            # sent, so no bin LED can light for them.
+            try:
+                snapshot = await gateway.snapshot(body.mode)
+            except Exception:  # noqa: BLE001 - a referral does not need the board
+                snapshot = {}
+            record = await db.add_recognition(
+                body.mode, category, body.confidence, body.model, "unavailable",
+                False, False, body.request_id, body.profile_id,
+            )
+            await db.add_event(
+                body.mode, "waste", "Recyclable item recognised",
+                f"confidence {body.confidence:.2f}; referred to the recycling agent; "
+                "no bin indicator used",
+                "info",
+                "camera",
+                {"recognition_id": record.get("id"), "category": category,
+                 "confidence": body.confidence},
+            )
+            return {
+                "recognition": record,
+                "indication": None,
+                "bin_alert": None,
+                "physical": snapshot.get("physical", False),
+                "note": "Not one of the three bins. Hand it to the recycling agent and contact the operator.",
+            }
         snapshot = await gateway.snapshot(body.mode)
         status = snapshot.get("status") or {}
         bins = {item.get("id"): item for item in (status.get("sensors", {}) or {}).get("bins", [])}
@@ -489,8 +524,10 @@ def create_app(
             )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        handed_over = disposal["category"] == "other"
         await db.add_event(
-            body.mode, "waste", "Deposit confirmed",
+            body.mode, "waste",
+            "Recyclable item handed over" if handed_over else "Deposit confirmed",
             f"{disposal['category'].title()} · {disposal['points']} points"
             + (f" · profile {body.profile_id}" if body.profile_id else " · no profile"),
             "info", "browser", {"disposal_id": disposal["id"]},

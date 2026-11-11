@@ -99,7 +99,9 @@ export function AboutHelp() {
               <IconWaste size={18} />
               <div>
                 <strong>Waste sorting.</strong> A camera recognises organic, plastic or paper waste
-                and lights the matching bin LED. It is a suggestion, not proof of disposal.
+                and lights the matching bin LED. Cloth, leather, footwear, glass, metal, thermocol
+                and electronic waste are referred to the recycling agent instead. It is a
+                suggestion, not proof of disposal.
               </div>
             </li>
           </ul>
@@ -137,7 +139,10 @@ export function AboutHelp() {
             <h3 className="about-h3">AI helps people</h3>
             <ul className="plain-list">
               <li>Speech is turned into text so you can ask the village to do something.</li>
-              <li>A camera suggests which bin an item belongs in.</li>
+              <li>
+                A camera suggests which bin an item belongs in, or says to hand it to the recycling
+                agent.
+              </li>
             </ul>
             <p className="hint">
               Neither one decides whether the pump may run. That is the board&apos;s job.
@@ -165,7 +170,10 @@ export function AboutHelp() {
             On <Link to="/">Our Village</Link>, choose <em>Automatic</em> for the streetlights, then
             cover the light sensor with your hand. Watch the streetlight LEDs.
           </li>
-          <li>Show one clean item to the camera on <Link to="/waste">Sort Waste</Link> and see which bin LED lights.</li>
+          <li>
+            Show one clean item to the camera on <Link to="/waste">Sort Waste</Link> and see which
+            bin LED lights — or whether it is referred to the recycling agent.
+          </li>
           <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>
         </ol>

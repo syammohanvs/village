@@ -190,6 +190,12 @@ reload. The app never substitutes random predictions. See
 - One item is counted once; the camera stops after an accepted item. Press
   Start Camera again for the next one. A refused request leaves the camera
   running so the item can be removed and shown again.
+- **Glass, metal, cloth, leather, footwear, thermocol and electronic waste
+  light no bin LED.** The page says “Recycling agent” and asks you to contact
+  the operator. That is deliberate, not a failed recognition.
+- A **clear plastic bottle** can be read as glass (or vice versa). Use a
+  coloured plastic bottle or a bag for the demo, and retrain with photos from
+  the exhibition table if it happens on the real items.
 - The camera identifies waste, not people, and does not prove deposition.
 
 ## Demo mode
