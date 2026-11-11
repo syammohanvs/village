@@ -32,8 +32,9 @@ The trained weights inherit those datasets' terms, which is one more reason
 `models/` is git-ignored.
 
 The trainer holds back 15% of each class for validation. The current install
-scores **97.1%** on those 140 held-out photos (136/140), with Background and
-Organic perfect and the few misses between paper and plastic.
+scores **97.1%** on those 140 held-out photos (136/140). Organic and Background
+are perfect on their own photos; the four misses are three plastic photos and
+one paper photo.
 
 The assembler maps TrashNet's `paper` and `cardboard` folders into `Paper`;
 the installed model used `paper` on its own. `glass`, `metal` and `trash` are
