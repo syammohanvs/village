@@ -46,11 +46,11 @@ function parseArgs(argv) {
     data: process.env.WASTE_DATA || path.join(os.homedir(), '.cache', 'village-waste'),
     out: path.join(REPO_ROOT, 'models', 'waste'),
     modules: process.env.WASTE_TRAIN_MODULES || '',
-    alpha: 0.5,
-    epochs: 40,
+    alpha: 1.0,
+    epochs: 60,
     batch: 16,
-    dense: 100,
-    'learning-rate': 0.001,
+    dense: 128,
+    'learning-rate': 0.002,
     augment: 2,
     split: 0.15,
     seed: 42,
@@ -83,6 +83,9 @@ function parseArgs(argv) {
   if (![0.25, 0.5, 0.75, 1].includes(args.alpha)) throw new Error('--alpha must be 0.25, 0.5, 0.75 or 1');
   if (!Number.isInteger(args.epochs) || args.epochs < 1) throw new Error('--epochs must be a positive integer');
   if (!Number.isInteger(args.augment) || args.augment < 0) throw new Error('--augment must be 0 or more');
+  if (!Number.isInteger(args.dense) || args.dense < 1) throw new Error('--dense must be a positive integer');
+  if (!(args['learning-rate'] > 0)) throw new Error('--learning-rate must be positive');
+  if (!(args.split > 0 && args.split < 1)) throw new Error('--split must be between 0 and 1');
   return args;
 }
 
@@ -283,13 +286,13 @@ async function main() {
   const alphaString = args.alpha === 1 ? '1.0' : args.alpha.toFixed(2);
   const checkpoint = CHECKPOINT.replace('%ALPHA%', alphaString);
   const mobilenet = await tf.loadLayersModel(checkpoint);
-  const trainingLayer = 'conv_pw_13_relu';
-  if (!mobilenet.getLayer(trainingLayer)) {
-    throw new Error(`the checkpoint has no layer ${trainingLayer}`);
-  }
+  // The pooled embedding is small (1024 values for alpha 1.0) and generalises
+  // better than flattening the 7x7xN feature map; Teachable Machine's own web
+  // export ends in the same global-average-pooling layer.
+  const pooling = mobilenet.layers.filter((layer) => layer.getClassName() === 'GlobalAveragePooling2D').pop();
+  if (!pooling) throw new Error('the checkpoint has no global average pooling layer');
   const base = tf.sequential();
-  base.add(tf.model({ inputs: mobilenet.inputs, outputs: mobilenet.getLayer(trainingLayer).output }));
-  base.add(tf.layers.flatten());
+  base.add(tf.model({ inputs: mobilenet.inputs, outputs: pooling.output }));
   base.trainable = false;
 
   const trainEntries = LABELS.flatMap((label, index) =>
@@ -324,6 +327,7 @@ async function main() {
         activation: 'relu',
         kernelInitializer: tf.initializers.varianceScaling({ seed: args.seed }),
       }),
+      tf.layers.dropout({ rate: 0.35 }),
       tf.layers.dense({
         units: LABELS.length,
         activation: 'softmax',
@@ -338,13 +342,21 @@ async function main() {
     metrics: ['accuracy'],
   });
 
-  let best = { valLoss: Number.POSITIVE_INFINITY, epoch: -1, weights: null };
+  let best = { valAcc: -1, valLoss: Number.POSITIVE_INFINITY, epoch: -1, weights: null };
   let stale = 0;
   console.log('\nTraining the classifier head...');
+  // Background has the fewest photos; weighting keeps it from being drowned by
+  // the two large classes while still letting the head see every example.
+  const trainCounts = new Array(LABELS.length).fill(0);
+  for (const entry of trainEntries) trainCounts[entry.label] += 1;
+  const classWeight = Object.fromEntries(
+    trainCounts.map((count, index) => [index, count > 0 ? trainEntries.length / (LABELS.length * count) : 1]),
+  );
   await head.fit(trainX, trainY, {
     epochs: args.epochs,
     batchSize: args.batch,
     shuffle: true,
+    classWeight,
     validationData: [valX, valY],
     callbacks: {
       onEpochEnd: async (epoch, logs) => {
@@ -353,13 +365,14 @@ async function main() {
         console.log(
           `  epoch ${String(epoch + 1).padStart(2)}  loss ${logs.loss.toFixed(4)}  acc ${(logs.acc * 100).toFixed(1)}%  val ${(valAcc * 100).toFixed(1)}%  val_loss ${valLoss.toFixed(4)}`,
         );
-        if (valLoss < best.valLoss - 1e-4) {
-          best = { valLoss, epoch, weights: head.getWeights().map((weight) => weight.clone()) };
+        const better = valAcc > best.valAcc || (valAcc === best.valAcc && valLoss < best.valLoss);
+        if (better) {
+          best = { valAcc, valLoss, epoch, weights: head.getWeights().map((weight) => weight.clone()) };
           stale = 0;
         } else {
           stale += 1;
-          if (stale >= 8) {
-            console.log(`  early stop: validation stopped improving after epoch ${best.epoch + 1}`);
+          if (stale >= 20) {
+            console.log(`  early stop: no better validation result after epoch ${best.epoch + 1}`);
             head.stopTraining = true;
           }
         }
@@ -399,9 +412,9 @@ async function main() {
   const joint = tf.sequential();
   joint.add(base);
   joint.add(head);
-  const saved = await joint.save(`file://${args.out}`);
-  const files = Array.isArray(saved) ? saved : [saved];
-  console.log(`\nSaved ${files.map((file) => path.basename(file)).join(', ')} to ${args.out}`);
+  await joint.save(`file://${args.out}`);
+  const saved = ['model.json', 'weights.bin'].filter((name) => fs.existsSync(path.join(args.out, name)));
+  console.log(`\nSaved ${saved.join(', ')} to ${args.out}`);
 
   const metadata = {
     tfjsVersion: tf.version.tfjs,
@@ -411,7 +424,7 @@ async function main() {
     timeStamp: new Date().toISOString(),
     userMetadata: {
       trainedBy: 'scripts/waste/train_waste_model.mjs',
-      base: `mobilenet_v1_${args.alpha}_224`,
+      base: `mobilenet_v1_${alphaString}_224`,
       validationAccuracy: report.accuracy,
       seed: args.seed,
     },
@@ -446,7 +459,7 @@ async function main() {
       throw new Error(`exported model has input ${inputShape} and output width ${outputWidth}`);
     }
     const sample = valEntries.slice(0, Math.min(8, valEntries.length));
-    const sampleX = await extractFeatures(tf, base, sample, sample.length, rng, 'verify');
+    const sampleX = tf.tidy(() => tf.stack(sample.map((entry) => preprocess(tf, entry.file, rng, false))));
     const sampleOut = reloaded.predict(sampleX);
     const samplePred = Array.from(sampleOut.argMax(1).dataSync());
     sampleOut.dispose();
@@ -455,6 +468,7 @@ async function main() {
     console.log(`  reloaded OK: input ${inputShape}, ${outputWidth} classes, ${sampleCorrect}/${sample.length} sample photos still classified correctly`);
   }
 
+  console.log(`\nBest epoch ${best.epoch + 1}: validation ${(best.valAcc * 100).toFixed(1)}%`);
   console.log('\nInstalled. Check it with:');
   console.log('  curl -s http://127.0.0.1:8010/api/v1/waste/model-status');
 }

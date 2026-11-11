@@ -22,7 +22,7 @@ and uses no paid API.
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
 | Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
-| Waste model (Teachable Machine) | **you must supply the three exported files** |
+| Waste model (Teachable Machine format) | **trained and installed; 97.1% on 140 held-out photos** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
 physical part needs the commissioning checks below.
@@ -101,7 +101,8 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
 - `shared/` — protocol, multilingual phrase dictionary, JSON examples.
 - `docs/` — wiring, installation, calibration, operation, Lia guide,
   Cloudflare deployment, troubleshooting, waste model, bench test.
-- `scripts/` — setup, download, launch, stop, dev, tests.
+- `scripts/` — setup, download, launch, stop, dev, tests; `scripts/waste/`
+  trains and installs the waste classifier.
 
 **Cloudflare builds only `web/frontend`.** The firmware (`uc/`) and the
 Python backend (`web/backend/`) sit outside that root, so a firmware commit
@@ -123,25 +124,30 @@ circuit and the unidentified driver-component warning.
 ## Tests run locally
 
 ```bash
-./scripts/test_firmware.sh      # 433 checks + PlatformIO build
+./scripts/test_firmware.sh      # 438 checks + PlatformIO build
 cd web/backend && .venv/bin/python -m pytest -q   # or VILLAGE_VENV
 cd web/frontend && npm run typecheck && npm test && npm run build
 ```
 
-- Firmware core: **433 checks, 0 failed** (irrigation safeguards, stop,
+- Firmware core: **438 checks, 0 failed** (irrigation safeguards, stop,
   duplicate commands, stale sensors, calibration polarity, LDR hysteresis,
   bin echo loss, persisted command ids).
 - ESP32 build: **SUCCESS** for `esp32doit-devkit-v1`.
-- Backend: **17 passed** (demo isolation, ack-not-assumed, retries with the same
+- Backend: **30 passed** (demo isolation, ack-not-assumed, retries with the same
   command id, stale/disconnected, config validation, waste/full-bin, voice
   rejection, settings).
-- Frontend: typecheck clean, **15 tests passed**, production build succeeded.
+- Frontend: typecheck clean, **80 tests in 9 files**, production build succeeded.
 - Browser walk: **7/7 routes render, 0 console errors**; Demo toggle, demo
   scenario, confirmed Start, Lights Off and the 10-phrase voice panel were
   driven in Chromium against the running server.
 - Whisper: `GET /health` → `{"status":"ok"}` with the multilingual model loaded.
-- Hardware: **not tested**; the bench checklist is in
-  [docs/bench-test.md](docs/bench-test.md).
+- Waste classifier: **97.1% on 140 held-out photos**, and all four classes
+  (three items plus an empty table) driven in Chromium with a fake camera
+  against a simulator backend; see
+  [docs/verification.md](docs/verification.md).
+- Hardware: streetlights, LDR, reservoir probes and the pump driver have been
+  exercised; the bench checklist in [docs/bench-test.md](docs/bench-test.md)
+  remains the gate for soil and the ultrasonic bins.
 
 ## Models you must supply
 
@@ -157,9 +163,14 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 2. **Whisper server** — build `whisper-server` (instructions in
    [docs/installation.md](docs/installation.md)) or set
    `VILLAGE_WHISPER_BIN` in `.env`.
-3. **Waste classifier** — train a Teachable Machine image model with classes
-   Organic, Plastic, Paper, Background and copy `model.json`,
-   `metadata.json`, `weights.bin` into `models/waste/`. See
+3. **Waste classifier** — already installed from a local training run
+   (`models/waste/` is git-ignored). It uses the Teachable Machine format and
+   architecture, trained from TrashNet plus organic and background photos;
+   it scores **97.1%** on 140 held-out photos. Its sources are TrashNet
+   (MIT) and the Voxel51 food-waste dataset (MIT), plus freely licensed Wikimedia
+   Commons room/table photos. Rebuild or retrain it with photos from the
+   exhibition table using
+   [`scripts/waste/`](scripts/waste/README.md); see
    [docs/waste-model.md](docs/waste-model.md). The app reports the model as
    missing rather than inventing predictions.
 

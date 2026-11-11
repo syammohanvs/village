@@ -32,7 +32,7 @@ the pinned `4.22.0` runtime works. The committed `.npmrc` sets
 | `/` | Dashboard | live reason panel, four KPI cards, bins, connection, AI readiness, recent controller events, manual controls, demo scenarios |
 | `/sensors` | Sensors & calibration | raw/calibrated values, soil two-point calibration, reservoir thresholds, bin distances, LDR thresholds, save with `config_revision` |
 | `/controls` | Controls | irrigation auto toggle, pump commissioning gate, light modes, waste indicator tests, emergency stop, command log |
-| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions, stabiliser, recognition record, separate deposit confirmation |
+| `/waste` | Waste camera | model status, camera device picker, code-split Teachable Machine, top-3 predictions ranked by confidence (Background included), stabiliser, recognition record, separate deposit confirmation |
 | `/activity` | Activity | live/demo events, kind filters, client-side CSV, retention note |
 | `/settings` | Settings | device URL/mode, `/device/health` test, app preferences with draft/validation, setup checklist, first-run order |
 | `/villagers` | Villagers | clearly fictional sample profiles; 3/2/1 points for organic/plastic/paper; no consumption or savings metrics |
@@ -89,14 +89,17 @@ voice tests also replace `src/lib/audio` and `src/lib/speech`.
 
 ## Deferred / needs the hardware or models
 
-- A real ESP32, a running whisper.cpp server and the Teachable Machine export
-  (`models/waste/model.json`, `metadata.json`, `weights.bin`). Without them the
-  UI shows the exact missing-model / missing-service messages and records
-  nothing.
+- A real ESP32 and a running whisper.cpp server. The waste model **is**
+  installed (`models/waste/`, trained locally with `scripts/waste/`); without
+  any of these the UI shows the exact missing-model / missing-service messages
+  and records nothing.
 - Prepared TTS WAV files in `public/audio/<lang>/<intent>.wav` are optional;
   browser speech synthesis is the fallback.
 - The Villagers page is explicitly fictional sample data; the backend
   `/profiles` route is optional.
-- Live camera recognition was not exercised by the unit suite (jsdom has no
-  camera); it is implemented but must be checked with a real camera and model
-  before the exhibition.
+- Live camera recognition: jsdom has no camera, so the component test stubs
+  `getUserMedia` and the classifier. The full path was driven in Chromium with
+  a fake camera against a simulator backend (Plastic, Organic, Paper and a
+  background frame) — see `docs/verification.md`. A physical camera at the
+  venue is still worth checking, and retraining with venue photos is described
+  in `docs/waste-model.md`.

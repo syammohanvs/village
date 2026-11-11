@@ -503,6 +503,51 @@ Two traps found here are now fixed and documented: a **resistor dummy load is
 not a motor test** (23.5 Ω passes where the pump's start-up surge collapses a
 USB feed), and the pump must run from the bank, never the PC's USB port.
 
+## Verified: waste classifier in a real browser (2026-11-11)
+
+The classifier is installed in `models/waste/` and the backend reports
+`installed: true` with the four expected labels. On **140 held-out photos**
+(15% of every class, never used for training) it scores **97.1% (135/140)**:
+
+| Class | Correct | Test photos |
+| --- | --- | --- |
+| Organic | 27 | 27 |
+| Plastic | 45 | 48 |
+| Paper | 47 | 48 |
+| Background | 17 | 17 |
+
+The four misses are three plastic photos (one read as organic, two as paper) and
+one paper photo read as background. The training report beside the model records
+the counts, seed and accuracy.
+
+The installed model was trained from TrashNet's `paper` folder only. As an
+out-of-set check, **30 unseen TrashNet cardboard photos** (never trained on)
+were classified **Paper 28, Background 2**, mean confidence 0.99 — the Paper
+bin accepts cardboard without a separate class.
+
+Chromium was then driven with a **fake camera** (Y4M files built from held-out
+photos) against a throwaway simulator backend on `:8013`, in demo mode so no
+command could reach the board:
+
+| Video | Ranked prediction | Recognition |
+| --- | --- | --- |
+| plastic bottle | Plastic 100% | **Plastic** |
+| food waste | Organic 100% | **Organic** |
+| cardboard/paper | Paper 85% | **Paper** |
+| empty room/table | Background 100% | **none** (correctly ignored) |
+
+Zero page errors in all four runs. `model.json`, `weights.bin` and
+`metadata.json` were all served with 200 and the recognition POST answered 200.
+
+**A real defect was found by this run and fixed.** The page called
+`classifier.predict(video, 3)`, but the library's second argument is
+`flipped`, not a result count — so every frame was horizontally mirrored.
+`predict()` also returns **every** class in metadata order, so `slice(0, 3)`
+silently dropped the last label (`Background`) and the page's "Looking at …"
+line always named `Organic`. Predictions are now ranked by confidence, the
+call passes no second argument, and a component test drives the camera path to
+keep both fixed.
+
 ## Not verified
 
 - Physical soil and ultrasonic-bin behaviour, and the four lamps beyond the one
@@ -516,8 +561,9 @@ USB feed), and the pump must run from the bank, never the PC's USB port.
   shuts when the command lands, so on this link the stop took ~1.7 s to reach
   the board — the delay is the Wi-Fi round trip, not the firmware.
 - Malayalam or Hindi recognition with the child's voice.
-- The Teachable Machine model (not supplied), and therefore live camera
-  classification in this build.
+- A physical camera and real waste items on the exhibition table. The model
+  has only been exercised with a fake camera and held-out photos; retraining
+  with venue photos is described in [waste-model.md](waste-model.md).
 - An OTA update interrupted midway (power loss during the transfer). The two
   app slots should keep the previous image bootable, but that has not been
   provoked on hardware.

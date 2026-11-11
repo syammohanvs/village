@@ -3,7 +3,71 @@
 The classifier runs **entirely in the browser** with TensorFlow.js. No image
 leaves the laptop and no cloud service is used.
 
-## 1. Train a Teachable Machine image project
+The installed model was trained on this laptop from public photos with the
+same architecture a Teachable Machine image project produces (a frozen
+truncated MobileNet v1 plus a small classifier head). It loads exactly as a
+Teachable Machine export does, so the dashboard cannot tell the two apart.
+
+## 1. Train it automatically on this laptop (what this project uses)
+
+The complete pipeline is in [`scripts/waste/`](../scripts/waste/README.md).
+It needs no browser, no Google account and no upload, and it writes the three
+files the dashboard expects.
+
+The training photos live outside the repository, in `~/.cache/village-waste`:
+
+| Class | Source | Photos |
+| --- | --- | --- |
+| Plastic | TrashNet `plastic` (MIT) | 320 |
+| Paper | TrashNet `paper` (MIT) | 320 |
+| Organic | Voxel51 food-waste dataset (MIT) | 180 |
+| Background | freely licensed room/table photos from Wikimedia Commons | 110 |
+
+The photos are not committed; they stay in `~/.cache/village-waste`. The
+trained weights are a derived work of those datasets, which is one more reason
+`models/` is git-ignored.
+
+Fifteen per cent of each class is held back for validation. The current install
+scores **97.1%** on those 140 held-out photos. (The dataset assembler can also
+map TrashNet's `cardboard` folder into Paper; the installed model used the
+`paper` folder on its own.) The trainer prints the accuracy
+per class and a confusion matrix, and writes `training-report.json` next to the
+model so the claim can be checked later.
+
+To rebuild it:
+
+```bash
+npm install --prefix ~/.cache/village-waste @tensorflow/tfjs-node@4.22.0
+node scripts/waste/train_waste_model.mjs \
+  --data ~/.cache/village-waste \
+  --modules ~/.cache/village-waste \
+  --out models/waste --force
+```
+
+The trainer refuses to overwrite an installed model without `--force`, and
+before it exits it reloads the exported files and classifies eight photos
+again to prove the export is complete.
+
+### Retrain it where the exhibition happens
+
+The public photos are a **bootstrap, not a finished model**. The same camera,
+lamp and table matter more than extra public images.
+
+1. Open **Sort Waste**, start the camera, and take 40–80 photos for each class
+   in the real setting. Add hands, the empty table and the room to
+   `Background`.
+2. Put them in `Organic/`, `Plastic/`, `Paper/` and `Background/` folders.
+3. Run `train_waste_model.mjs --data <that folder> --out models/waste --force`.
+4. Test with items that were **not** photographed. A model that only works on
+   its own training photos is not ready.
+
+The backend reads the model folder per request, so a new model is picked up on
+the next camera start; no restart is needed. Reload the page if it was already
+open.
+
+## 2. Alternative: train on the Teachable Machine website
+
+This is the manual route if the automated one is not wanted.
 
 1. Open <https://teachablemachine.withgoogle.com/train/image> once, while the
    laptop still has internet.
@@ -18,50 +82,12 @@ leaves the laptop and no cloud service is used.
    - Include hands, the empty table, the bin and the room in `Background`.
    - Use several examples of each material (a bottle, a bag, a wrapper; paper,
      card, newspaper; leaves, fruit peel, a small plant).
-4. Train, then test with items **not** in the training set. A model that only
-   works on its own training photos is not ready.
+4. Train, then test with items **not** in the training set.
 5. Export → **TensorFlow.js** → download the zip.
 
-## 1b. Or train it locally, without Teachable Machine
+## 3. Install the exported files
 
-`scripts/waste/train_waste_model.mjs` trains the same architecture Teachable
-Machine uses (a frozen truncated MobileNet v1 plus a small dense head) on this
-laptop and writes the exact three files the dashboard loads. It never talks to
-Google.
-
-```bash
-# once: the training dependencies live outside the web build
-npm install --prefix ~/.cache/village-waste @tensorflow/tfjs-node@4.22.0
-
-# train and install into models/waste/
-node scripts/waste/train_waste_model.mjs \
-  --data ~/.cache/village-waste \
-  --modules ~/.cache/village-waste \
-  --out models/waste
-```
-
-`--data` is a folder of one sub-folder per class (`Organic`, `Plastic`,
-`Paper`, `Background`), or an already-split `train/` + `val/` tree. If the
-sources are still in their original folders,
-
-`scripts/waste/prepare_waste_dataset.mjs` copies TrashNet's `plastic`,
-`paper` and `cardboard` together with your own `organic/` and `background/`
-folders into that one-folder-per-class layout. The script
-prints held-out accuracy, refuses an export whose input shape is not 224×224,
-reloads what it saved, and only then installs it.
-
-The model currently installed on this laptop was trained this way on 850
-photos: TrashNet (MIT, paper/cardboard/plastic), the Voxel51 food-waste
-dataset (MIT, organic), and freely licensed table/room photos from Wikimedia
-Commons for `Background`. Held-out accuracy was **96.4 %**. That is a starting
-point for the exhibition, not a promise: photos from the venue's own table
-under its own lighting will do better. Put ~80–150 photos per class in
-`~/.cache/village-waste/train/<class>/` and run the command again to replace
-the model in a few minutes.
-
-## 2. Install the exported files
-
-Copy these three files into `models/waste/`:
+Either pipeline must end with these three files in `models/waste/`:
 
 ```
 models/waste/model.json
@@ -69,20 +95,22 @@ models/waste/metadata.json
 models/waste/weights.bin
 ```
 
-They are git-ignored. Check them:
+They are git-ignored, so a fresh clone must retrain or copy them; a
+frontend-only deployment has no model and says so. Check them:
 
 ```bash
 curl -s http://127.0.0.1:8010/api/v1/waste/model-status
 ```
 
-`installed: true` means the backend found all three. The Waste page will load
-`/models/waste/model.json` and `metadata.json` through the local backend.
-If the files are missing the page says **Recognition model not installed**. It
-never substitutes random predictions.
+`installed: true` means the backend found all three and can read the labels.
+The Waste page loads `/models/waste/model.json` and `metadata.json` through the
+local backend. If the files are missing the page says **Recognition model not
+installed**. It never substitutes random predictions.
 
-## 3. How a prediction becomes an event
+## 4. How a prediction becomes an event
 
-- The camera preview runs at a modest rate. Each frame produces class scores.
+- The camera preview runs at a modest rate. Each frame produces a score for
+  every class; the page ranks them and shows the best three.
 - A class must exceed the confidence threshold (default 0.75) and be stable for
   several consecutive frames (default 5).
 - `Background`/unknown is ignored.
@@ -97,7 +125,10 @@ never substitutes random predictions.
   “Confirm deposited” creates a deliberate confirmation record. A photo of an
   item is not proof that it went into the bin.
 
-## 4. Class mapping
+The threshold, stable-frame count and cooldown are adjustable in
+Setup → Voice & Camera.
+
+## 5. Class mapping
 
 | Model class | Bin | LED |
 | --- | --- | --- |
@@ -106,17 +137,19 @@ never substitutes random predictions.
 | Paper | Paper | paper |
 | Background / unknown | none | none |
 
-The mapping is fixed in this build. The threshold, stable-frame count and
-cooldown are adjustable in Setup → Voice & Camera.
+The mapping is fixed in this build.
 
-## 5. Honest limits
+## 6. Honest limits
 
+- The public training photos are studio-like: waste on white backgrounds,
+  rooms and tables for Background. A camera at the venue can look different,
+  which is why section 1's retraining step exists.
 - The camera identifies waste, not people. It cannot attribute an item to a
   villager. Profiles are optional **fictional demo records** and require an
   explicit selection.
 - Recognition does not prove that the item was deposited.
 - Bin fill is estimated from ultrasonic distance, not measured weight or
   volume.
-- A model trained on one table under one lamp may fail under another. Test at
-  the exhibition location.
+- A crumpled wrapper is genuinely ambiguous between paper and plastic. The
+  stable-frames rule and the threshold stop a single weak frame from acting.
 - The app stores classification events, not images or video.
