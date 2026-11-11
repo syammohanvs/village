@@ -81,11 +81,15 @@ An English-only `*.en.bin` file is refused by the backend with
 python3 -m pip install --user cmake     # or install cmake normally
 git clone --depth 1 https://github.com/ggml-org/whisper.cpp
 cd whisper.cpp
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+  -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON
 cmake --build build -j --target whisper-server
 ```
 
-Then either copy `build/bin/whisper-server` to
+`-DBUILD_SHARED_LIBS=OFF` builds `libwhisper`/`libggml` into the server.
+Without it, copying only `build/bin/whisper-server` leaves it unable to start
+(`libwhisper.so.1: cannot open shared object file`); copy the libraries too or
+build statically. Then either copy `build/bin/whisper-server` to
 `models/whisper/whisper-server`, or set in `.env`:
 
 ```
