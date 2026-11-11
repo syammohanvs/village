@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWasteStabilizer, type Prediction, type StableEvent } from './wasteStabilizer';
+import { createWasteStabilizer, rankPredictions, type Prediction, type StableEvent } from './wasteStabilizer';
 
 const organic = (confidence = 0.9): Prediction[] => [{ label: 'Organic', confidence }];
 const background = (): Prediction[] => [{ label: 'Background', confidence: 0.98 }];
@@ -107,5 +107,41 @@ describe('waste stabilizer', () => {
       [{ label: 'Plastic', confidence: 0.9 }],
     ]);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('rankPredictions', () => {
+  it('returns the most likely classes first, whatever order the model used', () => {
+    // `@teachablemachine/image` returns every class in metadata order.
+    const raw: Prediction[] = [
+      { label: 'Organic', confidence: 0.01 },
+      { label: 'Plastic', confidence: 0.95 },
+      { label: 'Paper', confidence: 0.03 },
+      { label: 'Background', confidence: 0.01 },
+    ];
+    const ranked = rankPredictions(raw, 3);
+    expect(ranked.map((row) => row.label)).toEqual(['Plastic', 'Paper', 'Organic']);
+    expect(ranked[0].confidence).toBeCloseTo(0.95);
+  });
+
+  it('keeps Background when it is the best guess instead of slicing it away', () => {
+    const raw: Prediction[] = [
+      { label: 'Organic', confidence: 1e-11 },
+      { label: 'Plastic', confidence: 1e-22 },
+      { label: 'Paper', confidence: 1e-18 },
+      { label: 'Background', confidence: 1 },
+    ];
+    const ranked = rankPredictions(raw, 3);
+    expect(ranked[0]).toEqual({ label: 'Background', confidence: 1 });
+    expect(ranked).toHaveLength(3);
+  });
+
+  it('drops rows without a usable number rather than sorting on NaN', () => {
+    const raw = [
+      { label: 'Organic', confidence: Number.NaN },
+      { label: 'Paper', confidence: 0.4 },
+    ] as Prediction[];
+    expect(rankPredictions(raw, 3)).toEqual([{ label: 'Paper', confidence: 0.4 }]);
+    expect(rankPredictions([], 3)).toEqual([]);
   });
 });

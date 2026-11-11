@@ -46,6 +46,23 @@ function normalise(label: string): string {
   return label.trim().toLowerCase();
 }
 
+/**
+ * Sort a classifier's full output by confidence and keep the best few.
+ *
+ * `@teachablemachine/image`'s `predict()` returns every class in the order the
+ * metadata lists them, not the top N.  Slicing that array would drop whichever
+ * class happens to be last (Background), and taking index 0 as "the" answer
+ * would always name the first label.  Every caller goes through this helper so
+ * the UI, the stabilizer and the tests agree on what the best guess is.
+ */
+export function rankPredictions(predictions: Prediction[], limit = 3): Prediction[] {
+  return predictions
+    .filter((row) => row && typeof row.label === 'string' && Number.isFinite(Number(row.confidence)))
+    .map((row) => ({ label: row.label, confidence: Number(row.confidence) }))
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, Math.max(0, limit));
+}
+
 export interface WasteStabilizer {
   push(predictions: Prediction[], now?: number): StableEvent | null;
   snapshot(now?: number): StabilizerSnapshot;

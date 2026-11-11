@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
@@ -13,12 +13,27 @@ vi.mock('../lib/api', async (importOriginal) => {
       state: vi.fn(),
       settings: vi.fn(),
       wasteModelStatus: vi.fn(),
+      postRecognition: vi.fn(),
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
       events: vi.fn(),
     },
   };
 });
+
+const { predictMock, loadMock } = vi.hoisted(() => {
+  const predictMock = vi.fn(async () => [
+    { className: 'Organic', probability: 0.01 },
+    { className: 'Plastic', probability: 0.95 },
+    { className: 'Paper', probability: 0.03 },
+    { className: 'Background', probability: 0.01 },
+  ]);
+  const loadMock = vi.fn(async () => ({ predict: predictMock }));
+  return { predictMock, loadMock };
+});
+
+vi.mock('@teachablemachine/image', () => ({ load: loadMock }));
+vi.mock('@tensorflow/tfjs', () => ({}));
 
 beforeEach(() => {
   window.history.pushState({}, '', '/waste');
@@ -63,4 +78,57 @@ describe('Sort Waste', () => {
     expect(screen.getByText('Confidence and model details')).toBeInTheDocument();
     expect(screen.getByText(/does not identify people/i)).toBeInTheDocument();
   });
+
+  it('ranks what the model reported and calls predict without the flipped flag', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 7, category: 'plastic', confidence: 0.95 },
+      bin: { id: 'plastic', state: 'available' },
+    });
+    const stream = { getTracks: () => [] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue(stream),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 4000 });
+    // predict(image, flipped) returns every class; passing a count mirrored the
+    // frame and made '3' look like a page size.
+    expect(predictMock.mock.calls[0]).toHaveLength(1);
+    expect(await screen.findByText(/Looking at Plastic/i)).toBeInTheDocument();
+
+    // The list is ranked, not left in metadata order (which starts at Organic).
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('.prediction-list li'));
+      expect(rows).toHaveLength(3);
+      expect(rows[0].textContent).toContain('Plastic');
+      expect(rows[1].textContent).toContain('Paper');
+    });
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+      category: 'plastic',
+      confidence: 0.95,
+    });
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Plastic');
+  }, 15000);
 });

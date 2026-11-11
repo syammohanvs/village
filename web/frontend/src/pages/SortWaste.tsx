@@ -3,13 +3,21 @@ import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
 import { cx } from '../lib/format';
 import { useApi } from '../lib/useApi';
-import { createWasteStabilizer, type Prediction, type StabilizerSnapshot, type StableEvent } from '../lib/wasteStabilizer';
+import {
+  createWasteStabilizer,
+  rankPredictions,
+  type Prediction,
+  type StabilizerSnapshot,
+  type StableEvent,
+} from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
 import type { WasteRecognitionResult } from '../types';
 
 interface Classifier {
-  predict(input: HTMLVideoElement, maxPredictions: number): Promise<{ className: string; probability: number }[]>;
+  // The second argument is `flipped`, not a result count: predict() returns
+  // every class in metadata order.  Passing a number here mirrored the frame.
+  predict(input: HTMLVideoElement, flipped?: boolean): Promise<{ className: string; probability: number }[]>;
 }
 
 type ModelState = 'idle' | 'loading' | 'ready' | 'error';
@@ -193,12 +201,12 @@ export function SortWaste() {
       if (!video || !classifier || busyRef.current || video.readyState < 2) return;
       busyRef.current = true;
       try {
-        const raw = await classifier.predict(video, 3);
+        const raw = await classifier.predict(video);
         if (cancelled) return;
-        const top = raw.slice(0, 3).map((row) => ({
-          label: row.className,
-          confidence: row.probability,
-        }));
+        const top = rankPredictions(
+          raw.map((row) => ({ label: row.className, confidence: row.probability })),
+          3,
+        );
         setPredictions(top);
         const event = stabilizerRef.current.push(top);
         setStability(stabilizerRef.current.snapshot());
