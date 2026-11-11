@@ -41,7 +41,12 @@ node scripts/waste/train_waste_model.mjs \
 ```
 
 `--data` is a folder of one sub-folder per class (`Organic`, `Plastic`,
-`Paper`, `Background`), or an already-split `train/` + `val/` tree. The script
+`Paper`, `Background`), or an already-split `train/` + `val/` tree. If the
+sources are still in their original folders,
+
+`scripts/waste/prepare_waste_dataset.mjs` copies TrashNet's `plastic`,
+`paper` and `cardboard` together with your own `organic/` and `background/`
+folders into that one-folder-per-class layout. The script
 prints held-out accuracy, refuses an export whose input shape is not 224×224,
 reloads what it saved, and only then installs it.
 
