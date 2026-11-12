@@ -141,6 +141,11 @@ installed**. It never substitutes random predictions.
 - After an accepted event the **camera stops itself**, so repeated frames of
   the same bottle cannot become multiple items and the next item gets a fresh
   session when the operator presses Start Camera again.
+- A **Hazardous / medical** button next to Start Camera is for syringes,
+  cotton, napkins, diapers, urine bags and catheters. It records the item as
+  hazardous waste, lights no bin LED and asks you to hand it to the operator
+  and contact the operator. It works without a model, so it is the reliable
+  path for medical waste; the camera is stopped after it too.
 - If the target bin is **full**, the app still indicates the correct category
   and shows a warning. It never redirects the item to a different bin.
 - A recognition is not proof that an item reached a bin or an agent.
@@ -160,7 +165,8 @@ Setup → Voice & Camera; the cooldown applies to a session that stays open.
 
 The mapping is fixed in this build. The UI names the material it saw (for
 example “Glass” or “Electronic waste”) and then gives the same referral
-instructions.
+instructions. Medical waste is not a model class: the operator uses the
+**Hazardous / medical** button for it.
 
 ## 6. Honest limits
 

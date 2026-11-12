@@ -429,11 +429,39 @@ def create_app(
         db: Database = Depends(get_db),
     ):
         category = body.category.strip().lower()
-        if category not in WASTE_CATEGORIES and category != "other":
+        if category not in WASTE_CATEGORIES and category not in {"other", "medical"}:
             raise HTTPException(
                 status_code=422,
-                detail="category must be organic, plastic, paper or other; background is not logged",
+                detail="category must be organic, plastic, paper, other or medical; background is not logged",
             )
+        if category == "medical":
+            # Hazardous waste (syringes, cotton, napkins, diapers, catheters,
+            # urine bags) is not one of the three bins and must never be sent
+            # to a bin LED.  It is recorded and referred to the operator.
+            try:
+                snapshot = await gateway.snapshot(body.mode)
+            except Exception:  # noqa: BLE001 - a referral does not need the board
+                snapshot = {}
+            record = await db.add_recognition(
+                body.mode, category, body.confidence, body.model, "unavailable",
+                False, False, body.request_id, body.profile_id,
+            )
+            await db.add_event(
+                body.mode, "waste", "Hazardous waste recognised",
+                f"confidence {body.confidence:.2f}; referred to the operator; "
+                "no bin indicator used",
+                "warning",
+                "camera",
+                {"recognition_id": record.get("id"), "category": category,
+                 "confidence": body.confidence},
+            )
+            return {
+                "recognition": record,
+                "indication": None,
+                "bin_alert": None,
+                "physical": snapshot.get("physical", False),
+                "note": "Hazardous waste. Do not put it in the organic, plastic or paper bins. Hand it to the operator and contact the operator.",
+            }
         if category == "other":
             # Cloth, leather, footwear, glass, metal, thermocol and electronic
             # waste are not one of the three bins.  They are recorded and

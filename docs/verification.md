@@ -573,6 +573,23 @@ silently dropped the last label and the "Looking at …" line always named
 `Organic`. Predictions are now ranked by confidence and the call passes no
 second argument.
 
+
+**A manual Hazardous / medical button** was added for syringes, cotton,
+napkins, diapers, urine bags and catheters. It records `category: medical`,
+sends no `INDICATE_WASTE` command, lights no bin LED and asks you to hand the
+item to the operator and contact the operator. The backend test proves the
+no-command, zero-points behaviour and its own *Hazardous waste recognised* and
+*Recyclable item handed over* events; a component test drives it without a
+camera.
+
+**A 12th class was trained experimentally** on 123 Wikimedia medical-waste
+photos and scored only **62.5% (10/16)** on held-out photos, because a syringe
+looks like a plastic tube and cotton looks like paper. It also dragged overall
+accuracy from **93.4% to 91.3%**. It is not installed; the manual button is
+the reliable path, and venue photos would be needed to improve it. The
+experiment is recorded here so the result is not re-derived.
+
+
 ## Not verified
 
 - Physical soil and ultrasonic-bin behaviour, and the four lamps beyond the one

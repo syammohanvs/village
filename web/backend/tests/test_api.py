@@ -354,3 +354,32 @@ async def test_waste_model_status_reads_a_teachable_machine_export(tmp_path):
         )
         model = (await client.get("/api/v1/waste/model-status")).json()
         assert model["labels"] == ["Organic", "Plastic"]
+
+
+@pytest.mark.asyncio
+async def test_medical_waste_is_referred_without_a_bin_command(tmp_path):
+    """Syringes, cotton, napkins and the rest are hazardous waste: recorded,
+    no bin, and no INDICATE_WASTE command."""
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live",
+                "category": "medical",
+                "confidence": 0.91,
+                "model": "test",
+                "request_id": "medical-01",
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["recognition"]["category"] == "medical"
+        assert body["recognition"]["bin_state"] == "unavailable"
+        assert body["indication"] is None
+        assert body["bin_alert"] is None
+        assert "Hazardous" in body["note"]
+        assert real.calls == []
+        events = (await client.get("/api/v1/events?mode=live")).json()["events"]
+        assert any(event["title"] == "Hazardous waste recognised" for event in events)

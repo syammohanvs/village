@@ -80,6 +80,9 @@ Stop only this project:
   paper light the matching bin LED and warn when that bin is full. Cloth,
   leather, footwear, glass, metal, thermocol and electronic waste say **hand it
   to our recycling agent and contact the operator**, and light no bin LED.
+  Syringes, cotton, napkins, diapers, urine bags and catheters use a manual
+  **Hazardous / medical** button for the same reason: a camera cannot reliably
+  tell them apart from plastic and paper.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
 - **What Happened** — one timeline of actions and reasons; raw codes, filters

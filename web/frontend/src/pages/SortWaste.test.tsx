@@ -221,4 +221,102 @@ describe('Sort Waste', () => {
     expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
     await waitFor(() => expect(stopTrack).toHaveBeenCalled());
   }, 15000);
+
+  it('refers hazardous waste to the operator instead of a bin', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'medical',
+      recognition: { id: 10, category: 'medical', confidence: 0.92 },
+    });
+    predictionState.current = [
+      { className: 'Organic', probability: 0.01 },
+      { className: 'Plastic', probability: 0.03 },
+      { className: 'Paper', probability: 0.01 },
+      { className: 'Glass', probability: 0.02 },
+      { className: 'Metal', probability: 0.02 },
+      { className: 'Textile', probability: 0.005 },
+      { className: 'Leather', probability: 0.005 },
+      { className: 'Footwear', probability: 0.005 },
+      { className: 'Thermocol', probability: 0.005 },
+      { className: 'Ewaste', probability: 0.005 },
+      { className: 'Medical', probability: 0.9 },
+      { className: 'Background', probability: 0.01 },
+    ];
+    const stopTrack = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+      category: 'medical',
+      confidence: 0.9,
+    });
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
+    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/hazardous waste/i);
+    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
+    expect(screen.queryByText(/Put it in the medical bin/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
+  }, 15000);
+
+  it('records a hazardous item through the manual button without a bin LED', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'medical',
+      recognition: { id: 11, category: 'medical', confidence: 1 },
+    });
+    predictionState.current = DEFAULT_PREDICTIONS;
+    const stopTrack = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId('hazardous-button'));
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 4000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+      category: 'medical',
+      confidence: 1,
+    });
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
+    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/hazardous waste/i);
+    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
+    expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
+  }, 15000);
 });

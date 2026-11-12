@@ -50,8 +50,17 @@ const RECYCLING_NAMES: Record<string, string> = {
   ewaste: 'Electronic waste',
 };
 
+const HAZARDOUS_NAMES: Record<string, string> = {
+  medical: 'Medical waste',
+  hazardous: 'Hazardous waste',
+};
+
 function recyclingMaterial(label: string): string | null {
   return RECYCLING_NAMES[label.trim().toLowerCase()] ?? null;
+}
+
+function hazardousMaterial(label: string): string | null {
+  return HAZARDOUS_NAMES[label.trim().toLowerCase()] ?? null;
 }
 
 export function SortWaste() {
@@ -68,6 +77,7 @@ export function SortWaste() {
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
   const [referralLabel, setReferralLabel] = useState<string | null>(null);
+  const [hazardousLabel, setHazardousLabel] = useState<string | null>(null);
   const [recognitionError, setRecognitionError] = useState('');
   const [alert, setAlert] = useState('');
   const [note, setNote] = useState('');
@@ -129,6 +139,36 @@ export function SortWaste() {
     stabilizerRef.current.reset();
   }, []);
 
+  // Syringes, cotton, napkins, diapers, urine bags and catheters are hazardous
+  // waste, not one of the three bins.  The camera cannot reliably tell a
+  // syringe from a plastic tube, so this is an explicit operator decision
+  // rather than a guess: it records the item as "medical", lights no bin LED
+  // and stops the camera.
+  const recordHazardous = useCallback(async () => {
+    if (acceptingRef.current) return;
+    acceptingRef.current = true;
+    setRecognitionError('');
+    setDisposalMessage('');
+    setDisposalError('');
+    setNote('');
+    setReferralLabel(null);
+    setHazardousLabel('Medical waste');
+    stopCamera();
+    try {
+      const result = await api.postRecognition({
+        category: 'medical',
+        confidence: 1,
+        model: 'manual',
+        requestId: api.newRequestId(),
+      });
+      setRecognition(result);
+    } catch (cause) {
+      setRecognitionError(errorMessage(cause));
+    } finally {
+      acceptingRef.current = false;
+    }
+  }, [stopCamera]);
+
   const loadModel = useCallback(async () => {
     if (!installed || modelState === 'loading' || modelState === 'ready') return;
     setModelState('loading');
@@ -188,13 +228,16 @@ export function SortWaste() {
     setDisposalError('');
     setNote('');
     const material = recyclingMaterial(event.category);
+    const hazardous = hazardousMaterial(event.category);
     setReferralLabel(material);
+    setHazardousLabel(hazardous);
     let sorted = false;
     try {
       const result = await api.postRecognition({
-        // One referral category for every recycler material, so the backend
-        // records one outcome and never sends a bin command.
-        category: material ? 'other' : event.category,
+        // One referral category for every recycler material and one for
+        // hazardous material, so the backend records one outcome and never sends
+        // a bin command for either.
+        category: material ? 'other' : hazardous ? 'medical' : event.category,
         confidence: event.confidence,
         model: 'teachable-machine',
       });
@@ -274,7 +317,12 @@ export function SortWaste() {
 
   const resultCategory = targetCategory ? capitalise(String(targetCategory)) : null;
   const referred = Boolean(referralLabel) || String(targetCategory ?? '').toLowerCase() === 'other';
-  const shownCategory = referred ? (referralLabel ?? 'Recycling agent') : resultCategory;
+  const hazardous = Boolean(hazardousLabel) || String(targetCategory ?? '').toLowerCase() === 'medical';
+  const shownCategory = hazardous
+    ? (hazardousLabel ?? 'Hazardous waste')
+    : referred
+      ? (referralLabel ?? 'Recycling agent')
+      : resultCategory;
 
   return (
     <div className="page sort-waste">
@@ -314,6 +362,14 @@ export function SortWaste() {
                 <IconCamera size={18} /> Start Camera
               </button>
             )}
+            <button
+              type="button"
+              className="btn btn--ghost btn--large"
+              data-testid="hazardous-button"
+              onClick={() => void recordHazardous()}
+            >
+              Hazardous / medical
+            </button>
             <p className="camera-prompt">
               {!cameraSupported
                 ? 'This browser cannot open a camera in this tab, so Start Camera is disabled.'
@@ -343,15 +399,35 @@ export function SortWaste() {
         <div className="result-column">
           <Card
             className="result-card"
-            kicker={referred ? 'Not one of the three bins' : 'Suggested bin'}
-            title={referred ? 'Recycling agent' : resultCategory ?? (removing ? 'Remove the item' : 'Waiting for an item')}
+            kicker={
+              hazardous
+                ? 'Hazardous waste'
+                : referred
+                  ? 'Not one of the three bins'
+                  : 'Suggested bin'
+            }
+            title={
+              hazardous
+                ? 'Do not sort here'
+                : referred
+                  ? 'Recycling agent'
+                  : resultCategory ?? (removing ? 'Remove the item' : 'Waiting for an item')
+            }
           >
             {recognition ? (
               <>
                 <p className="result-big" data-testid="waste-result">
                   {shownCategory}
                 </p>
-                {referred ? (
+                {hazardous ? (
+                  <>
+                    <p className="result-sub" data-testid="waste-hazardous">
+                      This is hazardous waste. Do not put it in the organic, plastic or paper bins.
+                      Hand it to the operator and contact the operator.
+                    </p>
+                    <p className="hint">No bin LED is lit for this item.</p>
+                  </>
+                ) : referred ? (
                   <>
                     <p className="result-sub" data-testid="waste-referral">
                       {referralLabel ? `${referralLabel} does` : 'This item does'} not go in the
@@ -402,7 +478,11 @@ export function SortWaste() {
             {recognition && (
               <details className="advanced">
                 <summary>
-                  {referred ? 'Record that the recycling agent took it' : 'Record that you put it in the bin'}
+                  {hazardous
+                    ? 'Record that the operator took it'
+                    : referred
+                      ? 'Record that the recycling agent took it'
+                      : 'Record that you put it in the bin'}
                 </summary>
                 <div className="advanced-body">
                   <p className="hint">
@@ -425,7 +505,7 @@ export function SortWaste() {
                     onClick={() => void confirmDeposit()}
                     disabled={recognitionId === null || Boolean(disposalMessage)}
                   >
-                    <IconCheck size={15} /> {referred ? 'Confirm handed over' : 'Confirm deposited'}
+                    <IconCheck size={15} /> {hazardous ? 'Confirm reported' : referred ? 'Confirm handed over' : 'Confirm deposited'}
                   </button>
                   {disposalMessage && <p className="ok-text">{disposalMessage}</p>}
                   {disposalError && <p className="error-text">{disposalError}</p>}
