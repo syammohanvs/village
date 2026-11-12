@@ -219,10 +219,9 @@ describe('Sort Waste', () => {
     fireEvent.click(await screen.findByTestId('start-camera'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
-      category: 'other',
-      confidence: 0.9,
-    });
+    const recyclerCall = vi.mocked(api.postRecognition).mock.calls[0][0];
+    expect(recyclerCall.category).toBe('other');
+    expect(recyclerCall.confidence).toBeCloseTo(0.945, 6);
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Glass');
     expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
     expect(screen.getByTestId('waste-referral')).toHaveTextContent(/contact the operator/i);
@@ -411,6 +410,59 @@ describe('Sort Waste', () => {
     expect(api.postRecognition).not.toHaveBeenCalled();
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
     expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
+  }, 15000);
+
+  it('accepts a split recycler vote as one recycling outcome', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.75, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockClear();
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'other',
+      recognition: { id: 31, category: 'other', confidence: 0.8 },
+    });
+    // No single class clears 75%, but Ewaste + Metal together do.  Both are the
+    // same action, so the item should be referred to the recycling agent.
+    predictionState.current = [
+      { className: 'Organic', probability: 0.01 },
+      { className: 'Plastic', probability: 0.1 },
+      { className: 'Paper', probability: 0.02 },
+      { className: 'Glass', probability: 0.02 },
+      { className: 'Metal', probability: 0.35 },
+      { className: 'Textile', probability: 0.01 },
+      { className: 'Leather', probability: 0.01 },
+      { className: 'Footwear', probability: 0.01 },
+      { className: 'Thermocol', probability: 0.01 },
+      { className: 'Ewaste', probability: 0.45 },
+      { className: 'Background', probability: 0.01 },
+    ];
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+    const splitCall = vi.mocked(api.postRecognition).mock.calls[0][0];
+    expect(splitCall.category).toBe('other');
+    expect(splitCall.confidence).toBeCloseTo(0.86, 6);
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Electronic waste');
+    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
   }, 15000);
 
   it('keeps the camera running and arms itself for the next item', async () => {

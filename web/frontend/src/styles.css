@@ -631,6 +631,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* ------------------------------------------------------------------ misc */
 .hint { color: var(--muted); font-size: 12px; }
+.warn-text { color: var(--warn); font-size: 12px; }
 .error-text { color: var(--danger); font-size: 13px; }
 .ok-text { color: var(--success); font-size: 13px; }
 .notice {

@@ -576,9 +576,12 @@ rejected. Venue photos are the fix.
 The page also now **focuses on the object**: each frame is compared with one or
 more empty-scene snapshots (up to **three**, kept in this browser’s
 `localStorage`), and only the bounding box that differs from all of them is
-classified. An unchanged scene is reported as “Not a waste item” without
-asking the model to name the room. The geometry (`diffBox`, `diffBoxMulti`,
-`squareCrop`, `centreCrop`, `scaleBox`) has **12 unit tests**, the storage
+classified. The crop is weighted towards the middle of the frame, because an
+arm enters from an edge and the item is usually at its tip, and a change that
+touches the frame edge raises a “hand or person is in the picture” warning. An
+unchanged scene is reported as “Not a waste item” without asking the model to
+name the room. The geometry (`diffBox`, `diffBoxMulti`, `focusRegion`,
+`squareCrop`, `centreCrop`, `scaleBox`) has **14 unit tests**, the storage
 round-trip and three-background limit have **5**, and the controls (“Set
 background”, “Add background”, “Clear backgrounds”, “Focus on the object”, the
 empty-scene hint) plus **re-arming** are covered by `SortWaste.test.tsx`: a
@@ -587,6 +590,12 @@ again. **The live camera path itself is not exercised in this container** —
 there is no webcam here — so the background snapshot and the crop must be
 confirmed in a browser on the laptop at home. The fallback is deliberate: if the
 browser cannot read a canvas, the page classifies the whole frame as before.
+
+The page also **adds the seven recycler probabilities** before applying the
+confidence threshold, because they are one outcome. A frame that splits Ewaste
+45% + Metal 35% is accepted as 80% recycling and named by its stronger
+material, instead of waiting for one class to reach 75%. This is covered by
+`wasteActions.test.ts` and a Sort Waste component test with exactly that split.
 
 The training report beside the model records the counts, seed, confusion
 matrix and probe. `scripts/waste/evaluate_waste_model.mjs` reproduces both

@@ -12,7 +12,8 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { diffBoxMulti, scaleBox, squareCrop } from '../lib/focus';
+import { focusRegion, scaleBox, type FocusRegion } from '../lib/focus';
+import { groupedPrediction } from '../lib/wasteActions';
 import {
   clearBackgrounds as clearStoredBackgrounds,
   loadBackgrounds,
@@ -125,6 +126,8 @@ export function SortWaste() {
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [backgroundCount, setBackgroundCount] = useState(0);
+  const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
+  const [frameWarning, setFrameWarning] = useState('');
   const [backgroundReady, setBackgroundReady] = useState(false);
   const [focusOn, setFocusOn] = useState(true);
   const [focusNote, setFocusNote] = useState('');
@@ -200,6 +203,8 @@ export function SortWaste() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
     setPredictions([]);
+    setGroupedTop(null);
+    setFrameWarning('');
     stabilizerRef.current.reset();
   }, []);
 
@@ -264,34 +269,35 @@ export function SortWaste() {
   }, []);
 
   const focusInput = useCallback(
-    (video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement | null => {
-      if (!focusOn) return video;
+    (
+      video: HTMLVideoElement,
+    ): { input: HTMLVideoElement | HTMLCanvasElement; region: FocusRegion | null } | null => {
+      if (!focusOn) return { input: video, region: null };
       const backgrounds = backgroundRef.current;
-      if (backgrounds.length === 0) return video;
+      if (backgrounds.length === 0) return { input: video, region: null };
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
-      if (!context) return video;
+      if (!context) return { input: video, region: null };
       let frame: ImageData;
       try {
         context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       } catch {
-        return video;
+        return { input: video, region: null };
       }
-      const box = diffBoxMulti(
+      const region = focusRegion(
         backgrounds.map((background) => background.data),
         frame.data,
         ANALYSIS_WIDTH,
         ANALYSIS_HEIGHT,
       );
-      if (!box) return null;
-      const square = squareCrop(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      if (!region) return null;
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
-      const source = scaleBox(square, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
+      const source = scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
       const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
       const cropContext = crop.getContext('2d');
-      if (!cropContext) return video;
+      if (!cropContext) return { input: video, region };
       try {
         cropContext.drawImage(
           video,
@@ -305,9 +311,9 @@ export function SortWaste() {
           CROP_SIZE,
         );
       } catch {
-        return video;
+        return { input: video, region };
       }
-      return crop;
+      return { input: crop, region };
     },
     [focusOn],
   );
@@ -383,6 +389,8 @@ export function SortWaste() {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraOn(true);
+      setGroupedTop(null);
+      setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       setDevices(list.filter((device) => device.kind === 'videoinput'));
       if (installed) void loadModel();
@@ -442,31 +450,45 @@ export function SortWaste() {
       if (!video || !classifier || busyRef.current || video.readyState < 2) return;
       busyRef.current = true;
       try {
-        const input = focusInput(video);
+        const focused = focusInput(video);
         if (cancelled) return;
-        if (!input) {
+        if (!focused) {
           // The empty scene (or a moved camera) is not a classification
           // problem: there is no object to sort.  Say so without asking the
           // model to name a material from the room.
+          setFrameWarning('');
           const background = [{ label: 'Background', confidence: 1 }];
           setPredictions(background);
+          setGroupedTop(background[0]);
           const event = stabilizerRef.current.push(background);
           setStability(stabilizerRef.current.snapshot());
           if (event) void accept(event);
           return;
         }
+        const { input, region } = focused;
+        setFrameWarning(
+          region?.edgeTouch && region.coverage > 0.18
+            ? 'A hand or person is in the picture. Place the item on the table and step back so the camera sees only the waste.'
+            : '',
+        );
         const raw = await classifier.predict(input);
         if (cancelled) return;
-        const top = rankPredictions(
+        const all = rankPredictions(
           raw.map((row) => ({ label: row.className, confidence: row.probability })),
-          3,
+          raw.length,
         );
-        setPredictions(top);
-        const event = stabilizerRef.current.push(top);
+        const grouped = groupedPrediction(all);
+        setPredictions(all.slice(0, 3));
+        setGroupedTop(grouped);
+        const event = grouped ? stabilizerRef.current.push([grouped]) : null;
         setStability(stabilizerRef.current.snapshot());
         if (event) void accept(event);
       } catch {
-        if (!cancelled) setPredictions([]);
+        if (!cancelled) {
+          setPredictions([]);
+          setGroupedTop(null);
+          setFrameWarning('');
+        }
       } finally {
         busyRef.current = false;
       }
@@ -493,9 +515,17 @@ export function SortWaste() {
     }
   };
 
-  const top = predictions[0];
-  const strong = Boolean(top && top.confidence >= confidence);
-  const topIsBackground = Boolean(top && top.label.trim().toLowerCase() === 'background');
+  const top = groupedTop
+    ? { label: groupedTop.material ?? groupedTop.label, confidence: groupedTop.confidence }
+    : predictions[0];
+  const strong = Boolean(
+    groupedTop ? groupedTop.confidence >= confidence : top && top.confidence >= confidence,
+  );
+  const topIsBackground = Boolean(
+    groupedTop
+      ? groupedTop.label.trim().toLowerCase() === 'background'
+      : top && top.label.trim().toLowerCase() === 'background',
+  );
   const waitingRemoval = stability?.phase === 'waiting-removal';
   const removing = waitingRemoval && !recognition;
 
@@ -603,6 +633,11 @@ export function SortWaste() {
                         : 'add another for a door or lights that change.'
                     }`
                   : 'Show the empty table (or the room) and press Set background once, then show one item. Only the object that appears is classified.'}
+              </p>
+            )}
+            {frameWarning && (
+              <p className="warn-text" data-testid="frame-warning">
+                {frameWarning}
               </p>
             )}
             <p className="camera-prompt">
@@ -797,7 +832,14 @@ export function SortWaste() {
               {predictions.length > 0 ? (
                 <ul className="prediction-list">
                   {predictions.map((row) => (
-                    <li key={row.label} className={cx(row.confidence >= confidence && 'is-strong')}>
+                    <li
+                      key={row.label}
+                      className={cx(
+                        (row.confidence >= confidence ||
+                          (strong && groupedTop?.material === row.label)) &&
+                          'is-strong',
+                      )}
+                    >
                       <div className="prediction-head">
                         <span>{displayLabel(row.label)}</span>
                         <span className="prediction-value">{Math.round(row.confidence * 100)}%</span>

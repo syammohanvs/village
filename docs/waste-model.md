@@ -242,6 +242,13 @@ installed**. It never substitutes random predictions.
   every class; the page ranks them and shows the best three.
 - A class must exceed the confidence threshold (default 0.75) and be stable for
   several consecutive frames (default 5).
+- **The seven recycler materials are one outcome, so their probabilities are
+  added.** If a frame says Ewaste 45% and Metal 35%, the recycling action is
+  80% even though no single material reached 75%; the page accepts it and
+  names the stronger material. This is why a car key fob split between Ewaste
+  and Metal is no longer stuck on “not sure”. A bin action never borrows
+  another bin's probability: Plastic has to beat the recycler total on its
+  own.
 - An accepted Organic, Plastic or Paper item sends `INDICATE_WASTE`, lights the
   matching bin LED and stops the camera.
 - An accepted **Glass, Metal, Textile, Leather, Footwear, Thermocol or
@@ -290,6 +297,17 @@ pressing Start Camera again. The result card says *remove the item*, then
 This is why a car key on a home table no longer becomes “Leather” from the
 wooden table or a sleeve in the frame: the table and the room are the
 background, and the key is the crop.
+
+**Hands and people.** A background snapshot does not know that an arm is not
+waste: a hand entering the frame changes pixels too. The crop is therefore
+weighted towards the **middle** of the picture (an arm comes in from an edge;
+the item is usually at the far end of it), and when the changed area touches a
+frame edge the page shows a warning: *“A hand or person is in the picture.
+Place the item on the table and step back.”* It still classifies, but the
+operator knows why a sleeve may be read as cloth. The reliable workflow at the
+exhibition is to **put the item on the table** rather than hold it in front of
+the camera. There is no person-detection model in this build; if held-item
+recognition is needed, a person-segmentation pass is the next step.
 
 The threshold and stable-frame count are adjustable in
 Setup → Voice & Camera; the cooldown applies to a session that stays open.

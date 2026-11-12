@@ -1,6 +1,8 @@
 export interface Prediction {
   label: string;
   confidence: number;
+  /** The material behind a grouped action (e.g. Ewaste for "recycling"). */
+  material?: string;
 }
 
 export interface StabilizerOptions {
@@ -21,6 +23,8 @@ export interface StableEvent {
   category: string;
   confidence: number;
   at: number;
+  /** The material behind a grouped action, when there is one. */
+  material?: string;
 }
 
 export type StabilizerPhase = 'armed' | 'waiting-removal';
@@ -85,7 +89,7 @@ export function createWasteStabilizer(options: StabilizerOptions = {}): WasteSta
       const confidence = Number(prediction.confidence);
       if (!Number.isFinite(confidence)) continue;
       if (!top || confidence > top.confidence) {
-        top = { label: prediction.label, confidence };
+        top = { label: prediction.label, confidence, material: prediction.material };
       }
     }
     return top;
@@ -122,11 +126,13 @@ export function createWasteStabilizer(options: StabilizerOptions = {}): WasteSta
       armed = false;
       rearmCount = 0;
       lastEmit = now;
+      const material = top.material ?? top.label;
       return {
-        label: top.label,
-        category: normalise(top.label),
+        label: material,
+        category: normalise(material),
         confidence: top.confidence,
         at: now,
+        material: top.material,
       };
     },
 

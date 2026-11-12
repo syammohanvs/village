@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centreCrop, diffBox, diffBoxMulti, scaleBox, squareCrop } from './focus';
+import { centreCrop, diffBox, diffBoxMulti, focusRegion, scaleBox, squareCrop } from './focus';
 
 function frame(width: number, height: number, value = 20): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -104,5 +104,29 @@ describe('object focus', () => {
 
   it('has no object when there is no background at all', () => {
     expect(diffBoxMulti([], frame(100, 80), 100, 80)).toBeNull();
+  });
+
+  it('pulls the focus box towards the middle when an arm enters from an edge', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    // An arm from the right edge, and the item at the end of it.
+    fill(current, 100, 70, 10, 30, 60, 240);
+    fill(current, 100, 44, 32, 12, 12, 240);
+    const region = focusRegion([background], current, 100, 80);
+    expect(region).not.toBeNull();
+    expect(region?.edgeTouch).toBe(true);
+    const boundingCentre = (44 + 99) / 2;
+    expect(region!.centre.x).toBeLessThan(boundingCentre);
+    expect(region!.box.width).toBe(region!.box.height);
+  });
+
+  it('marks a central object as not touching an edge', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, 40, 30, 20, 20, 240);
+    const region = focusRegion([background], current, 100, 80);
+    expect(region?.edgeTouch).toBe(false);
+    expect(region!.box.x).toBeLessThanOrEqual(40);
+    expect(region!.box.x + region!.box.width).toBeGreaterThanOrEqual(60);
   });
 });

@@ -176,8 +176,9 @@ export function AboutHelp() {
             and press <em>Set background</em> first; the camera then ignores the room and classifies
             only the object that appears. You can store up to three backgrounds for a hall that
             changes, and after an item is recognised, remove it so the camera arms itself for the
-            next one. Ordinary objects are still sorted by material: a phone or key fob is
-            electronic waste, a wallet is leather and sunglasses are glass.
+            next one. If a hand or person comes into the picture, place the item on the table and
+            step back for a clear reading. Ordinary objects are still sorted by material: a phone or
+            key fob is electronic waste, a wallet is leather and sunglasses are glass.
           </li>
           <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>

@@ -90,6 +90,105 @@ export function diffBoxMulti(
   return box;
 }
 
+export interface FocusRegion {
+  box: Box;
+  coverage: number;
+  edgeTouch: boolean;
+  centre: { x: number; y: number };
+}
+
+/**
+ * The crop to classify, weighted towards the middle of the frame.
+ *
+ * A visitor holding an item brings an arm in from an edge; the item is usually
+ * at the far end of that arm.  A plain bounding box would centre the crop on
+ * the arm.  Each changed pixel is weighted by its distance from the nearest
+ * frame edge, so the arm contributes little and the item at the middle pulls
+ * the crop towards itself.  `edgeTouch` tells the page that a hand/person is
+ * probably in shot, so it can say so instead of quietly classifying a sleeve.
+ */
+export function focusRegion(
+  backgrounds: Uint8ClampedArray[],
+  frame: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: FocusOptions = {},
+): FocusRegion | null {
+  const { threshold, minFraction, maxFraction } = { ...DEFAULTS, ...options };
+  if (width <= 0 || height <= 0 || backgrounds.length === 0) return null;
+  const expected = width * height * 4;
+  if (frame.length < expected) return null;
+  if (backgrounds.some((background) => background.length < expected)) return null;
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+  let changed = 0;
+  let weightedX = 0;
+  let weightedY = 0;
+  let weightSum = 0;
+  let edgeTouch = false;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const background of backgrounds) {
+        const distance = Math.max(
+          Math.abs(frame[i] - background[i]),
+          Math.abs(frame[i + 1] - background[i + 1]),
+          Math.abs(frame[i + 2] - background[i + 2]),
+        );
+        if (distance < nearest) nearest = distance;
+        if (nearest < threshold) break;
+      }
+      if (nearest < threshold) continue;
+      changed += 1;
+      // Cube the distance to the nearest edge: an arm is a long strip of
+      // low-weight pixels near an edge, while the item at its tip sits near the
+      // middle.  Squared was not enough for a 30x60 arm against a 12x12 item.
+      const edge = Math.min(x + 1, y + 1, width - x, height - y);
+      const weight = edge * edge * edge;
+      weightedX += x * weight;
+      weightedY += y * weight;
+      weightSum += weight;
+      if (x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2) edgeTouch = true;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+
+  const total = width * height;
+  if (changed === 0 || changed / total < minFraction) return null;
+  const long = Math.max(maxX - minX + 1, maxY - minY + 1);
+  if ((long * long) / total > maxFraction) return null;
+  if (weightSum === 0) return null;
+  const centre = { x: weightedX / weightSum, y: weightedY / weightSum };
+  // A person can span most of the frame.  Keep the crop on the object scale
+  // rather than handing the classifier a picture of a torso.
+  const cap = Math.round(Math.min(width, height) * 0.75);
+  const side = Math.min(cap, Math.max(8, Math.round(long * 1.25)));
+  const box = squareCrop(
+    {
+      x: Math.round(centre.x - side / 2),
+      y: Math.round(centre.y - side / 2),
+      width: side,
+      height: side,
+    },
+    width,
+    height,
+    0,
+  );
+  return {
+    box,
+    coverage: (long * long) / total,
+    edgeTouch,
+    centre,
+  };
+}
+
 /** Bounding box against a single background (kept for callers and tests). */
 export function diffBox(
   background: Uint8ClampedArray,

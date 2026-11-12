@@ -233,6 +233,12 @@ the snapshots in `localStorage` so they survive a reload until cleared. An
 unchanged scene is reported as “Not a waste item” without asking the model.
 After a confirmed item the camera **stays on**: removing the item re-arms the
 stabilizer and the next item is classified without pressing Start Camera. The
-geometry has 12 unit tests, storage 5, and the controls/re-arming are component
+geometry has 14 unit tests (weighted-middle crop and the edge-touch hand
+warning), storage 5, and the controls/re-arming are component
 tested; the live camera path is not exercised in this container (no webcam), so
 confirm it in a browser at the exhibition/home table.
+
+The confidence is **action-level**: `lib/wasteActions.ts` adds the seven
+recycler probabilities, so Ewaste 45% + Metal 35% is accepted as 80% recycling
+and named by the stronger material. A bin still has to win on its own. This is
+what stops a car-key fob split between Ewaste and Metal sitting on “not sure”.
