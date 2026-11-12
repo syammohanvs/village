@@ -45,6 +45,13 @@ export interface LiaTopic {
 
 export interface LiaCopy {
   welcome: string;
+  /**
+   * The first thing Lia says on the Sort Waste page.  Two sentences because
+   * there are two visitors: one already knows the bin and should not be made to
+   * wait for a demonstration, one does not and needs to be shown what the
+   * camera is for.  Short on purpose — it is spoken while the page settles.
+   */
+  wasteWelcome: string;
   role: string;
   homeTitle: string;
   quickModel: string;
@@ -55,6 +62,8 @@ export interface LiaCopy {
   childNote: string;
   maybeLater: string;
   readAloud: string;
+  /** "Hear it again" under the Sort Waste greeting. */
+  hearAgain: string;
   helpButton: string;
   back: string;
   next: string;
@@ -110,6 +119,7 @@ const BIN_NAMES: Record<LiaLanguage, Record<string, string>> = {
 
 const EN: LiaCopy = {
   welcome: 'Hello! I’m Lia. I can help you explore our village.', 
+  wasteWelcome: 'Know the bin? Go ahead. Not sure? Show the item to the camera and I’ll help.',
   role: 'Village helper',
   homeTitle: 'What would you like to do?',
   quickModel: 'Show me the model',
@@ -120,6 +130,7 @@ const EN: LiaCopy = {
   childNote: 'Young children: try the physical demonstrations with an adult.',
   maybeLater: 'Maybe later',
   readAloud: 'Read aloud',
+  hearAgain: 'Hear it again',
   helpButton: 'Help with Lia',
   back: 'Back',
   next: 'Next',
@@ -229,6 +240,8 @@ const EN: LiaCopy = {
 const ML: LiaCopy = {
   welcome:
     'ഹലോ! ഞാൻ ലിയ, നിങ്ങളുടെ വില്ലേജ് സഹായി. ഞങ്ങളുടെ ഗ്രാമം എങ്ങനെ വെള്ളം ലാഭിക്കുന്നു, മാലിന്യം തരംതിരിക്കുന്നു, തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു എന്ന് ഞാൻ കാണിച്ചുതരാം. നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
+  wasteWelcome:
+    'ബിൻ അറിയാമോ? നേരിട്ട് ഇടാം. സംശയമുണ്ടോ? വസ്തു ക്യാമറയ്ക്ക് മുന്നിൽ കാണിക്കൂ, ഞാൻ സഹായിക്കാം.',
   role: 'ഗ്രാമ സഹായി',
   homeTitle: 'നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
   quickModel: 'മാതൃക കാണിക്കൂ',
@@ -239,6 +252,7 @@ const ML: LiaCopy = {
   childNote: 'കൊച്ചുകുട്ടികൾ: ശാരീരിക പ്രവർത്തനങ്ങൾ ഒരു മുതിർന്നയാളോടൊപ്പം ചെയ്യുക.',
   maybeLater: 'പിന്നീട്',
   readAloud: 'വായിച്ചു കേൾപ്പിക്കൂ',
+  hearAgain: 'വീണ്ടും കേൾക്കൂ',
   helpButton: 'ലിയയുടെ സഹായം',
   back: 'തിരികെ',
   next: 'അടുത്തത്',
@@ -348,6 +362,8 @@ const ML: LiaCopy = {
 const HI: LiaCopy = {
   welcome:
     'नमस्ते! मैं लिया हूँ, आपकी गाँव सहायक। मैं आपको दिखाऊँगी कि हमारा गाँव पानी कैसे बचाता है, कचरा कैसे अलग करता है और सड़क की बत्तियाँ कैसे जलाता है। आप क्या करना चाहेंगे?',
+  wasteWelcome:
+    'डिब्बा पता है? सीधे डाल दीजिए। पता नहीं? चीज़ कैमरे के सामने दिखाइए, मैं मदद करूँगी।',
   role: 'गाँव सहायक',
   homeTitle: 'आप क्या करना चाहेंगे?',
   quickModel: 'मॉडल दिखाओ',
@@ -358,6 +374,7 @@ const HI: LiaCopy = {
   childNote: 'छोटे बच्चे: शारीरिक प्रदर्शन किसी बड़े के साथ करें।',
   maybeLater: 'बाद में',
   readAloud: 'पढ़कर सुनाइए',
+  hearAgain: 'दोबारा सुनिए',
   helpButton: 'लिया से मदद',
   back: 'पीछे',
   next: 'आगे',

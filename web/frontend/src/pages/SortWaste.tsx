@@ -14,6 +14,7 @@ import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
 import { focusRegion, objectMask, scaleBox, type FocusRegion } from '../lib/focus';
 import { groupedPrediction } from '../lib/wasteActions';
+import { WasteWelcome } from '../components/WasteWelcome';
 import {
   clearBackgrounds as clearStoredBackgrounds,
   loadBackgrounds,
@@ -586,6 +587,7 @@ export function SortWaste() {
 
   return (
     <div className="page sort-waste">
+      <WasteWelcome />
       <div className="waste-layout">
         <div className="camera-column">
           <div className="camera-frame camera-frame--large">

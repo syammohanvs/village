@@ -308,6 +308,34 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .controls-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .waste-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 16px; align-items: start; }
+/* Lia's greeting on Sort Waste: one line, heard and read.  A grid rather than a
+   flex row so the buttons stay on the right when the sentence wraps to three
+   lines in Malayalam. */
+.lia-welcome {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 14px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.lia-welcome .lia-avatar { flex: 0 0 auto; }
+.lia-welcome-line {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.45;
+  color: var(--fg);
+}
+.lia-welcome-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.lia-welcome-note { grid-column: 2 / -1; margin: 0; }
+@media (max-width: 760px) {
+  .lia-welcome { grid-template-columns: auto minmax(0, 1fr); }
+  .lia-welcome-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .lia-welcome-note { grid-column: 1 / -1; }
+}
 .quick-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .quick-control-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
