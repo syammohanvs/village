@@ -1,5 +1,11 @@
 # AGENTS.md — working notes for this repository
 
+> **LOCAL ONLY — do not `git push`.** The user explicitly prefers local
+> commits (2026-11-12) because a push to `origin/main` triggers a Cloudflare
+> Pages build. Commit on the local `main` and leave it ahead of `origin`. Only
+> push if the user asks for it in that turn. (`origin` is
+> `git@github.com:syammohanvs/village.git`.)
+
 Smart Green Village: ESP32 firmware (`uc/`), FastAPI backend
 (`web/backend/`), React/Vite dashboard (`web/frontend/`), Whisper voice and a
 local waste classifier. Keep the app running at <http://127.0.0.1:8010/>.
