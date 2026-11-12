@@ -321,9 +321,9 @@ to GND):
 - Resistor to **3.3 V**, LDR to **GND** → the reading **falls with light**, so
   `analog_bright_high = false` (the default for this build).
 - With a typical LDR (≈1 kΩ bright, ≈10 kΩ indoors, ≈1 MΩ dark) the raw
-  reading runs roughly **50 bright / 1650 indoors / 3000 dark** on the 0–4095
-  scale; the firmware inverts it into the metric, so the same thresholds
-  (dark 1600, bright 2400) still apply.
+  reading runs roughly **730 bright / 1870 indoors / 3090 dark** on the 0–4095
+  scale (measured on this build); the firmware inverts it into the metric, so
+  the calibrated thresholds (dark 1500, bright 2800) apply.
 - Any value from 4.7 kΩ to 47 kΩ works; 10 kΩ gives the widest usable range.
 - Swapping the two parts (LDR to 3V3, 10 kΩ to GND) makes the reading rise
   with light; then set `analog_bright_high = true` instead of rewiring.

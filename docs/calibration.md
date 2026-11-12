@@ -105,7 +105,8 @@ distance, not a measured waste volume.
 
 - For an analogue module, `output_type = analog`. Set
   `analog_bright_high` according to the actual module (most increase with
-  light, but verify with a lamp).
+  light, but verify with a lamp).  This build defaults to the pull-up wiring
+  (resistor to 3.3 V, LDR to GND), i.e. `analog_bright_high = false`.
 - For a digital-only module, set `output_type = digital` and
   `digital_dark_when_high` according to the DO behaviour (typical modules
   output HIGH in darkness).
