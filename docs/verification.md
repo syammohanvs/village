@@ -575,23 +575,64 @@ Glass), but the public probe has only 1–9 photos of each: V6 gets phones 1/4,
 wallets 1/5, smartwatches 2/4 and wristwatches 2/4, while sunglasses are 4/5
 and the key-fob category is 6/6. Venue photos are the fix.
 
-The page also now **focuses on the object**: each frame is compared with one or
-more empty-scene snapshots (up to **three**, kept in this browser’s
-`localStorage`), and only the bounding box that differs from all of them is
-classified. The crop is weighted towards the middle of the frame, because an
-arm enters from an edge and the item is usually at its tip, and a change that
-touches the frame edge raises a “hand or person is in the picture” warning. An
-unchanged scene is reported as “Not a waste item” without asking the model to
-name the room. The geometry (`diffBox`, `diffBoxMulti`, `focusRegion`,
-`squareCrop`, `centreCrop`, `scaleBox`) has **14 unit tests**, the storage
+The page also now **focuses on the object and paints out the table**: each frame
+is compared with one or more empty-scene snapshots (up to **three**, kept in
+this browser’s `localStorage`), the bounding box that differs from all of them
+becomes a square crop weighted towards the middle of the frame (an arm enters
+from an edge and the item is usually at its tip), and then every pixel **inside
+that crop that still matches the empty scene is replaced with a plain white
+plate**. A change that touches the frame edge raises a “hand or person is in the
+picture” warning, and an unchanged scene is reported as “Not a waste item”
+without asking the model to name the room.
+
+**Measurement for the removal step.** An object photo was cut out and pasted
+onto a real room photo (222 scenes, 640×480, object at 33–55% of the frame,
+±18° rotation) so that the input matches what the camera sees — an item on a
+cluttered table — rather than a studio shot. The installed model then classified
+five renderings of the same 222 items:
+
+| What the model was given | Exact class | Bin kept | Recycler referred | **Item action** |
+| --- | --- | --- | --- | --- |
+| The whole frame, no focus | 6.8% | 7.8% | 9.7% | **8.6%** |
+| Square crop of the changed box (previous behaviour) | 25.7% | 31.8% | 34.4% | **32.9%** |
+| The whole frame through a subject-cutout model (`u2net`) | 24.8% | 31.8% | 45.2% | **37.4%** |
+| The crop through a subject-cutout model | 38.3% | 53.5% | 51.6% | **52.7%** |
+| **The crop with the stored empty scene painted out** | **44.7%** | **61.9%** | **54.9%** | **59.0%** |
+| The item alone on a white plate (cut out with `u2net`) | 43.7% | 59.7% | 49.5% | 55.4% |
+
+So the removal step is worth **+26 points of item accuracy** over the crop
+alone, and it beats the AI cutout by 6 points while needing no model. It was
+measured at the page’s own threshold of 38; thresholds 20–40 give 59.0–60.8%,
+which is the same answer within the noise of 217 photos, so the figure is quoted
+as **about 60%**. Painting out the stored scene also beats handing the model the
+item “perfectly” isolated by the cutout model, because the cutout damages shiny
+objects and the subtraction keeps the item’s own pixels.
+
+**The AI cutout was rejected on these numbers, not on preference.** Run on the
+whole frame it keeps the largest salient object — on a table that is the
+**furniture**, and in the test scenes it deleted the item and kept the desk, the
+picnic table and a bookcase. On the eight car-key photos (already object-on-white)
+the small `u2netp` model made the black plastic shell **semi-transparent** and
+the larger `u2net` left holes in it: those are the photos that started this work.
+Cost was 4.4–168 MB and 0.26–0.51 s per photo on this CPU, against a few
+milliseconds for the subtraction.
+
+The geometry (`diffBox`, `diffBoxMulti`, `focusRegion`, `objectMask`,
+`squareCrop`, `centreCrop`, `scaleBox`) has **21 unit tests**; `objectMask`’s
+tests pin the four ways it could go wrong — a table pixel kept as an object, an
+item lost, a pixel that matches *any* snapshot treated as an object, and a mask
+that would leave an almost empty plate refused rather than used. The storage
 round-trip and three-background limit have **5**, and the controls (“Set
 background”, “Add background”, “Clear backgrounds”, “Focus on the object”, the
-empty-scene hint) plus **re-arming** are covered by `SortWaste.test.tsx`: a
-second item is accepted after background frames without pressing Start Camera
-again. **The live camera path itself is not exercised in this container** —
-there is no webcam here — so the background snapshot and the crop must be
-confirmed in a browser on the laptop at home. The fallback is deliberate: if the
-browser cannot read a canvas, the page classifies the whole frame as before.
+empty-scene hint), **re-arming**, and the drawing order of the removal
+(`clearRect` → `drawImage` → mask → white plate → a 224×224 crop handed to the
+model) are covered by `SortWaste.test.tsx`, including the case with no stored
+scene where the picture must be left alone. **The live camera path itself is not
+exercised in this container** — there is no webcam here — so the background
+snapshot and the removal must be confirmed in a browser on the laptop at home.
+The fallback is deliberate: no stored scene, an unreadable canvas, a moved
+camera, or a mask that would keep almost nothing all classify the plain crop as
+before.
 
 The page also **adds the seven recycler probabilities** before applying the
 confidence threshold, because they are one outcome. A frame that splits Ewaste

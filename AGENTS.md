@@ -224,19 +224,35 @@ V3 is kept at `models/waste-v3-20261113/` because its bin accuracy is better.
 `evaluate_waste_model.mjs` reproduces the comparison and
 `predict_waste_image.mjs` shows the top classes for one photo.
 
-The Sort Waste camera now **focuses on the object** rather than the room:
+The Sort Waste camera now **focuses on the object and paints out the table**:
 `web/frontend/src/lib/focus.ts` diffs each frame against **up to three**
-empty-scene snapshots (`diffBoxMulti`) and crops the changed box;
-`SortWaste.tsx` exposes **Set background / Add background**, **Clear
-backgrounds** and **Focus on the object**, and `lib/backgroundStore.ts` keeps
-the snapshots in `localStorage` so they survive a reload until cleared. An
-unchanged scene is reported as “Not a waste item” without asking the model.
-After a confirmed item the camera **stays on**: removing the item re-arms the
-stabilizer and the next item is classified without pressing Start Camera. The
-geometry has 14 unit tests (weighted-middle crop and the edge-touch hand
-warning), storage 5, and the controls/re-arming are component
-tested; the live camera path is not exercised in this container (no webcam), so
-confirm it in a browser at the exhibition/home table.
+empty-scene snapshots (`diffBoxMulti`), crops the changed box, and then
+`objectMask` replaces every pixel **inside that crop that still matches the
+stored empty scene** with a plain white plate — the same picture a cutout site
+produces, by subtraction instead of by a model. `SortWaste.tsx` exposes **Set
+background / Add background**, **Clear backgrounds** and **Focus on the
+object**, and `lib/backgroundStore.ts` keeps the snapshots in `localStorage` so
+they survive a reload until cleared. An unchanged scene is reported as “Not a
+waste item” without asking the model. After a confirmed item the camera **stays
+on**: removing the item re-arms the stabilizer and the next item is classified
+without pressing Start Camera. The geometry has **21** unit tests (weighted-middle
+crop, the edge-touch hand warning, and the four ways the mask can go wrong),
+storage 5, and the controls/re-arming/the drawing order are component tested;
+the live camera path is not exercised in this container (no webcam), so confirm
+it in a browser at the exhibition/home table.
+
+**An AI background remover was measured and rejected — do not re-add one
+without new evidence.** On 222 scenes (a real object photo pasted onto a real
+room photo) item-level action accuracy is **8.6%** whole frame, **32.9%** with
+the crop alone, **52.7%** with a subject-cutout model (`u2net`) inside the crop,
+and **about 60%** with the stored-scene subtraction. Run on the whole frame the
+cutout keeps the largest salient object — the **furniture** — and deleted the
+item in the test scenes; on the eight car-key photos it made the black plastic
+shell semi-transparent (`u2netp`) or left holes (`u2net`), and it costs
+4.4–168 MB plus 0.26–0.51 s per photo against a few milliseconds for the
+subtraction. The subtraction also cannot make the picture emptier than the crop
+already was: a moved camera makes everything differ (whole crop kept) and a mask
+keeping under 2% is refused, both falling back to the plain crop.
 
 The confidence is **action-level**: `lib/wasteActions.ts` adds the seven
 recycler probabilities, so Ewaste 45% + Metal 35% is accepted as 80% recycling

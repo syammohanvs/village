@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centreCrop, diffBox, diffBoxMulti, focusRegion, scaleBox, squareCrop } from './focus';
+import { centreCrop, diffBox, diffBoxMulti, focusRegion, objectMask, scaleBox, squareCrop } from './focus';
 
 function frame(width: number, height: number, value = 20): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -128,5 +128,91 @@ describe('object focus', () => {
     expect(region?.edgeTouch).toBe(false);
     expect(region!.box.x).toBeLessThanOrEqual(40);
     expect(region!.box.x + region!.box.width).toBeGreaterThanOrEqual(60);
+  });
+});
+
+describe('painting out the stored background', () => {
+  const BOX = { x: 20, y: 20, width: 40, height: 40 };
+
+  it('keeps the item and clears the table around it', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    // A 10x10 object in the middle of the crop box; the rest of the box is still
+    // the empty table, so it must not reach the classifier.
+    fill(current, 100, 35, 35, 10, 10, 240);
+    const mask = objectMask([background], current, 100, 80, BOX);
+    expect(mask).not.toBeNull();
+    expect(mask!.width).toBe(BOX.width);
+    expect(mask!.height).toBe(BOX.height);
+    // 100 of the 1600 box pixels are the object.
+    expect(mask!.kept).toBeCloseTo(100 / 1600, 3);
+    // The object is opaque...
+    const object = ((35 - BOX.y) * BOX.width + (35 - BOX.x)) * 4;
+    expect(mask!.data[object + 3]).toBe(255);
+    // ...and the table beside it is clear, which is what becomes white.
+    const table = ((30 - BOX.y) * BOX.width + (30 - BOX.x)) * 4;
+    expect(mask!.data[table + 3]).toBe(0);
+  });
+
+  it('does not keep anything the stored background explains', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    // A shadow that is darker than the table but still present in the snapshot.
+    fill(current, 100, 30, 30, 20, 20, 20);
+    expect(objectMask([background], current, 100, 80, BOX)).toBeNull();
+  });
+
+  it('accepts a pixel that matches any one of the stored backgrounds', () => {
+    const first = frame(100, 80, 20);
+    const second = frame(100, 80, 90);
+    const current = frame(100, 80, 90);
+    // The whole frame matches the second snapshot, so nothing is an object even
+    // though it differs from the first.
+    expect(objectMask([first, second], current, 100, 80, BOX)).toBeNull();
+    // The object has to differ from both snapshots, not merely from one.
+    fill(current, 100, 40, 40, 12, 12, 250);
+    const mask = objectMask([first, second], current, 100, 80, BOX);
+    expect(mask).not.toBeNull();
+    expect(mask!.kept).toBeCloseTo(144 / 1600, 3);
+  });
+
+  it('refuses a mask that would leave an almost empty plate', () => {
+    // Almost the whole box is still the stored table, so the mask would hand the
+    // classifier a blank plate.  That is a mis-measurement (a stale snapshot of
+    // the wrong place), and the plain crop is the honest fallback.
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, BOX.x, BOX.y, 3, 3, 250);
+    expect(objectMask([background], current, 100, 80, BOX)).toBeNull();
+  });
+
+  it('keeps everything when a moved camera makes the whole box differ', () => {
+    // A nudged camera means the stored snapshot no longer explains anything.  The
+    // mask then covers the box, which is the plain crop by another route — never
+    // an empty plate.
+    const background = frame(100, 80);
+    const current = frame(100, 80, 200);
+    const mask = objectMask([background], current, 100, 80, BOX);
+    expect(mask).not.toBeNull();
+    expect(mask!.kept).toBeCloseTo(1, 5);
+  });
+
+  it('has nothing to paint out without a stored background', () => {
+    const current = frame(100, 80);
+    fill(current, 100, 35, 35, 10, 10, 240);
+    expect(objectMask([], current, 100, 80, BOX)).toBeNull();
+    // A snapshot of the wrong size cannot be compared with this frame.
+    expect(objectMask([frame(50, 40)], current, 100, 80, BOX)).toBeNull();
+  });
+
+  it('clamps a box that runs off the frame instead of reading past it', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, 90, 70, 8, 8, 240);
+    const mask = objectMask([background], current, 100, 80, { x: 90, y: 70, width: 40, height: 40 });
+    expect(mask).not.toBeNull();
+    expect(mask!.width).toBe(10);
+    expect(mask!.height).toBe(10);
+    expect(mask!.data.length).toBe(10 * 10 * 4);
   });
 });

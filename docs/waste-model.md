@@ -278,13 +278,22 @@ installed**. It never substitutes random predictions.
 
 The page compares each camera frame with one or more **empty-scene snapshots**.
 A pixel that matches any stored snapshot is background; everything else is the
-object. The page crops a square around the changed box and hands only that crop
-to the classifier. An unchanged scene is reported as **“Not a waste item”**
-without asking the model to name a material from the room.
+object. An unchanged scene is reported as **“Not a waste item”** without asking
+the model to name a material from the room.
 
 1. Start the camera with the table (or the room) empty.
 2. Press **Set background**. The page stores that snapshot on this device.
 3. Show one item. Only the part that appeared is classified.
+
+Inside the crop, every pixel that still matches the stored empty scene is then
+**replaced with a plain white plate**. A pixel that matches the empty table
+cannot be the item, so there is nothing to guess at: the table, the floor and
+the background between the item and the edge of the crop are removed exactly,
+and the classifier is handed the object on its own.
+
+This is the step people expect from a “remove the background” website. It is
+done **by subtraction rather than by a model**, and that is deliberate — see
+*Why not an AI background remover* below.
 
 The backgrounds are **kept on this device** across a camera stop and a page
 reload; the last set remains until **Clear backgrounds** is pressed. Up to
@@ -297,22 +306,70 @@ the whole frame, which is the old behaviour.
 After a confirmed item the **camera stays on**. Remove the item; the empty
 scene lets the stabilizer re-arm, and the next item is classified without
 pressing Start Camera again. The result card says *remove the item*, then
-*camera armed*, so the operator can see which state it is in.
+*Camera armed*, so the operator can see which state it is in.
 
 This is why a car key on a home table no longer becomes “Leather” from the
 wooden table or a sleeve in the frame: the table and the room are the
-background, and the key is the crop.
+background, and the key is what survives the subtraction.
+
+**What the removal is worth, measured.** 222 scenes were built by pasting a
+real object photo onto a real room photo the way the camera sees it, then
+classified with the installed model. Item-level action accuracy (the right bin,
+or “recycling agent” for any recycler material):
+
+| What the model is given | Right action |
+| --- | --- |
+| The whole frame | 8.6% |
+| A square crop of the changed box (the previous behaviour) | 32.9% |
+| A crop with the empty scene painted out | **about 60%** |
+
+The earlier install and the current one agree on the ranking, so this is a
+property of the step and not of one model. The measurement lives in
+`docs/verification.md`.
+
+**Why not an AI background remover.** A general subject-cutout model was tried
+first, because that is what the cutout websites use. It was rejected on
+measurement, not on taste:
+
+- **It removes the wrong thing.** Run on the whole frame it keeps the largest
+  salient object, which on a table is the **furniture**: in the test scenes it
+  deleted the item and kept the desk, the picnic table and a bookcase. Item
+  accuracy on the whole frame was 37.4% against 8.6% for no processing at all —
+  better than nothing, far worse than the crop.
+- **Run inside the crop it does help — but less than subtraction.** Crop then
+  cutout scores 52.7% against about 60% for painting out the stored scene.
+- **It damages shiny objects.** On the eight car-key photos, which already sit
+  on a white background, the small `u2netp` model made the black plastic shell
+  **semi-transparent** and the larger `u2net` left holes in it. Those are the
+  photos that started this work.
+- **It costs a lot for that.** A 4.4–168 MB model and 0.26–0.51 s per photo on
+  a desktop CPU, against a few milliseconds for the subtraction, which needs
+  no model at all because the empty scene is already stored.
+
+So the order is: compare with the stored empty scene, crop to what changed, then
+subtract the parts of the crop that are still that empty scene. The comparison
+is the only step that needs to know *where* the item is, and it already does.
 
 **Hands and people.** A background snapshot does not know that an arm is not
-waste: a hand entering the frame changes pixels too. The crop is therefore
-weighted towards the **middle** of the picture (an arm comes in from an edge;
-the item is usually at the far end of it), and when the changed area touches a
-frame edge the page shows a warning: *“A hand or person is in the picture.
-Place the item on the table and step back.”* It still classifies, but the
-operator knows why a sleeve may be read as cloth. The reliable workflow at the
-exhibition is to **put the item on the table** rather than hold it in front of
-the camera. There is no person-detection model in this build; if held-item
-recognition is needed, a person-segmentation pass is the next step.
+waste: a hand entering the frame changes pixels too, so it survives the
+subtraction. The crop is therefore weighted towards the **middle** of the
+picture (an arm comes in from an edge; the item is usually at the far end of
+it), and when the changed area touches a frame edge the page shows a warning:
+*“A hand or person is in the picture. Place the item on the table and step
+back.”* It still classifies, but the operator knows why a sleeve may be read as
+cloth. The reliable workflow at the exhibition is to **put the item on the
+table** rather than hold it in front of the camera. There is no
+person-detection model in this build; if held-item recognition is needed, a
+person-segmentation pass (which removes the *person*, not the background) is
+the next step — a cutout model is the wrong tool for it.
+
+**Where the subtraction can still lose something.** An item whose middle looks
+exactly like the table — a clear glass bottle, or white foam on a white
+tablecloth — has its interior painted out and reaches the model as an outline.
+The page refuses a mask that would keep less than 2% of the crop and falls back
+to the plain crop, and a moved camera makes everything differ, which also falls
+back to the plain crop, so the step cannot make the picture emptier than the
+crop already was.
 
 The threshold and stable-frame count are adjustable in
 Setup → Voice & Camera; the cooldown applies to a session that stays open.

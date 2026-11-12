@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
+import { saveBackgrounds } from '../lib/backgroundStore';
 import { makeSettings, makeState } from '../test/fixtures';
 
 vi.mock('../lib/api', async (importOriginal) => {
@@ -61,7 +62,7 @@ const { predictMock, loadMock, predictionState } = vi.hoisted(() => {
       { className: 'Background', probability: 0.01 },
     ],
   };
-  const predictMock = vi.fn(async () => state.current);
+  const predictMock = vi.fn(async (..._args: unknown[]) => state.current);
   const loadMock = vi.fn(async () => ({ predict: predictMock }));
   return { predictMock, loadMock, predictionState: state };
 });
@@ -515,4 +516,173 @@ describe('Sort Waste', () => {
     });
     expect(stopTrack).not.toHaveBeenCalled();
   }, 25000);
+});
+
+describe('Sort Waste — the empty table is painted out', () => {
+  // jsdom has no canvas implementation, so the drawing calls are recorded.  What
+  // is asserted here is the *order* and the composite operations, which is the
+  // part a component test can hold; the pixels are measured in docs/verification.md
+  // against 217 real scenes.
+  class RecordingContext {
+    canvas: HTMLCanvasElement;
+    ops: string[];
+    globalCompositeOperation = 'source-over';
+    fillStyle = '';
+    constructor(canvas: HTMLCanvasElement, ops: string[]) {
+      this.canvas = canvas;
+      this.ops = ops;
+    }
+    drawImage() {
+      this.ops.push(`drawImage:${this.canvas.width}x${this.canvas.height}`);
+    }
+    getImageData(_x: number, _y: number, width: number, height: number) {
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 20;
+        data[i + 1] = 20;
+        data[i + 2] = 20;
+        data[i + 3] = 255;
+      }
+      // An item sitting in the middle of the analysis frame; everything else is
+      // exactly the stored empty scene.
+      for (let y = 50; y < 62; y += 1) {
+        for (let x = 70; x < 82; x += 1) {
+          const i = (y * width + x) * 4;
+          data[i] = 250;
+          data[i + 1] = 250;
+          data[i + 2] = 250;
+        }
+      }
+      return { data, width, height };
+    }
+    putImageData() {
+      this.ops.push('putImageData');
+    }
+    clearRect() {
+      this.ops.push('clearRect');
+    }
+    fillRect() {
+      this.ops.push(`fillRect:${this.fillStyle}`);
+    }
+    createImageData(width: number, height: number) {
+      return { data: new Uint8ClampedArray(width * height * 4), width, height };
+    }
+  }
+
+  function installCanvas() {
+    const ops: string[] = [];
+    const originals = {
+      getContext: HTMLCanvasElement.prototype.getContext,
+    };
+    HTMLCanvasElement.prototype.getContext = (function getContext(this: HTMLCanvasElement) {
+      return new RecordingContext(this, ops);
+    } as unknown) as typeof HTMLCanvasElement.prototype.getContext;
+    return {
+      ops,
+      restore() {
+        HTMLCanvasElement.prototype.getContext = originals.getContext;
+      },
+    };
+  }
+
+  it('replaces the unchanged table with a plain plate, then classifies the crop', async () => {
+    const canvas = installCanvas();
+    try {
+      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      vi.mocked(api.settings).mockResolvedValue(
+        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+      );
+      vi.mocked(api.postRecognition).mockResolvedValue({
+        ok: true,
+        category: 'plastic',
+        recognition: { id: 1, category: 'plastic', confidence: 0.95 },
+        bin: { id: 'plastic', state: 'available' },
+      });
+      // One stored empty scene, the same 160x120 frame the page analyses.
+      const empty = new Uint8ClampedArray(160 * 120 * 4);
+      for (let i = 0; i < empty.length; i += 4) {
+        empty[i] = 20;
+        empty[i + 1] = 20;
+        empty[i + 2] = 20;
+        empty[i + 3] = 255;
+      }
+      // Seeded through the app's own store, so the test also proves the snapshot
+      // round-trips through localStorage.
+      expect(
+        saveBackgrounds(window.localStorage, [{ width: 160, height: 120, data: empty }]),
+      ).toBe(true);
+
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+          enumerateDevices: vi.fn().mockResolvedValue([]),
+        },
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+        configurable: true,
+        get: () => 2,
+      });
+
+      predictMock.mockClear();
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      // The model loads asynchronously; clicking before it is ready does nothing.
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
+
+      // The mask was painted and used to punch the picture out.
+      expect(canvas.ops).toContain('putImageData');
+      expect(canvas.ops.join('|')).toMatch(/clearRect.*drawImage:224x224/);
+      // ...and a white plate was put behind it, so no transparency reaches the
+      // model.
+      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(true);
+      // The classifier is handed the 224x224 crop, never the raw video.
+      const input = predictMock.mock.calls[0][0] as unknown as HTMLCanvasElement;
+      expect(input.tagName).toBe('CANVAS');
+      expect(input.width).toBe(224);
+      expect(input.height).toBe(224);
+    } finally {
+      canvas.restore();
+    }
+  }, 15000);
+
+  it('leaves the picture alone when no empty scene has been stored', async () => {
+    const canvas = installCanvas();
+    try {
+      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+          enumerateDevices: vi.fn().mockResolvedValue([]),
+        },
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+        configurable: true,
+        get: () => 2,
+      });
+      predictMock.mockClear();
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      // The model loads asynchronously; clicking before it is ready does nothing.
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
+
+      expect(canvas.ops).not.toContain('putImageData');
+      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(false);
+    } finally {
+      canvas.restore();
+    }
+  }, 15000);
 });
