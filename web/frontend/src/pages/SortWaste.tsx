@@ -12,7 +12,14 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { diffBox, scaleBox, squareCrop } from '../lib/focus';
+import { diffBoxMulti, scaleBox, squareCrop } from '../lib/focus';
+import {
+  clearBackgrounds as clearStoredBackgrounds,
+  loadBackgrounds,
+  saveBackgrounds,
+  MAX_BACKGROUNDS,
+  type BackgroundFrame,
+} from '../lib/backgroundStore';
 import type { WasteRecognitionResult } from '../types';
 
 interface Classifier {
@@ -114,9 +121,10 @@ export function SortWaste() {
   const stabilizerRef = useRef(createWasteStabilizer());
   const busyRef = useRef(false);
   const acceptingRef = useRef(false);
-  const backgroundRef = useRef<ImageData | null>(null);
+  const backgroundRef = useRef<BackgroundFrame[]>([]);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [backgroundCount, setBackgroundCount] = useState(0);
   const [backgroundReady, setBackgroundReady] = useState(false);
   const [focusOn, setFocusOn] = useState(true);
   const [focusNote, setFocusNote] = useState('');
@@ -136,13 +144,18 @@ export function SortWaste() {
   const stabilityFrames = settings.data?.waste_stability_frames ?? 4;
   const cooldownMs = settings.data?.waste_cooldown_ms ?? 8000;
 
+  const effectiveCooldown = focusOn && backgroundCount > 0 ? 0 : cooldownMs;
+
   useEffect(() => {
     stabilizerRef.current = createWasteStabilizer({
       threshold: confidence,
       consecutiveFrames: stabilityFrames,
-      cooldownMs,
+      // With a stored background, the empty-scene frames are the duplicate
+      // guard: an item still in view never produces them.  The time cooldown
+      // would otherwise make the operator wait after the item is removed.
+      cooldownMs: effectiveCooldown,
     });
-  }, [confidence, stabilityFrames, cooldownMs]);
+  }, [confidence, stabilityFrames, effectiveCooldown]);
 
   useEffect(() => {
     const media = navigator.mediaDevices;
@@ -151,6 +164,27 @@ export function SortWaste() {
       .enumerateDevices()
       .then((list) => setDevices(list.filter((device) => device.kind === 'videoinput')))
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try {
+      storage = window.localStorage;
+    } catch {
+      storage = null;
+    }
+    const stored = loadBackgrounds(storage);
+    if (!stored) return;
+    const usable = stored.filter(
+      (frame) => frame.width === ANALYSIS_WIDTH && frame.height === ANALYSIS_HEIGHT,
+    );
+    if (usable.length === 0) return;
+    backgroundRef.current = usable;
+    setBackgroundCount(usable.length);
+    setBackgroundReady(true);
+    setFocusNote(
+      `${usable.length} background${usable.length === 1 ? '' : 's'} remembered from this device.`,
+    );
   }, []);
 
   useEffect(() => {
@@ -164,9 +198,6 @@ export function SortWaste() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
-    backgroundRef.current = null;
-    setBackgroundReady(false);
-    setFocusNote('');
     setCameraOn(false);
     setPredictions([]);
     stabilizerRef.current.reset();
@@ -188,9 +219,28 @@ export function SortWaste() {
     }
     try {
       context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      backgroundRef.current = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      // Keep the newest three.  Adding a fourth at a hall whose background has
+      // changed again should replace the oldest, not lock the operator out.
+      const next: BackgroundFrame[] = [
+        ...backgroundRef.current,
+        { width: ANALYSIS_WIDTH, height: ANALYSIS_HEIGHT, data: frame.data },
+      ].slice(-MAX_BACKGROUNDS);
+      backgroundRef.current = next;
+      let storage: Storage | null = null;
+      try {
+        storage = window.localStorage;
+      } catch {
+        storage = null;
+      }
+      const saved = saveBackgrounds(storage, next);
+      setBackgroundCount(next.length);
       setBackgroundReady(true);
-      setFocusNote('Background set. Show one item; only the object is classified.');
+      setFocusNote(
+        saved
+          ? `Background ${next.length} of ${MAX_BACKGROUNDS} stored on this device. Show one item; only the object is classified.`
+          : `Background ${next.length} of ${MAX_BACKGROUNDS} captured, but this browser could not store it.`,
+      );
       return true;
     } catch {
       setFocusNote('The camera frame could not be read. Press Set background again.');
@@ -198,11 +248,26 @@ export function SortWaste() {
     }
   }, []);
 
+  const clearBackgrounds = useCallback(() => {
+    backgroundRef.current = [];
+    let storage: Storage | null = null;
+    try {
+      storage = window.localStorage;
+    } catch {
+      storage = null;
+    }
+    clearStoredBackgrounds(storage);
+    setBackgroundCount(0);
+    setBackgroundReady(false);
+    setFocusNote('Backgrounds cleared. Show the empty table and press Set background.');
+    stabilizerRef.current.reset();
+  }, []);
+
   const focusInput = useCallback(
     (video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement | null => {
       if (!focusOn) return video;
-      const background = backgroundRef.current;
-      if (!background) return video;
+      const backgrounds = backgroundRef.current;
+      if (backgrounds.length === 0) return video;
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
       if (!context) return video;
@@ -213,7 +278,12 @@ export function SortWaste() {
       } catch {
         return video;
       }
-      const box = diffBox(background.data, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const box = diffBoxMulti(
+        backgrounds.map((background) => background.data),
+        frame.data,
+        ANALYSIS_WIDTH,
+        ANALYSIS_HEIGHT,
+      );
       if (!box) return null;
       const square = squareCrop(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
@@ -313,9 +383,6 @@ export function SortWaste() {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraOn(true);
-      backgroundRef.current = null;
-        setBackgroundReady(false);
-      setFocusNote('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       setDevices(list.filter((device) => device.kind === 'videoinput'));
       if (installed) void loadModel();
@@ -337,7 +404,6 @@ export function SortWaste() {
     const hazardous = hazardousMaterial(event.category);
     setReferralLabel(material);
     setHazardousLabel(hazardous);
-    let sorted = false;
     try {
       const result = await api.postRecognition({
         // One referral category for every recycler material and one for
@@ -348,7 +414,6 @@ export function SortWaste() {
         model: 'teachable-machine',
       });
       setRecognition(result);
-      sorted = true;
       const binState = result.bin?.state;
       setAlert(
         result.alert ??
@@ -362,12 +427,11 @@ export function SortWaste() {
       setRecognitionError(errorMessage(cause));
     } finally {
       acceptingRef.current = false;
-      // One item per camera session, but only once the backend actually
-      // accepted it.  A refused request leaves the camera running so the
-      // operator can remove the item and try again without a restart.
-      if (sorted) stopCamera();
+      // The camera deliberately stays on.  The stabilizer waits for the item to
+      // be removed and then re-arms, so the next item is classified without
+      // pressing Start Camera again.
     }
-  }, [stopCamera]);
+  }, []);
 
   useEffect(() => {
     if (!cameraOn || modelState !== 'ready') return;
@@ -488,22 +552,30 @@ export function SortWaste() {
                   type="button"
                   className="btn btn--ghost"
                   onClick={() => captureBackground()}
+                  title={
+                    backgroundCount >= MAX_BACKGROUNDS
+                      ? 'Three backgrounds are stored; adding another replaces the oldest.'
+                      : 'Remember this empty scene as a background.'
+                  }
                   data-testid="set-background"
                 >
-                  <IconRefresh size={16} /> Set background
+                  <IconRefresh size={16} /> {backgroundCount === 0 ? 'Set background' : 'Add background'}
                 </button>
+                {backgroundCount > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    onClick={clearBackgrounds}
+                    data-testid="clear-backgrounds"
+                  >
+                    Clear backgrounds
+                  </button>
+                )}
                 <label className="check-row">
                   <input
                     type="checkbox"
                     checked={focusOn}
-                    onChange={(event) => {
-                      setFocusOn(event.target.checked);
-                      if (!event.target.checked) {
-                        backgroundRef.current = null;
-                                            setBackgroundReady(false);
-                        setFocusNote('');
-                      }
-                    }}
+                    onChange={(event) => setFocusOn(event.target.checked)}
                   />
                   <span>Focus on the object</span>
                 </label>
@@ -522,10 +594,15 @@ export function SortWaste() {
                 {focusNote}
               </p>
             )}
-            {cameraOn && installed && focusOn && !backgroundReady && (
+            {cameraOn && installed && focusOn && (
               <p className="hint">
-                Show the empty table (or the room) and press <strong>Set background</strong> once,
-                then show one item. Only the object that appears is classified.
+                {backgroundReady
+                  ? `${backgroundCount} of ${MAX_BACKGROUNDS} background${backgroundCount === 1 ? '' : 's'} stored on this device. The last set remains until you clear it; ${
+                      backgroundCount >= MAX_BACKGROUNDS
+                        ? 'adding another replaces the oldest.'
+                        : 'add another for a door or lights that change.'
+                    }`
+                  : 'Show the empty table (or the room) and press Set background once, then show one item. Only the object that appears is classified.'}
               </p>
             )}
             <p className="camera-prompt">
@@ -548,8 +625,8 @@ export function SortWaste() {
               <strong>Hold it still</strong> for a few seconds.
             </p>
             <p>
-              <strong>One item at a time.</strong> The camera stops by itself after an item is
-              recognised; start it again for the next one.
+              <strong>One item at a time.</strong> After an item is recognised, remove it; the camera
+              arms itself for the next one.
             </p>
           </div>
         </div>
@@ -604,6 +681,16 @@ export function SortWaste() {
                 <p className="hint">
                   This is a camera suggestion, not proof that the item was put in the bin.
                 </p>
+                {stability?.phase === 'waiting-removal' && (
+                  <p className="hint" data-testid="waste-rearm">
+                    Remove the item; the camera arms itself for the next one.
+                  </p>
+                )}
+                {stability?.phase === 'armed' && (
+                  <p className="hint" data-testid="waste-ready">
+                    Camera armed. Show the next item when you are ready.
+                  </p>
+                )}
                 {!cameraOn && (
                   <p className="hint" data-testid="waste-camera-stopped">
                     The camera stopped after this item. Start it again for the next one.
@@ -701,7 +788,11 @@ export function SortWaste() {
               <div className="prediction-meta">
                 <span>Confidence threshold {Math.round(confidence * 100)}%</span>
                 <span>{stabilityFrames} frames to accept</span>
-                <span>Cooldown {Math.round(cooldownMs / 1000)}s</span>
+                <span>
+                  {focusOn && backgroundCount > 0
+                    ? 'Rearm after the item is removed'
+                    : `Cooldown ${Math.round(cooldownMs / 1000)}s`}
+                </span>
               </div>
               {predictions.length > 0 ? (
                 <ul className="prediction-list">

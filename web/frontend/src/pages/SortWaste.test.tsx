@@ -35,6 +35,16 @@ const DEFAULT_PREDICTIONS = [
   { className: 'Background', probability: 0.01 },
 ];
 
+const TEST_LABELS = DEFAULT_PREDICTIONS.map((row) => row.className);
+
+function predictionsFor(top: string, confidence = 0.95) {
+  const rest = (1 - confidence) / (TEST_LABELS.length - 1);
+  return TEST_LABELS.map((label) => ({
+    className: label,
+    probability: label === top ? confidence : rest,
+  }));
+}
+
 const { predictMock, loadMock, predictionState } = vi.hoisted(() => {
   const state = {
     current: [
@@ -157,14 +167,12 @@ describe('Sort Waste', () => {
     });
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Plastic');
 
-    // One item per camera session: the track is stopped and the page offers a
-    // fresh Start Camera while the result stays on screen.
-    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
-    expect(screen.getByTestId('start-camera')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /stop camera/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId('waste-camera-stopped')).toHaveTextContent(
-      /camera stopped after this item/i,
-    );
+    // The camera stays on after a confirmed item.  Removing the item lets the
+    // stabilizer re-arm, so the next item needs no Start Camera press.
+    expect(stopTrack).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('waste-camera-stopped')).not.toBeInTheDocument();
+    expect(screen.getByTestId('waste-rearm')).toHaveTextContent(/remove the item/i);
   }, 15000);
 
   it('refers a recycler material to the agent instead of a bin', async () => {
@@ -219,7 +227,8 @@ describe('Sort Waste', () => {
     expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
     expect(screen.getByTestId('waste-referral')).toHaveTextContent(/contact the operator/i);
     expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
-    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
+    expect(stopTrack).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
   }, 15000);
 
   it('refers hazardous waste to the operator instead of a bin', async () => {
@@ -275,7 +284,10 @@ describe('Sort Waste', () => {
     expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/hazardous waste/i);
     expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
     expect(screen.queryByText(/Put it in the medical bin/i)).not.toBeInTheDocument();
-    await waitFor(() => expect(stopTrack).toHaveBeenCalled());
+    // A camera-recognised hazardous item also leaves the camera running; the
+    // manual Hazardous button is the one that stops it.
+    expect(stopTrack).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
   }, 15000);
 
   it('records a hazardous item through the manual button without a bin LED', async () => {
@@ -400,4 +412,55 @@ describe('Sort Waste', () => {
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
     expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
   }, 15000);
+
+  it('keeps the camera running and arms itself for the next item', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockClear();
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 21, category: 'plastic', confidence: 0.95 },
+    });
+    predictionState.current = predictionsFor('Plastic', 0.95);
+    const stopTrack = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), { timeout: 6000 });
+    expect(stopTrack).not.toHaveBeenCalled();
+
+    // The item is removed: the empty scene re-arms the stabilizer.
+    predictionState.current = predictionsFor('Background', 0.99);
+    expect(await screen.findByTestId('waste-ready', {}, { timeout: 10000 })).toHaveTextContent(
+      /camera armed/i,
+    );
+
+    // The next item is classified without pressing Start Camera again.
+    predictionState.current = predictionsFor('Paper', 0.95);
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(2), { timeout: 6000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[1][0]).toMatchObject({
+      category: 'paper',
+      confidence: 0.95,
+    });
+    expect(stopTrack).not.toHaveBeenCalled();
+  }, 25000);
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centreCrop, diffBox, scaleBox, squareCrop } from './focus';
+import { centreCrop, diffBox, diffBoxMulti, scaleBox, squareCrop } from './focus';
 
 function frame(width: number, height: number, value = 20): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -80,5 +80,29 @@ describe('object focus', () => {
       width: 80,
       height: 80,
     });
+  });
+
+  it('accepts any of several backgrounds, so a door or a light can change', () => {
+    const openDoor = frame(100, 80, 20);
+    const closedDoor = frame(100, 80, 80);
+    const current = frame(100, 80, 80);
+    fill(current, 100, 20, 30, 10, 12, 220);
+    expect(diffBoxMulti([openDoor, closedDoor], current, 100, 80)).toEqual({
+      x: 20,
+      y: 30,
+      width: 10,
+      height: 12,
+    });
+  });
+
+  it('treats a frame that matches the second background as background', () => {
+    const openDoor = frame(100, 80, 20);
+    const closedDoor = frame(100, 80, 80);
+    const current = frame(100, 80, 80);
+    expect(diffBoxMulti([openDoor, closedDoor], current, 100, 80)).toBeNull();
+  });
+
+  it('has no object when there is no background at all', () => {
+    expect(diffBoxMulti([], frame(100, 80), 100, 80)).toBeNull();
   });
 });

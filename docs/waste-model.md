@@ -264,20 +264,28 @@ installed**. It never substitutes random predictions.
 
 ### Focusing on the object, not the room
 
-The page compares each camera frame with an **empty-scene snapshot**. Everything
-that differs is the object; the page crops a square around it and hands only
-that crop to the classifier. An unchanged scene is reported as **“Not a waste
-item”** without asking the model to name a material from the room.
+The page compares each camera frame with one or more **empty-scene snapshots**.
+A pixel that matches any stored snapshot is background; everything else is the
+object. The page crops a square around the changed box and hands only that crop
+to the classifier. An unchanged scene is reported as **“Not a waste item”**
+without asking the model to name a material from the room.
 
 1. Start the camera with the table (or the room) empty.
-2. Press **Set background**. The page confirms that the background is set.
+2. Press **Set background**. The page stores that snapshot on this device.
 3. Show one item. Only the part that appeared is classified.
 
-The snapshot is remembered for that camera session; press **Set background**
-again after moving the camera or if the room changes. **Focus on the object**
-can be unticked to classify the whole frame, which is the old behaviour. The
-first frame is captured automatically on start, so a camera opened with an
-item already in view should be re-snapshotted with the item removed.
+The backgrounds are **kept on this device** across a camera stop and a page
+reload; the last set remains until **Clear backgrounds** is pressed. Up to
+**three** can be stored, because a hall changes: a door is open in one and
+closed in another, or the lamps are on in one and off in another. A fourth
+press of **Add background** replaces the oldest, so the newest views are
+always the three in force. **Focus on the object** can be unticked to classify
+the whole frame, which is the old behaviour.
+
+After a confirmed item the **camera stays on**. Remove the item; the empty
+scene lets the stabilizer re-arm, and the next item is classified without
+pressing Start Camera again. The result card says *remove the item*, then
+*camera armed*, so the operator can see which state it is in.
 
 This is why a car key on a home table no longer becomes “Leather” from the
 wooden table or a sleeve in the frame: the table and the room are the

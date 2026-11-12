@@ -38,22 +38,24 @@ const DEFAULTS = {
 };
 
 /**
- * Bounding box of the pixels that differ between two RGBA frames.
+ * Bounding box of the pixels that differ from EVERY stored background.
  *
- * Returns `null` when nothing meaningful changed, or when almost everything
- * changed (that is a moved camera or a light being switched, not one object).
+ * More than one background is allowed because a hall changes: a door is open
+ * in one snapshot and closed in another, or the lights are on in one and off
+ * in another. A pixel that matches any of them is background.
  */
-export function diffBox(
-  background: Uint8ClampedArray,
+export function diffBoxMulti(
+  backgrounds: Uint8ClampedArray[],
   frame: Uint8ClampedArray,
   width: number,
   height: number,
   options: FocusOptions = {},
 ): Box | null {
   const { threshold, minFraction, maxFraction } = { ...DEFAULTS, ...options };
-  if (width <= 0 || height <= 0) return null;
+  if (width <= 0 || height <= 0 || backgrounds.length === 0) return null;
   const expected = width * height * 4;
-  if (background.length < expected || frame.length < expected) return null;
+  if (frame.length < expected) return null;
+  if (backgrounds.some((background) => background.length < expected)) return null;
 
   let minX = width;
   let minY = height;
@@ -63,10 +65,16 @@ export function diffBox(
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
-      const dr = Math.abs(frame[i] - background[i]);
-      const dg = Math.abs(frame[i + 1] - background[i + 1]);
-      const db = Math.abs(frame[i + 2] - background[i + 2]);
-      if (Math.max(dr, dg, db) < threshold) continue;
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const background of backgrounds) {
+        const dr = Math.abs(frame[i] - background[i]);
+        const dg = Math.abs(frame[i + 1] - background[i + 1]);
+        const db = Math.abs(frame[i + 2] - background[i + 2]);
+        const distance = Math.max(dr, dg, db);
+        if (distance < nearest) nearest = distance;
+        if (nearest < threshold) break;
+      }
+      if (nearest < threshold) continue;
       changed += 1;
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
@@ -80,6 +88,17 @@ export function diffBox(
   const box = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
   if ((box.width * box.height) / total > maxFraction) return null;
   return box;
+}
+
+/** Bounding box against a single background (kept for callers and tests). */
+export function diffBox(
+  background: Uint8ClampedArray,
+  frame: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: FocusOptions = {},
+): Box | null {
+  return diffBoxMulti([background], frame, width, height, options);
 }
 
 /**

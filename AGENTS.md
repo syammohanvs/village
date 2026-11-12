@@ -225,9 +225,14 @@ and `predict_waste_image.mjs` shows the top classes for one photo.
 previous models.
 
 The Sort Waste camera now **focuses on the object** rather than the room:
-`web/frontend/src/lib/focus.ts` diffs each frame against an empty-scene
-snapshot and crops the changed box; `SortWaste.tsx` exposes **Set background**
-and **Focus on the object**. An unchanged scene is reported as “Not a waste
-item” without asking the model. The geometry has 9 unit tests; the live camera
-path is not exercised in this container (no webcam), so confirm it in a browser
-at the exhibition/home table.
+`web/frontend/src/lib/focus.ts` diffs each frame against **up to three**
+empty-scene snapshots (`diffBoxMulti`) and crops the changed box;
+`SortWaste.tsx` exposes **Set background / Add background**, **Clear
+backgrounds** and **Focus on the object**, and `lib/backgroundStore.ts` keeps
+the snapshots in `localStorage` so they survive a reload until cleared. An
+unchanged scene is reported as “Not a waste item” without asking the model.
+After a confirmed item the camera **stays on**: removing the item re-arms the
+stabilizer and the next item is classified without pressing Start Camera. The
+geometry has 12 unit tests, storage 5, and the controls/re-arming are component
+tested; the live camera path is not exercised in this container (no webcam), so
+confirm it in a browser at the exhibition/home table.
