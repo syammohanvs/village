@@ -4,7 +4,11 @@ Calibration is stored on the ESP32 after validation. The dashboard shows the
 saved revision and any unsaved draft separately. A calibration change is not
 accepted until the controller acknowledges it.
 
-## 1. Soil moisture (two raw points)
+## 1. Soil moisture (two raw points, direct probe or module)
+
+The firmware reads the soil sensor as an analogue value on GPIO 34 (D34).  A bare
+two-prong probe with a 10 kΩ resistor works directly; an LM393 module is only
+a convenience (use its AO, not DO).  See docs/wiring.md.
 
 The probe is a **relative** sensor, not a laboratory volumetric measurement.
 The firmware maps the raw ADC reading between two calibrated endpoints:

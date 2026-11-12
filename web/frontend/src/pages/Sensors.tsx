@@ -202,6 +202,7 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
           </dl>
           {soil?.fault && <p className="error-text">Fault: {soil.fault}</p>}
           <p className="hint">Calibrated relative value, never a laboratory volumetric measurement.</p>
+          <p className="hint">Works with a bare two-prong probe and a 10 kΩ resistor to GPIO 34 — no module needed.</p>
         </Card>
 
         <Card kicker="Reservoir" title="Two wire probes">

@@ -216,21 +216,45 @@ GND ─────────┴── source ─── pump −
 
 ### Soil moisture probe — GPIO 34
 
-An LM393 interface board (VCC / GND / **DO** / **AO**) plus a two-prong probe.
+The input is **GPIO 34** (header `D34`, ADC1 channel 6). It is input-only and
+3.3 V only: never feed it more than 3.3 V.
+
+**A. LM393 interface board (module) — VCC / GND / DO / AO:**
+
+- `VCC` → **3V3**, `GND` → **GND**, `AO` → **GPIO 34**. `DO` is not connected.
+- **Use AO, not DO.** AO is the analog soil reading; DO is only the
+  comparator's wet/dry threshold set by the blue potentiometer and would
+  discard the analog information.
+- **Power the module from 3.3 V.** At 5 V VCC the AO pin can rise above 3.3 V.
+- The module is just a convenience (comparator + potentiometer); the firmware
+  never uses its digital output.
+
+**B. Bare two-prong probe (no module) — recommended:**
+
+Build a divider with one fixed resistor. Recommended **10 kΩ**:
 
 ```
-Module VCC  →  3V3
-Module GND  →  GND
-Module AO   →  D34 (GPIO 34, ADC1_CH6)
-Module DO   →  not connected
+ 3V3 ──[ probe ]──●── GPIO 34 (D34)
+                  │
+              [ 10 kΩ ]
+                  │
+                 GND
 ```
 
-- **Use AO, not DO.** AO is the analog soil reading, which is what a moisture
-  percentage needs. DO is only the comparator's wet/dry threshold set by the
-  blue potentiometer and would discard the analog information.
-- **Power the module from 3.3 V.** GPIO 34 is input-only and must never see
-  more than 3.3 V; at 5 V VCC the AO pin can rise above that. If you must use
-  5 V, measure AO first and add a divider (10 kΩ / 20 kΩ) before GPIO 34.
+- Probe on the **3.3 V side**, 10 kΩ to **GND** → the reading rises with
+  moisture (probe resistance falls when wet).
+- Swapping the two (10 kΩ to 3V3, probe to GND) inverts the reading. **Either
+  is fine** — the firmware accepts either polarity during calibration, so do
+  not worry which way the voltage moves; just record which reading came from
+  dry soil and which from wet soil.
+- Any value from 4.7 kΩ to 47 kΩ works; 10 kΩ gives a wide usable range with
+  a typical resistive probe. If the probe is very high resistance, use a
+  larger resistor (e.g. 47 kΩ) to keep the reading in range.
+- **Power is negligible** (the probe draws microamps through 10 kΩ); no
+  regulator load.
+
+**Common to both:**
+
 - The probe is resistive and corrodes under continuous DC. The supplied probe
   is nickel-plated to slow this, but keep it out of standing water and unplug
   it when the exhibit is not running. Continuous sampling is fine for a
@@ -240,7 +264,12 @@ Module DO   →  not connected
 - Calibration is two raw readings: dry soil and wet soil. The firmware accepts
   either polarity, so do not worry which way the voltage moves — just record
   which reading came from dry soil and which from wet soil.
-- Only the prongs go in the soil. Never bury the interface board.
+- Only the prongs go in the soil. Never bury the interface board (if used).
+
+**After wiring, tick “The soil probe is wired” in Setup → Sensors & Calibration and save**, otherwise the
+controller still reports no moisture level. The controller starts with the probe
+marked as not wired; that is deliberate, because a floating ADC pin reads
+plausible-looking noise and must not claim a moisture reading.
 
 ### Reservoir probes (two wires, one level)
 
