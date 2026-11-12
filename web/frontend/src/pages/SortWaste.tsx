@@ -12,7 +12,7 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { focusRegion, objectMask, scaleBox, type FocusRegion } from '../lib/focus';
+import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import { groupedPrediction } from '../lib/wasteActions';
 import { WasteWelcome } from '../components/WasteWelcome';
 import {
@@ -32,6 +32,19 @@ interface Classifier {
     flipped?: boolean,
   ): Promise<{ className: string; probability: number }[]>;
 }
+
+/**
+ * What the camera loop got for this frame.
+ *
+ * `empty` and `unmatched` are two different facts and must not share an answer:
+ * an empty table is “Not a waste item”, while a background that no longer
+ * describes the table is something the operator has to fix — and the item in
+ * front of the camera still has to be classified.
+ */
+type FocusOutcome =
+  | { kind: 'empty' }
+  | { kind: 'whole'; input: HTMLVideoElement; warning?: string }
+  | { kind: 'object'; input: HTMLCanvasElement; region: FocusRegion };
 
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 120;
@@ -271,42 +284,53 @@ export function SortWaste() {
   }, []);
 
   const focusInput = useCallback(
-    (
-      video: HTMLVideoElement,
-    ): { input: HTMLVideoElement | HTMLCanvasElement; region: FocusRegion | null } | null => {
-      if (!focusOn) return { input: video, region: null };
+    (video: HTMLVideoElement): FocusOutcome | null => {
+      if (!focusOn) return { kind: 'whole', input: video };
       const backgrounds = backgroundRef.current;
-      if (backgrounds.length === 0) return { input: video, region: null };
+      if (backgrounds.length === 0) return { kind: 'whole', input: video };
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
-      if (!context) return { input: video, region: null };
+      if (!context) return { kind: 'whole', input: video };
       let frame: ImageData;
       try {
         context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       } catch {
-        return { input: video, region: null };
+        return { kind: 'whole', input: video };
       }
-      const region = focusRegion(
+      const state = sceneState(
         backgrounds.map((background) => background.data),
         frame.data,
         ANALYSIS_WIDTH,
         ANALYSIS_HEIGHT,
       );
-      if (!region) return null;
+      if (state.kind === 'empty') return { kind: 'empty' };
+      if (state.kind === 'unmatched') {
+        // The stored scene no longer explains this frame: the camera was nudged,
+        // the light changed, or Set background was pressed with an item already
+        // on the table.  Saying “Not a waste item” here is what left the screen
+        // stuck, so say what happened and classify the whole frame instead.
+        return {
+          kind: 'whole',
+          input: video,
+          warning:
+            'The stored background no longer matches this view. Show the empty table and press Set background again.',
+        };
+      }
+      const region = state.region;
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
       const source = scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
       const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
       const cropContext = crop.getContext('2d');
-      if (!cropContext) return { input: video, region };
+      if (!cropContext) return { kind: 'whole', input: video };
       try {
         cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
         // Background is painted out, not merely cropped away.  A pixel inside the
         // square that still matches the stored empty scene is the table, the
         // room or the space beside the item, so it is replaced with a plain
         // plate and the classifier sees the object on its own.  Measured on 217
-        // scenes: item-level accuracy 32.9% (crop only) -> 60.8% (crop + this).
+        // scenes: item-level accuracy 32.9% (crop only) -> about 60% (crop + this).
         const mask = objectMask(
           backgrounds.map((background) => background.data),
           frame.data,
@@ -340,7 +364,7 @@ export function SortWaste() {
             cropContext.fillStyle = '#ffffff';
             cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
           } else {
-            return { input: video, region };
+            return { kind: 'whole', input: video };
           }
         } else {
           // No usable mask: the plain crop, exactly as before.
@@ -358,9 +382,9 @@ export function SortWaste() {
         }
         cropContext.globalCompositeOperation = 'source-over';
       } catch {
-        return { input: video, region };
+        return { kind: 'whole', input: video };
       }
-      return { input: crop, region };
+      return { kind: 'object', input: crop, region };
     },
     [focusOn],
   );
@@ -499,7 +523,8 @@ export function SortWaste() {
       try {
         const focused = focusInput(video);
         if (cancelled) return;
-        if (!focused) {
+        if (!focused) return;
+        if (focused.kind === 'empty') {
           // The empty scene (or a moved camera) is not a classification
           // problem: there is no object to sort.  Say so without asking the
           // model to name a material from the room.
@@ -508,6 +533,25 @@ export function SortWaste() {
           setPredictions(background);
           setGroupedTop(background[0]);
           const event = stabilizerRef.current.push(background);
+          setStability(stabilizerRef.current.snapshot());
+          if (event) void accept(event);
+          return;
+        }
+        if (focused.kind === 'whole') {
+          // Either focus is off, or the stored background no longer matches the
+          // view.  The second case used to report “Not a waste item” and never
+          // classify anything; now it says what to fix and still answers.
+          setFrameWarning(focused.warning ?? '');
+          const raw = await classifier.predict(focused.input);
+          if (cancelled) return;
+          const all = rankPredictions(
+            raw.map((row) => ({ label: row.className, confidence: row.probability })),
+            raw.length,
+          );
+          const grouped = groupedPrediction(all);
+          setPredictions(all.slice(0, 3));
+          setGroupedTop(grouped);
+          const event = grouped ? stabilizerRef.current.push([grouped]) : null;
           setStability(stabilizerRef.current.snapshot());
           if (event) void accept(event);
           return;
@@ -791,7 +835,7 @@ export function SortWaste() {
                     ? 'Nothing to sort — this does not look like waste. Show one item, or wait for the table to be clear.'
                     : strong
                       ? `Looking at ${displayLabel(top.label)}… hold still.`
-                      : 'Not sure yet — move the item a little and hold it still.'
+                      : `Best guess ${displayLabel(top.label)} at ${Math.round(top.confidence * 100)}% — not sure enough to choose a bin. Move it a little and hold it still.`
                   : 'Waiting for the camera to see something.'}
               </p>
             ) : cameraOn && previewOnly ? (

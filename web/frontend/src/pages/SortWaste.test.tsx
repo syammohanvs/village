@@ -518,11 +518,54 @@ describe('Sort Waste', () => {
   }, 25000);
 });
 
+describe('Sort Waste — a low guess says what it is', () => {
+  it('names its best guess and the percentage instead of going quiet', async () => {
+    // "Unable to identify it for a long time" was the report: the page said
+    // "Not sure yet" forever, which tells the operator nothing.  Naming the
+    // guess and how sure it is shows them what to fix.
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.9, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    predictionState.current = predictionsFor('Paper', 0.55);
+
+    render(<App />);
+    const start = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(start);
+
+    expect(await screen.findByText(/Best guess Paper at 55%/i, {}, { timeout: 5000 })).toBeInTheDocument();
+    // It must not claim a bin it is not sure about.
+    expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
+    expect(api.postRecognition).not.toHaveBeenCalled();
+  }, 15000);
+});
+
 describe('Sort Waste — the empty table is painted out', () => {
   // jsdom has no canvas implementation, so the drawing calls are recorded.  What
   // is asserted here is the *order* and the composite operations, which is the
   // part a component test can hold; the pixels are measured in docs/verification.md
   // against 217 real scenes.
+  // `null` draws one item over the stored empty scene; a number paints the
+  // whole frame that brightness, which is what a nudged camera or a change of
+  // light looks like.
+  let frameOverride: number | null = null;
+
   class RecordingContext {
     canvas: HTMLCanvasElement;
     ops: string[];
@@ -536,21 +579,24 @@ describe('Sort Waste — the empty table is painted out', () => {
       this.ops.push(`drawImage:${this.canvas.width}x${this.canvas.height}`);
     }
     getImageData(_x: number, _y: number, width: number, height: number) {
+      const base = frameOverride ?? 20;
       const data = new Uint8ClampedArray(width * height * 4);
       for (let i = 0; i < data.length; i += 4) {
-        data[i] = 20;
-        data[i + 1] = 20;
-        data[i + 2] = 20;
+        data[i] = base;
+        data[i + 1] = base;
+        data[i + 2] = base;
         data[i + 3] = 255;
       }
-      // An item sitting in the middle of the analysis frame; everything else is
-      // exactly the stored empty scene.
-      for (let y = 50; y < 62; y += 1) {
-        for (let x = 70; x < 82; x += 1) {
-          const i = (y * width + x) * 4;
-          data[i] = 250;
-          data[i + 1] = 250;
-          data[i + 2] = 250;
+      if (frameOverride === null) {
+        // An item sitting in the middle of the analysis frame; everything else
+        // is exactly the stored empty scene.
+        for (let y = 50; y < 62; y += 1) {
+          for (let x = 70; x < 82; x += 1) {
+            const i = (y * width + x) * 4;
+            data[i] = 250;
+            data[i + 1] = 250;
+            data[i + 2] = 250;
+          }
         }
       }
       return { data, width, height };
@@ -648,6 +694,72 @@ describe('Sort Waste — the empty table is painted out', () => {
       expect(input.width).toBe(224);
       expect(input.height).toBe(224);
     } finally {
+      canvas.restore();
+    }
+  }, 15000);
+
+  it('still classifies when the stored background no longer matches the view', async () => {
+    // The reported bug: after Set background, a nudged camera or a change of
+    // light makes every pixel differ, the old code reported "no object", and the
+    // screen sat on "Nothing to sort" while a real item was in front of it.
+    const canvas = installCanvas();
+    try {
+      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      vi.mocked(api.settings).mockResolvedValue(
+        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+      );
+      vi.mocked(api.postRecognition).mockResolvedValue({
+        ok: true,
+        category: 'plastic',
+        recognition: { id: 2, category: 'plastic', confidence: 0.95 },
+        bin: { id: 'plastic', state: 'available' },
+      });
+      const empty = new Uint8ClampedArray(160 * 120 * 4);
+      for (let i = 0; i < empty.length; i += 4) {
+        empty[i] = 20;
+        empty[i + 1] = 20;
+        empty[i + 2] = 20;
+        empty[i + 3] = 255;
+      }
+      expect(
+        saveBackgrounds(window.localStorage, [{ width: 160, height: 120, data: empty }]),
+      ).toBe(true);
+      // Every pixel differs from that snapshot.
+      frameOverride = 210;
+
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+          enumerateDevices: vi.fn().mockResolvedValue([]),
+        },
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+        configurable: true,
+        get: () => 2,
+      });
+
+      predictMock.mockClear();
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+
+      // The model is still asked, on the whole frame.
+      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
+      const input = predictMock.mock.calls[0][0] as unknown as HTMLVideoElement;
+      expect(input.tagName).toBe('VIDEO');
+      // ...and the page says what to fix instead of claiming there is no waste.
+      expect(await screen.findByTestId('frame-warning')).toHaveTextContent(
+        /background no longer matches/i,
+      );
+      expect(screen.queryByText(/this does not look like waste/i)).not.toBeInTheDocument();
+    } finally {
+      frameOverride = null;
       canvas.restore();
     }
   }, 15000);

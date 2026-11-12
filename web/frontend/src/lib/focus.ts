@@ -98,37 +98,59 @@ export interface FocusRegion {
 }
 
 /**
- * The crop to classify, weighted towards the middle of the frame.
+ * What the frame is, compared with the stored empty scenes.
  *
- * A visitor holding an item brings an arm in from an edge; the item is usually
- * at the far end of that arm.  A plain bounding box would centre the crop on
- * the arm.  Each changed pixel is weighted by its distance from the nearest
- * frame edge, so the arm contributes little and the item at the middle pulls
- * the crop towards itself.  `edgeTouch` tells the page that a hand/person is
- * probably in shot, so it can say so instead of quietly classifying a sleeve.
+ * `empty` and `unmatched` both used to be "no region", which made them
+ * indistinguishable to the page — and the page told the visitor “Not a waste
+ * item” for both.  That is right for an empty table and wrong for a background
+ * that no longer describes the table (the camera was nudged, the light
+ * changed, or somebody pressed Set background with an item already on it).  In
+ * that case the page must say so and keep classifying, because otherwise a real
+ * item is never seen and the screen sits on “Nothing to sort” for good.
  */
-export function focusRegion(
+export type SceneState =
+  | { kind: 'empty' }
+  | { kind: 'unmatched' }
+  | { kind: 'object'; region: FocusRegion };
+
+interface Scan {
+  changed: number;
+  total: number;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  weightedX: number;
+  weightedY: number;
+  weightSum: number;
+  edgeTouch: boolean;
+}
+
+/** One pass over the frame: which pixels differ from every stored scene. */
+function scan(
   backgrounds: Uint8ClampedArray[],
   frame: Uint8ClampedArray,
   width: number,
   height: number,
-  options: FocusOptions = {},
-): FocusRegion | null {
-  const { threshold, minFraction, maxFraction } = { ...DEFAULTS, ...options };
+  threshold: number,
+): Scan | null {
   if (width <= 0 || height <= 0 || backgrounds.length === 0) return null;
   const expected = width * height * 4;
   if (frame.length < expected) return null;
   if (backgrounds.some((background) => background.length < expected)) return null;
 
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-  let changed = 0;
-  let weightedX = 0;
-  let weightedY = 0;
-  let weightSum = 0;
-  let edgeTouch = false;
+  const result: Scan = {
+    changed: 0,
+    total: width * height,
+    minX: width,
+    minY: height,
+    maxX: -1,
+    maxY: -1,
+    weightedX: 0,
+    weightedY: 0,
+    weightSum: 0,
+    edgeTouch: false,
+  };
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
@@ -143,29 +165,35 @@ export function focusRegion(
         if (nearest < threshold) break;
       }
       if (nearest < threshold) continue;
-      changed += 1;
+      result.changed += 1;
       // Cube the distance to the nearest edge: an arm is a long strip of
       // low-weight pixels near an edge, while the item at its tip sits near the
       // middle.  Squared was not enough for a 30x60 arm against a 12x12 item.
       const edge = Math.min(x + 1, y + 1, width - x, height - y);
       const weight = edge * edge * edge;
-      weightedX += x * weight;
-      weightedY += y * weight;
-      weightSum += weight;
-      if (x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2) edgeTouch = true;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+      result.weightedX += x * weight;
+      result.weightedY += y * weight;
+      result.weightSum += weight;
+      if (x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2) result.edgeTouch = true;
+      if (x < result.minX) result.minX = x;
+      if (x > result.maxX) result.maxX = x;
+      if (y < result.minY) result.minY = y;
+      if (y > result.maxY) result.maxY = y;
     }
   }
+  return result;
+}
 
-  const total = width * height;
-  if (changed === 0 || changed / total < minFraction) return null;
-  const long = Math.max(maxX - minX + 1, maxY - minY + 1);
-  if ((long * long) / total > maxFraction) return null;
-  if (weightSum === 0) return null;
-  const centre = { x: weightedX / weightSum, y: weightedY / weightSum };
+function regionFrom(
+  found: Scan,
+  width: number,
+  height: number,
+  maxFraction: number,
+): FocusRegion | null {
+  if (found.weightSum === 0) return null;
+  const long = Math.max(found.maxX - found.minX + 1, found.maxY - found.minY + 1);
+  if ((long * long) / found.total > maxFraction) return null;
+  const centre = { x: found.weightedX / found.weightSum, y: found.weightedY / found.weightSum };
   // A person can span most of the frame.  Keep the crop on the object scale
   // rather than handing the classifier a picture of a torso.
   const cap = Math.round(Math.min(width, height) * 0.75);
@@ -183,10 +211,60 @@ export function focusRegion(
   );
   return {
     box,
-    coverage: (long * long) / total,
-    edgeTouch,
+    coverage: (long * long) / found.total,
+    edgeTouch: found.edgeTouch,
     centre,
   };
+}
+
+/**
+ * The crop to classify, weighted towards the middle of the frame.
+ *
+ * A visitor holding an item brings an arm in from an edge; the item is usually
+ * at the far end of that arm.  A plain bounding box would centre the crop on
+ * the arm.  Each changed pixel is weighted by its distance from the nearest
+ * frame edge, so the arm contributes little and the item at the middle pulls
+ * the crop towards itself.  `edgeTouch` tells the page that a hand/person is
+ * probably in shot, so it can say so instead of quietly classifying a sleeve.
+ */
+export function focusRegion(
+  backgrounds: Uint8ClampedArray[],
+  frame: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: FocusOptions = {},
+): FocusRegion | null {
+  const { threshold, minFraction, maxFraction } = { ...DEFAULTS, ...options };
+  const found = scan(backgrounds, frame, width, height, threshold);
+  if (!found) return null;
+  if (found.changed === 0 || found.changed / found.total < minFraction) return null;
+  return regionFrom(found, width, height, maxFraction);
+}
+
+/**
+ * The same comparison, but it says *which* of the two "no region" answers it is.
+ *
+ * The camera loop needs the difference: an empty table is worth reporting as
+ * “Not a waste item”, while a background that no longer matches the table is a
+ * problem the operator has to fix, and the item in front of the camera must
+ * still be classified.
+ */
+export function sceneState(
+  backgrounds: Uint8ClampedArray[],
+  frame: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: FocusOptions = {},
+): SceneState {
+  const { threshold, minFraction, maxFraction } = { ...DEFAULTS, ...options };
+  const found = scan(backgrounds, frame, width, height, threshold);
+  // No usable reference: nothing to compare with, so the page falls back to the
+  // whole frame rather than claiming the table is empty.
+  if (!found) return { kind: 'unmatched' };
+  if (found.changed === 0 || found.changed / found.total < minFraction) return { kind: 'empty' };
+  const region = regionFrom(found, width, height, maxFraction);
+  if (!region) return { kind: 'unmatched' };
+  return { kind: 'object', region };
 }
 
 export interface ObjectMask {

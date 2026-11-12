@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { centreCrop, diffBox, diffBoxMulti, focusRegion, objectMask, scaleBox, squareCrop } from './focus';
+import {
+  centreCrop,
+  diffBox,
+  diffBoxMulti,
+  focusRegion,
+  objectMask,
+  scaleBox,
+  sceneState,
+  squareCrop,
+} from './focus';
 
 function frame(width: number, height: number, value = 20): Uint8ClampedArray {
   const data = new Uint8ClampedArray(width * height * 4);
@@ -128,6 +137,51 @@ describe('object focus', () => {
     expect(region?.edgeTouch).toBe(false);
     expect(region!.box.x).toBeLessThanOrEqual(40);
     expect(region!.box.x + region!.box.width).toBeGreaterThanOrEqual(60);
+  });
+});
+
+describe('what the frame is', () => {
+  it('says the table is empty when nothing changed', () => {
+    const background = frame(100, 80);
+    expect(sceneState([background], frame(100, 80), 100, 80)).toEqual({ kind: 'empty' });
+  });
+
+  it('says there is an object when a box changed', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, 40, 30, 20, 20, 240);
+    const state = sceneState([background], current, 100, 80);
+    expect(state.kind).toBe('object');
+    if (state.kind !== 'object') throw new Error('expected an object');
+    expect(state.region.box.width).toBe(state.region.box.height);
+    expect(state.region.box.x).toBeLessThanOrEqual(40);
+  });
+
+  it('says the background no longer matches when the whole view changed', () => {
+    // A nudged camera or a switched-on lamp: every pixel differs.  This used to
+    // be reported as "no region", which the page showed as "Not a waste item"
+    // — so a real item in front of the camera was never classified at all.
+    const background = frame(100, 80, 20);
+    const current = frame(100, 80, 200);
+    expect(sceneState([background], current, 100, 80)).toEqual({ kind: 'unmatched' });
+    // The old answer for this frame is indistinguishable from an empty table:
+    expect(focusRegion([background], current, 100, 80)).toBeNull();
+  });
+
+  it('says the background no longer matches when there is no usable reference', () => {
+    expect(sceneState([], frame(100, 80), 100, 80)).toEqual({ kind: 'unmatched' });
+    // A snapshot of another size cannot explain this frame either.
+    expect(sceneState([frame(50, 40)], frame(100, 80), 100, 80)).toEqual({ kind: 'unmatched' });
+  });
+
+  it('agrees with focusRegion about which regions exist', () => {
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, 20, 30, 10, 12, 240);
+    const state = sceneState([background], current, 100, 80);
+    expect(state.kind === 'object' ? state.region : null).toEqual(
+      focusRegion([background], current, 100, 80),
+    );
   });
 });
 
