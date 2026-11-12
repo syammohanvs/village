@@ -262,6 +262,27 @@ installed**. It never substitutes random predictions.
   and shows a warning. It never redirects the item to a different bin.
 - A recognition is not proof that an item reached a bin or an agent.
 
+### Focusing on the object, not the room
+
+The page compares each camera frame with an **empty-scene snapshot**. Everything
+that differs is the object; the page crops a square around it and hands only
+that crop to the classifier. An unchanged scene is reported as **“Not a waste
+item”** without asking the model to name a material from the room.
+
+1. Start the camera with the table (or the room) empty.
+2. Press **Set background**. The page confirms that the background is set.
+3. Show one item. Only the part that appeared is classified.
+
+The snapshot is remembered for that camera session; press **Set background**
+again after moving the camera or if the room changes. **Focus on the object**
+can be unticked to classify the whole frame, which is the old behaviour. The
+first frame is captured automatically on start, so a camera opened with an
+item already in view should be re-snapshotted with the item removed.
+
+This is why a car key on a home table no longer becomes “Leather” from the
+wooden table or a sleeve in the frame: the table and the room are the
+background, and the key is the crop.
+
 The threshold and stable-frame count are adjustable in
 Setup → Voice & Camera; the cooldown applies to a session that stays open.
 

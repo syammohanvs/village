@@ -573,6 +573,17 @@ experimental run with more of them raised those objects but sent four of the
 eight car keys to the Plastic bin and dropped ball pens to 69%, so it was
 rejected. Venue photos are the fix.
 
+The page also now **focuses on the object**: each frame is compared with an
+empty-scene snapshot, and only the bounding box that changed is classified. An
+unchanged scene is reported as “Not a waste item” without asking the model to
+name the room. The geometry (`diffBox`, `squareCrop`, `centreCrop`,
+`scaleBox`) has **9 unit tests**, and the controls (“Set background”, “Focus on
+the object”, the empty-scene hint) are covered by `SortWaste.test.tsx`.
+**The live camera path itself is not exercised in this container** — there is
+no webcam here — so the background snapshot and the crop must be confirmed in
+a browser on the laptop at home. The fallback is deliberate: if the browser
+cannot read a canvas, the page classifies the whole frame as before.
+
 The training report beside the model records the counts, seed, confusion
 matrix and probe. `scripts/waste/evaluate_waste_model.mjs` reproduces both
 columns on any exported model, and `predict_waste_image.mjs` shows the top

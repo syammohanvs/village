@@ -320,6 +320,36 @@ describe('Sort Waste', () => {
     expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
   }, 15000);
 
+  it('offers a background snapshot so the room is not classified', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    predictionState.current = DEFAULT_PREDICTIONS;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    expect(await screen.findByTestId('set-background')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Focus on the object/i)).toBeChecked();
+    expect(screen.getByText(/Show the empty table/i)).toBeInTheDocument();
+  }, 15000);
+
   it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
     vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
     vi.mocked(api.settings).mockResolvedValue(

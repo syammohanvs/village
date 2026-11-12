@@ -223,3 +223,11 @@ Leather. `scripts/waste/evaluate_waste_model.mjs` reproduces the comparison
 and `predict_waste_image.mjs` shows the top classes for one photo.
 `models/waste-old-20261112/` and `models/waste-v2-20261112b/` keep the
 previous models.
+
+The Sort Waste camera now **focuses on the object** rather than the room:
+`web/frontend/src/lib/focus.ts` diffs each frame against an empty-scene
+snapshot and crops the changed box; `SortWaste.tsx` exposes **Set background**
+and **Focus on the object**. An unchanged scene is reported as “Not a waste
+item” without asking the model. The geometry has 9 unit tests; the live camera
+path is not exercised in this container (no webcam), so confirm it in a browser
+at the exhibition/home table.

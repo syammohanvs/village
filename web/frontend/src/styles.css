@@ -1475,6 +1475,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .camera-column, .result-column { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .camera-frame--large { aspect-ratio: 4 / 3; }
 .camera-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.focus-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.focus-controls .check-row { align-items: center; font-size: 14px; }
 .camera-prompt { margin: 0; color: var(--muted); font-size: 14px; }
 .waste-guidance {
   display: grid;

@@ -172,9 +172,10 @@ export function AboutHelp() {
           </li>
           <li>
             Show one clean item to the camera on <Link to="/waste">Sort Waste</Link> and see which
-            bin LED lights — or whether it is referred to the recycling agent. Ordinary objects are
-            still sorted by material: a phone or key fob is electronic waste, a wallet is leather
-            and sunglasses are glass.
+            bin LED lights — or whether it is referred to the recycling agent. Show the empty table
+            and press <em>Set background</em> first; the camera then ignores the room and classifies
+            only the object that appears. Ordinary objects are still sorted by material: a phone or
+            key fob is electronic waste, a wallet is leather and sunglasses are glass.
           </li>
           <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>

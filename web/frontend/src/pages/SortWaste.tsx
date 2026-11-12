@@ -12,12 +12,28 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
+import { diffBox, scaleBox, squareCrop } from '../lib/focus';
 import type { WasteRecognitionResult } from '../types';
 
 interface Classifier {
   // The second argument is `flipped`, not a result count: predict() returns
   // every class in metadata order.  Passing a number here mirrored the frame.
-  predict(input: HTMLVideoElement, flipped?: boolean): Promise<{ className: string; probability: number }[]>;
+  predict(
+    input: HTMLVideoElement | HTMLCanvasElement,
+    flipped?: boolean,
+  ): Promise<{ className: string; probability: number }[]>;
+}
+
+const ANALYSIS_WIDTH = 160;
+const ANALYSIS_HEIGHT = 120;
+const CROP_SIZE = 224;
+
+function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
+  if (!ref.current) ref.current = document.createElement('canvas');
+  const canvas = ref.current;
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
+  return canvas;
 }
 
 type ModelState = 'idle' | 'loading' | 'ready' | 'error';
@@ -98,6 +114,12 @@ export function SortWaste() {
   const stabilizerRef = useRef(createWasteStabilizer());
   const busyRef = useRef(false);
   const acceptingRef = useRef(false);
+  const backgroundRef = useRef<ImageData | null>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  const [focusOn, setFocusOn] = useState(true);
+  const [focusNote, setFocusNote] = useState('');
 
   const installed = modelInstalled(modelStatus.data);
   // Three different facts: the browser can open a camera, the model status is
@@ -142,10 +164,83 @@ export function SortWaste() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    backgroundRef.current = null;
+    setBackgroundReady(false);
+    setFocusNote('');
     setCameraOn(false);
     setPredictions([]);
     stabilizerRef.current.reset();
   }, []);
+
+  // Remember the empty scene once.  Everything that differs from it later is
+  // the object, and only that box is handed to the classifier.
+  const captureBackground = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      setFocusNote('The camera frame is not ready yet.');
+      return false;
+    }
+    const canvas = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+    const context = canvas.getContext('2d');
+    if (!context) {
+      setFocusNote('This browser cannot read the camera frame, so the whole picture is classified.');
+      return false;
+    }
+    try {
+      context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      backgroundRef.current = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      setBackgroundReady(true);
+      setFocusNote('Background set. Show one item; only the object is classified.');
+      return true;
+    } catch {
+      setFocusNote('The camera frame could not be read. Press Set background again.');
+      return false;
+    }
+  }, []);
+
+  const focusInput = useCallback(
+    (video: HTMLVideoElement): HTMLVideoElement | HTMLCanvasElement | null => {
+      if (!focusOn) return video;
+      const background = backgroundRef.current;
+      if (!background) return video;
+      const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const context = analysis.getContext('2d');
+      if (!context) return video;
+      let frame: ImageData;
+      try {
+        context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      } catch {
+        return video;
+      }
+      const box = diffBox(background.data, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      if (!box) return null;
+      const square = squareCrop(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
+      const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
+      const source = scaleBox(square, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
+      const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
+      const cropContext = crop.getContext('2d');
+      if (!cropContext) return video;
+      try {
+        cropContext.drawImage(
+          video,
+          source.x,
+          source.y,
+          source.width,
+          source.height,
+          0,
+          0,
+          CROP_SIZE,
+          CROP_SIZE,
+        );
+      } catch {
+        return video;
+      }
+      return crop;
+    },
+    [focusOn],
+  );
 
   // Syringes, cotton, napkins, diapers, urine bags and catheters are hazardous
   // waste, not one of the three bins.  The camera cannot reliably tell a
@@ -218,6 +313,9 @@ export function SortWaste() {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraOn(true);
+      backgroundRef.current = null;
+        setBackgroundReady(false);
+      setFocusNote('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       setDevices(list.filter((device) => device.kind === 'videoinput'));
       if (installed) void loadModel();
@@ -280,7 +378,20 @@ export function SortWaste() {
       if (!video || !classifier || busyRef.current || video.readyState < 2) return;
       busyRef.current = true;
       try {
-        const raw = await classifier.predict(video);
+        const input = focusInput(video);
+        if (cancelled) return;
+        if (!input) {
+          // The empty scene (or a moved camera) is not a classification
+          // problem: there is no object to sort.  Say so without asking the
+          // model to name a material from the room.
+          const background = [{ label: 'Background', confidence: 1 }];
+          setPredictions(background);
+          const event = stabilizerRef.current.push(background);
+          setStability(stabilizerRef.current.snapshot());
+          if (event) void accept(event);
+          return;
+        }
+        const raw = await classifier.predict(input);
         if (cancelled) return;
         const top = rankPredictions(
           raw.map((row) => ({ label: row.className, confidence: row.probability })),
@@ -300,7 +411,7 @@ export function SortWaste() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [cameraOn, modelState, accept]);
+  }, [cameraOn, modelState, accept, focusOn, captureBackground, focusInput]);
 
   const recognitionId = recognition?.recognition?.id ?? recognition?.recognition_id ?? null;
   const targetCategory =
@@ -371,6 +482,33 @@ export function SortWaste() {
                 <IconCamera size={18} /> Start Camera
               </button>
             )}
+            {cameraOn && installed && (
+              <div className="focus-controls">
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => captureBackground()}
+                  data-testid="set-background"
+                >
+                  <IconRefresh size={16} /> Set background
+                </button>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={focusOn}
+                    onChange={(event) => {
+                      setFocusOn(event.target.checked);
+                      if (!event.target.checked) {
+                        backgroundRef.current = null;
+                                            setBackgroundReady(false);
+                        setFocusNote('');
+                      }
+                    }}
+                  />
+                  <span>Focus on the object</span>
+                </label>
+              </div>
+            )}
             <button
               type="button"
               className="btn btn--ghost btn--large"
@@ -379,6 +517,17 @@ export function SortWaste() {
             >
               Hazardous / medical
             </button>
+            {focusNote && (
+              <p className="hint" data-testid="focus-note">
+                {focusNote}
+              </p>
+            )}
+            {cameraOn && installed && focusOn && !backgroundReady && (
+              <p className="hint">
+                Show the empty table (or the room) and press <strong>Set background</strong> once,
+                then show one item. Only the object that appears is classified.
+              </p>
+            )}
             <p className="camera-prompt">
               {!cameraSupported
                 ? 'This browser cannot open a camera in this tab, so Start Camera is disabled.'
