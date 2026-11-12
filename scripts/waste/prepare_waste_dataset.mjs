@@ -46,6 +46,7 @@ function parseArgs(argv) {
     footwear: '',
     thermocol: '',
     ewaste: '',
+    medical: '',
     out: '',
     limit: 0,
     force: false,
@@ -64,6 +65,7 @@ function parseArgs(argv) {
     args[key] = value;
   }
   if (!args.trashnet) throw new Error('--trashnet is required (the extracted dataset-resized folder)');
+  if (!args.medical && !args.ewaste) console.warn('note: --medical and/or --ewaste are optional but recommended');
   if (!args.out) throw new Error('--out is required');
   for (const key of ['trashnet', 'organic', 'background', 'textile', 'leather', 'footwear', 'thermocol', 'ewaste', 'out']) {
     if (args[key]) {
@@ -120,6 +122,7 @@ function main() {
     Footwear: args.footwear,
     Thermocol: args.thermocol,
     Ewaste: args.ewaste,
+    Medical: args.medical,
     Background: args.background,
   };
 

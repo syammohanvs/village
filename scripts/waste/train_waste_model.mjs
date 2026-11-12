@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
-const LABELS = ['Organic', 'Plastic', 'Paper', 'Glass', 'Metal', 'Textile', 'Leather', 'Footwear', 'Thermocol', 'Ewaste', 'Background'];
+const LABELS = ['Organic', 'Plastic', 'Paper', 'Glass', 'Metal', 'Textile', 'Leather', 'Footwear', 'Thermocol', 'Ewaste', 'Medical', 'Background'];
 const IMAGE_SIZE = 224;
 const CHECKPOINTS = {
   v1: 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_%ALPHA%_224/model.json',
