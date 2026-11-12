@@ -43,32 +43,38 @@ families were simply absent before, which is why a brown paper cover was read
 as e-waste, a bottle cap as e-waste and a ball pen as glass.
 
 Fifteen per cent of each class is held back for validation. The installed model
-scores **85.1% exact class (811/953)** on the common mixed set (studio photos
+scores **86.7% exact class (826/953)** on the common mixed set (studio photos
 plus real-world object photos). Because the seven recycler classes share one
-action, **90.6% of items get the right action**: **362/414 bin items** kept
-their own bin and **485/521 recycler items** were referred.
+action, **91.4% of items get the right action**: **356/414 bin items** kept
+their own bin and **499/521 recycler items** were referred.
 
-The trade is deliberate. The previous install (V3) scores **85.6% (816/953)**
-on the same photos, with **91.8%** bin accuracy and **87.5%** recycler
-accuracy. The installed V6 gives up about **4 points of bin accuracy** for
-about **5.6 points of recycler accuracy** and the car-key result below. If bin
-sorting matters more than arbitrary objects, the V3 backup is kept at
-`models/waste-v3-20261113/`. The real-world probe is **64.8% (153/236)** for
-V6 against **62.3%** for V3.
+| Model | Exact (953) | Bin | Recycler | Item action | Probe (236) |
+| --- | --- | --- | --- | --- | --- |
+| V3 (backup) | 85.6% | **91.8%** | 87.5% | 89.4% | 62.3% |
+| V6 (backup) | 85.1% | 87.4% | 93.1% | 90.6% | **64.8%** |
+| **V8 (installed)** | **86.7%** | 86.0% | **95.8%** | **91.4%** | 64.0% |
+
+V8 is the best on exact class, on item action and on recycler materials, and it
+is the only one that can recognise a **handkerchief** — see below. It gives up
+about **1.4 points of bin accuracy** against V6 and about 0.8 points on the
+236-photo probe (two photos, which is noise at that size). The two earlier
+models are kept at `models/waste-v3-20261113/` (best bin accuracy) and
+`models/waste-v6-20261113/` (best probe), so any of the three can be restored
+by copying four files.
 
 | Class | Exact match | Held-out photos |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 82.4% | 170 |
-| Paper | 89.9% | 217 |
-| Glass | 85.7% | 91 |
-| Metal | 70.7% | 82 |
-| Textile | 96.0% | 126 |
-| Leather | 75.0% | 36 |
-| Footwear | 86.7% | 30 |
-| Thermocol | 85.7% | 70 |
-| Ewaste | 77.9% | 86 |
-| Background | 66.7% | 18 |
+| Plastic | 83.5% | 170 |
+| Paper | 86.2% | 217 |
+| Glass | 74.7% | 91 |
+| Metal | 80.5% | 82 |
+| Textile | 94.4% | 126 |
+| Leather | 83.3% | 36 |
+| Footwear | 93.3% | 30 |
+| Thermocol | 91.4% | 70 |
+| Ewaste | 94.2% | 86 |
+| Background | 77.8% | 18 |
 
 ### The objects that were misread
 
@@ -99,6 +105,28 @@ produces **3 Metal, 5 Ewaste — all eight are recycler materials and none is
 Leather**. With the grouped recycler confidence below, all eight are accepted
 even when the top class is only 42–64%: Metal + Ewaste together clear the
 threshold.
+
+### A handkerchief, and why it needed photos rather than a bigger model
+
+A handkerchief was reported as never resolving. It is **Textile**, and the
+Textile class was built from a clothing dataset: shirts, trousers and jackets
+hanging or being worn, not a flat square of cloth lying on a table. On 28 real
+handkerchief photos the installed V6 put Textile first **0–7 times out of 28**
+depending on the sample, and mostly said Paper, Thermocol or Background.
+
+Twenty of those photos were added to the training tree (four copies each, so the
+class is 20% handkerchief) and the model retrained as **V8**. On the **8 photos
+never trained on**, Textile is now first **4 times out of 8** (two of them above
+75%, so they are accepted; two at about 49%, so the page names Textile as its
+best guess), with Background 3 and Thermocol 1. Item-level action went from
+**1/8 to 5/8** on that slice, and the model got better everywhere else at the
+same time.
+
+**The lesson: the failure was the dataset, not the network.** No amount of
+MobileNetV3, ResNet50 or a cloud vision model is a substitute for having the
+object in the training data — but it is also true that a larger network would
+generalise further from 20 photos than a frozen MobileNetV1 does. Venue photos
+remain the highest-value input.
 
 ### Ordinary objects
 
