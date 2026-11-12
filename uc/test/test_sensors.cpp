@@ -18,6 +18,7 @@ DeviceConfig tunedSoil() {
   c.soil.samples = 3;
   c.soil.max_age_ms = 5000;
   c.soil.calibrated = true;
+  c.soil.rises_with_moisture = true;  // raw values in this test rise... actually fall; but levels match, so no inversion
   c.irrigation.dry_start_pct = 35;
   c.irrigation.stop_pct = 55;
   return c;

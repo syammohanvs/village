@@ -16,7 +16,13 @@ The firmware maps the raw ADC reading between two calibrated endpoints:
 - `dry_raw` → 0 %
 - `wet_raw` → 100 %
 
-Either polarity is accepted. If the raw value rises with moisture, the wet
+Either polarity is accepted automatically: the firmware maps one endpoint to 0%
+and the other to 100%, so do not worry which way the voltage moves.  For the
+pull-up wiring (resistor to 3.3 V, probe to GND) the reading falls with
+moisture; tick **The reading rises with moisture** in Setup only if your probe
+is wired the other way (probe to 3.3 V, resistor to GND).
+
+If the raw value rises with moisture, the wet
 reading will be larger than the dry reading; the mapping handles it without a
 polarity switch.
 

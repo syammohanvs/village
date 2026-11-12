@@ -47,6 +47,7 @@ TEST(config_accepts_either_soil_polarity) {
   float pct = -1;
   c.soil.dry_raw = 2800;
   c.soil.wet_raw = 1100;
+  c.soil.rises_with_moisture = true;  // no inversion; polarity via span sign
   CHECK(soilPercent(c.soil, 2800, pct));
   CHECK_NEAR(pct, 0.0, 0.001);
   CHECK(soilPercent(c.soil, 1100, pct));
@@ -56,6 +57,7 @@ TEST(config_accepts_either_soil_polarity) {
 
   c.soil.dry_raw = 1100;
   c.soil.wet_raw = 2800;
+  c.soil.rises_with_moisture = true;
   CHECK(soilPercent(c.soil, 1100, pct));
   CHECK_NEAR(pct, 0.0, 0.001);
   CHECK(soilPercent(c.soil, 2800, pct));
@@ -65,6 +67,7 @@ TEST(config_accepts_either_soil_polarity) {
 TEST(config_clamps_soil_percentage_and_rejects_bad_span) {
   DeviceConfig c = defaults();
   c.soil.calibrated = true;
+  c.soil.rises_with_moisture = true;  // test the no-inversion path
   float pct = -1;
   CHECK(soilPercent(c.soil, 0, pct));
   CHECK_NEAR(pct, 100.0, 0.001);

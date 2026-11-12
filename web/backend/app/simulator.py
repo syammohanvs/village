@@ -94,6 +94,7 @@ def default_config() -> dict[str, Any]:
             "samples": 9,
             "max_age_ms": 5000,
             "calibrated": True,
+            "rises_with_moisture": False,
         },
         "reservoir": {
             "wet_threshold_mv": 1200,

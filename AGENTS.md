@@ -179,6 +179,27 @@ ground). The reading falls with light, so:
 Opposite wiring (LDR to 3.3 V, resistor to GND) needs
 `analog_bright_high = true`. See `docs/wiring.md` § "LDR (light sensor)".
 
+## Soil moisture polarity
+
+The soil probe is read as an analogue value on GPIO 34 (D34).  A bare
+two-prong probe with a 10 kΩ resistor divider works directly — no LM393
+module needed (its digital output was never used).
+
+`SoilConfig` gained `rises_with_moisture` (default **false**, matching the
+pull-up wiring: resistor to 3.3 V, probe to GND, raw falls with moisture).
+When false, the firmware inverts the raw reading (`4095 - raw`) before
+mapping, so calibration endpoints recorded with the opposite wiring still
+work.  When true, no inversion is applied.
+
+- `soilPercent()` applies the inversion via the flag.
+- The Setup page has a **"The reading rises with moisture"** checkbox
+  (ticking it sets the flag true; changing it clears the calibration).
+- The simulator mirrors the flag and keeps its raw values inverted.
+- `docs/wiring.md` and `docs/calibration.md` document both wirings.
+
+If the soil reading is backwards, flip the checkbox in Setup → Sensors &
+Calibration.  The calibration endpoints themselves are preserved.
+
 ## Waste classifier
 
 `models/waste/` is git-ignored. It holds the 11-class model trained in

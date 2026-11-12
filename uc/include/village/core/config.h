@@ -14,6 +14,11 @@ struct SoilConfig {
   // Deliberately false until the real probe endpoints have been captured and
   // confirmed.  Valid-looking default endpoints must not claim calibration.
   bool calibrated = false;
+  // true  = raw reading rises with moisture (probe on the 3.3 V side)
+  // false = raw reading falls with moisture (resistor on the 3.3 V side,
+  //         probe to GND).  The firmware inverts the reading when this is
+  //         false so the calibration endpoints keep their original meaning.
+  bool rises_with_moisture = false;
 };
 
 struct ReservoirConfig {
@@ -106,8 +111,12 @@ inline bool soilCalibrated(const SoilConfig& c) {
 // "uncalibrated" rather than a percentage.
 inline bool soilPercent(const SoilConfig& c, uint16_t raw, float& out) {
   if (!soilCalibrated(c)) return false;
+  uint16_t effective = raw;
+  if (!c.rises_with_moisture) {
+    effective = static_cast<uint16_t>(4095 - raw);
+  }
   const float span = static_cast<float>(c.wet_raw) - static_cast<float>(c.dry_raw);
-  float pct = (static_cast<float>(raw) - static_cast<float>(c.dry_raw)) / span * 100.0f;
+  float pct = (static_cast<float>(effective) - static_cast<float>(c.dry_raw)) / span * 100.0f;
   if (!std::isfinite(pct)) return false;
   if (pct < 0.0f) pct = 0.0f;
   if (pct > 100.0f) pct = 100.0f;

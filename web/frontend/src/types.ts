@@ -147,6 +147,7 @@ export interface SoilConfig {
   samples?: number;
   max_age_ms?: number;
   calibrated?: boolean;
+  rises_with_moisture?: boolean;
 }
 
 export interface ReservoirConfig {

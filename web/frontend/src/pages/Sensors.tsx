@@ -398,6 +398,24 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                 <label className="check-row" style={{ marginTop: 10 }}>
                   <input
                     type="checkbox"
+                    checked={Boolean(draft.soil.rises_with_moisture)}
+                    onChange={(event) =>
+                      update((next) => {
+                        next.soil.rises_with_moisture = event.target.checked;
+                        next.soil.calibrated = false;
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>The reading rises with moisture.</strong> Tick this if the raw value goes
+                    up when the soil gets wetter (probe on the 3.3 V side). Leave it unticked for
+                    the pull-up wiring (resistor to 3.3 V, probe to GND), where the reading falls
+                    with moisture. Changing this clears the calibration.
+                  </span>
+                </label>
+                <label className="check-row" style={{ marginTop: 10 }}>
+                  <input
+                    type="checkbox"
                     checked={Boolean(draft.soil.calibrated)}
                     onChange={(event) =>
                       update((next) => {

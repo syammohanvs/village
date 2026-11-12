@@ -189,7 +189,7 @@ export function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings 
 
 export function makeConfig(overrides: Partial<DeviceConfig> = {}): DeviceConfig {
   return {
-    soil: { dry_raw: 4095, wet_raw: 1460, min_span_raw: 400, samples: 9, max_age_ms: 5000, calibrated: true },
+    soil: { dry_raw: 4095, wet_raw: 1460, min_span_raw: 400, samples: 9, max_age_ms: 5000, calibrated: true, rises_with_moisture: false },
     reservoir: {
       wet_threshold_mv: 2300,
       dry_threshold_mv: 2800,
