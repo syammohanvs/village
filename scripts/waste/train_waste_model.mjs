@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
-const LABELS = ['Organic', 'Plastic', 'Paper', 'Glass', 'Metal', 'Textile', 'Leather', 'Footwear', 'Thermocol', 'Ewaste', 'Medical', 'Background'];
+const LABELS = ['Organic', 'Plastic', 'Paper', 'Glass', 'Metal', 'Textile', 'Leather', 'Footwear', 'Thermocol', 'Ewaste', 'Background'];
 const IMAGE_SIZE = 224;
 const CHECKPOINTS = {
   v1: 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_%ALPHA%_224/model.json',
@@ -59,6 +59,9 @@ function parseArgs(argv) {
     pooling: 'gap',
     split: 0.15,
     seed: 42,
+    probe: '',
+    'class-weight': 'sqrt',
+    'label-smoothing': 0.05,
     force: false,
     verify: true,
   };
@@ -83,7 +86,9 @@ function parseArgs(argv) {
   args.augment = Number(args.augment);
   args.split = Number(args.split);
   args.seed = Number(args.seed);
+  args['label-smoothing'] = Number(args['label-smoothing']);
   args.data = path.resolve(args.data.replace(/^~(?=\/|$)/, os.homedir()));
+  args.probe = args.probe ? path.resolve(args.probe.replace(/^~(?=\/|$)/, os.homedir())) : '';
   args.out = path.resolve(args.out);
   if (!['v1', 'v2'].includes(args.backbone)) throw new Error('--backbone must be v1 or v2');
   const alphas = args.backbone === 'v2' ? [0.35, 0.5, 0.75, 1] : [0.25, 0.5, 0.75, 1];
@@ -94,6 +99,12 @@ function parseArgs(argv) {
   if (!(args['learning-rate'] > 0)) throw new Error('--learning-rate must be positive');
   if (!(args.split > 0 && args.split < 1)) throw new Error('--split must be between 0 and 1');
   if (!['gap', 'gapmax'].includes(args.pooling)) throw new Error('--pooling must be gap or gapmax');
+  if (!['balanced', 'sqrt', 'none'].includes(args['class-weight'])) {
+    throw new Error('--class-weight must be balanced, sqrt or none');
+  }
+  if (!(args['label-smoothing'] >= 0 && args['label-smoothing'] < 0.3)) {
+    throw new Error('--label-smoothing must be between 0 and 0.3');
+  }
   return args;
 }
 
@@ -216,9 +227,10 @@ function preprocess(tf, file, rng, augment) {
     const image = tf.node.decodeImage(buffer, 3);
     const [height, width] = image.shape;
     const shortSide = Math.min(height, width);
-    // A little scale jitter keeps the model from memorising the exact framing
-    // of a studio photo; validation always uses the plain centre crop.
-    const scale = augment ? 0.86 + rng() * 0.14 : 1;
+    // A wider scale jitter than the first model used: the exhibition photo is
+    // rarely framed like a studio photo, and a bottle cap or a pen is small in
+    // the frame.  Validation always uses the plain centre crop.
+    const scale = augment ? 0.72 + rng() * 0.28 : 1;
     const side = Math.max(16, Math.round(shortSide * scale));
     const maxX = width - side;
     const maxY = height - side;
@@ -227,12 +239,30 @@ function preprocess(tf, file, rng, augment) {
     let crop = image.slice([dy, dx, 0], [side, side, 3]);
     if (augment && rng() < 0.5) crop = crop.reverse(1);
     let tensor = tf.image.resizeBilinear(crop, [IMAGE_SIZE, IMAGE_SIZE], true).toFloat();
+    if (augment) {
+      // Rotation would be the natural augmentation for a hand-held photo, but
+      // tfjs-node does not register the RotateWithOffset kernel for the
+      // TensorFlow backend.  Scale/translation jitter (above), a flip,
+      // brightness, contrast and saturation cover the same ground without an
+      // op the training backend cannot run.
+      const brightness = 1 + (rng() - 0.5) * 0.35;
+      tensor = tensor.mul(tf.scalar(brightness));
+      if (rng() < 0.5) {
+        const contrast = 0.8 + rng() * 0.5;
+        const mean = tensor.mean();
+        tensor = tensor.sub(mean).mul(tf.scalar(contrast)).add(mean);
+      }
+      // The lamp changes the apparent colour of brown paper and coloured caps.
+      // tfjs-node has no adjustSaturation, so blend towards the grey version.
+      if (rng() < 0.4) {
+        const factor = 0.6 + rng() * 0.9;
+        const grey = tf.image.rgbToGrayscale(tensor);
+        tensor = grey.add(tensor.sub(grey).mul(tf.scalar(factor)));
+      }
+      tensor = tensor.clipByValue(0, 255);
+    }
     // Teachable Machine's own capture step normalises to [-1, 1].
     tensor = tensor.div(tf.scalar(127)).sub(tf.scalar(1));
-    if (augment) {
-      const brightness = 1 + (rng() - 0.5) * 0.18;
-      tensor = tensor.mul(tf.scalar(brightness)).clipByValue(-1, 1);
-    }
     return tensor;
   });
 }
@@ -288,6 +318,91 @@ function confusion(predictions, truth) {
     perClass,
     matrix: Object.fromEntries(labels.map((label, index) => [label, matrix[index]])),
   };
+}
+
+function classWeights(counts, mode) {
+  const classCount = counts.length;
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  let weights = counts.map((count) => (count > 0 ? total / (classCount * count) : 0));
+  if (mode === 'sqrt') {
+    // Full inverse-frequency weighting over-corrects when a class is rare.  The
+    // first model up-weighted Ewaste by more than 3x against Paper, so an
+    // unfamiliar brown object fell into Ewaste.  Square-root damping keeps every
+    // class visible without making the rarest class the default answer.
+    weights = weights.map((value) => Math.sqrt(value));
+  }
+  if (mode === 'none') weights = weights.map(() => 1);
+  const present = weights.filter((value, index) => counts[index] > 0);
+  const mean = present.length > 0 ? present.reduce((sum, value) => sum + value, 0) / present.length : 1;
+  return Object.fromEntries(weights.map((value, index) => [index, value > 0 ? value / mean : 1]));
+}
+
+function smoothedOneHot(tf, labels, width, smoothing) {
+  const oneHot = tf.oneHot(tf.tensor1d(labels, 'int32'), width).toFloat();
+  if (smoothing <= 0) return oneHot;
+  return oneHot.mul(tf.scalar(1 - smoothing)).add(tf.scalar(smoothing / width));
+}
+
+// The probe tree is one folder per class, named `<source>__<index>.ext` so the
+// report can say which object the model still gets wrong.
+function loadProbe(dir) {
+  const entries = [];
+  if (!dir) return entries;
+  for (let index = 0; index < LABELS.length; index += 1) {
+    const label = LABELS[index];
+    for (const file of listImages(path.join(dir, label))) {
+      entries.push({
+        file,
+        label: index,
+        labelName: label,
+        source: path.basename(file).split('__')[0],
+      });
+    }
+  }
+  return entries;
+}
+
+async function predictEntries(tf, base, head, entries, batchSize) {
+  const predictions = [];
+  for (let start = 0; start < entries.length; start += batchSize) {
+    const slice = entries.slice(start, start + batchSize);
+    const batch = tf.tidy(() => tf.stack(slice.map((entry) => preprocess(tf, entry.file, () => 0.5, false))));
+    const features = base.predict(batch);
+    const logits = head.predict(features);
+    predictions.push(...Array.from(logits.argMax(1).dataSync()));
+    batch.dispose();
+    features.dispose();
+    logits.dispose();
+  }
+  return predictions;
+}
+
+function probeReport(predictions, entries) {
+  const truth = entries.map((entry) => entry.label);
+  const report = confusion(predictions, truth);
+  const bySource = new Map();
+  entries.forEach((entry, index) => {
+    const row = bySource.get(entry.source) || { source: entry.source, label: entry.labelName, total: 0, correct: 0, wrong: new Map() };
+    row.total += 1;
+    if (predictions[index] === entry.label) {
+      row.correct += 1;
+    } else {
+      const got = LABELS[predictions[index]];
+      row.wrong.set(got, (row.wrong.get(got) || 0) + 1);
+    }
+    bySource.set(entry.source, row);
+  });
+  const sources = [...bySource.values()]
+    .map((row) => ({
+      source: row.source,
+      class: row.label,
+      total: row.total,
+      correct: row.correct,
+      accuracy: row.correct / row.total,
+      wrong: Object.fromEntries([...row.wrong.entries()].sort((a, b) => b[1] - a[1])),
+    }))
+    .sort((a, b) => a.source.localeCompare(b.source));
+  return { ...report, sources };
 }
 
 async function main() {
@@ -355,8 +470,8 @@ async function main() {
   console.log('\nComputing MobileNet features (the base is frozen)...');
   const trainX = await extractFeatures(tf, base, trainEntries, args.batch, rng, 'train');
   const valX = await extractFeatures(tf, base, valEntries, args.batch, rng, 'val');
-  const trainY = tf.oneHot(tf.tensor1d(trainEntries.map((entry) => entry.label), 'int32'), LABELS.length);
-  const valY = tf.oneHot(tf.tensor1d(valEntries.map((entry) => entry.label), 'int32'), LABELS.length);
+  const trainY = smoothedOneHot(tf, trainEntries.map((entry) => entry.label), LABELS.length, args['label-smoothing']);
+  const valY = smoothedOneHot(tf, valEntries.map((entry) => entry.label), LABELS.length, 0);
   console.log(`  features ${trainX.shape[0]} train / ${valX.shape[0]} val, width ${trainX.shape[1]}`);
 
   const head = tf.sequential({
@@ -385,13 +500,10 @@ async function main() {
   let best = { valAcc: -1, valLoss: Number.POSITIVE_INFINITY, epoch: -1, weights: null };
   let stale = 0;
   console.log('\nTraining the classifier head...');
-  // Background has the fewest photos; weighting keeps it from being drowned by
-  // the two large classes while still letting the head see every example.
+  console.log(`  class weighting ${args['class-weight']}, label smoothing ${args['label-smoothing']}`);
   const trainCounts = new Array(LABELS.length).fill(0);
   for (const entry of trainEntries) trainCounts[entry.label] += 1;
-  const classWeight = Object.fromEntries(
-    trainCounts.map((count, index) => [index, count > 0 ? trainEntries.length / (LABELS.length * count) : 1]),
-  );
+  const classWeight = classWeights(trainCounts, args['class-weight']);
   await head.fit(trainX, trainY, {
     epochs: args.epochs,
     batchSize: args.batch,
@@ -449,6 +561,33 @@ async function main() {
     console.log('         Add more photos of that class, taken in the same place as the exhibition.');
   }
 
+  // The probe tree is separate from validation: it is the real objects the
+  // exhibition actually confuses (caps, pens, brown cardboard, foam), so a
+  // better validation score alone cannot hide a regression on them.
+  let probe = null;
+  const probeEntries = loadProbe(args.probe);
+  if (probeEntries.length > 0) {
+    const probePredictions = await predictEntries(tf, base, head, probeEntries, args.batch);
+    probe = probeReport(probePredictions, probeEntries);
+    console.log('\nProbe (photos of the objects that were misread, never trained on)');
+    console.log(`  accuracy ${(probe.accuracy * 100).toFixed(1)}% (${probe.correct}/${probe.total})`);
+    for (const row of probe.perClass) {
+      if (row.total === 0) continue;
+      console.log(`    ${row.label.padEnd(10)} ${(row.accuracy * 100).toFixed(1).padStart(5)}%  (${row.correct}/${row.total})`);
+    }
+    console.log('  by object');
+    for (const row of probe.sources) {
+      const wrong = Object.entries(row.wrong)
+        .map(([label, count]) => `${label} ${count}`)
+        .join(', ');
+      console.log(
+        `    ${row.source.padEnd(24)} ${(row.accuracy * 100).toFixed(1).padStart(5)}%  (${row.correct}/${row.total})${wrong ? `   misread as: ${wrong}` : ''}`,
+      );
+    }
+  } else if (args.probe) {
+    console.warn(`\nwarning: --probe ${args.probe} holds no photos; skipping the probe report`);
+  }
+
   const joint = tf.sequential();
   joint.add(base);
   joint.add(head);
@@ -466,6 +605,8 @@ async function main() {
       trainedBy: 'scripts/waste/train_waste_model.mjs',
       base: `mobilenet_${args.backbone}_${alphaString}_224_${args.pooling}`,
       validationAccuracy: report.accuracy,
+      probeAccuracy: probe ? probe.accuracy : null,
+      classWeight: args['class-weight'],
       seed: args.seed,
     },
     modelName: 'waste',
@@ -483,8 +624,11 @@ async function main() {
     denseUnits: args.dense,
     pooling: args.pooling,
     learningRate: args['learning-rate'],
+    classWeight: args['class-weight'],
+    labelSmoothing: args['label-smoothing'],
     counts,
     validation: report,
+    probe,
     labels: LABELS,
     imageSize: IMAGE_SIZE,
   };

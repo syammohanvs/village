@@ -26,35 +26,42 @@ texture. The dashboard maps all seven recycler classes to one outcome,
 | Class | Source | Photos |
 | --- | --- | --- |
 | `Organic` | Voxel51 food-waste dataset (MIT) | 180 |
-| `Plastic` | TrashNet `plastic` (MIT) | 482 |
-| `Paper` | TrashNet `paper` (MIT) | 594 |
+| `Plastic` | TrashNet `plastic` (MIT) + Wikimedia caps, pens, bottles, cups | 888 |
+| `Paper` | TrashNet `paper` + `cardboard` (MIT) + Wikimedia paper bags/board | 1 279 |
 | `Glass` | TrashNet `glass` (MIT) | 501 |
 | `Metal` | TrashNet `metal` (MIT) | 410 |
 | `Textile` | clothing-dataset-small (CC0) + fabric photos | 841 |
 | `Leather` | clothing-dataset-small `outwear` (CC0) | 184 |
 | `Footwear` | clothing-dataset-small `shoes` (CC0) | 198 |
-| `Thermocol` | Wikimedia Commons foam/packaging photos | 42 |
+| `Thermocol` | Wikimedia Commons foam/packaging photos | 171 |
 | `Ewaste` | Wikimedia Commons electronic-waste photos | 123 |
 | `Background` | room and table photos with no item | 110 |
 
 The trainer holds back 15% of each class for validation. The current install
-scores **93.4% exact class (513/549)**. Because the seven recycler classes
-share one action, **97.3% of items get the right action**: 180/188 bin items
-kept their own bin and 338/345 recycler items were referred.
+scores **88.8% exact class (717/807)** on a mixed set that now includes
+real-world object photos. Because the seven recycler classes share one action,
+**91.8% of items get the right action**: 371/414 bin items kept their own bin
+and 355/377 recycler items were referred.
+
+On the **same 807 photos** the previous studio-only model scores 76.5%, so the
+drop from its old 93.4% is the harder validation set, not a worse model. A
+separate probe of real-world objects never used for training goes from
+**17.4% (28/161)** to **77.6% (125/161)**; every ball pen, bottle cap and
+cardboard box that the old model misread is now mostly correct.
 
 | Class | Exact match | Held out |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 93.1% | 72 |
-| Paper | 96.6% | 89 |
-| Glass | 82.7% | 75 |
-| Metal | 98.4% | 62 |
+| Plastic | 87.6% | 170 |
+| Paper | 89.9% | 217 |
+| Glass | 86.7% | 75 |
+| Metal | 93.5% | 62 |
 | Textile | 93.7% | 126 |
-| Leather | 92.9% | 28 |
-| Footwear | 100.0% | 30 |
-| Thermocol | 66.7% | 6 |
-| Ewaste | 88.9% | 18 |
-| Background | 100.0% | 16 |
+| Leather | 82.1% | 28 |
+| Footwear | 93.3% | 30 |
+| Thermocol | 73.7% | 38 |
+| Ewaste | 72.2% | 18 |
+| Background | 81.2% | 16 |
 
 The images are not redistributed here; they stay in `~/.cache/village-waste`.
 The trained weights inherit those datasets' terms, which is one more reason
@@ -71,8 +78,8 @@ npm install --prefix ~/.cache/village-waste @tensorflow/tfjs-node@4.22.0
 ## Rebuild the dataset
 
 `prepare_waste_dataset.mjs` copies one folder per class. TrashNet supplies
-Plastic, Paper, Glass and Metal; the others are folders you supply. Separate
-several sources for one class with a comma.
+Plastic, Paper (including its `cardboard` folder), Glass and Metal; the others
+are folders you supply. Separate several sources for one class with a comma.
 
 ```bash
 node scripts/waste/prepare_waste_dataset.mjs \
@@ -106,9 +113,53 @@ node scripts/waste/train_waste_model.mjs \
   each class itself.
 
 Useful options: `--epochs`, `--augment` (extra augmented copies per photo,
-default 2), `--alpha` (MobileNet width, default 1.0), `--pooling gap`,
+default 2), `--alpha` (MobileNet width, default 1.0), `--pooling gap|gapmax`,
+`--class-weight balanced|sqrt|none`, `--label-smoothing`, `--probe <dir>`,
 `--seed`, `--force`, and `--no-verify` (skip the reload check). The trainer
 refuses to replace an installed model without `--force`.
+
+## Fixing a specific confusion
+
+A confusion is a data gap, not a reason to lower the threshold.  The loop is:
+
+1. **Prove it.**  Put a dozen photos of the item in `probe/<Class>/` and run
+   the trainer with `--probe`.  The report prints one line per object
+   (`bottle-caps 0/11, misread as Ewaste 5, Metal 3`), so the failure is a
+   number rather than a story.
+2. **Find the missing class contents.**  `fetch_extra_images.mjs` downloads
+   real photos of the object families that the bootstrap datasets do not
+   cover — bottle caps, ball pens, paper bags, cardboard, foam packaging — from
+   Wikimedia Commons, with the licence recorded in `sources.json`.
+3. **Rebuild the tree.**  `build_waste_dataset.mjs` keeps the bootstrap
+   `train/` + `val/`, adds TrashNet's unused `cardboard` folder to Paper and
+   the extra photos (repeated so they are not drowned by studio photos), and
+   copies the held-out probe slice.
+4. **Retrain and compare.**  The two numbers that matter are the ordinary
+   validation score and the per-object probe score.  A model that wins on the
+   probe is the one for the exhibition, even if the studio validation drops a
+   point.
+
+```bash
+node scripts/waste/fetch_extra_images.mjs \
+  --out ~/.cache/village-waste/extra --per-source 60 --probe 0.2
+node scripts/waste/build_waste_dataset.mjs \
+  --base ~/.cache/village-waste \
+  --trashnet ~/.cache/village-waste/dataset-resized \
+  --extra ~/.cache/village-waste/extra \
+  --out ~/.cache/village-waste/v2 --extra-repeat 2 --force
+node scripts/waste/train_waste_model.mjs \
+  --data ~/.cache/village-waste/v2 \
+  --probe ~/.cache/village-waste/v2/probe \
+  --modules ~/.cache/village-waste \
+  --pooling gapmax --class-weight sqrt --label-smoothing 0.05 \
+  --out models/waste --force
+```
+
+Two training choices are deliberate.  **`--class-weight sqrt`** damps the
+inverse-frequency weighting: full balancing up-weighted the small Ewaste class
+by more than 3x against Paper, which is why an unfamiliar brown object fell
+into Ewaste.  **Label smoothing** keeps a rare class from becoming the
+confident default answer for anything unusual.
 
 Before it exits it:
 
@@ -139,13 +190,18 @@ than pretending the model is finished.
 
 ## Honest limits
 
-- **Clear glass versus clear plastic is the hard pair.** Five of 72 held-out
-  plastic photos were read as recycler material and five of 75 glass photos
-  were read as plastic. A coloured plastic bottle or a bag is easier for the
-  demo; venue photos are the real fix.
-- **Thermocol is the weakest class** (42 public photos; two of six held-out
-  photos were ignored because they were not really foam). Add real thermocol
-  plates, cups and packing before relying on it.
+- **Clear glass versus clear plastic is still the hard pair.** On the mixed
+  held-out set Glass is 86.7% and Plastic 87.6%; most misses are glass read as
+  metal (6 of 75) and plastic read as paper (13 of 170). A coloured plastic
+  bottle or a bag is easier for the demo; venue photos are the real fix.
+- **Paper, foam and thin plastic overlap.** Foam cups are read as plastic in
+  half the probe photos, and paper bags as thermocol in three of fourteen.
+  Thermocol is now 73.7% on held-out photos (it had 42 public photos before;
+  the current tree has 171), but it is still the weakest class.
+- **Brown cardboard is mostly fixed, not perfect.** Cardboard boxes are 85.7%
+  and corrugated board 64.3% on the probe; the remaining corrugated misses are
+  read as e-waste, because brown board and a brown circuit board share a colour
+  and a texture at 224×224.
 - The model classifies the item in front of the camera. It cannot tell who put
   it there, and a recognition is not proof of a deposit or a handover.
 - A 224×224 image of a crumpled wrapper is genuinely ambiguous. The page

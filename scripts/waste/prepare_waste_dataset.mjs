@@ -9,7 +9,8 @@
  *   Organic  Plastic  Paper  Glass  Metal  Textile  Leather  Footwear
  *   Thermocol  Ewaste  Background
  *
- * TrashNet supplies Plastic, Paper, Glass and Metal.  The other folders are
+ * TrashNet supplies Plastic, Paper (including its `cardboard` folder, which is
+ * what brown cardboard covers need) , Glass and Metal.  The other folders are
  * collected separately (see docs/waste-model.md and scripts/waste/README.md).
  *
  * Usage (paths separated by a comma when one class has several sources):
@@ -46,7 +47,6 @@ function parseArgs(argv) {
     footwear: '',
     thermocol: '',
     ewaste: '',
-    medical: '',
     out: '',
     limit: 0,
     force: false,
@@ -65,7 +65,7 @@ function parseArgs(argv) {
     args[key] = value;
   }
   if (!args.trashnet) throw new Error('--trashnet is required (the extracted dataset-resized folder)');
-  if (!args.medical && !args.ewaste) console.warn('note: --medical and/or --ewaste are optional but recommended');
+  if (!args.ewaste) console.warn('note: --ewaste is optional but recommended');
   if (!args.out) throw new Error('--out is required');
   for (const key of ['trashnet', 'organic', 'background', 'textile', 'leather', 'footwear', 'thermocol', 'ewaste', 'out']) {
     if (args[key]) {
@@ -114,7 +114,10 @@ function main() {
   const plan = {
     Organic: args.organic,
     Plastic: [path.join(trashnet, 'plastic')],
-    Paper: [path.join(trashnet, 'paper')],
+    // TrashNet's `cardboard` folder is brown corrugated board: it belongs in
+    // the Paper bin and is the fix for a brown paper cover being read as
+    // electronic waste.
+    Paper: [path.join(trashnet, 'paper'), path.join(trashnet, 'cardboard')],
     Glass: [path.join(trashnet, 'glass')],
     Metal: [path.join(trashnet, 'metal')],
     Textile: args.textile,
@@ -122,7 +125,6 @@ function main() {
     Footwear: args.footwear,
     Thermocol: args.thermocol,
     Ewaste: args.ewaste,
-    Medical: args.medical,
     Background: args.background,
   };
 

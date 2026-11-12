@@ -510,36 +510,65 @@ The classifier is installed in `models/waste/` and the backend reports
 Textile, Leather, Footwear, Thermocol, Ewaste and Background. Every recycler
 class is mapped to one outcome, **Recycling agent**, with no bin LED.
 
-On **549 held-out photos** (15% of every class, never used for training) the
-exact-class score is **93.4% (513/549)**. Because the seven recycler classes
-share one action, the action-level score is **97.3%**:
+On **807 held-out photos** (15% of every class, never used for training; this
+set now includes real-world object photos as well as the studio bootstrap) the
+exact-class score is **88.8% (717/807)**. Because the seven recycler classes
+share one action, the action-level score is **91.8%**:
 
 | Class | Exact | Held out | Action |
 | --- | --- | --- | --- |
 | Organic | 100.0% | 27 | Organic bin |
-| Plastic | 93.1% | 72 | Plastic bin |
-| Paper | 96.6% | 89 | Paper bin |
-| Glass | 82.7% | 75 | Recycling agent |
-| Metal | 98.4% | 62 | Recycling agent |
+| Plastic | 87.6% | 170 | Plastic bin |
+| Paper | 89.9% | 217 | Paper bin |
+| Glass | 86.7% | 75 | Recycling agent |
+| Metal | 93.5% | 62 | Recycling agent |
 | Textile | 93.7% | 126 | Recycling agent |
-| Leather | 92.9% | 28 | Recycling agent |
-| Footwear | 100.0% | 30 | Recycling agent |
-| Thermocol | 66.7% | 6 | Recycling agent |
-| Ewaste | 88.9% | 18 | Recycling agent |
-| Background | 100.0% | 16 | ignored |
+| Leather | 82.1% | 28 | Recycling agent |
+| Footwear | 93.3% | 30 | Recycling agent |
+| Thermocol | 73.7% | 38 | Recycling agent |
+| Ewaste | 72.2% | 18 | Recycling agent |
+| Background | 81.2% | 16 | ignored |
 
-**180/188 bin items kept their own bin**; **338/345 recycler items were
-referred**. The notable misses are the hard clear-glass/clear-plastic pair:
-five plastic photos were read as a recycler material and five glass photos as
-plastic. Thermocol has only 42 public photos, and two of its six held-out
-photos were not really foam (they were ignored, which is correct for those
-images). The training report beside the model records the counts, seed and
-confusion matrix.
+**371/414 bin items kept their own bin**; **355/377 recycler items were
+referred**. The numbers are lower than the earlier studio-only 93.4% because
+the held-out set now contains the real-world photos the model was missing, not
+because the model got worse. Scored on these same 807 photos, the previous
+model gets **76.5% (617/807)**.
 
-Sources: TrashNet (MIT) for Plastic, Paper, Glass and Metal; Voxel51 food-waste
-(MIT) for Organic; clothing-dataset-small (CC0) for Textile, Leather and
-Footwear; Wikimedia Commons photos for fabric, Thermocol, Ewaste and
-Background. The images are not committed and `models/` is git-ignored.
+A separate **probe** of real-world objects (never trained on) is the direct
+answer to the reported failures:
+
+| Model | Validation (same 807) | Probe (161) |
+| --- | --- | --- |
+| Previous | 76.5% (617/807) | 17.4% (28/161) |
+| Installed | **88.8% (717/807)** | **77.6% (125/161)** |
+
+| Object | Correct | Misread as |
+| --- | --- | --- |
+| Ball-pointed pen | 100.0% (14/14) | — |
+| Ball pen | 92.3% (12/13) | Thermocol 1 |
+| Bottle cap | 90.9% (10/11) | Ewaste 1 |
+| Cardboard box | 85.7% (12/14) | Background 1, Thermocol 1 |
+| Corrugated board | 64.3% (9/14) | Ewaste 3, Metal 1, Plastic 1 |
+| Paper bag | 71.4% (10/14) | Thermocol 3, Plastic 1 |
+| Plastic bottle | 71.4% (10/14) | Thermocol 2, Paper 1, Background 1 |
+| Plastic cup | 64.3% (9/14) | Paper 2, Thermocol 2, Ewaste 1 |
+| Foam food container | 66.7% (8/12) | Plastic 2, Paper 1, Ewaste 1 |
+| Foam cup | 50.0% (3/6) | Plastic 3 |
+
+The previous model read **every ball pen as glass**, **every bottle cap as
+e-waste** and **every cardboard box as e-waste** on this probe. The remaining
+misses are mostly the paper/foam and foam/plastic boundaries, which are close on
+a 224×224 frame; the training report beside the model records the counts,
+seed, confusion matrix and probe. `scripts/waste/evaluate_waste_model.mjs`
+reproduces both columns on any exported model.
+
+Sources: TrashNet (MIT) for Plastic, Paper, Glass, Metal and the previously
+unused `cardboard` folder; Voxel51 food-waste (MIT) for Organic;
+clothing-dataset-small (CC0) for Textile, Leather and Footwear; Wikimedia
+Commons photos for fabric, bottle caps, ball pens, paper bags, cardboard, cans,
+foam packaging, Ewaste and Background (licences recorded in the downloader's
+`sources.json`). The images are not committed and `models/` is git-ignored.
 
 Chromium was driven with a **fake camera** (Y4M files built from held-out
 photos) against a throwaway simulator backend on `:8013`, in demo mode so no
