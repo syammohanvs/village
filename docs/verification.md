@@ -617,8 +617,8 @@ the larger `u2net` left holes in it: those are the photos that started this work
 Cost was 4.4–168 MB and 0.26–0.51 s per photo on this CPU, against a few
 milliseconds for the subtraction.
 
-The geometry (`diffBox`, `diffBoxMulti`, `focusRegion`, `objectMask`,
-`squareCrop`, `centreCrop`, `scaleBox`) has **21 unit tests**; `objectMask`’s
+The geometry (`diffBox`, `diffBoxMulti`, `focusRegion`, `sceneState`,
+`objectMask`, `squareCrop`, `centreCrop`, `scaleBox`) has **26 unit tests**; `objectMask`’s
 tests pin the four ways it could go wrong — a table pixel kept as an object, an
 item lost, a pixel that matches *any* snapshot treated as an object, and a mask
 that would leave an almost empty plate refused rather than used. The storage
@@ -627,7 +627,22 @@ background”, “Add background”, “Clear backgrounds”, “Focus on the ob
 empty-scene hint), **re-arming**, and the drawing order of the removal
 (`clearRect` → `drawImage` → mask → white plate → a 224×224 crop handed to the
 model) are covered by `SortWaste.test.tsx`, including the case with no stored
-scene where the picture must be left alone. **The live camera path itself is not
+scene where the picture must be left alone.
+
+**The stuck-screen bug is pinned by its own test.** `sceneState` distinguishes
+an empty table from a background that no longer matches, and a component test
+drives the second case: with every pixel different from the snapshot, the model
+is still asked (so the visitor gets an answer) and the page warns that the
+background needs re-setting. The test **was proved to fire** — restoring the old
+conflation (`unmatched` treated as `empty`) makes it fail with *“expected spy to
+be called at least once”*, which is exactly the reported symptom: nothing was
+classified. A second test pins the low-confidence card naming its guess (*“Best
+guess Paper at 55%”*) without posting a recognition.
+
+Lia's greeting has **9** component tests of its own (`WasteWelcome.test.tsx`):
+the configured language on arrival, English as the fallback, every language
+carrying a line, a language switch re-speaking, the replay button, dismissal
+stopping the voice, and the two silent-device notes. **The live camera path itself is not
 exercised in this container** — there is no webcam here — so the background
 snapshot and the removal must be confirmed in a browser on the laptop at home.
 The fallback is deliberate: no stored scene, an unreadable canvas, a moved

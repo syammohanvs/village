@@ -278,8 +278,25 @@ installed**. It never substitutes random predictions.
 
 The page compares each camera frame with one or more **empty-scene snapshots**.
 A pixel that matches any stored snapshot is background; everything else is the
-object. An unchanged scene is reported as **“Not a waste item”** without asking
-the model to name a material from the room.
+object.
+
+The comparison has **three** outcomes, and they must not be confused:
+
+| What the frame is | What the page does |
+| --- | --- |
+| Matches the stored scene | “Not a waste item”. The model is not asked to name the room. |
+| Something changed | Crops to it, paints out the empty scene, classifies. |
+| **Matches nothing** | **Says so, and still classifies the whole frame.** |
+
+The third row is the one that used to break the exhibit. “The table is empty”
+and “the stored background no longer describes this view” both arrived as *no
+region*, so the page reported “Not a waste item” for the second one too — and a
+real item in front of the camera was never looked at again. A nudged camera, a
+lamp switched on, or **pressing Set background with an item already on the
+table** all produce it. Now the page says *“The stored background no longer
+matches this view. Show the empty table and press Set background again.”* and
+keeps classifying, so the visitor still gets an answer while the operator fixes
+the snapshot.
 
 1. Start the camera with the table (or the room) empty.
 2. Press **Set background**. The page stores that snapshot on this device.
@@ -349,6 +366,20 @@ measurement, not on taste:
 So the order is: compare with the stored empty scene, crop to what changed, then
 subtract the parts of the crop that are still that empty scene. The comparison
 is the only step that needs to know *where* the item is, and it already does.
+
+**When it is not sure, it says what it thinks.** The page used to say *“Not sure
+yet”* for as long as the guess stayed below the acceptance threshold, which tells
+the operator nothing — the report that prompted this was a handkerchief that
+never resolved. The card now reads *“Best guess Paper at 55% — not sure enough
+to choose a bin. Move it a little and hold it still.”* It still refuses to pick a
+bin, but the guess and the number are the information needed to decide whether to
+move the item, change the light, or hand it to the operator.
+
+**Lia greets the visitor.** On arrival the page says one line in the language the
+app is set to — *“Know the bin? Go ahead. Not sure? Show the item to the camera
+and I’ll help.”* — and shows the same words for a device with no voice. It is
+said again if the language is switched while the card is open, and stops when
+the card is dismissed or the page is left.
 
 **Hands and people.** A background snapshot does not know that an arm is not
 waste: a hand entering the frame changes pixels too, so it survives the
