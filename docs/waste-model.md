@@ -43,32 +43,32 @@ families were simply absent before, which is why a brown paper cover was read
 as e-waste, a bottle cap as e-waste and a ball pen as glass.
 
 Fifteen per cent of each class is held back for validation. The installed model
-scores **88.1% exact class (734/833)** on that mixed set (studio photos plus
-real-world object photos). Because the seven recycler classes share one action,
-**90.8% of items get the right action**: **380/414 bin items** kept their own
-bin and **360/401 recycler items** were referred.
+scores **85.1% exact class (811/953)** on the common mixed set (studio photos
+plus real-world object photos). Because the seven recycler classes share one
+action, **90.6% of items get the right action**: **362/414 bin items** kept
+their own bin and **485/521 recycler items** were referred.
 
-The previous install is the fair comparison, not the older studio-only 93.4%
-figure. Scored on the **same 833 photos**, the previous model gets **87.3%
-(727/833)** and the installed one **88.1%**. The probe changed too: on the
-original 161 paper/plastic/thermocol photos it is **125/161 (77.6%)** for the
-previous model and **124/161 (77.0%)** for this one — essentially unchanged.
-On the expanded 194-photo probe, which adds ordinary objects, it is **66.5%**
-versus **68.6%**.
+The trade is deliberate. The previous install (V3) scores **85.6% (816/953)**
+on the same photos, with **91.8%** bin accuracy and **87.5%** recycler
+accuracy. The installed V6 gives up about **4 points of bin accuracy** for
+about **5.6 points of recycler accuracy** and the car-key result below. If bin
+sorting matters more than arbitrary objects, the V3 backup is kept at
+`models/waste-v3-20261113/`. The real-world probe is **64.8% (153/236)** for
+V6 against **62.3%** for V3.
 
 | Class | Exact match | Held-out photos |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 85.3% | 170 |
-| Paper | 95.9% | 217 |
-| Glass | 83.1% | 77 |
-| Metal | 83.3% | 72 |
+| Plastic | 82.4% | 170 |
+| Paper | 89.9% | 217 |
+| Glass | 85.7% | 91 |
+| Metal | 70.7% | 82 |
 | Textile | 96.0% | 126 |
-| Leather | 76.7% | 30 |
-| Footwear | 100.0% | 30 |
-| Thermocol | 68.4% | 38 |
-| Ewaste | 57.1% | 28 |
-| Background | 77.8% | 18 |
+| Leather | 75.0% | 36 |
+| Footwear | 86.7% | 30 |
+| Thermocol | 85.7% | 70 |
+| Ewaste | 77.9% | 86 |
+| Background | 66.7% | 18 |
 
 ### The objects that were misread
 
@@ -77,40 +77,41 @@ the results on photos the model has never seen:
 
 | Object | Correct | Misread as |
 | --- | --- | --- |
-| Ball-pointed pen | **92.9%** (13/14) | Glass 1 |
-| Ball pen | **92.3%** (12/13) | Paper 1 |
-| Bottle cap | **81.8%** (9/11) | Paper 1, Glass 1 |
-| Cardboard box | **71.4%** (10/14) | Plastic 2, Textile 1, Ewaste 1 |
-| Corrugated board | **57.1%** (8/14) | Plastic 2, Background 2, Thermocol 1, Leather 1 |
-| Paper bag | **85.7%** (12/14) | Plastic 1, Thermocol 1 |
-| Plastic bottle | **64.3%** (9/14) | Paper 2, Background 2, Footwear 1 |
-| Plastic cup | **71.4%** (10/14) | Paper 2, Thermocol 1, Ewaste 1 |
-| Foam food container | **66.7%** (8/12) | Plastic 2, Paper 2 |
-| Foam cup | **66.7%** (4/6) | Plastic 2 |
-| Car key (ordinary key) | **5/10** | Plastic 2, Paper 1, Ewaste 1, Metal 1 |
-| Electronic key fob | **4/7** | Plastic 2, Metal 1 |
+| Ball-pointed pen | **100.0%** (14/14) | — |
+| Ball pen | **92.3%** (12/13) | Thermocol 1 |
+| Bottle cap | **81.8%** (9/11) | Ewaste 1, Background 1 |
+| Cardboard box | **64.3%** (9/14) | Ewaste 3, Background 1, Plastic 1 |
+| Corrugated board | **42.9%** (6/14) | Ewaste 3, Thermocol 2, Plastic 2, Metal 1 |
+| Paper bag | **71.4%** (10/14) | Thermocol 4 |
+| Plastic bottle | **64.3%** (9/14) | Paper 3, Ewaste 2 |
+| Plastic cup | **64.3%** (9/14) | Thermocol 2, Ewaste 2, Paper 1 |
+| Foam food container | **83.3%** (10/12) | Plastic 1, Background 1 |
+| Foam cup | **83.3%** (5/6) | Plastic 1 |
+| Electronic key fob | **66.7%** (6/9) | Plastic 2, Leather 1 |
+| Key fob (key-fob category) | **100.0%** (6/6) | — |
+| Advertising key fob | **83.3%** (5/6) | Plastic 1 |
+| Car key (ordinary key) | **4/10** | Ewaste 5, Thermocol 1 |
 
 The car key that started this work was read as Leather by the older model. On
-the **8 photos of car keys** used for that check, the previous model produced
-**4 Ewaste, 3 Plastic, 1 Glass** (zero Metal, four recycler materials); the
-installed model produces **4 Metal, 3 Ewaste, 1 Paper** — **seven of eight are
-recycler materials and none is Leather**. That is the check that answers the
-operator's report.
+the **8 photos of car keys** used for that check, the previous install produced
+**4 Metal, 3 Ewaste, 1 Paper** (seven recycler materials); the installed V6
+produces **3 Metal, 5 Ewaste — all eight are recycler materials and none is
+Leather**. With the grouped recycler confidence below, all eight are accepted
+even when the top class is only 42–64%: Metal + Ewaste together clear the
+threshold.
 
 ### Ordinary objects
 
 A phone, watch, key fob, mechanical key, wallet or pair of sunglasses is still
 a **material**: Ewaste, Metal, Leather or Glass, and the app refers all of them
-to the recycling agent. The public samples for phones, watches, wallets and
-sunglasses are still small (1–9 probe photos each), so the model is not yet
-reliable on them. An experimental run with more of those photos raised phone,
-smartwatch and sunglasses accuracy, but it sent **4 of the 8 car keys to the
-Plastic bin** and dropped ball pens from 92% to 69%; it was rejected. The
-installed model is the one that keeps the car keys and pens right. Venue photos
-are the fix.
+to the recycling agent. The public samples are small (1–9 probe photos each),
+so V6 is not yet reliable on phones (1/4), wallets (1/5), smartwatches (2/4)
+or wristwatches (2/4); sunglasses are 4/5. A key fob is much better
+(6/6 in the fob category). Venue photos are the fix.
 
 The remaining misses on the waste photos are mostly the paper/foam and
-foam/plastic boundaries, which are genuinely close on a 224×224 photo.
+foam/plastic boundaries and brown cardboard against e-waste, which are
+genuinely close on a 224×224 photo.
 
 To rebuild it:
 
@@ -122,7 +123,8 @@ node scripts/waste/build_waste_dataset.mjs \
   --base ~/.cache/village-waste \
   --trashnet ~/.cache/village-waste/dataset-resized \
   --extra ~/.cache/village-waste/extra \
-  --out ~/.cache/village-waste/v2 --extra-repeat 2 --force
+  --out ~/.cache/village-waste/v2 --extra-repeat 2 \
+  --focus-labels Ewaste --focus-repeat 6 --force
 node scripts/waste/train_waste_model.mjs \
   --data ~/.cache/village-waste/v2 \
   --probe ~/.cache/village-waste/v2/probe \
@@ -130,7 +132,9 @@ node scripts/waste/train_waste_model.mjs \
   --out models/waste --force
 ```
 
-The trainer refuses to overwrite an installed model without `--force`, and
+The installed V6 repeated the **key-fob photos 6×**; the phone/watch extras were
+left out of its Ewaste tree, because they pulled paper into e-waste. The trainer
+refuses to overwrite an installed model without `--force`, and
 before it exits it reloads the exported files and classifies eight photos
 again to prove the export is complete. `evaluate_waste_model.mjs` scores any
 exported model on the same photos, which is what makes an old-versus-new
@@ -188,7 +192,8 @@ node scripts/waste/build_waste_dataset.mjs \
   --base ~/.cache/village-waste \
   --trashnet ~/.cache/village-waste/dataset-resized \
   --extra ~/.cache/village-waste/extra \
-  --out ~/.cache/village-waste/v2 --extra-repeat 2 --force
+  --out ~/.cache/village-waste/v2 --extra-repeat 2 \
+  --focus-labels Ewaste --focus-repeat 6 --force
 node scripts/waste/train_waste_model.mjs \
   --data ~/.cache/village-waste/v2 \
   --probe ~/.cache/village-waste/v2/probe \

@@ -82,6 +82,7 @@ const SOURCES = [
   { label: 'Metal', slug: 'automobile-keys', category: 'Automobile keys' },
   { label: 'Ewaste', slug: 'electronic-key-fobs', category: 'Electronic key fobs' },
   { label: 'Ewaste', slug: 'key-fobs-electronic', category: 'Key fobs' },
+  { label: 'Ewaste', slug: 'advertising-fobs', category: 'Advertising key fobs' },
   { label: 'Metal', slug: 'key-rings', category: 'Key rings' },
   { label: 'Metal', slug: 'keys', category: 'Keys' },
   { label: 'Ewaste', slug: 'mobile-phones', category: 'Mobile phones' },
@@ -95,7 +96,8 @@ const TITLE_FILTERS = {
   'automobile-keys': { match: '(key|cl[ée]|schl[üu]ssel|chiave|llave|chave|nyckel|kl[ií][cč]|fob|remote|keyless|ignition|renault|ford|volvo|seat|fiat|dodge|opel|mercedes|toyota|honda|bmw|audi|truck)' },
   'key-rings': { match: '(key|ring|porte.?cl|schl[üu]sselanh|llavero|llavin|chaveiro)', exclude: '(yubikey|usb|flash|pendrive)' },
   keys: { match: '(key|cl[ée]|schl[üu]ssel|chiave|llave|chave|nyckel|kl[ií][cč])', exclude: '(yubikey|usb|flash|pendrive)' },
-  'key-fobs-electronic': { match: '(fob|remote|keyless|electronic|transmitter|smart|usb|token|chip|rfid)' },
+  'key-fobs-electronic': { match: '.*' },
+  'advertising-fobs': { match: '.*' },
   'mobile-phones': { match: '(phone|mobile|smartphone|iphone|android|cell|telefon|handy|t[ée]l[ée]phone|tel[ée]fono|3g|4g|5g)' },
   smartwatches: { match: '(watch|uhr|montre|reloj|orologio)' },
   wristwatches: { match: '(watch|uhr|montre|reloj|orologio|wrist)' },
@@ -111,6 +113,7 @@ function parseArgs(argv) {
     seed: 42,
     force: false,
     only: '',
+    slug: '',
     'max-requests': 40,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -267,6 +270,7 @@ async function main() {
   let pending = 0;
   for (const source of SOURCES) {
     if (only.size > 0 && !only.has(source.label.toLowerCase())) continue;
+    if (args.slug && source.slug !== args.slug) continue;
     const want = args['per-source'];
     console.log(`\n${source.label} / ${source.slug}  (Category:${source.category})`);
     let pages;

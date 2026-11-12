@@ -221,7 +221,7 @@ function summarise(dataset) {
   }));
 }
 
-function preprocess(tf, file, rng, augment) {
+function preprocess(tf, file, rng, augment, zoom = 0) {
   const buffer = fs.readFileSync(file);
   return tf.tidy(() => {
     const image = tf.node.decodeImage(buffer, 3);
@@ -229,8 +229,15 @@ function preprocess(tf, file, rng, augment) {
     const shortSide = Math.min(height, width);
     // A wider scale jitter than the first model used: the exhibition photo is
     // rarely framed like a studio photo, and a bottle cap or a pen is small in
-    // the frame.  Validation always uses the plain centre crop.
-    const scale = augment ? 0.72 + rng() * 0.28 : 1;
+    // the frame.  The extra copies get progressively tighter crops so a close-up
+    // from the object-focused camera is not a domain the model never saw.
+    const scale = augment
+      ? zoom === 2
+        ? 0.42 + rng() * 0.23
+        : zoom === 1
+          ? 0.55 + rng() * 0.25
+          : 0.72 + rng() * 0.28
+      : 1;
     const side = Math.max(16, Math.round(shortSide * scale));
     const maxX = width - side;
     const maxY = height - side;
@@ -271,7 +278,7 @@ async function extractFeatures(tf, base, entries, batchSize, rng, label) {
   const chunks = [];
   for (let start = 0; start < entries.length; start += batchSize) {
     const slice = entries.slice(start, start + batchSize);
-    const batch = tf.tidy(() => tf.stack(slice.map((entry) => preprocess(tf, entry.file, rng, entry.augment))));
+    const batch = tf.tidy(() => tf.stack(slice.map((entry) => preprocess(tf, entry.file, rng, entry.augment, entry.zoom))));
     chunks.push(base.predict(batch));
     batch.dispose();
     if (start === 0 || (start / batchSize) % 10 === 0 || start + batchSize >= entries.length) {
@@ -286,8 +293,10 @@ async function extractFeatures(tf, base, entries, batchSize, rng, label) {
 function toEntries(files, labelIndex, copies, rng) {
   const entries = [];
   for (const file of files) {
-    entries.push({ file, label: labelIndex, augment: false });
-    for (let copy = 0; copy < copies; copy += 1) entries.push({ file, label: labelIndex, augment: true });
+    entries.push({ file, label: labelIndex, augment: false, zoom: 0 });
+    for (let copy = 0; copy < copies; copy += 1) {
+      entries.push({ file, label: labelIndex, augment: true, zoom: copy % 3 });
+    }
   }
   for (let i = entries.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1));

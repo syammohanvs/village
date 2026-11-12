@@ -510,68 +510,70 @@ The classifier is installed in `models/waste/` and the backend reports
 Textile, Leather, Footwear, Thermocol, Ewaste and Background. Every recycler
 class is mapped to one outcome, **Recycling agent**, with no bin LED.
 
-On **833 held-out photos** (15% of every class, never used for training; this
+On **953 held-out photos** (15% of every class, never used for training; this
 set now includes real-world object photos as well as the studio bootstrap) the
-exact-class score is **88.1% (734/833)**. Because the seven recycler classes
-share one action, the action-level score is **90.8%**:
+exact-class score is **85.1% (811/953)**. Because the seven recycler classes
+share one action, the action-level score is **90.6%**:
 
 | Class | Exact | Held out | Action |
 | --- | --- | --- | --- |
 | Organic | 100.0% | 27 | Organic bin |
-| Plastic | 85.3% | 170 | Plastic bin |
-| Paper | 95.9% | 217 | Paper bin |
-| Glass | 83.1% | 77 | Recycling agent |
-| Metal | 83.3% | 72 | Recycling agent |
+| Plastic | 82.4% | 170 | Plastic bin |
+| Paper | 89.9% | 217 | Paper bin |
+| Glass | 85.7% | 91 | Recycling agent |
+| Metal | 70.7% | 82 | Recycling agent |
 | Textile | 96.0% | 126 | Recycling agent |
-| Leather | 76.7% | 30 | Recycling agent |
-| Footwear | 100.0% | 30 | Recycling agent |
-| Thermocol | 68.4% | 38 | Recycling agent |
-| Ewaste | 57.1% | 28 | Recycling agent |
-| Background | 77.8% | 18 | ignored |
+| Leather | 75.0% | 36 | Recycling agent |
+| Footwear | 86.7% | 30 | Recycling agent |
+| Thermocol | 85.7% | 70 | Recycling agent |
+| Ewaste | 77.9% | 86 | Recycling agent |
+| Background | 66.7% | 18 | ignored |
 
-**380/414 bin items kept their own bin**; **360/401 recycler items were
-referred**. The exact-class number is higher than the previous install
-(**87.3%, 727/833**) on the same photos; the recycler figure is slightly lower
-because thermocol was sometimes read as paper. The earlier studio-only 93.4%
-figure is not comparable: it was measured before the real-world photos were in
-the held-out set.
+**362/414 bin items kept their own bin**; **485/521 recycler items were
+referred**. The previous install (V3) is **85.6% (816/953)** on the same
+photos, with **91.8%** bin accuracy and **87.5%** recycler accuracy. The
+installed V6 gives up about **4 points of bin accuracy** for about **5.6
+points of recycler accuracy** and the car-key result below; the V3 backup is
+`models/waste-v3-20261113/`. The earlier studio-only 93.4% figure is not
+comparable: it was measured before the real-world photos were in the held-out
+set.
 
 A separate **probe** of real-world objects (never trained on) is the direct
 answer to the reported failures:
 
-| Model | Validation (same 833) | Probe (194) |
+| Model | Validation (same 953) | Probe (236) |
 | --- | --- | --- |
-| Previous install | 87.3% (727/833) | 66.5% (129/194) |
-| Installed | **88.1% (734/833)** | **68.6% (133/194)** |
-
-On the original 161 paper/plastic/thermocol probe the two models are
-essentially level (**77.6%** previous, **77.0%** installed). The expanded probe
-adds ordinary objects, which is why its overall figure is lower.
+| Previous install (V3) | 85.6% (816/953) | 62.3% (147/236) |
+| Installed (V6) | **85.1% (811/953)** | **64.8% (153/236)** |
 
 | Object | Correct | Misread as |
 | --- | --- | --- |
-| Ball-pointed pen | 92.9% (13/14) | Glass 1 |
-| Ball pen | 92.3% (12/13) | Paper 1 |
-| Bottle cap | 81.8% (9/11) | Paper 1, Glass 1 |
-| Cardboard box | 71.4% (10/14) | Plastic 2, Textile 1, Ewaste 1 |
-| Corrugated board | 57.1% (8/14) | Plastic 2, Background 2, Thermocol 1, Leather 1 |
-| Paper bag | 85.7% (12/14) | Plastic 1, Thermocol 1 |
-| Plastic bottle | 64.3% (9/14) | Paper 2, Background 2, Footwear 1 |
-| Plastic cup | 71.4% (10/14) | Paper 2, Thermocol 1, Ewaste 1 |
-| Foam food container | 66.7% (8/12) | Plastic 2, Paper 2 |
-| Foam cup | 66.7% (4/6) | Plastic 2 |
-| Car key (ordinary key) | 5/10 | Plastic 2, Paper 1, Ewaste 1, Metal 1 |
-| Electronic key fob | 4/7 | Plastic 2, Metal 1 |
+| Ball-pointed pen | 100.0% (14/14) | — |
+| Ball pen | 92.3% (12/13) | Thermocol 1 |
+| Bottle cap | 81.8% (9/11) | Ewaste 1, Background 1 |
+| Cardboard box | 64.3% (9/14) | Ewaste 3, Background 1, Plastic 1 |
+| Corrugated board | 42.9% (6/14) | Ewaste 3, Thermocol 2, Plastic 2, Metal 1 |
+| Paper bag | 71.4% (10/14) | Thermocol 4 |
+| Plastic bottle | 64.3% (9/14) | Paper 3, Ewaste 2 |
+| Plastic cup | 64.3% (9/14) | Thermocol 2, Ewaste 2, Paper 1 |
+| Foam food container | 83.3% (10/12) | Plastic 1, Background 1 |
+| Foam cup | 83.3% (5/6) | Plastic 1 |
+| Car key (ordinary key) | 4/10 | Ewaste 5, Thermocol 1 |
+| Electronic key fob | **100.0%** (6/6) | — |
+| Key-fob category | 6/9 | Plastic 2, Leather 1 |
+| Advertising key fob | 83.3% (5/6) | Plastic 1 |
 
 The operator's **car key** was the report that started this work. The previous
-install read the 8 car-key photos as **4 Ewaste, 3 Plastic, 1 Glass**; the
-installed model reads them as **4 Metal, 3 Ewaste, 1 Paper** — seven of eight
-are recycler materials and **none is Leather**. A phone/watch/wallet/
-sunglasses is still a material (Ewaste, Metal, Leather, Glass), but the public
-probe has only 1–9 photos of each, which is not enough to make a claim; an
-experimental run with more of them raised those objects but sent four of the
-eight car keys to the Plastic bin and dropped ball pens to 69%, so it was
-rejected. Venue photos are the fix.
+install read the 8 car-key photos as **4 Metal, 3 Ewaste, 1 Paper**; the
+installed V6 reads them as **3 Metal, 5 Ewaste** — **all eight are recycler
+materials and none is Leather**. With the grouped recycler confidence below,
+all eight are accepted even where the top class is only 42–64%, because Metal
+and Ewaste together clear 75%.
+
+A phone/watch/wallet/sunglasses is still a material (Ewaste, Metal, Leather,
+Glass), but the public probe has only 1–9 photos of each: V6 gets phones 1/4,
+wallets 1/5, smartwatches 2/4 and wristwatches 2/4, while sunglasses are 4/5
+and the key-fob category is 6/6. Venue photos are the fix.
 
 The page also now **focuses on the object**: each frame is compared with one or
 more empty-scene snapshots (up to **three**, kept in this browser’s

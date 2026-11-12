@@ -208,21 +208,21 @@ footwear, thermocol, e-waste) all map to **Recycling agent** in the UI with no
 bin LED. Medical waste is handled by the manual **Hazardous / medical** button,
 not a model class. See `docs/waste-model.md` and `scripts/waste/README.md`.
 
-The current install (2026-11-13) was retrained after brown paper, bottle caps,
-ball pens and a **car key read as Leather** were misread.
-`build_waste_dataset.mjs` assembles `~/.cache/village-waste/v2` from the
-bootstrap tree, TrashNet's previously unused `cardboard` folder and Commons
-photos of caps, pens, paper bags, foam, key fobs, keys, phones, watches,
-wallets and sunglasses; `train_waste_model.mjs --probe` reports per-object
-accuracy on photos kept out of training. Scored on the same 833 photos, the
-previous install gets **87.3%** and the current one **88.1%**; on the 194-photo
-real-world probe it is **66.5% → 68.6%**. The car-key check is the direct
-result: the previous model read 8 car-key photos as 4 Ewaste, 3 Plastic and 1
-Glass, while the install reads them as 4 Metal, 3 Ewaste and 1 Paper — no
-Leather. `scripts/waste/evaluate_waste_model.mjs` reproduces the comparison
-and `predict_waste_image.mjs` shows the top classes for one photo.
-`models/waste-old-20261112/` and `models/waste-v2-20261112b/` keep the
-previous models.
+The current install (2026-11-13, **V6**) was retrained after brown paper,
+bottle caps, ball pens and a **car key read as Leather** were misread.
+`build_waste_dataset.mjs` assembles the training tree from the bootstrap,
+TrashNet's unused `cardboard` folder and Commons photos of caps, pens, paper
+bags, foam, key fobs, keys, phones, watches, wallets and sunglasses; the
+install repeated the **key-fob photos 6x** and left the phone/watch extras out
+of its Ewaste tree (they pulled paper into e-waste). On the same 953 photos the
+previous V3 scores **85.6%** and V6 **85.1%**, but item-level action accuracy
+is **89.4% → 90.6%** (bin 91.8% → 87.4%, recycler 87.5% → 93.1%) and the
+236-photo real-world probe is **62.3% → 64.8%**. The car-key check is the
+direct result: V3 read 8 car-key photos as 4 Metal, 3 Ewaste and 1 Paper, V6
+as **3 Metal and 5 Ewaste — all eight recycler materials, none Leather**.
+V3 is kept at `models/waste-v3-20261113/` because its bin accuracy is better.
+`evaluate_waste_model.mjs` reproduces the comparison and
+`predict_waste_image.mjs` shows the top classes for one photo.
 
 The Sort Waste camera now **focuses on the object** rather than the room:
 `web/frontend/src/lib/focus.ts` diffs each frame against **up to three**

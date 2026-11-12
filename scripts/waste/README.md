@@ -38,37 +38,38 @@ texture. The dashboard maps all seven recycler classes to one outcome,
 | `Background` | room and table photos with no item | 110 |
 
 The trainer holds back 15% of each class for validation. The current install
-scores **88.1% exact class (734/833)** on a mixed set that now includes
+scores **85.1% exact class (811/953)** on a mixed set that now includes
 real-world object photos. Because the seven recycler classes share one action,
-**90.8% of items get the right action**: 380/414 bin items kept their own bin
-and 360/401 recycler items were referred.
+**90.6% of items get the right action**: 362/414 bin items kept their own bin
+and 485/521 recycler items were referred.
 
-On the **same 833 photos** the previous install scores 87.3%, so the exact-class
-number is a small gain, not a regression. On the original 161-photo
-paper/plastic/thermocol probe the two models are level (77.6% previous, 77.0%
-installed); the expanded 194-photo probe adds ordinary objects and scores
-66.5% versus 68.6%.
+The previous install (V3) scores **85.6% (816/953)** on the same photos, with
+**91.8%** bin accuracy and **87.5%** recycler accuracy. V6 trades about four
+points of bin accuracy for about 5.6 points of recycler accuracy and the
+car-key result; the V3 backup is `models/waste-v3-20261113/`. The real-world
+probe is **64.8% (153/236)** for V6 against **62.3%** for V3.
 
 | Class | Exact match | Held out |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 85.3% | 170 |
-| Paper | 95.9% | 217 |
-| Glass | 83.1% | 77 |
-| Metal | 83.3% | 72 |
+| Plastic | 82.4% | 170 |
+| Paper | 89.9% | 217 |
+| Glass | 85.7% | 91 |
+| Metal | 70.7% | 82 |
 | Textile | 96.0% | 126 |
-| Leather | 76.7% | 30 |
-| Footwear | 100.0% | 30 |
-| Thermocol | 68.4% | 38 |
-| Ewaste | 57.1% | 28 |
-| Background | 77.8% | 18 |
+| Leather | 75.0% | 36 |
+| Footwear | 86.7% | 30 |
+| Thermocol | 85.7% | 70 |
+| Ewaste | 77.9% | 86 |
+| Background | 66.7% | 18 |
 
 The **car key** report is checked separately: the previous model read the 8
-car-key photos as 4 Ewaste, 3 Plastic and 1 Glass; the install reads them as
-4 Metal, 3 Ewaste and 1 Paper, with no Leather. A phone, watch, key fob or
-wallet is still a material (Ewaste, Metal, Leather, Glass), but the public
-probe has only a handful of each, so those need venue photos before they can
-be claimed.
+car-key photos as 4 Metal, 3 Ewaste and 1 Paper; the install reads them as
+3 Metal and 5 Ewaste — all eight are recycler materials, none is Leather. The
+grouped recycler confidence accepts all eight even when the top class is only
+42–64%. A phone, watch, key fob or wallet is still a material (Ewaste, Metal,
+Leather, Glass); the public probe has only a handful of each, so phones,
+wallets and watches still need venue photos before they can be claimed.
 
 The images are not redistributed here; they stay in `~/.cache/village-waste`.
 The trained weights inherit those datasets' terms, which is one more reason
