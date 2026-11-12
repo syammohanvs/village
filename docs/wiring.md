@@ -306,24 +306,27 @@ never feed it 5 V.
 
 **B. Bare two-leg LDR** (no board):
 
-Build a divider with one fixed resistor. Recommended **10 kΩ**:
+Build a divider with one fixed resistor. Recommended **10 kΩ**. The wiring
+below is the default assumed by this build (resistor on the 3.3 V side, LDR
+to GND):
 
 ```
- 3V3 ──[ LDR ]──●── GPIO 32 (D32)
-                 │
-             [ 10 kΩ ]
-                 │
-                GND
+ 3V3 ──[ 10 kΩ ]──●── GPIO 32 (D32)
+                   │
+               [ LDR ]
+                   │
+                  GND
 ```
 
-- LDR on the **3.3 V side**, 10 kΩ to **GND** → the reading **rises with
-  light**, so `analog_bright_high = true` (the default).
+- Resistor to **3.3 V**, LDR to **GND** → the reading **falls with light**, so
+  `analog_bright_high = false` (the default for this build).
 - With a typical LDR (≈1 kΩ bright, ≈10 kΩ indoors, ≈1 MΩ dark) the raw
-  reading runs roughly **3000 bright / 1650 indoors / 50 dark** on the 0–4095
-  scale, which brackets the default thresholds (dark 1600, bright 2400).
+  reading runs roughly **50 bright / 1650 indoors / 3000 dark** on the 0–4095
+  scale; the firmware inverts it into the metric, so the same thresholds
+  (dark 1600, bright 2400) still apply.
 - Any value from 4.7 kΩ to 47 kΩ works; 10 kΩ gives the widest usable range.
-- Swapping the two parts (10 kΩ to 3V3, LDR to GND) inverts the reading; then
-  set `analog_bright_high = false` instead of rewiring.
+- Swapping the two parts (LDR to 3V3, 10 kΩ to GND) makes the reading rise
+  with light; then set `analog_bright_high = true` instead of rewiring.
 
 **After wiring, tick “The LDR is wired” in Setup → Sensors & Calibration and save**, otherwise the
 controller still reports no light level.

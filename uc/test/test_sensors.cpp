@@ -175,6 +175,7 @@ TEST(lights_auto_has_hysteresis_and_delay) {
   c.light.dark_threshold = 1600;
   c.light.bright_threshold = 2400;
   c.light.stable_ms = 4000;
+  c.light.analog_bright_high = true;  // raw values below rise with light
   LightsModel m;
   m.observeAnalog(1000, 0, c.light);
   LightReading r = m.read(c, 0);
@@ -206,6 +207,7 @@ TEST(lights_stale_sensor_fails_safe_in_auto) {
   c.light.sensor_fitted = true;
   c.light.stable_ms = 0;
   c.light.max_age_ms = 5000;
+  c.light.analog_bright_high = true;  // raw 3000 is bright
   LightsModel m;
   m.observeAnalog(3000, 1000, c.light);
   CHECK(m.read(c, 1000).brightness == Brightness::Bright);

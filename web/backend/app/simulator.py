@@ -106,7 +106,7 @@ def default_config() -> dict[str, Any]:
             "installed": True,
             "sensor_fitted": True,
             "output_type": "analog",
-            "analog_bright_high": True,
+            "analog_bright_high": False,
             "digital_dark_when_high": True,
             "dark_threshold": 1600,
             "bright_threshold": 2400,
@@ -360,7 +360,7 @@ class SimulatedDevice:
             }
         return {
             "valid": True,
-            "raw": 900 if self.light == "dark" else 3200,
+            "raw": 3200 if self.light == "dark" else 900,
             "brightness": self.light,
             "output_type": "analog",
             "age_ms": 200,

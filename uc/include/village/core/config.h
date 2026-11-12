@@ -33,7 +33,7 @@ struct LightConfig {
   bool installed = false;
   bool sensor_fitted = false;
   bool digital = false;              // false = analogue AO, true = digital DO
-  bool analog_bright_high = true;    // module AO rises with light
+  bool analog_bright_high = false;   // resistor to 3V3, LDR to GND: voltage falls with light
   bool digital_dark_when_high = true;  // typical LDR module DO
   uint16_t dark_threshold = 1600;    // metric units, dark at or below
   uint16_t bright_threshold = 2400;  // metric units, bright at or above
