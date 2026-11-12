@@ -42,6 +42,8 @@ function parseArgs(argv) {
     out: path.join(os.homedir(), '.cache', 'village-waste', 'v2'),
     'val-fraction': 0.15,
     'extra-repeat': 1,
+    'focus-labels': '',
+    'focus-repeat': 1,
     seed: 42,
     force: false,
   };
@@ -63,9 +65,11 @@ function parseArgs(argv) {
   }
   args['val-fraction'] = Number(args['val-fraction']);
   args['extra-repeat'] = Number(args['extra-repeat']);
+  args['focus-repeat'] = Number(args['focus-repeat']);
   args.seed = Number(args.seed);
   if (!(args['val-fraction'] > 0 && args['val-fraction'] < 0.5)) throw new Error('--val-fraction must be between 0 and 0.5');
   if (!Number.isInteger(args['extra-repeat']) || args['extra-repeat'] < 1) throw new Error('--extra-repeat must be a positive integer');
+  if (!Number.isInteger(args['focus-repeat']) || args['focus-repeat'] < 1) throw new Error('--focus-repeat must be a positive integer');
   return args;
 }
 
@@ -160,9 +164,16 @@ function main() {
   // photos are repeated so the studio photos in the bootstrap tree do not
   // drown them: a bottle cap from a Commons photo is what the venue sees.
   const extraDir = path.join(args.extra, 'images');
+  const focus = new Set(
+    String(args['focus-labels'] || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
   for (const label of CLASSES) {
     const files = listImages(path.join(extraDir, label));
-    addSource(args, rng, label, files, 'extra', counts, args['extra-repeat']);
+    const repeat = focus.has(label) ? args['focus-repeat'] : args['extra-repeat'];
+    addSource(args, rng, label, files, 'extra', counts, repeat);
     const probe = listImages(path.join(args.extra, 'probe', label));
     probe.forEach((file) => {
       linkOrCopy(file, path.join(args.out, 'probe', label, path.basename(file)));

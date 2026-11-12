@@ -73,7 +73,35 @@ const SOURCES = [
   { label: 'Thermocol', slug: 'foam-cups', category: 'Expanded polystyrene cups' },
   { label: 'Thermocol', slug: 'foam-food-containers', category: 'Expanded polystyrene food containers' },
   { label: 'Thermocol', slug: 'foam-packaging', category: 'Expanded polystyrene packaging' },
+
+  // Ordinary objects a visitor may show are still a *material*, not "nothing".
+  // A key fob, phone or watch is electronic waste; a mechanical key or key ring
+  // is metal; sunglasses are glass; a wallet is leather (natural or synthetic).
+  // The app sends every one of these to the recycling agent, which is why the
+  // right material matters for the label but not for the bin action.
+  { label: 'Metal', slug: 'automobile-keys', category: 'Automobile keys' },
+  { label: 'Ewaste', slug: 'electronic-key-fobs', category: 'Electronic key fobs' },
+  { label: 'Ewaste', slug: 'key-fobs-electronic', category: 'Key fobs' },
+  { label: 'Metal', slug: 'key-rings', category: 'Key rings' },
+  { label: 'Metal', slug: 'keys', category: 'Keys' },
+  { label: 'Ewaste', slug: 'mobile-phones', category: 'Mobile phones' },
+  { label: 'Ewaste', slug: 'wristwatches', category: 'Wristwatches' },
+  { label: 'Ewaste', slug: 'smartwatches', category: 'Smartwatches' },
+  { label: 'Leather', slug: 'wallets', category: 'Wallets' },
+  { label: 'Glass', slug: 'sunglasses', category: 'Sunglasses' },
 ];
+
+const TITLE_FILTERS = {
+  'automobile-keys': { match: '(key|cl[ée]|schl[üu]ssel|chiave|llave|chave|nyckel|kl[ií][cč]|fob|remote|keyless|ignition|renault|ford|volvo|seat|fiat|dodge|opel|mercedes|toyota|honda|bmw|audi|truck)' },
+  'key-rings': { match: '(key|ring|porte.?cl|schl[üu]sselanh|llavero|llavin|chaveiro)', exclude: '(yubikey|usb|flash|pendrive)' },
+  keys: { match: '(key|cl[ée]|schl[üu]ssel|chiave|llave|chave|nyckel|kl[ií][cč])', exclude: '(yubikey|usb|flash|pendrive)' },
+  'key-fobs-electronic': { match: '(fob|remote|keyless|electronic|transmitter|smart|usb|token|chip|rfid)' },
+  'mobile-phones': { match: '(phone|mobile|smartphone|iphone|android|cell|telefon|handy|t[ée]l[ée]phone|tel[ée]fono|3g|4g|5g)' },
+  smartwatches: { match: '(watch|uhr|montre|reloj|orologio)' },
+  wristwatches: { match: '(watch|uhr|montre|reloj|orologio|wrist)' },
+  wallets: { match: '(wallet|purse|billfold|porte.?monnaie|geldb[öo]rse|portafoglio|cartera|brieftasche|brustbeutel)' },
+  sunglasses: { match: '(sunglass|sun.?glass|eyewear|sonnenbrille|lunettes|gafas|occhiali|glasses)' },
+};
 
 function parseArgs(argv) {
   const args = {
@@ -248,7 +276,16 @@ async function main() {
       console.warn(`  skipped: ${error.message}`);
       continue;
     }
-    const usablePages = pages.map(usable).filter(Boolean);
+    let usablePages = pages.map(usable).filter(Boolean);
+    const filter = TITLE_FILTERS[source.slug];
+    if (filter?.match) {
+      const allow = new RegExp(filter.match, 'i');
+      usablePages = usablePages.filter((item) => allow.test(item.title));
+    }
+    if (filter?.exclude) {
+      const deny = new RegExp(filter.exclude, 'i');
+      usablePages = usablePages.filter((item) => !deny.test(item.title));
+    }
     // Deterministic order, then a seeded shuffle so a rerun picks the same set.
     usablePages.sort((a, b) => a.title.localeCompare(b.title));
     for (let i = usablePages.length - 1; i > 0; i -= 1) {
@@ -302,7 +339,7 @@ async function main() {
       if (pending % 20 === 0) {
         fs.writeFileSync(manifestPath, `${JSON.stringify([...keep.values()], null, 2)}\n`);
       }
-      await sleep(1200);
+      await sleep(4000);
     }
     console.log(`  ${downloaded} downloaded, ${skipped} already present, ${picked.length - probeCount} train / ${probeCount} probe`);
     fs.writeFileSync(manifestPath, `${JSON.stringify([...keep.values()], null, 2)}\n`);

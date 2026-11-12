@@ -28,40 +28,47 @@ texture. The dashboard maps all seven recycler classes to one outcome,
 | `Organic` | Voxel51 food-waste dataset (MIT) | 180 |
 | `Plastic` | TrashNet `plastic` (MIT) + Wikimedia caps, pens, bottles, cups | 888 |
 | `Paper` | TrashNet `paper` + `cardboard` (MIT) + Wikimedia paper bags/board | 1 279 |
-| `Glass` | TrashNet `glass` (MIT) | 501 |
-| `Metal` | TrashNet `metal` (MIT) | 410 |
+| `Glass` | TrashNet `glass` (MIT) + Wikimedia glasses/sunglasses | ~509 |
+| `Metal` | TrashNet `metal` (MIT) + Wikimedia keys/key rings | ~476 |
 | `Textile` | clothing-dataset-small (CC0) + fabric photos | 841 |
-| `Leather` | clothing-dataset-small `outwear` (CC0) | 184 |
+| `Leather` | clothing-dataset-small `outwear` (CC0) + Wikimedia wallets | ~194 |
 | `Footwear` | clothing-dataset-small `shoes` (CC0) | 198 |
 | `Thermocol` | Wikimedia Commons foam/packaging photos | 171 |
-| `Ewaste` | Wikimedia Commons electronic-waste photos | 123 |
+| `Ewaste` | Wikimedia e-waste + key fobs, phones, watches | ~183 |
 | `Background` | room and table photos with no item | 110 |
 
 The trainer holds back 15% of each class for validation. The current install
-scores **88.8% exact class (717/807)** on a mixed set that now includes
+scores **88.1% exact class (734/833)** on a mixed set that now includes
 real-world object photos. Because the seven recycler classes share one action,
-**91.8% of items get the right action**: 371/414 bin items kept their own bin
-and 355/377 recycler items were referred.
+**90.8% of items get the right action**: 380/414 bin items kept their own bin
+and 360/401 recycler items were referred.
 
-On the **same 807 photos** the previous studio-only model scores 76.5%, so the
-drop from its old 93.4% is the harder validation set, not a worse model. A
-separate probe of real-world objects never used for training goes from
-**17.4% (28/161)** to **77.6% (125/161)**; every ball pen, bottle cap and
-cardboard box that the old model misread is now mostly correct.
+On the **same 833 photos** the previous install scores 87.3%, so the exact-class
+number is a small gain, not a regression. On the original 161-photo
+paper/plastic/thermocol probe the two models are level (77.6% previous, 77.0%
+installed); the expanded 194-photo probe adds ordinary objects and scores
+66.5% versus 68.6%.
 
 | Class | Exact match | Held out |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 87.6% | 170 |
-| Paper | 89.9% | 217 |
-| Glass | 86.7% | 75 |
-| Metal | 93.5% | 62 |
-| Textile | 93.7% | 126 |
-| Leather | 82.1% | 28 |
-| Footwear | 93.3% | 30 |
-| Thermocol | 73.7% | 38 |
-| Ewaste | 72.2% | 18 |
-| Background | 81.2% | 16 |
+| Plastic | 85.3% | 170 |
+| Paper | 95.9% | 217 |
+| Glass | 83.1% | 77 |
+| Metal | 83.3% | 72 |
+| Textile | 96.0% | 126 |
+| Leather | 76.7% | 30 |
+| Footwear | 100.0% | 30 |
+| Thermocol | 68.4% | 38 |
+| Ewaste | 57.1% | 28 |
+| Background | 77.8% | 18 |
+
+The **car key** report is checked separately: the previous model read the 8
+car-key photos as 4 Ewaste, 3 Plastic and 1 Glass; the install reads them as
+4 Metal, 3 Ewaste and 1 Paper, with no Leather. A phone, watch, key fob or
+wallet is still a material (Ewaste, Metal, Leather, Glass), but the public
+probe has only a handful of each, so those need venue photos before they can
+be claimed.
 
 The images are not redistributed here; they stay in `~/.cache/village-waste`.
 The trained weights inherit those datasets' terms, which is one more reason
@@ -118,6 +125,10 @@ default 2), `--alpha` (MobileNet width, default 1.0), `--pooling gap|gapmax`,
 `--seed`, `--force`, and `--no-verify` (skip the reload check). The trainer
 refuses to replace an installed model without `--force`.
 
+`build_waste_dataset.mjs` has two more: `--extra-repeat` repeats every extra
+photo (default 1), and `--focus-labels Metal,Ewaste --focus-repeat 4`
+oversamples only the classes whose real-world photos are still scarce.
+
 ## Fixing a specific confusion
 
 A confusion is a data gap, not a reason to lower the threshold.  The loop is:
@@ -128,8 +139,10 @@ A confusion is a data gap, not a reason to lower the threshold.  The loop is:
    number rather than a story.
 2. **Find the missing class contents.**  `fetch_extra_images.mjs` downloads
    real photos of the object families that the bootstrap datasets do not
-   cover — bottle caps, ball pens, paper bags, cardboard, foam packaging — from
-   Wikimedia Commons, with the licence recorded in `sources.json`.
+   cover — bottle caps, ball pens, paper bags, cardboard, foam packaging, key
+   fobs, phones, watches, wallets and sunglasses — from Wikimedia Commons,
+   with the licence recorded in `sources.json`.  The title filter drops the
+   category's noise (a photo of spring flowers is not a key).
 3. **Rebuild the tree.**  `build_waste_dataset.mjs` keeps the bootstrap
    `train/` + `val/`, adds TrashNet's unused `cardboard` folder to Paper and
    the extra photos (repeated so they are not drowned by studio photos), and
@@ -138,6 +151,12 @@ A confusion is a data gap, not a reason to lower the threshold.  The loop is:
    validation score and the per-object probe score.  A model that wins on the
    probe is the one for the exhibition, even if the studio validation drops a
    point.
+
+An ordinary object is still a **material**, not "nothing": a key fob, phone or
+watch is **Ewaste**; a mechanical key or key ring is **Metal**; sunglasses are
+**Glass**; a wallet is **Leather**.  They all go to the recycling agent, so the
+material changes the label, not the bin action.  Only the empty table and the
+room are `Background`.
 
 ```bash
 node scripts/waste/fetch_extra_images.mjs \

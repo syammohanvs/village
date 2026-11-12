@@ -319,4 +319,55 @@ describe('Sort Waste', () => {
     expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
     expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
   }, 15000);
+
+  it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
+    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockClear();
+    // A car key, a phone or the empty table: the model's "Background" class is
+    // the not-waste side, and it must never become a recycling referral.
+    predictionState.current = [
+      { className: 'Organic', probability: 0.005 },
+      { className: 'Plastic', probability: 0.01 },
+      { className: 'Paper', probability: 0.01 },
+      { className: 'Glass', probability: 0.005 },
+      { className: 'Metal', probability: 0.005 },
+      { className: 'Textile', probability: 0.005 },
+      { className: 'Leather', probability: 0.01 },
+      { className: 'Footwear', probability: 0.005 },
+      { className: 'Thermocol', probability: 0.005 },
+      { className: 'Ewaste', probability: 0.01 },
+      { className: 'Background', probability: 0.93 },
+    ];
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    fireEvent.click(await screen.findByTestId('start-camera'));
+
+    expect(await screen.findByText(/Nothing to sort/i, {}, { timeout: 4000 })).toBeInTheDocument();
+    await waitFor(() => {
+      const rows = Array.from(document.querySelectorAll('.prediction-list li'));
+      expect(rows[0].textContent).toContain('Not a waste item');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(api.postRecognition).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
+  }, 15000);
 });

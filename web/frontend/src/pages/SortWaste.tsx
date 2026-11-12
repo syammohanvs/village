@@ -37,6 +37,14 @@ function capitalise(value: string): string {
   return value.replace(/^\w/, (c) => c.toUpperCase());
 }
 
+// The model's last class is the "nothing to sort" side of the camera: the empty
+// table, the room, and ordinary objects (a car key, a phone, a wallet) that are
+// not waste.  "Background" is the engineering name; the operator needs the
+// plain-English one.
+function displayLabel(label: string): string {
+  return label.trim().toLowerCase() === 'background' ? 'Not a waste item' : label;
+}
+
 // The model names the recycler material so it can learn each one, but the app
 // has one outcome for all of them: hand it to the recycling agent.  Anything
 // in this set is posted to the backend as category "other" and lights no LED.
@@ -312,6 +320,7 @@ export function SortWaste() {
 
   const top = predictions[0];
   const strong = Boolean(top && top.confidence >= confidence);
+  const topIsBackground = Boolean(top && top.label.trim().toLowerCase() === 'background');
   const waitingRemoval = stability?.phase === 'waiting-removal';
   const removing = waitingRemoval && !recognition;
 
@@ -459,9 +468,11 @@ export function SortWaste() {
             ) : cameraOn ? (
               <p className="result-sub">
                 {top
-                  ? strong
-                    ? `Looking at ${top.label}… hold still.`
-                    : 'Not sure yet — move the item a little and hold it still.'
+                  ? topIsBackground
+                    ? 'Nothing to sort — this does not look like waste. Show one item, or wait for the table to be clear.'
+                    : strong
+                      ? `Looking at ${displayLabel(top.label)}… hold still.`
+                      : 'Not sure yet — move the item a little and hold it still.'
                   : 'Waiting for the camera to see something.'}
               </p>
             ) : cameraOn && previewOnly ? (
@@ -548,7 +559,7 @@ export function SortWaste() {
                   {predictions.map((row) => (
                     <li key={row.label} className={cx(row.confidence >= confidence && 'is-strong')}>
                       <div className="prediction-head">
-                        <span>{row.label}</span>
+                        <span>{displayLabel(row.label)}</span>
                         <span className="prediction-value">{Math.round(row.confidence * 100)}%</span>
                       </div>
                       <div className="prediction-bar">

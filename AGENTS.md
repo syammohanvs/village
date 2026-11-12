@@ -208,13 +208,18 @@ footwear, thermocol, e-waste) all map to **Recycling agent** in the UI with no
 bin LED. Medical waste is handled by the manual **Hazardous / medical** button,
 not a model class. See `docs/waste-model.md` and `scripts/waste/README.md`.
 
-The current install (2026-11-12) was retrained after brown paper, bottle caps
-and ball pens were misread. `build_waste_dataset.mjs` assembles
-`~/.cache/village-waste/v2` from the bootstrap tree, TrashNet's previously
-unused `cardboard` folder and Commons photos of caps, pens, paper bags and
-foam; `train_waste_model.mjs --probe` reports per-object accuracy on photos
-kept out of training. Scored on the same 807 photos, the previous model gets
-**76.5%** and the current one **88.8%**; on the real-world probe it is
-**17.4% → 77.6%** (pens 0→100%, caps 0→91%, cardboard boxes 21→86%).
-`scripts/waste/evaluate_waste_model.mjs` reproduces both columns for any
-exported model. `models/waste-old-20261112/` keeps the previous model.
+The current install (2026-11-13) was retrained after brown paper, bottle caps,
+ball pens and a **car key read as Leather** were misread.
+`build_waste_dataset.mjs` assembles `~/.cache/village-waste/v2` from the
+bootstrap tree, TrashNet's previously unused `cardboard` folder and Commons
+photos of caps, pens, paper bags, foam, key fobs, keys, phones, watches,
+wallets and sunglasses; `train_waste_model.mjs --probe` reports per-object
+accuracy on photos kept out of training. Scored on the same 833 photos, the
+previous install gets **87.3%** and the current one **88.1%**; on the 194-photo
+real-world probe it is **66.5% → 68.6%**. The car-key check is the direct
+result: the previous model read 8 car-key photos as 4 Ewaste, 3 Plastic and 1
+Glass, while the install reads them as 4 Metal, 3 Ewaste and 1 Paper — no
+Leather. `scripts/waste/evaluate_waste_model.mjs` reproduces the comparison
+and `predict_waste_image.mjs` shows the top classes for one photo.
+`models/waste-old-20261112/` and `models/waste-v2-20261112b/` keep the
+previous models.

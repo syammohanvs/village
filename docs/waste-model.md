@@ -24,47 +24,51 @@ recycling agent**. The training photos live outside the repository, in
 | Organic | Voxel51 food-waste dataset (MIT) | 180 |
 | Plastic | TrashNet `plastic` (MIT) + Wikimedia caps, pens, bottles, cups | 888 |
 | Paper | TrashNet `paper` + `cardboard` (MIT) + Wikimedia paper bags/board | 1 279 |
-| Glass | TrashNet `glass` (MIT) | 501 |
-| Metal | TrashNet `metal` (MIT) | 410 |
+| Glass | TrashNet `glass` (MIT) + Wikimedia glasses/sunglasses | ~509 |
+| Metal | TrashNet `metal` (MIT) + Wikimedia keys/key rings | ~476 |
 | Textile | clothing-dataset-small (CC0) + fabric photos (Wikimedia) | 841 |
-| Leather | clothing-dataset-small `outwear` (CC0) | 184 |
+| Leather | clothing-dataset-small `outwear` (CC0) + Wikimedia wallets | ~194 |
 | Footwear | clothing-dataset-small `shoes` (CC0) | 198 |
 | Thermocol | Wikimedia foam/packaging photos | 171 |
-| Ewaste | electronic-waste photos from Wikimedia Commons | 123 |
+| Ewaste | Wikimedia e-waste + key fobs, phones, watches | ~183 |
 | Background | room and table photos with no item | 110 |
 
 The Paper count includes TrashNet's **403 `cardboard` photos**, which the first
 pipeline never copied. The Plastic count includes real-world photos of bottle
 caps, ball pens, bottles, cups and containers; Thermocol gained 129 foam
-photos. Those object families were simply absent before, which is why a brown
-paper cover was read as e-waste, a bottle cap as e-waste and a ball pen as
-glass.
+photos. Glass, Metal, Leather and Ewaste also gained a small set of ordinary
+objects (sunglasses, keys, key rings, wallets, key fobs, phones and watches),
+because those are still materials a visitor may hand to the camera. Those
+families were simply absent before, which is why a brown paper cover was read
+as e-waste, a bottle cap as e-waste and a ball pen as glass.
 
 Fifteen per cent of each class is held back for validation. The installed model
-scores **88.8% exact class (717/807)** on that mixed set (studio photos plus
+scores **88.1% exact class (734/833)** on that mixed set (studio photos plus
 real-world object photos). Because the seven recycler classes share one action,
-**91.8% of items get the right action**: **371/414 bin items** kept their own
-bin and **355/377 recycler items** were referred.
+**90.8% of items get the right action**: **380/414 bin items** kept their own
+bin and **360/401 recycler items** were referred.
 
-The previous model is not comparable on its own older figures, because those
-were measured on studio photos only. Scored on the **same 807 photos**, the old
-model gets **76.5% (617/807)** and the new one **88.8%**. On the separate
-**probe** of real-world objects it is even clearer: the old model **17.4%**
-(28/161), the new model **77.6%** (125/161).
+The previous install is the fair comparison, not the older studio-only 93.4%
+figure. Scored on the **same 833 photos**, the previous model gets **87.3%
+(727/833)** and the installed one **88.1%**. The probe changed too: on the
+original 161 paper/plastic/thermocol photos it is **125/161 (77.6%)** for the
+previous model and **124/161 (77.0%)** for this one — essentially unchanged.
+On the expanded 194-photo probe, which adds ordinary objects, it is **66.5%**
+versus **68.6%**.
 
 | Class | Exact match | Held-out photos |
 | --- | --- | --- |
 | Organic | 100.0% | 27 |
-| Plastic | 87.6% | 170 |
-| Paper | 89.9% | 217 |
-| Glass | 86.7% | 75 |
-| Metal | 93.5% | 62 |
-| Textile | 93.7% | 126 |
-| Leather | 82.1% | 28 |
-| Footwear | 93.3% | 30 |
-| Thermocol | 73.7% | 38 |
-| Ewaste | 72.2% | 18 |
-| Background | 81.2% | 16 |
+| Plastic | 85.3% | 170 |
+| Paper | 95.9% | 217 |
+| Glass | 83.1% | 77 |
+| Metal | 83.3% | 72 |
+| Textile | 96.0% | 126 |
+| Leather | 76.7% | 30 |
+| Footwear | 100.0% | 30 |
+| Thermocol | 68.4% | 38 |
+| Ewaste | 57.1% | 28 |
+| Background | 77.8% | 18 |
 
 ### The objects that were misread
 
@@ -73,26 +77,47 @@ the results on photos the model has never seen:
 
 | Object | Correct | Misread as |
 | --- | --- | --- |
-| Ball-pointed pen | **100.0%** (14/14) | — |
-| Ball pen | **92.3%** (12/13) | Thermocol 1 |
-| Bottle cap | **90.9%** (10/11) | Ewaste 1 |
-| Cardboard box | **85.7%** (12/14) | Background 1, Thermocol 1 |
-| Corrugated board | **64.3%** (9/14) | Ewaste 3, Metal 1, Plastic 1 |
-| Paper bag | **71.4%** (10/14) | Thermocol 3, Plastic 1 |
-| Plastic bottle | **71.4%** (10/14) | Thermocol 2, Paper 1, Background 1 |
-| Plastic cup | **64.3%** (9/14) | Paper 2, Thermocol 2, Ewaste 1 |
-| Foam food container | **66.7%** (8/12) | Plastic 2, Paper 1, Ewaste 1 |
-| Foam cup | **50.0%** (3/6) | Plastic 3 |
+| Ball-pointed pen | **92.9%** (13/14) | Glass 1 |
+| Ball pen | **92.3%** (12/13) | Paper 1 |
+| Bottle cap | **81.8%** (9/11) | Paper 1, Glass 1 |
+| Cardboard box | **71.4%** (10/14) | Plastic 2, Textile 1, Ewaste 1 |
+| Corrugated board | **57.1%** (8/14) | Plastic 2, Background 2, Thermocol 1, Leather 1 |
+| Paper bag | **85.7%** (12/14) | Plastic 1, Thermocol 1 |
+| Plastic bottle | **64.3%** (9/14) | Paper 2, Background 2, Footwear 1 |
+| Plastic cup | **71.4%** (10/14) | Paper 2, Thermocol 1, Ewaste 1 |
+| Foam food container | **66.7%** (8/12) | Plastic 2, Paper 2 |
+| Foam cup | **66.7%** (4/6) | Plastic 2 |
+| Car key (ordinary key) | **5/10** | Plastic 2, Paper 1, Ewaste 1, Metal 1 |
+| Electronic key fob | **4/7** | Plastic 2, Metal 1 |
 
-Before this retraining the same probe scored **17.4%**, with every ball pen read
-as glass, every bottle cap as e-waste, and every cardboard box as e-waste. The
-remaining misses are mostly the paper/foam and foam/plastic boundaries, which
-are genuinely close on a 224×224 photo.
+The car key that started this work was read as Leather by the older model. On
+the **8 photos of car keys** used for that check, the previous model produced
+**4 Ewaste, 3 Plastic, 1 Glass** (zero Metal, four recycler materials); the
+installed model produces **4 Metal, 3 Ewaste, 1 Paper** — **seven of eight are
+recycler materials and none is Leather**. That is the check that answers the
+operator's report.
+
+### Ordinary objects
+
+A phone, watch, key fob, mechanical key, wallet or pair of sunglasses is still
+a **material**: Ewaste, Metal, Leather or Glass, and the app refers all of them
+to the recycling agent. The public samples for phones, watches, wallets and
+sunglasses are still small (1–9 probe photos each), so the model is not yet
+reliable on them. An experimental run with more of those photos raised phone,
+smartwatch and sunglasses accuracy, but it sent **4 of the 8 car keys to the
+Plastic bin** and dropped ball pens from 92% to 69%; it was rejected. The
+installed model is the one that keeps the car keys and pens right. Venue photos
+are the fix.
+
+The remaining misses on the waste photos are mostly the paper/foam and
+foam/plastic boundaries, which are genuinely close on a 224×224 photo.
 
 To rebuild it:
 
 ```bash
 npm install --prefix ~/.cache/village-waste @tensorflow/tfjs-node@4.22.0
+node scripts/waste/fetch_extra_images.mjs \
+  --out ~/.cache/village-waste/extra --per-source 40 --probe 0.2
 node scripts/waste/build_waste_dataset.mjs \
   --base ~/.cache/village-waste \
   --trashnet ~/.cache/village-waste/dataset-resized \
@@ -109,7 +134,9 @@ The trainer refuses to overwrite an installed model without `--force`, and
 before it exits it reloads the exported files and classifies eight photos
 again to prove the export is complete. `evaluate_waste_model.mjs` scores any
 exported model on the same photos, which is what makes an old-versus-new
-comparison honest.
+comparison honest. `predict_waste_image.mjs` shows the top classes for one
+photo, which is how an operator's "my car key came out as leather" report is
+checked.
 
 ### Retrain it where the exhibition happens
 
@@ -252,6 +279,14 @@ The mapping is fixed in this build. The UI names the material it saw (for
 example “Glass” or “Electronic waste”) and then gives the same referral
 instructions. Medical waste is not a model class: the operator uses the
 **Hazardous / medical** button for it.
+
+An ordinary object is still sorted by its material, because that is what the
+camera sees: a phone, key fob or watch is **Electronic waste**; a mechanical
+key or key ring is **Metal**; sunglasses are **Glass**; a wallet is **Leather**
+(natural or synthetic). All of them are referred to the recycling agent, so the
+material changes the label but not the bin action. Only the empty table and the
+room are **Background**, which the page shows as **“Not a waste item”** and
+ignores.
 
 ## 6. Honest limits
 
