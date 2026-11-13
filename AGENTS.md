@@ -281,7 +281,30 @@ crop as a JPEG data URL; `SortWaste.tsx` no longer imports TensorFlow, and
 `@teachablemachine/image` + `@tensorflow/tfjs` were removed from package.json.
 Reproduce with `scripts/waste/train_resnet50.py` then `export_resnet50.py`.
 
-The Sort Waste camera now **focuses on the object and paints out the table**:
+**The venue case is an item held in a hand, not an item on a table
+(2026-11-13).** The user said so explicitly, and the numbers agreed: on 528
+hand-held composites the old checkpoint scored **26.3% item action**, and **252
+of 528 frames were read as "Background"** — "not a waste item" while somebody
+held one up. The fix is training data, not architecture:
+`scripts/waste/make_handheld_set.py` cuts each training object out (u2netp,
+offline, **training only**) and composites it into a room photo with a drawn
+arm and hand — 15 skin tones, random angle, fingers over the object, optional
+sleeve, random scale/rotation/position, plus hand-only negatives.
+`train_handheld_head.py` does 30 archive epochs then 18 more on archive +
+composites at a small learning rate. Measured through the backend's own HTTP
+route: hand-held **26.3% → 63.6%** item action, real probe **74.3% → 76.3%**,
+withheld archive **91.1% → 90.5%**. The previous checkpoint is at
+`models/waste-resnet50-backup-v13/model.pt`. **The hands are drawn, not
+photographed** — ten real photos of a person holding an item are still the
+measurement that counts, and `scripts/waste/hand_eval.py` scores whatever model
+the backend is serving.
+
+The empty table is now an **optional aid, not the method**: with no stored scene
+the page classifies every frame (centre crop) and "nothing to sort" comes from
+the model's Background class. The copy no longer tells the operator to clear a
+table they do not have.
+
+The Sort Waste camera can still **focus on a fixed table and paint it out**:
 `web/frontend/src/lib/focus.ts` diffs each frame against **up to three**
 empty-scene snapshots (`diffBoxMulti`), crops the changed box, and then
 `objectMask` replaces every pixel **inside that crop that still matches the

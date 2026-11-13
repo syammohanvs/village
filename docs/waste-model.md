@@ -336,11 +336,31 @@ installed**. It never substitutes random predictions.
   and shows a warning. It never redirects the item to a different bin.
 - A recognition is not proof that an item reached a bin or an agent.
 
-### Focusing on the object, not the room
+### Showing the item in your hand
 
-The page compares each camera frame with one or more **empty-scene snapshots**.
-A pixel that matches any stored snapshot is background; everything else is the
-object.
+The normal case at the venue is **a person holding the item up to the camera in
+a room that is not empty**. Nothing is placed on a table, and there may be no
+table at all. The page is built for that:
+
+- With no stored scene it classifies **every frame**, using a square crop of the
+  middle of the picture. "There is nothing to sort" comes from the model's own
+  **Background** class, not from comparing with an empty room.
+- An empty scene is **optional**. If the camera does look at a fixed, empty
+  table, **Set background** makes the page subtract it and classify only what
+  appeared. That is an accuracy aid for a booth, not a requirement.
+- A hand in the frame is expected. The page warns only when the changed area
+  touches the frame edge and covers more than about a fifth of it — and it still
+  classifies, because a visitor holding an item is exactly the case that matters.
+
+The model itself was retrained on hand-held scenes; see
+[showing an item in the hand](#showing-an-item-in-the-hand-model-work) below.
+
+### The optional empty-scene aid
+
+The page can compare each camera frame with one or more **empty-scene
+snapshots**. A pixel that matches any stored snapshot is background; everything
+else is the object. Press **Clear backgrounds** to go back to classifying
+everything.
 
 The comparison has **three** outcomes, and they must not be confused:
 
@@ -480,6 +500,52 @@ crop already was.
 
 The threshold and stable-frame count are adjustable in
 Setup → Voice & Camera; the cooldown applies to a session that stays open.
+
+### Showing an item in the hand (model work)
+
+There were no photographs from the venue, so the case was manufactured instead
+of guessed at: `scripts/waste/make_handheld_set.py` cuts each training object
+out of its own photo (u2netp, offline, training data only), then composites it
+into a room photograph with a **drawn arm and hand** - random skin tone from 15
+real values, random angle, 3-4 fingers over the object, optional sleeve, random
+object scale, rotation and position. Label comes from the object, never the
+scene, so the augmentation cannot mislabel a photo. Hand-only negatives are
+included, because "a hand in frame with nothing in it" is what a venue sees most
+of the time.
+
+`scripts/waste/train_handheld_head.py` then fine-tunes the head: 30 epochs on
+the archive (reaching the deployed model's own validation accuracy), then 18
+epochs on the archive **plus** the composites at a small learning rate, so the
+archive's decision boundaries move as little as possible.
+
+Measured through the running backend (`POST /api/v1/waste/classify`, i.e. the
+same JPEG the camera sends), 528 hand-held composites whose objects come only
+from the withheld set:
+
+| Set | Before | After |
+| --- | --- | --- |
+| Hand-held, exact class | 19.5% | **44.9%** |
+| **Hand-held, item action** | **26.3%** | **63.6%** |
+| Real-world probe, item action (241 photos) | 74.3% | **76.3%** |
+| Withheld archive, item action (505 photos) | 91.1% | 90.5% |
+
+So the venue case gains **37 points** and the real-world probe gains 2, at a
+cost of **0.6 points** on clean archive photos. The dominant old failure was
+that **half of all hand-held frames were read as "Background"** (252 of 528) -
+the camera was told "not a waste item" while an item was being held up. That is
+down to 92 of 528.
+
+`scripts/waste/hand_eval.py` reproduces any of these numbers against whatever
+model the backend is serving.
+
+The previous checkpoint is kept at `models/waste-resnet50-backup-v13/model.pt`;
+restoring it is copying one file and restarting the backend.
+
+**What this does not prove.** The hands are drawn, not photographed. Real hands
+are three-dimensional, cast shadows and have sleeves, cuffs and jewellery that
+this generator does not show. The gain is large and consistent enough to be
+worth shipping, but the venue's own camera is still the measurement that counts:
+put ten real photos of someone holding an item in front of it.
 
 ## 5. Class mapping
 
