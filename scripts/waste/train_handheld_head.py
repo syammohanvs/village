@@ -78,21 +78,35 @@ def folder_items(root: Path) -> list[tuple[Path, int]]:
 
 def features_of(backbone, items, batch=32):
     X, y = [], []
+    skipped: list[str] = []
     with torch.no_grad():
         for start in range(0, len(items), batch):
             chunk = items[start:start + batch]
             tensors = []
-            for path, _ in chunk:
-                image = Image.open(path).convert("RGB").resize(
-                    (IMAGE_SIZE, IMAGE_SIZE), Image.BILINEAR)
+            kept: list[int] = []
+            for path, label in chunk:
+                try:
+                    image = Image.open(path).convert("RGB").resize(
+                        (IMAGE_SIZE, IMAGE_SIZE), Image.BILINEAR)
+                except Exception:  # noqa: BLE001
+                    # A folder of the venue's own photos will contain a corrupt
+                    # file or an HTML "download" some day.  Skipping it (and
+                    # saying so) beats losing the run at hour one.
+                    skipped.append(str(path))
+                    continue
                 tensor = torch.from_numpy(
                     np.asarray(image, dtype=np.float32) / 255.0).permute(2, 0, 1)
                 tensors.append((tensor - MEAN.squeeze(0)) / STD.squeeze(0))
+                kept.append(label)
+            if not tensors:
+                continue
             xb = torch.stack(tensors)
             X.append(backbone(xb).pooler_output.flatten(1).numpy())
-            y.extend(label for _, label in chunk)
+            y.extend(kept)
             if start and start % (batch * 20) == 0:
                 print(f"    {start}/{len(items)}", flush=True)
+    if skipped:
+        print(f"    skipped {len(skipped)} unreadable file(s): {skipped[:3]}", flush=True)
     return np.concatenate(X), np.array(y, dtype=np.int64)
 
 
@@ -122,6 +136,10 @@ def main() -> int:
     ap.add_argument("--hand-train", required=True)
     ap.add_argument("--hand-test", required=True)
     ap.add_argument("--probe", default="")
+    ap.add_argument("--extra-train", default="",
+                    help="folder of new photos to ADD to training, in <Class>/<file> "
+                         "layout (e.g. the venue's own handkerchiefs).  Validation and "
+                         "the probe are untouched, so the measurement stays honest.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--epochs", type=int, default=40,
                     help="epochs on the archive alone, before the hand-held stage")
@@ -151,7 +169,10 @@ def main() -> int:
     for parameter in backbone.parameters():
         parameter.requires_grad = False
 
+    extra_items = folder_items(Path(args.extra_train).expanduser()) if args.extra_train else []
+
     cache = out / "hand-features.npz"
+    extra_cache = out / "extra-features.npz"
     if cache.exists():
         zz = np.load(cache)
         Xh, yh, Xt, yt = zz["Xh"], zz["yh"], zz["Xt"], zz["yt"]
@@ -164,6 +185,28 @@ def main() -> int:
         Xh, yh = features_of(backbone, hand_train)
         Xt, yt = features_of(backbone, hand_test)
         np.savez(cache, Xh=Xh, yh=yh, Xt=Xt, yt=yt)
+
+    if extra_items:
+        # Its own cache, keyed by the file list, so dropping more photos in later
+        # only re-reads the new ones.
+        signature = ",".join(str(path) for path, _ in extra_items)
+        if extra_cache.exists():
+            zz = np.load(extra_cache)
+            if str(zz["signature"]) == signature:
+                Xe, ye = zz["Xe"], zz["ye"]
+                print(f"loaded cached features for {len(ye)} new photos", flush=True)
+            else:
+                extra_cache.unlink()
+                Xe, ye = None, None
+        else:
+            Xe, ye = None, None
+        if Xe is None:
+            print(f"extracting features for {len(extra_items)} new photos ...", flush=True)
+            Xe, ye = features_of(backbone, extra_items)
+            np.savez(extra_cache, Xe=Xe, ye=ye, signature=signature)
+        Xtr = np.concatenate([Xtr, Xe])
+        ytr = np.concatenate([ytr, ye])
+        print(f"archive + {len(ye)} new photos: {len(ytr)} views", flush=True)
 
     # `hand-repeat` lets the composites outweigh their raw count: the venue is
     # all hand, while the archive is all clean product shots.

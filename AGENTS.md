@@ -307,6 +307,21 @@ photographed** — ten real photos of a person holding an item are still the
 measurement that counts, and `scripts/waste/hand_eval.py` scores whatever model
 the backend is serving.
 
+**A confident wrong answer is fixed with photographs, not with a rule**
+(2026-11-13, the user's choice). A handkerchief read as Plastic 0.75 lit the
+plastic bin, so a higher bar for bins was measured and **rejected**: 0.80 for the
+hand-held path gains 1.3 points but diverts 35 of 528 correct bin items, and on
+clean table photos the same bar costs 9.7. Routing is unchanged. The ceramic tea
+cup (read Thermocol 0.95) is also left alone — ceramic is not one of the 11
+classes and its *action*, hand it to the agent, was already right.
+
+The path for a misread is one command now: photos in
+`data/waste-samples/<Class>/` (the class the item **actually** is), then
+`train_handheld_head.py --extra-train data/waste-samples`. New photos go into
+**training only**, so the withheld set and the probe stay an honest measurement;
+an unreadable file is skipped and named. Then export, restart, re-check with
+`hand_eval.py`.
+
 The empty table is now an **optional aid, not the method**: with no stored scene
 the page classifies every frame (centre crop) and "nothing to sort" comes from
 the model's Background class. The copy no longer tells the operator to clear a

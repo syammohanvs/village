@@ -535,6 +535,56 @@ that **half of all hand-held frames were read as "Background"** (252 of 528) -
 the camera was told "not a waste item" while an item was being held up. That is
 down to 92 of 528.
 
+### Adding photos of an item that misreads
+
+The routing was deliberately left alone: a bin is still chosen on a single
+clear winner, because diverting uncertain items to the operator costs more bins
+than it saves (measured: a 0.80 confidence bar for bins moves hand-held item
+accuracy 67.6% -> 68.9%, but diverts 35 of 528 correct bin items, and applied to
+clean table photos it costs 9.7 points). So a confident wrong answer is fixed
+with photographs, not with a rule.
+
+Anything read wrongly -- a handkerchief called plastic, a tea cup called
+thermocol -- is fixed by putting its photos in the training set:
+
+```bash
+# 10-30 photos per item, phone snaps are fine, in <Class>/<file> layout.
+# The class is what the item ACTUALLY is, not what the model said.
+mkdir -p data/waste-samples/Textile
+cp ~/photos/handkerchief-*.jpg data/waste-samples/Textile/
+
+python3 scripts/waste/train_handheld_head.py \
+    --features /tmp/opencode/waste-resnet50-v13/features.npz \
+    --hand-train /tmp/opencode/hand-train \
+    --hand-test /tmp/opencode/hand-test \
+    --probe ~/.cache/village-waste/v13/probe \
+    --extra-train data/waste-samples \
+    --out /tmp/opencode/waste-handheld-next
+```
+
+The new photos are added to **training only**: the withheld set and the probe
+are untouched, so the three numbers the trainer prints stay an honest
+measurement rather than a memory test. An unreadable file (a corrupt JPEG, an
+HTML "download") is skipped and named instead of failing the run.
+
+Then, only if `val` has not fallen and the number for the item improved:
+
+```bash
+python3 scripts/waste/export_resnet50.py \
+    --head /tmp/opencode/waste-handheld-next/resnet50_head.pt \
+    --out models/waste-resnet50/model.pt
+# restart the backend, then re-check with hand_eval.py
+```
+
+Keep the previous checkpoint (`models/waste-resnet50-backup-v13/`) until the new
+one has been seen working in front of the real items.
+
+**What "the class is what the item actually is" means for the awkward ones.** A
+tea cup is ceramic, which is not one of the eleven classes, so its photos go
+into `Glass` (the nearest recyclable material) -- the *action* is already right,
+only the spoken name changes. A handkerchief is `Textile`. A car key fob is
+`Ewaste`.
+
 ### The browser's JPEG quality was costing accuracy
 
 The camera sends its 224x224 crop as `canvas.toDataURL('image/jpeg', q)`, and q
