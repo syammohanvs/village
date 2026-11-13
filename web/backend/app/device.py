@@ -155,12 +155,30 @@ class DeviceGateway:
             except asyncio.TimeoutError:
                 continue
 
+    def _poll_interval_ms(self) -> float:
+        """How long to wait between attempts.
+
+        The configured cadence is right while the controller answers.  Once it
+        does not, keeping that cadence means every reader queues behind another
+        connect timeout, so each failure doubles the gap up to half a minute and
+        a success resets it.
+        """
+        interval = float(self.settings.poll_interval_ms)
+        if self._failures:
+            interval = min(30000.0, interval * (2 ** min(self._failures, 5)))
+        return interval
+
     async def _maybe_poll(self) -> None:
+        age_ms = (time.monotonic() - self._last_poll_mono) * 1000.0
         if self._last_success_mono is None:
+            # It has never answered.  That is not a reason to let every single
+            # reader start its own connect attempt -- which is how a state read
+            # came to take 6-12 s with the board switched off.
+            if self._failures and age_ms < self._poll_interval_ms():
+                return
             await self.poll_once()
             return
-        age = time.monotonic() - self._last_poll_mono
-        if age * 1000.0 >= self.settings.poll_interval_ms:
+        if age_ms >= self._poll_interval_ms():
             await self.poll_once()
 
     async def _call(self, device: Any, method: str, *args: Any, **kwargs: Any) -> Any:
@@ -238,7 +256,14 @@ class DeviceGateway:
     def _demo_status(self) -> dict[str, Any]:
         return self.demo.status()
 
-    async def snapshot(self, mode: str = "live") -> dict[str, Any]:
+    async def snapshot(self, mode: str = "live", *, allow_poll: bool = True) -> dict[str, Any]:
+        """The current state.
+
+        `allow_poll=False` answers from what the gateway already knows instead of
+        waiting for the controller.  Use it where a fresh reading is a nicety
+        rather than the answer -- a recognition must not be held up by a board
+        that is switched off.
+        """
         if mode == "demo":
             status = self._demo_status()
             return {
@@ -259,7 +284,8 @@ class DeviceGateway:
                 "status": status,
             }
 
-        await self._maybe_poll()
+        if allow_poll:
+            await self._maybe_poll()
         age = self._age_ms()
         stale = age is None or age > self.settings.stale_after_ms
         connected = bool(

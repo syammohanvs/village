@@ -540,6 +540,20 @@ export function SortWaste() {
     const hazardous = hazardousMaterial(event.category);
     setReferralLabel(material);
     setHazardousLabel(hazardous);
+
+    // Sara speaks from what was just decided, not from the reply.  Waiting for
+    // the recording held her sentence for as long as the round trip took --
+    // measured at 19-21 s with the controller switched off, because the record
+    // asked the board for its fill levels.  The sentence is already known here:
+    // a bin name for the three bins, a referral for anything else.
+    const spoken =
+      hazardous
+        ? 'Hazardous waste. Do not put it in the bins. Hand it to the operator.'
+        : material
+          ? `Classified as ${event.label || event.category}. Please contact the operator.`
+          : `Classified as ${event.category}. Put it in the ${event.category} bin.`;
+    void speakText(spoken, voiceLanguage, 0.95);
+
     try {
       const result = await api.postRecognition({
         // One referral category for every recycler material and one for
@@ -550,18 +564,6 @@ export function SortWaste() {
         model: 'teachable-machine',
       });
       setRecognition(result);
-      // Sara reads the result aloud: a bin name for the three bins, or a
-      // referral to the operator for anything else.
-      const spokenCategory = result.category ?? event.category;
-      const isRecycler = Boolean(material);
-      const isHazardous = Boolean(hazardous);
-      const spoken =
-        isHazardous
-          ? 'Hazardous waste. Do not put it in the bins. Hand it to the operator.'
-          : isRecycler
-            ? `Classified as ${event.category}. Please contact the operator.`
-            : `Classified as ${spokenCategory}. Put it in the ${spokenCategory} bin.`;
-      void speakText(spoken, voiceLanguage, 0.95);
       const binState = result.bin?.state;
       setAlert(
         result.alert ??

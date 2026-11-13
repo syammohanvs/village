@@ -68,6 +68,21 @@ const { predictionState } = vi.hoisted(() => {
 });
 
 
+// What the page asked Sara to say, in order.  The delay this pins was measured
+// in the app: the sentence used to wait for the recording round trip.
+const spoken: string[] = [];
+
+vi.mock('../lib/speech', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/speech')>();
+  return {
+    ...actual,
+    speakText: (text: string) => {
+      spoken.push(text);
+      return Promise.resolve();
+    },
+  };
+});
+
 // Every quality argument the page has passed to toDataURL since the last
 // test started.  The JPEG quality is an accuracy knob (measured, see
 // SortWaste.tsx), so it is worth pinning where a test can see it.
@@ -93,6 +108,7 @@ beforeEach(() => {
     }),
   });
   toDataUrlCalls.length = 0;
+  spoken.length = 0;
   Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
     configurable: true,
     value: (_type?: string, quality?: unknown) => {
@@ -834,5 +850,57 @@ describe('Sort Waste — the empty table is painted out', () => {
     } finally {
       canvas.restore();
     }
+  }, 15000);
+});
+
+describe('Sort Waste — Sara speaks without waiting on the recording', () => {
+  it('says the result even when the record request never answers', async () => {
+    // Measured in the app: the sentence waited for POST /waste/recognition,
+    // which asks the controller for its bin levels and took 19-21 s with the
+    // board switched off.  The sentence is already known from the frame, so it
+    // must not depend on that call at all.
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    // A promise that never settles: exactly the case that used to hang.
+    vi.mocked(api.postRecognition).mockImplementation(
+      () => new Promise(() => undefined) as never,
+    );
+    predictionState.current = [
+      { className: 'Metal', probability: 0.91 },
+      { className: 'Ewaste', probability: 0.05 },
+      { className: 'Background', probability: 0.01 },
+    ];
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    const start = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(start);
+
+    // The greeting speaks on mount, so look for the classification itself.
+    await waitFor(
+      () => expect(spoken.some((line) => /Classified as Metal/i.test(line))).toBe(true),
+      { timeout: 8000 },
+    );
+    // ...and the request is genuinely still outstanding, so this was not a
+    // lucky ordering.
+    expect(api.postRecognition).toHaveBeenCalled();
   }, 15000);
 });

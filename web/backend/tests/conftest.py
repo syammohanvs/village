@@ -23,11 +23,13 @@ class RecordingDevice:
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.status_calls = 0
         self.fail_next = 0
         self.unreachable = False
         self._sim = SimulatedDevice()
 
     def status(self) -> dict[str, Any]:
+        self.status_calls += 1
         if self.unreachable:
             raise DeviceUnreachable("fake controller is unreachable")
         return self._sim.status()

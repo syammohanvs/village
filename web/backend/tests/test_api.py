@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 import pytest
 
@@ -444,3 +445,90 @@ async def test_an_offline_controller_is_reported_not_crashed(tmp_path):
         assert (
             await client.get("/api/v1/device/config", params={"mode": "demo"})
         ).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_recording_a_recyclable_never_waits_for_the_controller(tmp_path):
+    """The sentence must not wait for the bin levels.
+
+    Measured in the app: with the board switched off, POST
+    /api/v1/waste/recognition took 19-21 s, because the handler asked the
+    controller for its state before answering -- and each attempt costs a
+    connect timeout, with readers queueing behind it.  Sara speaks after that
+    call returns, so the delay was heard as "she says nothing for ages".
+
+    A referral needs nothing from the board, so the path must not touch it.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    real.unreachable = True
+    async with client_for(settings, device=real) as (client, gateway, app):
+        started = time.monotonic()
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={"mode": "live", "category": "other", "confidence": 0.9,
+                  "model": "resnet50", "request_id": "no-wait-for-board"},
+        )
+        elapsed = time.monotonic() - started
+        assert response.status_code == 200
+        body = response.json()
+        assert body["recognition"]["category"] == "other"
+        assert body["indication"] is None
+        # Not one poll: the answer does not depend on the controller.
+        assert real.status_calls == 0
+        assert elapsed < 0.5
+
+
+@pytest.mark.asyncio
+async def test_a_controller_that_never_answered_does_not_retry_per_reader(tmp_path):
+    """With the board off from the start, a state read must stay instant.
+
+    The gateway used to poll at the configured cadence with no failure backoff,
+    so every reader queued behind a fresh connect timeout: /api/v1/state took
+    6-12 s.  A board that has never answered is answered from what is already
+    known rather than retried for every request.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    real.unreachable = True
+    async with client_for(settings, device=real) as (client, gateway, app):
+        first = await client.get("/api/v1/state", params={"mode": "live"})
+        assert first.status_code == 200
+        assert first.json()["connection"]["connected"] is False
+        calls_after_first = real.status_calls
+        assert calls_after_first >= 1
+
+        for _ in range(5):
+            started = time.monotonic()
+            again = await client.get("/api/v1/state", params={"mode": "live"})
+            elapsed = time.monotonic() - started
+            assert again.status_code == 200
+            # Backoff means these are answered from the cached view...
+            assert elapsed < 0.5
+        # ...without a new attempt each time.
+        assert real.status_calls == calls_after_first
+
+
+@pytest.mark.asyncio
+async def test_the_poll_gap_grows_while_the_controller_is_away(tmp_path):
+    """The backoff curve itself, which no request-level test can see.
+
+    A gateway that answers slowly enough to exceed the poll interval would keep
+    polling at the configured cadence, and every reader would wait behind it.
+    """
+    settings = make_settings(tmp_path)
+    base = settings.poll_interval_ms
+    async with client_for(settings, device=RecordingDevice()) as (client, gateway, app):
+        assert gateway._poll_interval_ms() == pytest.approx(base)
+
+        gateway._failures = 1
+        assert gateway._poll_interval_ms() == pytest.approx(base * 2)
+        gateway._failures = 3
+        assert gateway._poll_interval_ms() == pytest.approx(base * 8)
+        # Capped: a board left off overnight must not go quiet for an hour.
+        gateway._failures = 40
+        assert gateway._poll_interval_ms() == pytest.approx(30000)
+
+        # A success resets it.
+        gateway._failures = 0
+        assert gateway._poll_interval_ms() == pytest.approx(base)

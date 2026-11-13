@@ -462,8 +462,12 @@ def create_app(
             # Hazardous waste (syringes, cotton, napkins, diapers, catheters,
             # urine bags) is not one of the three bins and must never be sent
             # to a bin LED.  It is recorded and referred to the operator.
+            # `allow_poll=False`: the board is a convenience here, not part of
+            # the answer.  Waiting for a controller that is switched off held
+            # the whole recognition -- and therefore Sara's sentence -- for
+            # 19-21 s, measured.
             try:
-                snapshot = await gateway.snapshot(body.mode)
+                snapshot = await gateway.snapshot(body.mode, allow_poll=False)
             except Exception:  # noqa: BLE001 - a referral does not need the board
                 snapshot = {}
             record = await db.add_recognition(
@@ -492,7 +496,7 @@ def create_app(
             # referred to the recycling agent, and no INDICATE_WASTE command is
             # sent, so no bin LED can light for them.
             try:
-                snapshot = await gateway.snapshot(body.mode)
+                snapshot = await gateway.snapshot(body.mode, allow_poll=False)
             except Exception:  # noqa: BLE001 - a referral does not need the board
                 snapshot = {}
             record = await db.add_recognition(
@@ -515,7 +519,10 @@ def create_app(
                 "physical": snapshot.get("physical", False),
                 "note": "Not one of the three bins. Hand it to the recycling agent and contact the operator.",
             }
-        snapshot = await gateway.snapshot(body.mode)
+        # The bin's fill level decides whether to warn, and the cached reading
+        # is good enough for that; the LED command below is what waits for the
+        # board, and it fails fast and says so.
+        snapshot = await gateway.snapshot(body.mode, allow_poll=False)
         status = snapshot.get("status") or {}
         bins = {item.get("id"): item for item in (status.get("sensors", {}) or {}).get("bins", [])}
         target = bins.get(category, {})
