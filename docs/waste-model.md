@@ -326,8 +326,12 @@ matches this view. Show the empty table and press Set background again.”* and
 keeps classifying, so the visitor still gets an answer while the operator fixes
 the snapshot.
 
-1. Start the camera with the table (or the room) empty.
-2. Press **Set background**. The page stores that snapshot on this device.
+1. Start the camera. If the table is empty, press **Set background** once — that
+   gives the best accuracy (the table is painted out of the crop).
+2. If the table is not empty (or the item is being held in the hand), leave
+   **Focus on the object** ticked and show the item in the centre of the frame.
+   The page crops the centre and classifies that; the hint below the camera
+   says how to do better.
 3. Show one item. Only the part that appeared is classified.
 
 Inside the crop, every pixel that still matches the stored empty scene is then
@@ -352,6 +356,16 @@ After a confirmed item the **camera stays on**. Remove the item; the empty
 scene lets the stabilizer re-arm, and the next item is classified without
 pressing Start Camera again. The result card says *remove the item*, then
 *Camera armed*, so the operator can see which state it is in.
+
+**Practical workflow.** A background is what makes the system accurate, but it
+is not required. With no background stored the page classifies a centre crop of
+the frame, which is enough for an item held in the hand or shown close to the
+camera. The result card still names the class and the confidence, so the
+operator can see what the model thinks even when it is unsure. For an item that
+keeps misreading, the fix is the same as for the car key and the handkerchief:
+photographs of that object in the exhibition setting, added to the training set
+and retrained. The training scripts and the measurement harness are in
+`scripts/waste/`.
 
 This is why a car key on a home table no longer becomes “Leather” from the
 wooden table or a sleeve in the frame: the table and the room are the
