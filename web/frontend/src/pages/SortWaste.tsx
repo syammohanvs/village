@@ -282,7 +282,7 @@ export function SortWaste() {
     clearStoredBackgrounds(storage);
     setBackgroundCount(0);
     setBackgroundReady(false);
-    setFocusNote('Backgrounds cleared. Show the empty table and press Set background.');
+    setFocusNote('Backgrounds cleared. Every frame is classified now — hold an item up to the camera.');
     stabilizerRef.current.reset();
   }, []);
 
@@ -353,7 +353,7 @@ export function SortWaste() {
           kind: 'whole',
           input: video,
           warning:
-            'The stored background no longer matches this view. Show the empty table and press Set background again.',
+            'The stored background no longer matches this view. Press Set background again on the empty table, or press Clear backgrounds and show the item in your hand instead.',
         };
       }
       const region = state.region;
@@ -741,7 +741,7 @@ export function SortWaste() {
                   title={
                     backgroundCount >= MAX_BACKGROUNDS
                       ? 'Three backgrounds are stored; adding another replaces the oldest.'
-                      : 'Remember this empty scene as a background.'
+                      : 'Optional: remember an empty table, so only the object that appears is classified.'
                   }
                   data-testid="set-background"
                 >
@@ -788,7 +788,7 @@ export function SortWaste() {
                         ? 'adding another replaces the oldest.'
                         : 'add another for a door or lights that change.'
                     }`
-                  : 'Show the empty table (or the room) and press Set background once, then show one item. Only the object that appears is classified.'}
+                  : 'Show one item to the camera — held in your hand is fine. An empty scene is optional: set one only if the camera looks at a fixed, empty table, and then only the object that appears is classified.'}
               </p>
             )}
             {frameWarning && (
@@ -890,13 +890,13 @@ export function SortWaste() {
               </>
             ) : removing ? (
               <p className="result-sub" data-testid="waste-remove">
-                Take the item away (or show the empty table) before the next one.
+                Take this item away — the camera re-arms by itself.
               </p>
             ) : cameraOn ? (
               <p className="result-sub">
                 {top
                   ? topIsBackground
-                    ? 'Nothing to sort — this does not look like waste. Show one item, or wait for the table to be clear.'
+                    ? 'Nothing to sort — this does not look like waste. Show one item, held in your hand is fine.'
                     : strong
                       ? `Looking at ${displayLabel(top.label)}… hold still.`
                       : `Best guess ${displayLabel(top.label)} at ${Math.round(top.confidence * 100)}% — not sure enough to choose a bin. Move it a little and hold it still.`

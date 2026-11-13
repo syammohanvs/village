@@ -382,7 +382,11 @@ describe('Sort Waste', () => {
 
     expect(await screen.findByTestId('set-background')).toBeInTheDocument();
     expect(screen.getByLabelText(/Focus on the object/i)).toBeChecked();
-    expect(screen.getByText(/Show the empty table/i)).toBeInTheDocument();
+    // The venue is a dynamic room where the item is held up to the camera, so
+    // an empty table is the exception, not the instruction.  The page used to
+    // tell the operator to clear a table they do not have.
+    expect(screen.getByText(/held in your hand is fine/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Show the empty table and press/i)).not.toBeInTheDocument();
   }, 15000);
 
   it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
