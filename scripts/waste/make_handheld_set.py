@@ -232,16 +232,26 @@ def _room(rng, backgrounds, width, height):
     return room
 
 
-def compose_scene(cutout, backgrounds, rng, with_object=True):
-    """One 512x512 scene: a room, an object (maybe), and a hand holding it."""
+def compose_pair(cutout, backgrounds, rng):
+    """A scene, and the SAME scene with the object taken away.
+
+    Both come out of one RNG stream, so the room, the hand, the light and the
+    blur are identical: the only difference between the two pictures is the
+    item.  That is what makes it possible to measure a crop or a mask honestly
+    -- the "room" is the pair, not an assumption.
+    """
     from PIL import Image, ImageFilter
 
-    scene = _room(rng, backgrounds, CANVAS, CANVAS).convert("RGBA")
+    room = _room(rng, backgrounds, CANVAS, CANVAS).convert("RGBA")
     side = rng.choice(["left", "right", "bottom"])
     cx = int(CANVAS * rng.uniform(0.38, 0.62))
     cy = int(CANVAS * rng.uniform(0.42, 0.6))
+    behind, front = draw_hand(rng, side, (cx, cy), CANVAS, CANVAS,
+                              rng.uniform(0.9, 1.25))
 
-    if with_object and cutout is not None:
+    obj = None
+    box = None
+    if cutout is not None:
         obj = cutout.copy()
         long_side = int(CANVAS * rng.uniform(0.45, 0.8))
         ratio = long_side / max(obj.size)
@@ -253,24 +263,36 @@ def compose_scene(cutout, backgrounds, rng, with_object=True):
         oy = cy - obj.height // 2 + rng.randint(-int(CANVAS * 0.08), int(CANVAS * 0.08))
         ox = max(-obj.width // 5, min(ox, CANVAS - obj.width * 4 // 5))
         oy = max(-obj.height // 5, min(oy, CANVAS - obj.height * 4 // 5))
-    else:
-        obj = None
+        box = (ox, oy, ox + obj.width, oy + obj.height)
 
-    behind, front = draw_hand(rng, side, (cx, cy), CANVAS, CANVAS,
-                              rng.uniform(0.9, 1.25))
-    scene.alpha_composite(behind)
-    if obj is not None:
-        # A soft shadow under the object, so it is not pasted on flat.
-        shadow = Image.new("RGBA", obj.size, (0, 0, 0, 0))
-        shadow.putalpha(obj.split()[-1].point(lambda v: int(v * 0.35)))
-        scene.alpha_composite(shadow, (ox + 6, oy + 8))
-        scene.alpha_composite(obj, (ox, oy))
-    scene.alpha_composite(front)
+    blur = rng.uniform(0.3, 0.9) if rng.random() < 0.5 else None
 
-    # Slight global blur/noise: a webcam is not a scanner.
-    if rng.random() < 0.5:
-        scene = scene.filter(ImageFilter.GaussianBlur(rng.uniform(0.3, 0.9)))
-    return scene.convert("RGB")
+    def finish(layers):
+        scene = room.copy()
+        for layer in layers:
+            scene.alpha_composite(layer)
+        if blur:
+            scene = scene.filter(ImageFilter.GaussianBlur(blur))
+        return scene.convert("RGB")
+
+    without = finish([behind, front])
+    if obj is None:
+        return without, without, None
+
+    shadow = Image.new("RGBA", obj.size, (0, 0, 0, 0))
+    shadow.putalpha(obj.split()[-1].point(lambda v: int(v * 0.35)))
+    # The object sits between the palm and the fingers, as a held item does.
+    behind_with_shadow = behind.copy()
+    behind_with_shadow.alpha_composite(shadow, (box[0] + 6, box[1] + 8))
+    behind_with_shadow.alpha_composite(obj, (box[0], box[1]))
+    with_object = finish([behind_with_shadow, front])
+    return with_object, without, box
+
+
+def compose_scene(cutout, backgrounds, rng, with_object=True):
+    """One 512x512 scene: a room, an object (maybe), and a hand holding it."""
+    scene, without, _ = compose_pair(cutout if with_object else None, backgrounds, rng)
+    return scene if with_object else without
 
 
 # --------------------------------------------------------------------------
@@ -296,8 +318,11 @@ def compose(args) -> None:
     out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(args.seed)
     written = 0
+    pair_meta: dict[str, dict] = {}
 
     for cls in CLASSES:
+        if args.pairs:
+            continue
         items = by_class.get(cls, [])
         if not items:
             continue
@@ -315,6 +340,28 @@ def compose(args) -> None:
                 scene.save(folder / name, quality=args.quality)
                 written += 1
         print(f"  {cls:11s} {len(items) * args.copies} composites", flush=True)
+
+    if args.pairs:
+        # Same room and same hand, twice: with the item and without it.  A crop
+        # or a mask can then be measured against the truth instead of against
+        # an assumption, and the "room" is exact rather than approximate.
+        room_dir = out / "without"
+        room_dir.mkdir(parents=True, exist_ok=True)
+        for cls in CLASSES:
+            items = by_class.get(cls, [])
+            if not items:
+                continue
+            folder = out / "with" / cls
+            folder.mkdir(parents=True, exist_ok=True)
+            for src in items[: args.pairs]:
+                cutout = Image.open(src).convert("RGBA")
+                with_object, without, box = compose_pair(cutout, backgrounds, rng)
+                name = f"pair-{cls.lower()}-{src.stem.lower()}.jpg"
+                with_object.save(folder / name, quality=args.quality)
+                without.save(room_dir / name, quality=args.quality)
+                pair_meta[name] = {"class": cls, "box": box}
+            print(f"  {cls:11s} {len(items[: args.pairs])} pairs", flush=True)
+        (out / "pairs.json").write_text(json.dumps(pair_meta, indent=1))
 
     # Negatives: a hand and a room, no object.  Without these the model learns
     # "hand in frame means something is being shown", which is exactly wrong.
@@ -350,6 +397,9 @@ def main() -> None:
     p.add_argument("--out", required=True)
     p.add_argument("--copies", type=int, default=3)
     p.add_argument("--negatives", type=int, default=0)
+    p.add_argument("--pairs", type=int, default=0,
+                   help="also write the same scene with and without the item, for "
+                        "measuring a crop or a mask (see measure_hand_crop.py)")
     p.add_argument("--layout", choices=["dataset", "flat"], default="dataset")
     p.add_argument("--quality", type=int, default=92)
     p.add_argument("--seed", type=int, default=11)

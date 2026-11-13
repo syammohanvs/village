@@ -179,7 +179,11 @@ export function SortWaste() {
   const stabilityFrames = settings.data?.waste_stability_frames ?? 2;
   const cooldownMs = settings.data?.waste_cooldown_ms ?? 3000;
 
-  const effectiveCooldown = focusOn && backgroundCount > 0 ? 0 : cooldownMs;
+  // With focus on, the release signal is the item leaving the frame (an empty
+  // scene, decided by geometry now that the room is learned), so a timer would
+  // only add dead time between items.  It is kept for the unfocused mode, where
+  // every frame is classified blindly and only a clock prevents duplicates.
+  const effectiveCooldown = focusOn ? 0 : cooldownMs;
 
   useEffect(() => {
     stabilizerRef.current = createWasteStabilizer({
@@ -1024,7 +1028,7 @@ export function SortWaste() {
                 <span>Confidence threshold {Math.round(confidence * 100)}%</span>
                 <span>{stabilityFrames} frames to accept</span>
                 <span>
-                  {focusOn && backgroundCount > 0
+                  {focusOn
                     ? 'Rearm after the item is removed'
                     : `Cooldown ${Math.round(cooldownMs / 1000)}s`}
                 </span>

@@ -385,6 +385,34 @@ measurement**: on 60 hand-free product photographs it fired on **46**, so it
 would have let the room through while failing honest frames too. The learned
 room is the reliable signal, not the presence of skin.
 
+### What the crop should keep of the hand (measured)
+
+The obvious next idea is to take the hand out of the picture so the model sees
+only the item. It was measured before being built, using scenes where the *same*
+room and hand exist with and without the item (`make_handheld_set.py compose
+--pairs N`, scored by `measure_hand_crop.py`), 66 pairs across every class:
+
+| Crop | Exact | Item action |
+| --- | --- | --- |
+| **square around the edge-weighted centre, 1.25x the long side (the page today)** | **28.8%** | **53.0%** |
+| tighter, 0.9x — less of the arm | 27.3% | 51.5% |
+| paint skin out of the crop | 19.7% | 39.4% |
+| tighter + paint skin out | 25.8% | 43.9% |
+
+**Removing the hand costs 13.6 points, and it costs them on exactly the items
+that matter**: Ewaste 83% → 33%, Leather 100% → 67%, Textile 100% → 67%. A
+skin-colour mask cannot tell a hand from a leather wallet, a brown paper bag or
+a dark key fob, so it eats the item along with the fingers.
+
+So the crop stays as it is, and the hand is left in the frame: the item is
+already centred on it, and the room around it is painted out. This section
+exists so the idea is not re-tried from scratch.
+
+The real cause of "it said different things about one key fob" was not the crop:
+it was the camera re-arming whenever the model changed its label, which turned
+one presentation into ten events in a minute. That is fixed separately (see
+`wasteStabilizer.ts`).
+
 ### The optional empty-scene aid
 
 The page can compare each camera frame with one or more **empty-scene

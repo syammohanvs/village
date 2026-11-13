@@ -146,31 +146,31 @@ describe('rankPredictions', () => {
   });
 });
 
-describe('re-arming without an empty frame', () => {
-  it('re-arms on a different stable label, not only on "Background"', () => {
-    // Reported from the venue: after a classification the camera never came
-    // back, because re-arming waited for the model to say "Background" and the
-    // hand-trained model almost never does -- it names the room's contents.
+describe('re-arming only when the item goes', () => {
+  it('does NOT re-arm when the model changes its mind about the same object', () => {
+    // Measured at the venue: one key fob produced ten classifications in sixty
+    // seconds, because every time the model changed its label the camera opened
+    // again and accepted the new name.  The item is still in front of the lens,
+    // so there is nothing new to accept.
     const s = createWasteStabilizer({ consecutiveFrames: 2, cooldownMs: 0, rearmFrames: 2 });
-    const metal = [{ label: 'Metal', confidence: 0.9 }];
-
-    expect(s.push(metal, 0)).toBeNull();
-    const first = s.push(metal, 100);
-    expect(first?.label).toBe('Metal');
-    expect(s.snapshot(200).phase).toBe('waiting-removal');
-
-    // The same item, still held: nothing new, and it must not be counted twice.
-    expect(s.push(metal, 300)).toBeNull();
-    expect(s.push(metal, 400)).toBeNull();
-    expect(s.snapshot(400).phase).toBe('waiting-removal');
-
-    // A different item is presented.  The streak that proves it is also what
-    // re-arms the camera, so the very next frame is accepted.
-    const paper = [{ label: 'Paper', confidence: 0.8 }];
-    expect(s.push(paper, 500)).toBeNull();   // first frame of the streak
-    expect(s.push(paper, 600)).toBeNull();   // stable + different -> re-armed
-    expect(s.snapshot(600).phase).toBe('armed');
-    expect(s.push(paper, 700)?.label).toBe('Paper');
+    const names = [
+      [{ label: 'Ewaste', confidence: 0.47 }],
+      [{ label: 'Thermocol', confidence: 0.29 }],
+      [{ label: 'Plastic', confidence: 0.95 }],
+      [{ label: 'Paper', confidence: 0.81 }],
+      [{ label: 'Textile', confidence: 0.77 }],
+    ];
+    let accepted = 0;
+    expect(s.push(names[0], 0)).toBeNull();
+    if (s.push(names[0], 100)) accepted += 1;
+    // Two frames of each new name, which is what the model actually did.
+    let now = 200;
+    for (const name of names.slice(1)) {
+      s.push(name, (now += 100));
+      if (s.push(name, (now += 100))) accepted += 1;
+    }
+    expect(accepted).toBe(1);
+    expect(s.snapshot(now).phase).toBe('waiting-removal');
   });
 
   it('still re-arms on the held item going away', () => {
