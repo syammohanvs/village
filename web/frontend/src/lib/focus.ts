@@ -343,11 +343,18 @@ export function objectMask(
   }
 
   const kept = keptCount / (boxWidth * boxHeight);
-  // Less than this and the plate would be mostly empty: a stale background (the
-  // camera was nudged, the light changed) reads as "everything changed", which
-  // keeps everything — but a mask that keeps almost nothing has mis-measured
-  // and must not be used.
-  if (kept < 0.02) return null;
+  // A mask that keeps almost nothing has mis-measured, and the plain white plate
+  // it leaves is not a neutral picture -- it is an answer.  Measured on the
+  // deployed model: a plain white 224x224 square is Paper 0.69, and a white
+  // plate with a small dark object on it is still Paper 0.67.
+  //
+  // That is not hypothetical.  Fifteen of the venue's own saved captures were
+  // called "paper" with a median of 85% of the crop white: the mask had painted
+  // the item away and the model was shown an empty plate.
+  //
+  // 15% is the floor: below it the plain crop is used instead, which is at worst
+  // the item plus its surroundings rather than a white square.
+  if (kept < 0.15) return null;
   return { data, width: boxWidth, height: boxHeight, kept };
 }
 

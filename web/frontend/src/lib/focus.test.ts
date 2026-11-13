@@ -191,15 +191,17 @@ describe('painting out the stored background', () => {
   it('keeps the item and clears the table around it', () => {
     const background = frame(100, 80);
     const current = frame(100, 80);
-    // A 10x10 object in the middle of the crop box; the rest of the box is still
-    // the empty table, so it must not reach the classifier.
-    fill(current, 100, 35, 35, 10, 10, 240);
+    // An object filling a quarter of the crop box; the rest of the box is still
+    // the empty table, so it must not reach the classifier.  It is deliberately
+    // more than the 15% floor: a mask that keeps less than that is refused now,
+    // because the white plate it leaves is read as "Paper".
+    fill(current, 100, 35, 35, 20, 20, 240);
     const mask = objectMask([background], current, 100, 80, BOX);
     expect(mask).not.toBeNull();
     expect(mask!.width).toBe(BOX.width);
     expect(mask!.height).toBe(BOX.height);
-    // 100 of the 1600 box pixels are the object.
-    expect(mask!.kept).toBeCloseTo(100 / 1600, 3);
+    // 400 of the 1600 box pixels are the object.
+    expect(mask!.kept).toBeCloseTo(400 / 1600, 3);
     // The object is opaque...
     const object = ((35 - BOX.y) * BOX.width + (35 - BOX.x)) * 4;
     expect(mask!.data[object + 3]).toBe(255);
@@ -224,10 +226,10 @@ describe('painting out the stored background', () => {
     // though it differs from the first.
     expect(objectMask([first, second], current, 100, 80, BOX)).toBeNull();
     // The object has to differ from both snapshots, not merely from one.
-    fill(current, 100, 40, 40, 12, 12, 250);
+    fill(current, 100, 40, 40, 20, 20, 250);
     const mask = objectMask([first, second], current, 100, 80, BOX);
     expect(mask).not.toBeNull();
-    expect(mask!.kept).toBeCloseTo(144 / 1600, 3);
+    expect(mask!.kept).toBeCloseTo(400 / 1600, 3);
   });
 
   it('refuses a mask that would leave an almost empty plate', () => {
@@ -238,6 +240,23 @@ describe('painting out the stored background', () => {
     const current = frame(100, 80);
     fill(current, 100, BOX.x, BOX.y, 3, 3, 250);
     expect(objectMask([background], current, 100, 80, BOX)).toBeNull();
+  });
+
+  it('refuses a plate that is mostly white even when a sliver survives', () => {
+    // The measured failure: a crop that is 85% white plate is classified as
+    // Paper 0.69 on the deployed model, so a mask keeping only a sliver is worse
+    // than no mask at all. Fifteen of the venue's own captures were called
+    // "paper" with a median of 85% white.
+    const background = frame(100, 80);
+    const current = frame(100, 80);
+    fill(current, 100, BOX.x, BOX.y, Math.floor(BOX.width * 0.1), BOX.height, 250);
+    expect(objectMask([background], current, 100, 80, BOX)).toBeNull();
+
+    // A quarter surviving is a picture rather than a plate.
+    fill(current, 100, BOX.x, BOX.y, Math.ceil(BOX.width * 0.25), BOX.height, 250);
+    const mask = objectMask([background], current, 100, 80, BOX);
+    expect(mask).not.toBeNull();
+    expect(mask!.kept).toBeGreaterThan(0.15);
   });
 
   it('keeps everything when a moved camera makes the whole box differ', () => {

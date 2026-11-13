@@ -54,6 +54,27 @@ export interface SceneMemory {
  */
 export const STALE_OBJECT_MS = 4000;
 
+/**
+ * How much of the frame has to change before it counts as "something is being
+ * shown".
+ *
+ * The first threshold used was 0.3%, which is **58 pixels** of a 160x120 frame:
+ * a curtain moving, a screen flickering, the noise of a cheap sensor or a
+ * person breathing all clear that, and the page then classified the room —
+ * reported as "it is classifying without me showing anything".
+ *
+ * An item held up to the camera is a large part of the picture, not a few
+ * pixels. Two percent of the frame is about 380 pixels: still small enough for
+ * an item held at arm's length, large enough that scenery drift does not
+ * qualify.
+ */
+export const PRESENTATION_SHARE = 0.02;
+
+/** Whether a changed share is a presentation rather than the room moving. */
+export function isPresentation(changedShareValue: number): boolean {
+  return Number.isFinite(changedShareValue) && changedShareValue >= PRESENTATION_SHARE;
+}
+
 export type SceneKind = 'object' | 'empty';
 
 /**

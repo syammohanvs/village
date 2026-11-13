@@ -277,7 +277,7 @@ def compose_pair(cutout, backgrounds, rng):
 
     without = finish([behind, front])
     if obj is None:
-        return without, without, None
+        return without, without, None, room.convert("RGB")
 
     shadow = Image.new("RGBA", obj.size, (0, 0, 0, 0))
     shadow.putalpha(obj.split()[-1].point(lambda v: int(v * 0.35)))
@@ -286,12 +286,12 @@ def compose_pair(cutout, backgrounds, rng):
     behind_with_shadow.alpha_composite(shadow, (box[0] + 6, box[1] + 8))
     behind_with_shadow.alpha_composite(obj, (box[0], box[1]))
     with_object = finish([behind_with_shadow, front])
-    return with_object, without, box
+    return with_object, without, box, room.convert("RGB")
 
 
 def compose_scene(cutout, backgrounds, rng, with_object=True):
     """One 512x512 scene: a room, an object (maybe), and a hand holding it."""
-    scene, without, _ = compose_pair(cutout if with_object else None, backgrounds, rng)
+    scene, without, _, _ = compose_pair(cutout if with_object else None, backgrounds, rng)
     return scene if with_object else without
 
 
@@ -345,8 +345,10 @@ def compose(args) -> None:
         # Same room and same hand, twice: with the item and without it.  A crop
         # or a mask can then be measured against the truth instead of against
         # an assumption, and the "room" is exact rather than approximate.
-        room_dir = out / "without"
+        room_dir = out / "without"   # the same scene, hand only, no item
         room_dir.mkdir(parents=True, exist_ok=True)
+        bare_dir = out / "rooms"     # the room on its own: what the page learns
+        bare_dir.mkdir(parents=True, exist_ok=True)
         for cls in CLASSES:
             items = by_class.get(cls, [])
             if not items:
@@ -355,10 +357,11 @@ def compose(args) -> None:
             folder.mkdir(parents=True, exist_ok=True)
             for src in items[: args.pairs]:
                 cutout = Image.open(src).convert("RGBA")
-                with_object, without, box = compose_pair(cutout, backgrounds, rng)
+                with_object, without, box, room_only = compose_pair(cutout, backgrounds, rng)
                 name = f"pair-{cls.lower()}-{src.stem.lower()}.jpg"
                 with_object.save(folder / name, quality=args.quality)
                 without.save(room_dir / name, quality=args.quality)
+                room_only.save(bare_dir / name, quality=args.quality)
                 pair_meta[name] = {"class": cls, "box": box}
             print(f"  {cls:11s} {len(items[: args.pairs])} pairs", flush=True)
         (out / "pairs.json").write_text(json.dumps(pair_meta, indent=1))
@@ -392,6 +395,28 @@ def plates(args) -> None:
     empty plate is Background is what stops the plate from voting for a class.
     """
     from PIL import Image, ImageDraw, ImageFilter
+
+    hand_out = Path(args.out).expanduser() / "Background"
+    if args.hands:
+        # An empty hand, as the page shows it to the model: the crop is the
+        # hand, the room around it is painted out, so it arrives on a plain
+        # plate. Measured at the venue: that picture was being called a
+        # material. It is not waste, so it is Background.
+        hand_out.mkdir(parents=True, exist_ok=True)
+        rng_hand = random.Random(args.seed + 1)
+        for i in range(args.hands):
+            plate = Image.new("RGB", (CANVAS, CANVAS), (rng_hand.choice([
+                (255, 255, 255), (250, 250, 248), (243, 243, 240),
+            ])))
+            behind, front = draw_hand(rng_hand, rng_hand.choice(["left", "right", "bottom"]),
+                                      (CANVAS // 2, CANVAS // 2), CANVAS, CANVAS,
+                                      rng_hand.uniform(0.8, 1.3))
+            plate = plate.convert("RGBA")
+            plate.alpha_composite(behind)
+            plate.alpha_composite(front)
+            plate.convert("RGB").resize((224, 224), Image.BILINEAR).save(
+                hand_out / f"empty-hand-{i:04d}.jpg", quality=92)
+        print(f"wrote {args.hands} empty hands to {hand_out}")
 
     out = Path(args.out).expanduser() / "Background"
     out.mkdir(parents=True, exist_ok=True)
@@ -446,6 +471,9 @@ def main() -> None:
     pl = sub.add_parser("plates", help="empty white plates, labelled Background")
     pl.add_argument("--out", required=True)
     pl.add_argument("--count", type=int, default=300)
+    pl.add_argument("--hands", type=int, default=0,
+                    help="also write empty hands on a plain plate (the pipeline's "
+                         "own picture of 'nothing is being shown')")
     pl.add_argument("--seed", type=int, default=21)
     pl.set_defaults(func=plates)
 

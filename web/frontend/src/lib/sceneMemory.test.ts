@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PRESENTATION_SHARE,
   SCENE_WARMUP_FRAMES,
+  isPresentation,
   STALE_OBJECT_MS,
   noteScene,
   changedShare,
@@ -145,5 +147,17 @@ describe('when the room must be learned again', () => {
     resetScene(memory);
     expect(memory.objectSince).toBeNull();
     expect(noteScene(memory, 'object', 10)).toBe(false);
+  });
+});
+
+describe('what counts as "something is being shown"', () => {
+  it('needs a real part of the frame, not a few noisy pixels', () => {
+    // 0.3% of a 160x120 frame is 58 pixels: a curtain, a screen or sensor noise
+    // clears that, and the page then classified the room.
+    expect(isPresentation(0.003)).toBe(false);
+    expect(isPresentation(0.01)).toBe(false);
+    expect(isPresentation(PRESENTATION_SHARE)).toBe(true);
+    expect(isPresentation(0.3)).toBe(true);
+    expect(isPresentation(Number.NaN)).toBe(false);
   });
 });

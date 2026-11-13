@@ -631,6 +631,77 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### The pipeline's own pictures are now training data (2026-11-14)
+
+The venue's saved captures named both failures in one table — 156 crops, sorted
+by what the model called them:
+
+| Called | n | Skin in the crop | White plate in the crop |
+| --- | ---: | ---: | ---: |
+| Background (right) | 115 | 22% | 70% |
+| **Textile** | 16 | **64%** | 0% |
+| **Paper** | 15 | 4% | **85%** |
+
+So "textile" was **a hand with nothing in it** (no plate at all: the mask had
+kept everything), and "paper" was **an almost empty white plate** (the mask had
+kept almost nothing). Both are pictures the model had never been trained on,
+because it only ever saw photographs of objects.
+
+Two fixes, both measured through the app's own route:
+
+1. **The mask refuses a plate.** `objectMask` already refused a mask keeping
+   under 2%; that floor is now **15%**, because a crop that is 85% white is
+   classified `Paper 0.69`. Below 15% the plain crop is used instead.
+2. **Empty plates and empty hands are taught as Background.** 300 generated
+   blank plates plus the 31 real captures the page had mislabelled were added to
+   training (the captures via `promote_captures.py`, which files a saved crop
+   under the class it really is).
+
+| Through `POST /waste/classify` | Before | After |
+| --- | --- | --- |
+| Blank white plate (120, held out) | 22.5% Background | **100%** |
+| Empty hand on a plate (120, held out) | 95.8% | **98.3%** |
+| Hand-held items (528) | 50.0% / 67.6% | 48.9% / 65.7% |
+| Real-world probe (241) | 70.1% / 77.6% | 68.9% / 75.1% |
+| Withheld archive (505) | 87.7% / 91.7% | **89.1% / 92.5%** |
+
+The plate is gone as an answer and the archive improved; the cost is about two
+points on items held in a hand, which is the honest price of no longer answering
+from the background. The previous checkpoint is
+`models/waste-resnet50-backup-v13/model-before-plates-20261114.pt`.
+
+### "It classifies when I only show my hand"
+
+Reported from the venue: an empty hand held up, with nothing in it, was
+classified as a material. Two obvious fixes were measured and both fail:
+
+| Test | Empty hand | Hand + item | Archive photos |
+| --- | --- | --- | --- |
+| Share of frame the change fills | 75% | 75% | — |
+| Share of the crop that is skin | 22% | 44% | up to 60% |
+
+Geometry cannot separate them, and neither can skin: a hand **with** an item is
+often *more* skin-coloured than the same hand without one (the item hides behind
+the fingers), and leather, card and woodfall inside the same colour window.
+
+What does work is teaching the model what the pipeline shows it. Drawn hands on a
+plain plate — the pipeline's own picture of "nothing is being shown" — are
+already read as **Background 95.8%** of the time, which proves the mechanism; the
+drawings simply do not look like a real hand. Real ones can only come from the
+venue's own camera, and now that every crop is saved that is a two-minute loop:
+
+1. hold the empty hand up to the camera for a few seconds — the page will
+   mislabel it, and each crop lands in `data/waste-captures/`;
+2. promote those crops to `Background`:
+   ```bash
+   python3 scripts/waste/promote_captures.py --class Background --dry-run
+   python3 scripts/waste/promote_captures.py --class Background
+   ```
+3. retrain with `--extra-train data/waste-samples` and re-check.
+
+The same route fixes a misread item: `--class Ewaste --wrongly Paper` takes
+everything the model called paper and files it as the key fob it really was.
+
 ### Adding photos of an item that misreads
 
 The routing was deliberately left alone: a bin is still chosen on a single
