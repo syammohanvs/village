@@ -106,7 +106,7 @@ Leather**. With the grouped recycler confidence below, all eight are accepted
 even when the top class is only 42–64%: Metal + Ewaste together clear the
 threshold.
 
-### A handkerchief, and why it needed photos rather than a bigger model
+### Specific objects, and why they need photos rather than a bigger model
 
 A handkerchief was reported as never resolving. It is **Textile**, and the
 Textile class was built from a clothing dataset: shirts, trousers and jackets
@@ -114,19 +114,24 @@ hanging or being worn, not a flat square of cloth lying on a table. On 28 real
 handkerchief photos the installed V6 put Textile first **0–7 times out of 28**
 depending on the sample, and mostly said Paper, Thermocol or Background.
 
-Twenty of those photos were added to the training tree (four copies each, so the
-class is 20% handkerchief) and the model retrained as **V8**. On the **8 photos
-never trained on**, Textile is now first **4 times out of 8** (two of them above
-75%, so they are accepted; two at about 49%, so the page names Textile as its
-best guess), with Background 3 and Thermocol 1. Item-level action went from
-**1/8 to 5/8** on that slice, and the model got better everywhere else at the
-same time.
+A business card was reported as Thermocol. It is **Paper**, but the Paper class
+was built from TrashNet's flat sheets and paper bags — not printed cards with
+text and logos.
 
-**The lesson: the failure was the dataset, not the network.** No amount of
-MobileNetV3, ResNet50 or a cloud vision model is a substitute for having the
-object in the training data — but it is also true that a larger network would
-generalise further from 20 photos than a frozen MobileNetV1 does. Venue photos
-remain the highest-value input.
+Adding 20 photos of each (four copies each) improved the general metrics every
+time, but the two specific objects **oscillate**: V8 gets handkerchiefs 4/8 and
+business cards 14/25; V9 gets business cards 25/25 but handkerchiefs 1/8; V12
+gets business cards 5/5 and handkerchiefs 3/8. No single MobileNetV1 build is
+best on both. This is the ceiling of the current approach — adding photos of one
+object dilutes another.
+
+**The lesson: the failure is the dataset, and the network is too small to learn
+both from 20 photos each.** No amount of MobileNetV3, ResNet50 or a cloud
+vision model is a substitute for having the object in the training data — but a
+larger network would generalise further from 20 photos than a frozen
+MobileNetV1 does. The ResNet50 experiment (89.7% exact, 74.6% probe) shows
+that. Venue photos remain the highest-value input, and a bigger backbone is
+the path to recognising all of them at once.
 
 ### Ordinary objects
 
