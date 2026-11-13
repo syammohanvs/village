@@ -138,10 +138,10 @@ session; local automatic watering continues if the laptop disappears.
 - If Windows Defender Firewall blocks the inbound UDP reply, allow Python on
   private networks, or use USB flashing.
 
-## Lia does not read aloud
+## Zara does not read aloud
 
-- Lia reads aloud as soon as she opens. **Setup → Voice & Camera → Read aloud
-  as soon as Lia opens** turns that off; the **Read aloud** switch on the Lia
+- Zara reads aloud as soon as she opens. **Setup → Voice & Camera → Read aloud
+  as soon as Zara opens** turns that off; the **Read aloud** switch on the Zara
   card stops or restarts the reading for that visit.
 - If the card says the browser cannot read aloud, use Chrome or Edge. Firefox
   may have no speech synthesis.
@@ -152,11 +152,11 @@ session; local automatic watering continues if the laptop disappears.
   language's voice in the operating system. The words are still displayed.
 - Nothing is downloaded: speech is generated locally by the browser.
 
-## Lia says a probe is not calibrated
+## Zara says a probe is not calibrated
 
 That is the honest state, not a fault. A probe reports a real percentage only
 after the two endpoints are captured and confirmed in **Setup → Sensors & Calibration**. Until then
-Lia refuses to guess. See [calibration.md](calibration.md).
+Zara refuses to guess. See [calibration.md](calibration.md).
 
 ## Voice does not work
 

@@ -79,7 +79,7 @@ npx wrangler dev
 ```
 
 Without `VILLAGE_API_ORIGIN`, `/api/v1/*` answers **503**
-`API_ORIGIN_MISSING` and the dashboard correctly shows **Offline**. Lia still
+`API_ORIGIN_MISSING` and the dashboard correctly shows **Offline**. Zara still
 works, because her guide is local; the live narration says it cannot see the
 sensors.
 
@@ -117,7 +117,7 @@ and leave it unauthenticated.
 | Live sensors / controls | yes | only with a reachable `VILLAGE_API_ORIGIN` |
 | Whisper voice recognition | local server | needs the backend |
 | Waste camera model | local `models/` | proxied from the backend |
-| Lia guide + browser speech | yes | yes, entirely in the browser |
+| Zara guide + browser speech | yes | yes, entirely in the browser |
 
 ## If you use classic Pages instead
 

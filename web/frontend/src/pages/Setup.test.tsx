@@ -196,7 +196,7 @@ describe('connection health wording', () => {
 });
 
 describe('spoken language setting', () => {
-  it('changes the language every screen uses, and remembers whether Lia reads on open', async () => {
+  it('changes the language every screen uses, and remembers whether Zara reads on open', async () => {
     window.localStorage.clear();
     const user = userEvent.setup();
     render(<App />);
@@ -206,7 +206,7 @@ describe('spoken language setting', () => {
     expect(window.localStorage.getItem('village.voiceLanguage')).toBe('ml');
     expect(malayalam).toHaveAttribute('aria-pressed', 'true');
 
-    const toggle = await screen.findByRole('switch', { name: /read aloud as soon as lia opens/i });
+    const toggle = await screen.findByRole('switch', { name: /read aloud as soon as zara opens/i });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'false');

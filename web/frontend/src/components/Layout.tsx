@@ -95,10 +95,10 @@ function TalkToLia({ compact = false }: { compact?: boolean }) {
       className={cx('talk-lia', compact && 'talk-lia--compact')}
       onClick={() => openLia('help')}
       data-testid="talk-to-lia"
-      aria-label="Talk to Lia"
+      aria-label="Talk to Zara"
     >
       <LiaAvatar size={compact ? 30 : 40} decorative />
-      {!compact && <span className="talk-lia-label">Talk to Lia</span>}
+      {!compact && <span className="talk-lia-label">Talk to Zara</span>}
     </button>
   );
 }

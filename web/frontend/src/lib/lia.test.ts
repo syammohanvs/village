@@ -16,7 +16,7 @@ const status = (options: Parameters<typeof makeState>[0] = {}) => makeState(opti
 
 describe('Lia copy', () => {
   it('uses the requested welcome message in English', () => {
-    expect(LIA_COPY.en.welcome).toBe('Hello! I’m Lia. I can help you explore our village.');
+    expect(LIA_COPY.en.welcome).toBe('Hello! I’m Zara. I can help you explore our village.');
   });
 
   it('offers all six topics in every language with short, complete steps', () => {

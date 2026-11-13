@@ -301,7 +301,7 @@ for the board's CP2102/CH340 chip; install it if the port does not appear.
 
 ## Spoken replies (local neural voice)
 
-Lia and the voice panel read replies aloud with **Piper**, a local neural
+Zara and the voice panel read replies aloud with **Piper**, a local neural
 text-to-speech engine. It replaces the browser's own speech synthesis, which
 varies by machine — Windows, for example, has no Malayalam voice at all, so the
 dashboard would have gone silent in Malayalam while English and Hindi worked.

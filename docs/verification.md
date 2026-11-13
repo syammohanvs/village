@@ -272,7 +272,7 @@ soil scenario changed the demo simulator, Start irrigation was sent and
 **confirmed by the controller**, Lights Off was accepted, the Stop control
 stayed available, and the voice panel listed all 10 supported phrases.
 
-## Lia guide — browser check (2026-11-08)
+## Zara guide — browser check (2026-11-08)
 
 The guide was driven in headless Chromium 156 through the DevTools protocol
 against the running build, not read from the source. **16/16 checks passed:**
@@ -281,7 +281,7 @@ against the running build, not read from the source. **16/16 checks passed:**
 - the language switch changes the whole card to Malayalam, including the six
   labels and the "Maybe later" button;
 - "Maybe later" closes the card, stores `dismissed: true` and keeps the
-  **Help with Lia** button;
+  **Help with Zara** button;
 - the helper button reopens the guide and is **not covered by the existing
   Voice launcher** (it sits above it; the browser check hit-tests the centre of
   the button);
@@ -295,7 +295,7 @@ Screenshots: `/tmp/opencode/lia-welcome.png` (800×600),
 (390×844), `/tmp/opencode/lia-fab.png` (both launchers in place) and
 `/tmp/opencode/lia-live.png` (offline narration). On desktop the card is 702 px
 tall and fits a 900 px window without scrolling; on the phone it scrolls in one
-column. The Lia launcher occupies x 1266–1418, y 762–816 and the Voice launcher
+column. The Zara launcher occupies x 1266–1418, y 762–816 and the Voice launcher
 x 1313–1418, y 829–878 — no overlap.
 
 The component and content tests are part of the normal suite
@@ -443,11 +443,11 @@ and gold palette is unchanged.
 
 ```
 Navigation      Our Village · Sort Waste · What Happened · About & Help
-                + Setup (smaller, bottom) + one Talk to Lia entry
+                + Setup (smaller, bottom) + one Talk to Zara entry
 Old addresses   /controls -> /        /settings -> /setup
                 /sensors  -> /setup#sensors   /villagers -> /about#sample-village
 Pages rewritten OurVillage, SortWaste, WhatHappened, AboutHelp, Setup
-Lia             opens on request, three quick choices, no autoplay
+Zara             opens on request, three quick choices, no autoplay
 Voice           opened from Our Village; readiness chip instead of "Live"
 ```
 
@@ -459,8 +459,8 @@ change earlier).
 
 - Every route returns 200, renders the expected `<h1>`, and has no horizontal
   overflow at 1440×900.
-- Four sidebar items, one visible **Talk to Lia**, and a smaller Setup link.
-- Lia opens from that entry, shows the three quick choices, and closes with
+- Four sidebar items, one visible **Talk to Zara**, and a smaller Setup link.
+- Zara opens from that entry, shows the three quick choices, and closes with
   Escape.
 - **Start voice** on Our Village opens the panel; three languages are offered;
   no "Live" badge is claimed.
@@ -639,7 +639,7 @@ be called at least once”*, which is exactly the reported symptom: nothing was
 classified. A second test pins the low-confidence card naming its guess (*“Best
 guess Paper at 55%”*) without posting a recognition.
 
-Lia's greeting has **9** component tests of its own (`WasteWelcome.test.tsx`):
+Zara's greeting has **9** component tests of its own (`WasteWelcome.test.tsx`):
 the configured language on arrival, English as the fallback, every language
 carrying a line, a language switch re-speaking, the replay button, dismissal
 stopping the voice, and the two silent-device notes. **The live camera path itself is not

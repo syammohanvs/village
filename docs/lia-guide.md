@@ -1,6 +1,6 @@
-# Lia, the village guide
+# Zara, the village guide
 
-Lia is the in-app guide for visitors. She welcomes first-time visitors, explains
+Zara is the in-app guide for visitors. She welcomes first-time visitors, explains
 the village in short sentences, gives step-by-step instructions and narrates
 what the live sensors can see.
 
@@ -8,14 +8,14 @@ She is deliberately simple:
 
 - **no language model, no cloud and no internet** — every sentence is written
   and stored in the app;
-- **no invented numbers** — if a probe is uncalibrated, stale or missing, Lia
+- **no invented numbers** — if a probe is uncalibrated, stale or missing, Zara
   says so instead of guessing;
 - **optional audio** uses the browser's own speech synthesis, so it works
   offline on the exhibition laptop.
 
 ## First visit
 
-On the first visit the app opens a welcome card with Lia's introduction and six
+On the first visit the app opens a welcome card with Zara's introduction and six
 large choices:
 
 - Show me around
@@ -26,15 +26,15 @@ large choices:
 - Help me with a problem
 
 The language is chosen once, in **Setup → Voice & Camera → Spoken language**,
-and the same choice is used by Lia, the voice panel and the invitation on the
-home page. Inside Lia a visitor can still switch language at any time.
+and the same choice is used by Zara, the voice panel and the invitation on the
+home page. Inside Zara a visitor can still switch language at any time.
 
 The card also offers a **Read aloud** switch and **Maybe later**. Choosing a
 topic counts as seeing the welcome, so it does not appear again on that
 browser.
 
-Lia is read aloud as soon as she opens, and again when the topic changes —
-**Setup → Voice & Camera → Read aloud as soon as Lia opens** turns that off for
+Zara is read aloud as soon as she opens, and again when the topic changes —
+**Setup → Voice & Camera → Read aloud as soon as Zara opens** turns that off for
 a quiet screen. The reading can always be stopped with the **Read aloud**
 switch on the card.
 
@@ -42,9 +42,9 @@ The choices are remembered in `localStorage` (`village.lia.v1` for the guide,
 `village.voiceLanguage` for the language). Clearing the site's storage brings
 the welcome back.
 
-## The Talk to Lia button
+## The Talk to Zara button
 
-Lia does not open by itself and there is no floating button. **Talk to Lia**
+Zara does not open by itself and there is no floating button. **Talk to Zara**
 sits at the bottom of the sidebar (and in the top bar on a phone), so the guide
 is one press away on every page. The button uses the
 same theme and the same avatar.
@@ -71,7 +71,7 @@ handle the pump, mains power or dirty waste alone.
 - pump: running or off, and "locked for safety" when it is not commissioned;
 - the last message or two recorded by the village.
 
-When the link is offline or stale, Lia stops describing sensors: a stale figure
+When the link is offline or stale, Zara stops describing sensors: a stale figure
 is not presented as a current one. She never reports litres, capacity, battery,
 solar or wind, because none of those are measured.
 
@@ -83,10 +83,10 @@ Adding another language means adding one more entry to that file and to
 `LIA_LANGUAGES`.
 
 **Read aloud** uses `speechSynthesis` with `en-IN`, `ml-IN` or `hi-IN`. If the
-device has no voice for the chosen language, Lia shows a note but still displays
+device has no voice for the chosen language, Zara shows a note but still displays
 the words. Nothing is downloaded and no audio is sent anywhere. Prepared clips
 in `web/frontend/public/audio/` are supported by the existing voice panel, not
-by Lia.
+by Zara.
 
 ## When to use it
 

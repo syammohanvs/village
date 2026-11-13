@@ -34,7 +34,7 @@ beforeEach(() => {
   setLanguage('en');
 });
 
-describe('Lia’s Sort Waste greeting', () => {
+describe('Zara’s Sort Waste greeting', () => {
   it('says the line in the configured language as soon as the page opens', async () => {
     setLanguage('ml');
     renderWelcome();

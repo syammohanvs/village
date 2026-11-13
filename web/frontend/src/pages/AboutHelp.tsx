@@ -61,7 +61,7 @@ export function AboutHelp() {
           </p>
           <div className="about-actions">
             <button type="button" className="btn btn--gold btn--large" onClick={() => openLia('model')}>
-              <IconMic size={17} /> Talk to Lia
+              <IconMic size={17} /> Talk to Zara
             </button>
             <Link to="/" className="btn btn--ghost">
               Open Our Village <IconArrowRight size={16} />
@@ -210,18 +210,18 @@ export function AboutHelp() {
       </Card>
 
       <Card
-        kicker="Lia"
+        kicker="Zara"
         title="Your guide, in English, Malayalam and Hindi"
         actions={<Chip tone="gold">Voice + help</Chip>}
       >
         <div className="lia-about">
           <p>
-            Lia explains the village, reads the current state aloud and shows you where to press.
+            Zara explains the village, reads the current state aloud and shows you where to press.
             She can open the right page for you, and she never makes up an action.
           </p>
           <div className="about-actions">
             <button type="button" className="btn btn--gold" onClick={() => openLia('help')}>
-              <IconMic size={16} /> Talk to Lia
+              <IconMic size={16} /> Talk to Zara
             </button>
             <button type="button" className="btn btn--ghost" onClick={() => openLia('voice')}>
               Help me use voice
@@ -231,7 +231,7 @@ export function AboutHelp() {
             </button>
           </div>
           <p className="hint">
-            <IconWifi size={13} /> Lia reads the same live state as the cards. If the connection
+            <IconWifi size={13} /> Zara reads the same live state as the cards. If the connection
             says Offline at the top, she says so instead of guessing.
           </p>
         </div>
