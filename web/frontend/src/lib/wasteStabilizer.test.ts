@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createWasteStabilizer, rankPredictions, type Prediction, type StableEvent } from './wasteStabilizer';
+import {
+  averageFrames,
+  createWasteStabilizer,
+  rankPredictions,
+  type Prediction,
+  type StableEvent,
+} from './wasteStabilizer';
 
 const organic = (confidence = 0.9): Prediction[] => [{ label: 'Organic', confidence }];
 const background = (): Prediction[] => [{ label: 'Background', confidence: 0.98 }];
@@ -196,5 +202,52 @@ describe('re-arming only when the item goes', () => {
     s.push(metal, 300);
     s.push(metal, 400);
     expect(s.snapshot(400).phase).toBe('waiting-removal');
+  });
+});
+
+describe('averageFrames', () => {
+  const frames = (...rows: [string, number][][]): Prediction[][] =>
+    rows.map((frame) => frame.map(([label, confidence]) => ({ label, confidence })));
+
+  it('averages the same answer across frames, which is the common case', () => {
+    // Three looks at one held-up object.  The answer must be the mean of the
+    // three, not whichever frame was grabbed last.
+    const mean = averageFrames(frames([['Paper', 0.9]], [['Paper', 0.92]], [['Paper', 0.88]]));
+    expect(mean[0].label).toBe('Paper');
+    expect(mean[0].confidence).toBeCloseTo((0.9 + 0.92 + 0.88) / 3, 6);
+  });
+
+  it('turns a flipping model into a small number instead of a decision', () => {
+    // The venue's brown paper cover: Thermocol 0.91, then Thermocol 0.60, then
+    // Textile 0.70 inside ten seconds.  Averaged, no class reaches a threshold
+    // that would choose a bin -- which is exactly the wanted behaviour.
+    const mean = averageFrames(
+      frames(
+        [['Thermocol', 0.91], ['Textile', 0.05]],
+        [['Thermocol', 0.6], ['Textile', 0.1]],
+        [['Textile', 0.7], ['Thermocol', 0.18]],
+      ),
+    );
+    const byLabel = Object.fromEntries(mean.map((row) => [row.label, row.confidence]));
+    expect(byLabel.Thermocol).toBeCloseTo((0.91 + 0.6 + 0.18) / 3, 6);
+    expect(byLabel.Textile).toBeCloseTo((0.05 + 0.1 + 0.7) / 3, 6);
+    expect(mean[0].confidence).toBeLessThan(0.6);
+  });
+
+  it('counts a class the frame did not mention as zero, not as its old value', () => {
+    const mean = averageFrames(frames([['Paper', 0.9]], [['Paper', 0.3], ['Glass', 0.6]]));
+    const byLabel = Object.fromEntries(mean.map((row) => [row.label, row.confidence]));
+    expect(byLabel.Paper).toBeCloseTo(0.6, 6);
+    expect(byLabel.Glass).toBeCloseTo(0.3, 6);
+  });
+
+  it('passes a single reading through, sorted', () => {
+    const one = averageFrames(frames([['Paper', 0.2], ['Glass', 0.7]]));
+    expect(one.map((row) => row.label)).toEqual(['Glass', 'Paper']);
+  });
+
+  it('answers nothing when there was nothing to read', () => {
+    expect(averageFrames([])).toEqual([]);
+    expect(averageFrames([[], []])).toEqual([]);
   });
 });

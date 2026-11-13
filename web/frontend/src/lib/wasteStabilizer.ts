@@ -67,6 +67,43 @@ export function rankPredictions(predictions: Prediction[], limit = 3): Predictio
     .slice(0, Math.max(0, limit));
 }
 
+/**
+ * Average the readings of several frames of the same object into one reading.
+ *
+ * The venue showed why a single frame is not enough: the same brown paper cover
+ * was called **Thermocol 0.91**, then **Thermocol 0.60**, then **Textile 0.70**
+ * inside ten seconds, and 66% of the captured bursts disagree with themselves.
+ * A person holding an item up for a moment is a *video*, and the honest reading
+ * of a video is the mean, not whichever frame happened to be grabbed.
+ *
+ * The averaging has a property worth relying on: **when the frames disagree the
+ * mean is small.** Two frames at 0.90 for different classes average to 0.45
+ * each, which is under any sane threshold, so a model that is flipping its
+ * answer stops being a decision instead of becoming a coin toss.  Nothing else
+ * in the page needs a special "the frames disagreed" rule because of that.
+ *
+ * A class missing from one frame contributes 0 there, not its previous value --
+ * the mean is over the frames that were actually read.
+ */
+export function averageFrames(frames: Prediction[][]): Prediction[] {
+  const usable = frames.filter((rows) => Array.isArray(rows) && rows.length > 0);
+  if (usable.length === 0) return [];
+  if (usable.length === 1) return rankPredictions(usable[0], Number.POSITIVE_INFINITY);
+  const totals = new Map<string, number>();
+  for (const rows of usable) {
+    for (const row of rows) {
+      if (!row || typeof row.label !== 'string') continue;
+      const confidence = Number(row.confidence);
+      if (!Number.isFinite(confidence)) continue;
+      totals.set(row.label, (totals.get(row.label) ?? 0) + confidence / usable.length);
+    }
+  }
+  return rankPredictions(
+    [...totals].map(([label, confidence]) => ({ label, confidence })),
+    Number.POSITIVE_INFINITY,
+  );
+}
+
 export interface WasteStabilizer {
   push(predictions: Prediction[], now?: number): StableEvent | null;
   snapshot(now?: number): StabilizerSnapshot;

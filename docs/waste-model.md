@@ -633,6 +633,78 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### A press is a short video, and the crop is tighter (2026-11-14)
+
+Reported again from the venue: *"the KFC brown cover was again misclassified … I think
+you should focus on what my palm and fingers are holding and showing the camera."* The
+saved crops proved the report right, and gave the two changes that were missing.
+
+**The crop was too wide.** `centreCrop(…, 0.8)` read the middle 80% of the frame, so a
+cover held slightly off centre was half item and half face. One capture of that cover was
+the bag on the left and a face plus a patterned curtain on the right; cropping the same
+picture onto the bag took it from `Thermocol 0.35` to **`Paper 0.94`**, and a tighter
+crop to **`Paper 0.99`**. The measure that decides it:
+
+| Set | crop 1.0 | 0.8 | **0.7** | 0.6 |
+| --- | --- | --- | --- | --- |
+| Hand-held items (528) exact | 49.8% | 56.8% | **61.1%** | 64.0% |
+| Hand-held items item action | 65.5% | 71.6% | **75.9%** | 74.4% |
+| Real-world probe (221) exact | 71.9% | 65.9% | 59.3% | 60.6% |
+
+**0.7** is the choice, and the cost is stated in the table: close-up product photographs
+lose about six points, because there the object really does fill the frame and a tighter
+crop starts cutting it. At the venue the item is *held*, so it occupies about half the
+picture. All three of the cover's own captures read **Paper 0.76–0.88** at that crop.
+
+**One frame was not a reading.** 66% of the 822 captured bursts in the index disagree with
+themselves — the cover was `Thermocol 0.91`, then `Thermocol 0.60`, then `Textile 0.70`
+inside ten seconds, from crops that differed by less than 3%. A press now takes three
+looks a quarter of a second apart and averages them (`averageFrames`), which has a
+property worth relying on: **when the frames disagree, the mean is small.** Three answers
+at 0.90 average to 0.30 each, under any threshold, so a flipping model stops being a coin
+toss and becomes an honest "not sure enough", with no separate rule needed. Averaging
+three readings of a still object is a *cheap* video model: it costs two extra inferences
+(about 150 ms) and no new dependency.
+
+### What a detector or a vision-language model would and would not add
+
+Asked to consider YOLOv8/11, ConvNeXt and CLIP/SigLIP2 as reinforcement, so it was
+measured rather than guessed.
+
+**CLIP cannot replace the classifier.** `openai/clip-vit-base-patch32` (MIT, free for any
+use) scored zero-shot against the same 11 classes, three prompts each, on the same
+subsets:
+
+| Set | ResNet50 (installed) | CLIP zero-shot |
+| --- | --- | --- |
+| Real-world probe (182) | **71.9%** exact / 79.2% action | 31.3% / 51.6% |
+| Hand-held items (440) | **49.8%** / 65.5% | 24.1% / 48.6% |
+
+Half the accuracy of a trained head, so it is not an alternative.
+
+**But it is excellent at the one question that keeps being asked.** Given the *same*
+venue crops that ResNet called foam or cloth, CLIP answered:
+
+| Crop | ResNet50 | CLIP, prompted for a bag |
+| --- | --- | --- |
+| cover A | Thermocol 0.91 | **a brown paper bag 0.96** |
+| cover B | Thermocol 0.60 | **a brown paper bag 0.98** |
+| cover C | Textile 0.70 | **a brown paper bag 0.98** |
+| a venue capture ResNet called Textile | Textile | **a folded cloth handkerchief 0.87** |
+
+So the useful shape is a **verifier, not a classifier**: ResNet decides, and CLIP is asked
+one narrow question about a named confusion. That is a real option and it is not wired in
+yet — it means a ~600 MB optional download and a routing change (a confident "paper bag"
+would move an item from *recycling agent* to the *paper bin*), which is a bigger decision
+than a crop. Recorded here so it is not re-derived.
+
+**YOLO would fix less than it looks.** COCO's 80 classes include *cup*, *bottle* and *cell
+phone*, which would have settled the ceramic cup and the phone outright — but there is no
+class for a paper bag, a handkerchief, a key fob or a piece of thermocol, so the two
+objects that actually caused trouble here are invisible to it. And Ultralytics' YOLOv8/11
+is AGPL-3.0: fine for a school project, not for a closed product. ConvNeXt is a backbone
+like the ResNet50 already installed, so it would be a retrain with no new capability.
+
 ### The brown paper cover: brown is not a material (2026-11-14)
 
 A KFC-style brown paper food cover was called **Thermocol 0.91**, then

@@ -4,6 +4,7 @@ import { api, errorMessage } from '../lib/api';
 import { cx } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import {
+  averageFrames,
   createWasteStabilizer,
   rankPredictions,
   type Prediction,
@@ -60,6 +61,29 @@ type FocusOutcome =
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 120;
 const CROP_SIZE = 224;
+/**
+ * How much of the frame a press reads, and how many times.
+ *
+ * A press used to read the middle 80% of the picture, once.  Both halves were
+ * measured on the venue's own captures and on the hand-held set:
+ *
+ *   - **0.7, not 0.8.**  On the 528 hand-held composites a tighter crop is worth
+ *     a lot (61.1% exact / 75.9% item action at 0.7 against 56.8 / 71.6 at 0.8),
+ *     because the ring a looser crop keeps is the room, the curtain and the edge
+ *     of a face.  The brown paper cover that was reported as "textile" is the
+ *     case in point: cropped to 0.7 of the frame it reads Paper 0.76, and the
+ *     second frame of the same cover reads Paper 0.83 instead of Thermocol.
+ *     Honest cost: close-up product photographs lose about six points (65.9 to
+ *     59.3 exact on the real-world probe) because the crop starts cutting the
+ *     object itself.  At the venue the object is held, not filling the frame.
+ *   - **three frames, not one.**  66% of the captured bursts disagree with
+ *     themselves, and one brown cover was Thermocol 0.91, Thermocol 0.60 and
+ *     Textile 0.70 inside ten seconds.  Three readings a quarter of a second
+ *     apart, averaged, are one reading of the same held-up object.
+ */
+const PRESS_CROP_SHARE = 0.7;
+const PRESS_FRAMES = 3;
+const PRESS_FRAME_GAP_MS = 250;
 
 function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
   if (!ref.current) ref.current = document.createElement('canvas');
@@ -169,6 +193,9 @@ export function SortWaste() {
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [backgroundCount, setBackgroundCount] = useState(0);
+  // A press reads three frames now, so it takes about a second.  The button
+  // says so instead of looking like it did nothing.
+  const [reading, setReading] = useState(false);
   const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
   const [backgroundReady, setBackgroundReady] = useState(false);
@@ -664,6 +691,7 @@ export function SortWaste() {
     const classifier = classifierRef.current;
     if (!video || !classifier || busyRef.current || video.readyState < 2) return;
     busyRef.current = true;
+    setReading(true);
     setFrameWarning('');
     setRecognition(null);
     setReferralLabel(null);
@@ -683,39 +711,64 @@ export function SortWaste() {
         if (sceneReady(memory)) backgrounds = [memory.background];
       }
 
-      const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, 0.8);
+      const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
       const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
-      cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
-      cropContext.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, CROP_SIZE, CROP_SIZE);
 
-      analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      const mask = backgrounds.length > 0
-        ? objectMask(backgrounds, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, box)
-        : null;
-      if (mask) {
-        const maskCanvas = ensureCanvas(maskCanvasRef, mask.width, mask.height);
-        const maskContext = maskCanvas.getContext('2d');
-        if (maskContext) {
-          const painted = maskContext.createImageData(mask.width, mask.height);
-          painted.data.set(mask.data);
-          maskContext.putImageData(painted, 0, 0);
-          cropContext.globalCompositeOperation = 'destination-in';
-          cropContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height, 0, 0, CROP_SIZE, CROP_SIZE);
-          cropContext.globalCompositeOperation = 'destination-over';
-          cropContext.fillStyle = '#ffffff';
-          cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
-          cropContext.globalCompositeOperation = 'source-over';
+      /** One look at the item: crop the frame now, paint out the room, read it. */
+      const readOnce = async (): Promise<Prediction[]> => {
+        cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
+        cropContext.drawImage(
+          video,
+          source.x,
+          source.y,
+          source.width,
+          source.height,
+          0,
+          0,
+          CROP_SIZE,
+          CROP_SIZE,
+        );
+
+        analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        const mask =
+          backgrounds.length > 0
+            ? objectMask(backgrounds, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, box)
+            : null;
+        if (mask) {
+          const maskCanvas = ensureCanvas(maskCanvasRef, mask.width, mask.height);
+          const maskContext = maskCanvas.getContext('2d');
+          if (maskContext) {
+            const painted = maskContext.createImageData(mask.width, mask.height);
+            painted.data.set(mask.data);
+            maskContext.putImageData(painted, 0, 0);
+            cropContext.globalCompositeOperation = 'destination-in';
+            cropContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height, 0, 0, CROP_SIZE, CROP_SIZE);
+            cropContext.globalCompositeOperation = 'destination-over';
+            cropContext.fillStyle = '#ffffff';
+            cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
+            cropContext.globalCompositeOperation = 'source-over';
+          }
         }
+        const raw = await classifier.predict(crop);
+        return raw.map((row) => ({ label: row.className, confidence: row.probability }));
+      };
+
+      // Three looks at what the hand is holding, averaged.  A crop is redrawn
+      // for each, so this is a reading of the video rather than of one still.
+      const shots: Prediction[][] = [];
+      for (let shot = 0; shot < PRESS_FRAMES; shot += 1) {
+        if (shot > 0) {
+          await new Promise((resolve) => setTimeout(resolve, PRESS_FRAME_GAP_MS));
+          if (video.readyState < 2) break;
+        }
+        shots.push(await readOnce());
       }
 
-      const raw = await classifier.predict(crop);
-      const all = rankPredictions(
-        raw.map((row) => ({ label: row.className, confidence: row.probability })),
-        raw.length,
-      );
+      const averaged = averageFrames(shots);
+      const all = averaged;
       const grouped = groupedPrediction(all);
       predictionsRef.current = all.slice(0, 3);
       setPredictions(predictionsRef.current);
@@ -744,6 +797,7 @@ export function SortWaste() {
       setRecognitionError(errorMessage(cause));
     } finally {
       busyRef.current = false;
+      setReading(false);
     }
   }, [accept]);
 
@@ -967,7 +1021,7 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void classifyNow()}
-                disabled={!installed || modelState !== 'ready'}
+                disabled={!installed || modelState !== 'ready' || reading}
                 title={
                   installed && modelState === 'ready'
                     ? 'Classify whatever is in the middle of the picture right now.'
@@ -975,7 +1029,7 @@ export function SortWaste() {
                 }
                 data-testid="classify-now"
               >
-                <IconCheck size={18} /> Check the item
+                <IconCheck size={18} /> {reading ? 'Reading…' : 'Check the item'}
               </button>
             )}
             {cameraOn && installed && (

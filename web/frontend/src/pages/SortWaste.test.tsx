@@ -1173,6 +1173,123 @@ describe('Sort Waste — the page says whether it is ready', () => {
   }, 25000);
 });
 
+describe('Sort Waste — one press reads the video, not one frame', () => {
+  function stubCamera() {
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ waste_confidence: 0.5 }));
+    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.postRecognition).mockClear();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+  }
+
+  function stubCanvas() {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = (function () {
+      return {
+        drawImage() {},
+        clearRect() {},
+        putImageData() {},
+        fillRect() {},
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+        getImageData: (_x: number, _y: number, width: number, height: number) => {
+          const data = new Uint8ClampedArray(width * height * 4);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 60;
+            data[i + 1] = 60;
+            data[i + 2] = 60;
+            data[i + 3] = 255;
+          }
+          return { data, width, height };
+        },
+      };
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+    return original;
+  }
+
+  it('reads three frames and makes one decision when they agree', async () => {
+    // The venue's brown paper cover was Thermocol 0.91, then Thermocol 0.60,
+    // then Textile 0.70 within ten seconds.  A press is now a short video: three
+    // looks a quarter of a second apart, averaged into one reading.
+    stubCamera();
+    const original = stubCanvas();
+    vi.mocked(api.wasteClassify)
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.9) }))
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.92) }))
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.88) }));
+    try {
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      await waitFor(() => expect(vi.mocked(api.wasteClassify).mock.calls.length).toBe(3), {
+        timeout: 10000,
+      });
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), {
+        timeout: 10000,
+      });
+      const body = vi.mocked(api.postRecognition).mock.calls[0][0];
+      expect(JSON.stringify(body)).toMatch(/paper/i);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+    }
+  }, 30000);
+
+  it('does not decide anything when the three frames disagree', async () => {
+    // Averaging is what turns a flipping model into an honest "not sure": three
+    // different answers at 0.90 average to 0.30 each, which is under any sane
+    // threshold.  That is the whole point of reading a moment instead of a
+    // still -- it needs no separate "the frames disagreed" rule.
+    //
+    // The three are deliberately from three different bins.  Two recyclers that
+    // disagree still add up to "recycling" (which is the documented grouping
+    // rule and a correct answer), so they would not test this.
+    stubCamera();
+    const original = stubCanvas();
+    vi.mocked(api.wasteClassify)
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.9) }))
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Plastic', 0.9) }))
+      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Organic', 0.9) }));
+    try {
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      await waitFor(() => expect(vi.mocked(api.wasteClassify).mock.calls.length).toBe(3), {
+        timeout: 10000,
+      });
+      expect(await screen.findByText(/Best guess/i, {}, { timeout: 5000 })).toBeInTheDocument();
+      expect(api.postRecognition).not.toHaveBeenCalled();
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+    }
+  }, 30000);
+});
+
 describe('Sort Waste — a near-tie is not a decision', () => {
   it('does not record or light anything when the best guess is under the threshold', async () => {
     // The handkerchief: Leather 0.24, Paper 0.24, Background 0.22.  A pressed

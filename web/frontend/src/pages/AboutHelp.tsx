@@ -171,18 +171,18 @@ export function AboutHelp() {
             cover the light sensor with your hand. Watch the streetlight LEDs.
           </li>
           <li>
-            Show one clean item to the camera on <Link to="/waste">Sort Waste</Link> and see which
-            bin LED lights — or whether it is referred to the recycling agent. If the table is
-            empty, show it and press <em>Set background</em> first; the camera then ignores the
-            room, and even the part of the table around the item is painted out, so only the
-            object is classified. If the table is not empty, or the item is held in the hand,
-            leave <em>Focus on the object</em> ticked and show it in the centre of the frame;
-            the page classifies the centre without a background. You can store up to three
-            backgrounds for a hall that changes, and after an item is recognised, remove it so
-            the camera arms itself for the next one. If a hand or person comes into the picture,
-            place the item on the table and step back for a clear reading. Ordinary objects are
-            still sorted by material: a phone or key fob is electronic waste, a wallet is leather
-            and sunglasses are glass.
+            Show one item to the camera on <Link to="/waste">Sort Waste</Link>, hold it in your
+            hand near the middle of the picture and press <em>Check the item</em>. It takes about
+            a second, because the page reads three frames before it answers — one frame is what
+            used to change its mind (a brown paper food cover was called foam, then cloth, inside
+            ten seconds). Three readings that agree are one answer; three that disagree are shown
+            as a best guess with “not sure enough”, and nothing lights. If the table is empty you
+            can press <em>Set background</em> first: the camera then ignores the room, and the
+            table around the item is painted out, so only the object is classified. You can store
+            up to three backgrounds for a hall that changes. After an item is recognised, take it
+            away so the camera arms itself for the next one. Ordinary objects are still sorted by
+            material: a phone or key fob is electronic waste, a wallet is leather and sunglasses
+            are glass.
           </li>
           <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>
