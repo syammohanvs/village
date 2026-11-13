@@ -70,7 +70,7 @@ missing — check where the cable is plugged in first.
 
 ### Wi-Fi / OTA (verified on this machine, 2026-11-12)
 
-The board joins `ASIANET Giga Fiber` and is normally at **192.168.1.8**; the
+The board joins `ASIANET Giga Fiber` and is normally at **192.168.1.6**; the
 Windows host is **192.168.1.6**. The OTA password is
 `VILLAGE_OTA_PASSWORD` in `uc/include/village/secrets.h` (git-ignored — never
 copy it into this file or a commit).
@@ -107,7 +107,7 @@ copy it into this file or a commit).
    host IP:
    ```powershell
    Set-Location C:\Users\<you>
-   .\espota.exe -i 192.168.1.8 -p 3232 -I 192.168.1.6 -P 3233 `
+   .\espota.exe -i 192.168.1.6 -p 3232 -I 192.168.1.6 -P 3233 `
      -a "<VILLAGE_OTA_PASSWORD>" -f village-firmware.bin -r
    ```
    Expected output: `Authenticating...OK`, progress, `Result: OK`,
@@ -120,7 +120,7 @@ firewall allowed:
 ```bash
 cd uc
 export VILLAGE_OTA_PASSWORD="$(sed -n 's/.*VILLAGE_OTA_PASSWORD "\(.*\)"/\1/p' include/village/secrets.h)"
-/home/ubuntu/.venvs/pio/bin/pio run -e esp32doit-devkit-v1-ota -t upload --upload-port 192.168.1.8
+/home/ubuntu/.venvs/pio/bin/pio run -e esp32doit-devkit-v1-ota -t upload --upload-port 192.168.1.6
 ```
 
 From WSL you can invoke Windows tools with `powershell.exe` / `cmd.exe`
@@ -134,8 +134,8 @@ The device API needs `X-Device-Token` (same value as `VILLAGE_DEVICE_TOKEN` in
 
 ```bash
 TOKEN="$(grep -oP 'VILLAGE_DEVICE_TOKEN "\K[^"]+' uc/include/village/secrets.h)"
-curl -s -H "X-Device-Token: $TOKEN" http://192.168.1.8/api/v1/status | python3 -m json.tool | head
-curl -s -H "X-Device-Token: $TOKEN" http://192.168.1.8/api/v1/config | python3 -m json.tool | head
+curl -s -H "X-Device-Token: $TOKEN" http://192.168.1.6/api/v1/status | python3 -m json.tool | head
+curl -s -H "X-Device-Token: $TOKEN" http://192.168.1.6/api/v1/config | python3 -m json.tool | head
 ```
 
 Through the backend (what the dashboard reads):
@@ -152,7 +152,7 @@ Check `firmware`, `config_revision`, and
 - **A reflash does not reset the stored config.** It lives in NVS and survives
   the update; `config_revision` stays the same. If a firmware default changed,
   save the config once from Setup (or reset the config) to apply it.
-- **The board's IP is DHCP.** `192.168.1.8` is the usual address; confirm from
+- **The board's IP is DHCP.** `192.168.1.6` is the usual address; confirm from
   the router or the backend's `VILLAGE_DEVICE_URL`.
 - **The OTA callback is the hard part.** If `espota` says
   `Authenticating...OK` then `No response from device`, the board cannot reach
@@ -163,7 +163,7 @@ Check `firmware`, `config_revision`, and
 - **Do not run `pio` from the repo root.** `cd uc` first.
 - The backend's `device.py` uses `/api/v1/status` and `/api/v1/config`; the
   board does not implement `/api/v1/state` (the backend exposes that path to
-  the browser). A bare `curl http://192.168.1.8/api/v1/state` returning
+  the browser). A bare `curl http://192.168.1.6/api/v1/state` returning
   `unknown endpoint` is expected, not a dead board.
 
 ## LDR calibration (this build)

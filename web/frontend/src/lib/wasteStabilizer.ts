@@ -39,9 +39,9 @@ export interface StabilizerSnapshot {
 }
 
 const DEFAULTS: Required<StabilizerOptions> = {
-  threshold: 0.62,
-  consecutiveFrames: 3,
-  cooldownMs: 4000,
+  threshold: 0.50,
+  consecutiveFrames: 2,
+  cooldownMs: 3000,
   backgroundClasses: ['background', 'unknown', 'none', 'empty', 'nothing'],
   rearmFrames: 2,
 };

@@ -17,9 +17,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "tts_enabled": True,
     "waste_model_path": "/models/waste/",
     "camera_device_id": "",
-    "waste_confidence": 0.75,
-    "waste_stability_frames": 3,
-    "waste_cooldown_ms": 4000,
+    "waste_confidence": 0.50,
+    "waste_stability_frames": 2,
+    "waste_cooldown_ms": 3000,
     "demo_mode": False,
 }
 

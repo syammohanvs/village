@@ -12,7 +12,7 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import { centreCrop, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import { groupedPrediction } from '../lib/wasteActions';
 import { WasteWelcome } from '../components/WasteWelcome';
 import {
@@ -158,9 +158,9 @@ export function SortWaste() {
   const modelKnown = !modelStatus.loading && !modelStatus.error;
   const previewOnly = !installed;
   const base = modelBase(settings.data?.waste_model_path);
-  const confidence = settings.data?.waste_confidence ?? 0.62;
-  const stabilityFrames = settings.data?.waste_stability_frames ?? 3;
-  const cooldownMs = settings.data?.waste_cooldown_ms ?? 4000;
+  const confidence = settings.data?.waste_confidence ?? 0.50;
+  const stabilityFrames = settings.data?.waste_stability_frames ?? 2;
+  const cooldownMs = settings.data?.waste_cooldown_ms ?? 3000;
 
   const effectiveCooldown = focusOn && backgroundCount > 0 ? 0 : cooldownMs;
 
@@ -287,7 +287,43 @@ export function SortWaste() {
     (video: HTMLVideoElement): FocusOutcome | null => {
       if (!focusOn) return { kind: 'whole', input: video };
       const backgrounds = backgroundRef.current;
-      if (backgrounds.length === 0) return { kind: 'whole', input: video };
+      // No stored scene: there is nothing to subtract, but classifying the whole
+      // frame gives the model the room, the table and the hand, and the accuracy
+      // collapses to about 9%.  Cropping to the centre of the frame at least
+      // keeps the item in view, which is where it is held; the page also says
+      // how to do better.
+      if (backgrounds.length === 0) {
+        const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        const context = analysis.getContext('2d');
+        if (!context) return { kind: 'whole', input: video };
+        try {
+          context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        } catch {
+          return { kind: 'whole', input: video };
+        }
+        const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, 0.72);
+        const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
+        const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
+        const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
+        const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
+        const cropContext = crop.getContext('2d');
+        if (!cropContext) return { kind: 'whole', input: video };
+        try {
+          cropContext.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, CROP_SIZE, CROP_SIZE);
+        } catch {
+          return { kind: 'whole', input: video };
+        }
+        return {
+          kind: 'object',
+          input: crop,
+          region: {
+            box,
+            coverage: 0,
+            edgeTouch: false,
+            centre: { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+          },
+        };
+      }
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
       if (!context) return { kind: 'whole', input: video };
@@ -583,7 +619,7 @@ export function SortWaste() {
       } finally {
         busyRef.current = false;
       }
-    }, 400);
+    }, 300);
     return () => {
       cancelled = true;
       clearInterval(timer);
