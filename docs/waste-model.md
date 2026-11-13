@@ -601,6 +601,36 @@ that **half of all hand-held frames were read as "Background"** (252 of 528) -
 the camera was told "not a waste item" while an item was being held up. That is
 down to 92 of 528.
 
+### Every crop the model judges is kept
+
+The camera sends exactly the 224x224 picture the classifier sees, so the backend
+keeps it: `data/waste-captures/` by default, named
+
+```
+20261113T195904-paper-0.67.jpg
+```
+
+— the time, the class chosen and its confidence — with every class and its
+probability in `index.jsonl` beside it. The folder is bounded
+(`VILLAGE_WASTE_CAPTURE_KEEP`, default 2000, oldest deleted first) and
+`VILLAGE_WASTE_CAPTURE_DIR=` (empty) switches it off. `GET
+/api/v1/waste/captures` reports where they are and how many.
+
+This exists because "it called my key fob paper" cannot be answered from an
+event log, and the answer was not what anybody guessed. The first capture taken
+through this route was a plain white plate — what the paint-out leaves when it
+keeps almost nothing — and the model reads that as **Paper 0.69**, with the item
+almost gone. That could only be found by looking at the image.
+
+A saved crop is already in the right shape to become training data: copy the
+ones that were wrong into `data/waste-samples/<Class>/` under the class the item
+actually is, then retrain (below). The plate-shaped ones go into `Background`,
+because an empty plate is not a waste item.
+
+Those crops are photographs of whatever was in front of the camera, hands
+included, so the folder is git-ignored with the rest of `data/` and is not part
+of any backup policy.
+
 ### Adding photos of an item that misreads
 
 The routing was deliberately left alone: a bin is still chosen on a single

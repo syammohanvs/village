@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import os
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -134,28 +137,128 @@ def status() -> dict[str, Any]:
     }
 
 
+# --- saved crops -----------------------------------------------------------
+# The camera sends exactly the 224x224 picture the model judged.  Keeping it is
+# the difference between "it called my key fob paper" and being able to look at
+# what it was actually shown, so it is on by default while the app is being
+# developed.  Bounded by `keep` so a long session cannot fill the disk.
+_capture_lock = threading.Lock()
+
+
+def _capture(raw: bytes, predictions: list[dict[str, Any]]) -> Path | None:
+    """Keep the crop and one line about what was said about it.
+
+    Best effort: a full disk, a read-only folder or a bad name must never fail a
+    classification -- the answer matters more than the record.
+    """
+    from .config import Settings  # local import: keeps the module importable alone
+
+    settings = _settings()
+    folder = settings.waste_capture_dir if settings else None
+    if folder is None:
+        return None
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+        top = predictions[0] if predictions else {"className": "unknown", "probability": 0.0}
+        safe = "".join(c for c in str(top["className"]).lower() if c.isalnum()) or "unknown"
+        name = f"{stamp}-{safe}-{top['probability']:.2f}"
+        with _capture_lock:
+            # Never overwrite: two frames in one second are two frames.
+            path = folder / f"{name}.jpg"
+            suffix = 1
+            while path.exists():
+                path = folder / f"{name}-{suffix}.jpg"
+                suffix += 1
+            path.write_bytes(raw)
+            line = {
+                "file": path.name,
+                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "predictions": [
+                    {"className": row["className"], "probability": round(row["probability"], 4)}
+                    for row in predictions
+                ],
+            }
+            with (folder / "index.jsonl").open("a", encoding="utf-8") as log:
+                log.write(json.dumps(line) + "\n")
+            _prune(folder, settings.waste_capture_keep)
+        return path
+    except Exception:  # noqa: BLE001 - a record must never break the answer
+        return None
+
+
+def _prune(folder: Path, keep: int) -> None:
+    """Keep the newest `keep` crops; the index keeps its own history."""
+    if keep <= 0:
+        return
+    files = sorted(folder.glob("*.jpg"), key=lambda p: p.stat().st_mtime)
+    for old in files[: max(0, len(files) - keep)]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+_settings_ref: Any = None
+
+
+def configure(settings: Any) -> None:
+    """Hand the resnet module the settings it needs for captures."""
+    global _settings_ref
+    _settings_ref = settings
+
+
+def _settings() -> Any:
+    return _settings_ref
+
+
+def captures() -> dict[str, Any]:
+    """What has been saved, for the status route."""
+    settings = _settings()
+    folder = settings.waste_capture_dir if settings else None
+    if folder is None:
+        return {"enabled": False, "folder": None, "count": 0, "newest": None}
+    count = len(list(folder.glob("*.jpg"))) if folder.is_dir() else 0
+    newest = None
+    if count:
+        newest = max(folder.glob("*.jpg"), key=lambda p: p.stat().st_mtime).name
+    return {"enabled": True, "folder": str(folder), "count": count, "newest": newest}
+
+
+def predict(image: Any) -> list[dict[str, Any]]:
+    """Every class with its probability, highest first.
+
+    Separate from `classify` so the wiring around it (decoding, saving the crop)
+    can be tested without loading the model.
+    """
+    import torch
+
+    _ensure_loaded()
+    tensor = _to_tensor(image)
+    with torch.no_grad():
+        logits = _model(tensor)
+        probs = torch.softmax(logits, dim=1)[0].tolist()
+    return [
+        {"className": label, "probability": float(prob)}
+        for label, prob in sorted(zip(_classes, probs), key=lambda pair: pair[1], reverse=True)
+    ]
+
+
 def classify(image_b64: str) -> list[dict[str, Any]]:
     """Return every class with its probability, highest first.
 
     The frontend groups the seven recycler materials itself, so this returns
-    the raw 11-class distribution rather than a decision.
+    the raw 11-class distribution rather than a decision.  The crop is kept as
+    it is classified, so a misread can be looked at afterwards.
     """
-    import torch
     from PIL import Image
 
-    _ensure_loaded()
     try:
         raw = base64.b64decode(image_b64.split(",")[-1], validate=False)
         image = Image.open(io.BytesIO(raw)).convert("RGB")
     except Exception as exc:  # noqa: BLE001 - the caller sends whatever a canvas gave it
         raise WasteModelError(422, "BAD_IMAGE", f"the image could not be read: {exc}") from exc
 
-    tensor = _to_tensor(image)
-    with torch.no_grad():
-        logits = _model(tensor)
-        probs = torch.softmax(logits, dim=1)[0].tolist()
-
-    return [
-        {"className": label, "probability": float(prob)}
-        for label, prob in sorted(zip(_classes, probs), key=lambda pair: pair[1], reverse=True)
-    ]
+    predictions = predict(image)
+    _capture(raw, predictions)
+    return predictions

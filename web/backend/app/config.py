@@ -7,6 +7,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+def _capture_dir(name: str, default: Path) -> Path | None:
+    """A directory for saved crops, or None when the setting is switched off.
+
+    An explicit empty value disables it; unset uses the default.  The directory
+    is not created here -- the first capture does that -- so a deployment that
+    never classifies anything leaves no empty folder behind.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    raw = raw.strip()
+    return Path(raw) if raw else None
+
+
 def _bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
@@ -43,6 +57,10 @@ class Settings:
     whisper_timeout_s: float
     models_dir: Path
     waste_model_dir: Path
+    # Where the crops the camera sends are kept, so a misread can be looked at
+    # afterwards.  Empty disables it.
+    waste_capture_dir: Path | None
+    waste_capture_keep: int
     db_path: Path
     dist_dir: Path
     frontend_dir: Path
@@ -98,6 +116,9 @@ class Settings:
             whisper_timeout_s=_float("VILLAGE_WHISPER_TIMEOUT_SECS", 90.0),
             models_dir=models,
             waste_model_dir=models / "waste",
+            waste_capture_dir=_capture_dir("VILLAGE_WASTE_CAPTURE_DIR",
+                                          root / "data" / "waste-captures"),
+            waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 2000),
             db_path=Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")),
             dist_dir=dist,
             frontend_dir=frontend,

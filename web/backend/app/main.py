@@ -133,6 +133,7 @@ async def lifespan(app: FastAPI):
     settings: Settings = app.state.settings
     db: Database = app.state.db
     gateway: DeviceGateway = app.state.gateway
+    waste_resnet.configure(settings)
     await db.init()
     await gateway.start()
 
@@ -426,7 +427,17 @@ def create_app(
 
     @app.get("/api/v1/waste/resnet-status")
     async def waste_resnet_status():
-        return waste_resnet.status()
+        return {**waste_resnet.status(), "captures": waste_resnet.captures()}
+
+    @app.get("/api/v1/waste/captures")
+    async def waste_captures():
+        """The crops the camera has sent, kept for fixing a misread.
+
+        The filename carries the time, the class chosen and its confidence, so a
+        directory listing answers "what did it call that?" without opening the
+        index.
+        """
+        return waste_resnet.captures()
 
     @app.post("/api/v1/waste/classify")
     async def waste_classify(body: WasteClassifyRequest):

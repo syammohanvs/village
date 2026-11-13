@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import dataclasses
 import json
 import time
 
@@ -566,3 +568,102 @@ async def test_the_material_the_model_named_is_kept_with_the_record(tmp_path):
         meta = titled[0]["meta"]
         assert meta["material"] == "Leather"
         assert meta["top"][0]["className"] == "Leather"
+
+
+def test_every_crop_the_camera_sends_is_kept_with_what_was_said(tmp_path):
+    """A misread has to be inspectable afterwards.
+
+    "It called my key fob paper" is unanswerable from an event log. The backend
+    therefore keeps the exact 224x224 picture the model judged, named after the
+    time, the chosen class and the confidence, with the whole distribution in an
+    index. Measured live: a plain white plate -- what the paint-out leaves when it
+    keeps almost nothing -- is `Paper 0.69`, which is exactly the kind of thing
+    that can only be found by looking at the image.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    from app import waste_resnet
+
+    folder = tmp_path / "captures"
+    settings = make_settings(tmp_path)
+    settings = dataclasses.replace(
+        settings, waste_capture_dir=folder, waste_capture_keep=3
+    )
+    waste_resnet.configure(settings)
+
+    image = Image.new("RGB", (224, 224), (255, 255, 255))
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    raw = buffer.getvalue()
+    predictions = [
+        {"className": "Paper", "probability": 0.69},
+        {"className": "Background", "probability": 0.06},
+    ]
+
+    for _ in range(5):
+        assert waste_resnet._capture(raw, predictions) is not None
+
+    saved = sorted(folder.glob("*.jpg"))
+    assert len(saved) == 3, "the folder is bounded by waste_capture_keep"
+    assert all(p.stat().st_size > 0 for p in saved)
+    assert all("paper-0.69" in p.name for p in saved)
+
+    lines = (folder / "index.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 5, "the index keeps the whole history"
+    first = json.loads(lines[0])
+    assert first["predictions"][0] == {"className": "Paper", "probability": 0.69}
+    assert first["file"].endswith(".jpg")
+
+    # The status route says where they are and how many.
+    report = waste_resnet.captures()
+    assert report["enabled"] is True
+    assert report["count"] == 3
+    assert report["folder"] == str(folder)
+
+
+def test_saved_crops_can_be_switched_off(tmp_path):
+    from app import waste_resnet
+
+    settings = dataclasses.replace(make_settings(tmp_path), waste_capture_dir=None)
+    waste_resnet.configure(settings)
+    assert waste_resnet._capture(b"not a jpeg", [{"className": "Paper", "probability": 0.5}]) is None
+    assert waste_resnet.captures() == {"enabled": False, "folder": None, "count": 0, "newest": None}
+
+
+def test_classify_saves_the_crop_it_judged(tmp_path, monkeypatch):
+    """The wiring, not just the helper: a real classification keeps its picture.
+
+    `predict` is replaced so the test needs neither torch nor the 95 MB
+    checkpoint; everything around it -- decoding the data URL, naming the file,
+    writing the index -- is the real code.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    from app import waste_resnet
+
+    folder = tmp_path / "captures"
+    settings = dataclasses.replace(make_settings(tmp_path), waste_capture_dir=folder)
+    waste_resnet.configure(settings)
+    monkeypatch.setattr(
+        waste_resnet,
+        "predict",
+        lambda image: [
+            {"className": "Paper", "probability": 0.81},
+            {"className": "Background", "probability": 0.05},
+        ],
+    )
+
+    image = Image.new("RGB", (224, 224), (250, 250, 250))
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    payload = "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+    assert waste_resnet.classify(payload)[0]["className"] == "Paper"
+    saved = list(folder.glob("*.jpg"))
+    assert len(saved) == 1
+    assert "paper-0.81" in saved[0].name
+    assert saved[0].stat().st_size > 0
