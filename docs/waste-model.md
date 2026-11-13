@@ -612,7 +612,9 @@ keeps it: `data/waste-captures/` by default, named
 
 — the time, the class chosen and its confidence — with every class and its
 probability in `index.jsonl` beside it. The folder is bounded
-(`VILLAGE_WASTE_CAPTURE_KEEP`, default 2000, oldest deleted first) and
+(`VILLAGE_WASTE_CAPTURE_KEEP`, default 20000 — about two hours at three frames a
+second; it was 2000, which turned out to be eleven minutes and deleted the very
+captures a session was investigating) and
 `VILLAGE_WASTE_CAPTURE_DIR=` (empty) switches it off. `GET
 /api/v1/waste/captures` reports where they are and how many.
 
@@ -630,6 +632,40 @@ because an empty plate is not a waste item.
 Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
+
+### The brown paper cover: brown is not a material (2026-11-14)
+
+A KFC-style brown paper food cover was called **Thermocol 0.91**, then
+**Thermocol 0.60**, then **Textile 0.70** within ten seconds — one object, three
+answers. Its crops were near identical: 0–3% white, mean RGB about (140, 110, 85),
+saturation 52, edge contrast 7.5.
+
+That is the whole story of the failure: **no shape, one colour.** Brown
+low-contrast surfaces in the training set are leather (bags, shoes), cloth,
+packing foam and cardboard, and with nothing else to go on the head sat on the
+boundary between them. It mattered because two of those three answers are
+recycler materials (harmless, same action) — but a flip to *Paper* is a real bin.
+
+What fixed it: three of its own captures promoted to `Paper`, plus 70 photographs
+of brown and kraft paper bags from Commons. The same frames now read **Paper
+0.96 / 0.97 / 0.91**.
+
+That in turn hurt the handkerchief — a coloured fabric square was pulled towards
+paper (0.24 tie became Paper 0.59, which would have lit the paper bin) — so 70
+handkerchief and cloth-napkin photographs were added to `Textile` in the same
+pass. The measured result of the pair:
+
+| Set | Before the cover work | After |
+| --- | --- | --- |
+| Brown paper cover (3 captures) | Thermocol 0.91 / Textile 0.70 | **Paper 0.96 / 0.97 / 0.91** |
+| Handkerchiefs (8 held-out) | 1/8 · 25% item | **3/8 · 50% item** |
+| Real-world probe (241) | 71.4% / 77.6% | 70.5% / 77.2% |
+| Withheld archive (505) | 87.7% / 91.5% | **88.1% / 91.9%** |
+| Hand-held items (528) | 49.8% / 67.0% | 49.8% / 65.5% |
+
+This is the dilution problem the model has always had, stated plainly: **adding
+one object's photos pulls another object's answers.** The cover and the
+handkerchief had to move together, and the handkerchief is still only 3 of 8.
 
 ### The cup, and why a handle is the clue (2026-11-14)
 

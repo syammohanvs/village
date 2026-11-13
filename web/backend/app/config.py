@@ -118,7 +118,7 @@ class Settings:
             waste_model_dir=models / "waste",
             waste_capture_dir=_capture_dir("VILLAGE_WASTE_CAPTURE_DIR",
                                           root / "data" / "waste-captures"),
-            waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 2000),
+            waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 20000),
             db_path=Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")),
             dist_dir=dist,
             frontend_dir=frontend,
