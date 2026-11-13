@@ -38,9 +38,13 @@ class RecordingDevice:
         return self._sim.health()
 
     def get_config(self) -> dict[str, Any]:
+        if self.unreachable:
+            raise DeviceUnreachable("fake controller is unreachable")
         return self._sim.get_config()
 
     def put_config(self, revision: int, config: dict[str, Any]) -> dict[str, Any]:
+        if self.unreachable:
+            raise DeviceUnreachable("fake controller is unreachable")
         return self._sim.put_config(revision, config)
 
     def command(self, payload: dict[str, Any]) -> dict[str, Any]:

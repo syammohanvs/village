@@ -413,6 +413,12 @@ class DeviceGateway:
         device, _ = self._select(mode)
         try:
             return await self._call(device, "get_config")
+        except DeviceUnreachable as exc:
+            # A controller that is off is not a server fault.  Left unhandled
+            # this escaped as a 500 stack trace, so the Setup page showed an
+            # internal error instead of "the controller is not answering" --
+            # which is the one thing an operator can act on.
+            raise DeviceError(503, "DEVICE_UNREACHABLE", exc.message) from exc
         except SimulatorError as exc:
             raise DeviceError(
                 exc.status,
@@ -426,6 +432,12 @@ class DeviceGateway:
         device, _ = self._select(mode)
         try:
             return await self._call(device, "put_config", expected_revision, config)
+        except DeviceUnreachable as exc:
+            # Nothing was written, and saying so is the difference between
+            # "try again" and "was my change saved?".
+            raise DeviceError(
+                503, "DEVICE_UNREACHABLE", exc.message + ". Nothing was changed."
+            ) from exc
         except SimulatorError as exc:
             raise DeviceError(
                 exc.status,

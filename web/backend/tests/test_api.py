@@ -396,3 +396,51 @@ async def test_medical_waste_is_referred_without_a_bin_command(tmp_path):
         assert real.calls == []
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]
         assert any(event["title"] == "Hazardous waste recognised" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_an_offline_controller_is_reported_not_crashed(tmp_path):
+    """The board is switched off most of the time in ordinary use.
+
+    Every configuration route reads the controller's current config before it
+    writes, so an unreachable board used to fall through as a 500 with a stack
+    trace in the log.  That reads as "the server is broken", and the operator
+    has no idea whether their change was saved.  A 503 that names the
+    controller is the honest answer, and the write says nothing was changed.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    real.unreachable = True
+    async with client_for(settings, device=real) as (client, gateway, app):
+        read = await client.get("/api/v1/device/config", params={"mode": "live"})
+        assert read.status_code == 503
+        body = read.json()["error"]
+        assert body["code"] == "DEVICE_UNREACHABLE"
+        assert "unreachable" in body["message"].lower()
+
+        current = (await client.get("/api/v1/device/config", params={"mode": "demo"})).json()
+        write = await client.put(
+            "/api/v1/device/config",
+            json={
+                "mode": "live",
+                "config_revision": current["config_revision"],
+                "config": current["config"],
+            },
+        )
+        assert write.status_code == 503
+        # A refused write must not read as a saved one.
+        assert "nothing was changed" in write.json()["error"]["message"].lower()
+
+        # Both calibration routes read the config first, so they go the same way.
+        soil = await client.post(
+            "/api/v1/calibration/soil",
+            json={"mode": "live", "dry_raw": 3000, "wet_raw": 1200},
+        )
+        assert soil.status_code == 503
+        assert soil.json()["error"]["code"] == "DEVICE_UNREACHABLE"
+
+        # And demo mode still works while the board is off: the simulator is
+        # always available, which is what makes the app usable without it.
+        assert (
+            await client.get("/api/v1/device/config", params={"mode": "demo"})
+        ).status_code == 200
