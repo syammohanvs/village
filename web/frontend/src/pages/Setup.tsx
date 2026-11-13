@@ -412,9 +412,9 @@ function Preferences() {
         )}
       </Card>
 
-      <Card kicker="Zara" title="Spoken language">
+      <Card kicker="Sara" title="Spoken language">
         <p className="hint">
-          The language Zara speaks and reads in. The voice panel and the invitation on the home
+          The language Sara speaks and reads in. The voice panel and the invitation on the home
           page use the same choice, so there is only one setting to change.
         </p>
         <LanguagePicker
@@ -431,15 +431,15 @@ function Preferences() {
         />
         <div className="setting-row">
           <div>
-            <p className="setting-name">Read aloud as soon as Zara opens</p>
+            <p className="setting-name">Read aloud as soon as Sara opens</p>
             <p className="hint">
-              On: the page is read in the language above the moment Zara opens, and again when the
-              topic changes. Visitors can still switch language or stop the reading inside Zara.
+              On: the page is read in the language above the moment Sara opens, and again when the
+              topic changes. Visitors can still switch language or stop the reading inside Sara.
             </p>
           </div>
           <Toggle
             id="lia-auto-read"
-            label="Read aloud as soon as Zara opens"
+            label="Read aloud as soon as Sara opens"
             checked={autoRead}
             onChange={(next) => {
               setAutoRead(next);

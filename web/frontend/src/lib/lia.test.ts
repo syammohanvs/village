@@ -16,7 +16,7 @@ const status = (options: Parameters<typeof makeState>[0] = {}) => makeState(opti
 
 describe('Lia copy', () => {
   it('uses the requested welcome message in English', () => {
-    expect(LIA_COPY.en.welcome).toBe('Hello! I’m Zara. I can help you explore our village.');
+    expect(LIA_COPY.en.welcome).toBe('Hello! I’m Sara. I can help you explore our village.');
   });
 
   it('offers all six topics in every language with short, complete steps', () => {
@@ -37,6 +37,25 @@ describe('Lia copy', () => {
           expect(step.text.trim().length).toBeGreaterThan(0);
         }
         if (topic.adult) expect(topic.adultNote?.trim().length ?? 0).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('calls her Sara in every language, and never by an old name', () => {
+    // The name is the one thing a rename gets wrong in the language nobody on
+    // the team reads: the last rename left the Malayalam and Hindi help button
+    // saying "Lia" while the English said something else.  So each language is
+    // pinned to its own spelling, and the older names are refused outright.
+    const names: Record<string, string> = { en: 'Sara', ml: 'സാറ', hi: 'सारा' };
+    for (const { code } of LIA_LANGUAGES) {
+      const copy = LIA_COPY[code];
+      const name = names[code];
+      expect(name, `no pinned spelling for ${code}`).toBeTruthy();
+      expect(copy.welcome).toContain(name);
+      expect(copy.helpButton).toContain(name);
+      for (const stale of ['Zara', 'Lia', 'ജാറ', 'ലിയ', 'ज़ारा', 'लिया']) {
+        expect(copy.welcome).not.toContain(stale);
+        expect(copy.helpButton).not.toContain(stale);
       }
     }
   });

@@ -451,7 +451,7 @@ to choose a bin. Move it a little and hold it still.”* It still refuses to pic
 bin, but the guess and the number are the information needed to decide whether to
 move the item, change the light, or hand it to the operator.
 
-**Zara greets the visitor.** On arrival the page says one line in the language the
+**Sara greets the visitor.** On arrival the page says one line in the language the
 app is set to — *“Know the bin? Go ahead. Not sure? Show the item to the camera
 and I’ll help.”* — and shows the same words for a device with no voice. It is
 said again if the language is switched while the card is open, and stops when

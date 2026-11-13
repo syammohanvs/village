@@ -18,7 +18,7 @@ and uses no paid API.
 | FastAPI backend, SQLite, simulator, demo isolation | **done; 17 tests pass** |
 | Whisper.cpp + multilingual `ggml-base.bin` | **built and running on 8181** |
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
-| Zara guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
+| Sara guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
 | Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
@@ -89,7 +89,7 @@ Stop only this project:
 - **What Happened** — one timeline of actions and reasons; raw codes, filters
   and CSV export live under Advanced details.
 - **Navigation** — four pages (Our Village, Sort Waste, What Happened, About &
-  Help), a smaller Setup link, and one Talk to Zara entry. Old addresses
+  Help), a smaller Setup link, and one Talk to Sara entry. Old addresses
   (`/sensors`, `/controls`, `/settings`, `/villagers`) redirect.
 
 ## Architecture
@@ -106,7 +106,7 @@ browser (React/Vite) ──HTTP──▶ FastAPI (laptop) ──HTTP──▶ ES
 - `web/frontend/` — React 19 + TypeScript + Vite.
 - `web/backend/` — FastAPI + SQLite + simulator + Whisper proxy.
 - `shared/` — protocol, multilingual phrase dictionary, JSON examples.
-- `docs/` — wiring, installation, calibration, operation, Zara guide,
+- `docs/` — wiring, installation, calibration, operation, Sara guide,
   Cloudflare deployment, troubleshooting, waste model, bench test.
 - `scripts/` — setup, download, launch, stop, dev, tests; `scripts/waste/`
   trains and installs the waste classifier.

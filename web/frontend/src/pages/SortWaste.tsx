@@ -545,7 +545,7 @@ export function SortWaste() {
         model: 'teachable-machine',
       });
       setRecognition(result);
-      // Zara reads the result aloud: a bin name for the three bins, or a
+      // Sara reads the result aloud: a bin name for the three bins, or a
       // referral to the operator for anything else.
       const spokenCategory = result.category ?? event.category;
       const isRecycler = Boolean(material);

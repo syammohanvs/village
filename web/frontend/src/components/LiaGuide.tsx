@@ -556,7 +556,7 @@ export function LiaGuide() {
               <LiaAvatar size={66} />
               <div className="lia-head-copy">
                 <p className="lia-name" id="lia-dialog-title">
-                  Zara
+                  Sara
                 </p>
                 <p className="lia-role">{copy.role}</p>
               </div>

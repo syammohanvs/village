@@ -62,7 +62,7 @@ describe('Lia guide', () => {
 
     openGuide();
     expect(screen.getByTestId('lia-guide')).toBeInTheDocument();
-    expect(screen.getByText(/Hello! I’m Zara. I can help you explore our village/)).toBeInTheDocument();
+    expect(screen.getByText(/Hello! I’m Sara. I can help you explore our village/)).toBeInTheDocument();
 
     expect(screen.getByTestId('lia-quick-model')).toHaveTextContent('Show me the model');
     expect(screen.getByTestId('lia-quick-voice')).toHaveTextContent('Help me use voice');
@@ -148,7 +148,7 @@ describe('Lia guide', () => {
     // No second press: opening Lia is the invitation, and at the exhibition a
     // visitor should hear her immediately.
     await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(1));
-    expect(speech.speakText.mock.calls[0][0]).toContain('Hello! I’m Zara');
+    expect(speech.speakText.mock.calls[0][0]).toContain('Hello! I’m Sara');
     expect(speech.speakText.mock.calls[0][1]).toBe('en');
     expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'true');
   });
@@ -234,7 +234,10 @@ describe('read-aloud follows the language', () => {
 
     await waitFor(() => expect(speech.speakText).toHaveBeenCalledTimes(2));
     expect(speech.speakText.mock.calls[1][1]).toBe('ml');
-    expect(String(speech.speakText.mock.calls[1][0])).toMatch(/ഹലോ|ലിയ/);
+    expect(String(speech.speakText.mock.calls[1][0])).toMatch(/ഹലോ/);
+    // The spoken welcome must name her, or a visitor hears a greeting with no
+    // idea who is talking.
+    expect(String(speech.speakText.mock.calls[1][0])).toContain('സാറ');
     // The button stays ON: it must not need a second press (which would turn
     // read-aloud off).
     expect(screen.getByTestId('lia-read-aloud')).toHaveAttribute('aria-pressed', 'true');

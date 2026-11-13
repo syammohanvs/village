@@ -118,7 +118,7 @@ const BIN_NAMES: Record<LiaLanguage, Record<string, string>> = {
 };
 
 const EN: LiaCopy = {
-  welcome: 'Hello! I’m Zara. I can help you explore our village.', 
+  welcome: 'Hello! I’m Sara. I can help you explore our village.', 
   wasteWelcome: 'Know the bin? Go ahead. Not sure? Show the item to the camera and I’ll help.',
   role: 'Village helper',
   homeTitle: 'What would you like to do?',
@@ -131,7 +131,7 @@ const EN: LiaCopy = {
   maybeLater: 'Maybe later',
   readAloud: 'Read aloud',
   hearAgain: 'Hear it again',
-  helpButton: 'Help with Zara',
+  helpButton: 'Help with Sara',
   back: 'Back',
   next: 'Next',
   previous: 'Previous',
@@ -239,7 +239,7 @@ const EN: LiaCopy = {
 
 const ML: LiaCopy = {
   welcome:
-    'ഹലോ! ഞാൻ ജാറ, നിങ്ങളുടെ വില്ലേജ് സഹായി. ഞങ്ങളുടെ ഗ്രാമം എങ്ങനെ വെള്ളം ലാഭിക്കുന്നു, മാലിന്യം തരംതിരിക്കുന്നു, തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു എന്ന് ഞാൻ കാണിച്ചുതരാം. നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
+    'ഹലോ! ഞാൻ സാറ, നിങ്ങളുടെ വില്ലേജ് സഹായി. ഞങ്ങളുടെ ഗ്രാമം എങ്ങനെ വെള്ളം ലാഭിക്കുന്നു, മാലിന്യം തരംതിരിക്കുന്നു, തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു എന്ന് ഞാൻ കാണിച്ചുതരാം. നിങ്ങൾക്ക് എന്ത് ചെയ്യണം?',
   wasteWelcome:
     'ബിൻ അറിയാമോ? നേരിട്ട് ഇടാം. സംശയമുണ്ടോ? വസ്തു ക്യാമറയ്ക്ക് മുന്നിൽ കാണിക്കൂ, ഞാൻ സഹായിക്കാം.',
   role: 'ഗ്രാമ സഹായി',
@@ -253,7 +253,7 @@ const ML: LiaCopy = {
   maybeLater: 'പിന്നീട്',
   readAloud: 'വായിച്ചു കേൾപ്പിക്കൂ',
   hearAgain: 'വീണ്ടും കേൾക്കൂ',
-  helpButton: 'ലിയയുടെ സഹായം',
+  helpButton: 'സാറയുടെ സഹായം',
   back: 'തിരികെ',
   next: 'അടുത്തത്',
   previous: 'മുൻപത്തേത്',
@@ -361,7 +361,7 @@ const ML: LiaCopy = {
 
 const HI: LiaCopy = {
   welcome:
-    'नमस्ते! मैं ज़ारा हूँ, आपकी गाँव सहायक। मैं आपको दिखाऊँगी कि हमारा गाँव पानी कैसे बचाता है, कचरा कैसे अलग करता है और सड़क की बत्तियाँ कैसे जलाता है। आप क्या करना चाहेंगे?',
+    'नमस्ते! मैं सारा हूँ, आपकी गाँव सहायक। मैं आपको दिखाऊँगी कि हमारा गाँव पानी कैसे बचाता है, कचरा कैसे अलग करता है और सड़क की बत्तियाँ कैसे जलाता है। आप क्या करना चाहेंगे?',
   wasteWelcome:
     'डिब्बा पता है? सीधे डाल दीजिए। पता नहीं? चीज़ कैमरे के सामने दिखाइए, मैं मदद करूँगी।',
   role: 'गाँव सहायक',
@@ -375,7 +375,7 @@ const HI: LiaCopy = {
   maybeLater: 'बाद में',
   readAloud: 'पढ़कर सुनाइए',
   hearAgain: 'दोबारा सुनिए',
-  helpButton: 'लिया से मदद',
+  helpButton: 'सारा से मदद',
   back: 'पीछे',
   next: 'आगे',
   previous: 'पिछला',

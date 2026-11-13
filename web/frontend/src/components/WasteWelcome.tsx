@@ -91,7 +91,7 @@ export function WasteWelcome() {
   if (dismissed) return null;
 
   return (
-    <section className="lia-welcome" data-testid="waste-welcome" aria-label="Zara">
+    <section className="lia-welcome" data-testid="waste-welcome" aria-label="Sara">
       <LiaAvatar size={46} decorative />
       <p className="lia-welcome-line" data-testid="waste-welcome-line">
         {line}

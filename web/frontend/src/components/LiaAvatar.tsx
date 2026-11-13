@@ -4,7 +4,7 @@ import { cx } from '../lib/format';
 export function LiaAvatar({
   size = 96,
   className,
-  label = 'Zara, the village helper',
+  label = 'Sara, the village helper',
   decorative = false,
 }: {
   size?: number;

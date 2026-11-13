@@ -30,9 +30,9 @@ backend; Windows can also resolve `village.local`.
 Firmware can be updated over Wi-Fi once the board is on the network — see
 `docs/installation.md` (“Updating firmware without the USB cable”).
 
-## Zara, the village guide
+## Sara, the village guide
 
-The **Help with Zara** button at the bottom right opens a guide written for
+The **Help with Sara** button at the bottom right opens a guide written for
 children and first-time visitors. On the first visit it opens by itself with a
 short welcome and six large choices: show me around, water the plants, use the
 lights, sort waste, talk to the village, or help with a problem.
