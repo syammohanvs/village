@@ -631,6 +631,42 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### The cup, and why a handle is the clue (2026-11-14)
+
+The user's point was the right one: *"a cup with handle is usually not what
+thermocole is used for, so you should be able to distinguish it as cup."* A
+handle is a shape cue nothing else in the taxonomy has.
+
+The model could not use it, and the reason is in the training set: **`Glass`
+contained bottles and jars, not cups.** A white ceramic cup with a handle is
+neither, so it had nothing to match and landed on the nearest white curved
+object — a thermocol cup. The saved crop confirmed the picture was fine (12-14%
+white, no plate: the whole cup was in frame), so this was never a crop problem.
+
+Seventy freely licensed photographs of ceramic cups and white mugs were fetched
+from Wikimedia Commons under `Glass` (`fetch_class_images.py`, labelled by the
+search phrase rather than by asking the model). The same three captures, before
+and after:
+
+| Capture | Before | After |
+| --- | --- | --- |
+| cup, clear frame | Thermocol **0.70** | **Glass 0.90** |
+| cup, second angle | Thermocol **0.41** | Glass 0.43 (near tie with 0.26) |
+| cup, poor frame | Thermocol 0.41 | Thermocol 0.44 — **not fixed** |
+
+Through `POST /waste/classify` the rest held or improved:
+
+| Set | Before | After |
+| --- | --- | --- |
+| Hand-held items (528) | 48.9 / 65.7 | **49.8 / 67.0** |
+| Real-world probe (241) | 68.9 / 75.1 | **71.4 / 77.6** |
+| Withheld archive (505) | 89.1 / 92.5 | 87.7 / 91.5 |
+| Blank plate / empty hand | 100 / 98.3 | 100 / 98.3 |
+
+Spreadsheet of the honest limit: one of the three cup frames still says
+Thermocol, and the second is a near tie, so a cup is now *usually* read as
+recyclable rather than *always*. A cup photographed badly is still a cup.
+
 ### Why a handkerchief can be called leather, and a cup thermocol
 
 Asked directly: "how is this possible?" The saved captures answer it, because the
