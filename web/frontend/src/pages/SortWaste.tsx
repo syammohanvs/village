@@ -12,7 +12,7 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import { centreCrop, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import {
   SCENE_WARMUP_FRAMES,
   createSceneMemory,
@@ -132,6 +132,11 @@ export function SortWaste() {
   const [modelError, setModelError] = useState('');
   // The room, learned from the live stream when no backdrop was set.
   const sceneRef = useRef(createSceneMemory(ANALYSIS_WIDTH, ANALYSIS_HEIGHT));
+  // Off by default.  An automatic watcher in a room with a person in it decides
+  // for itself what is "being shown", and at the venue that decision was wrong
+  // often enough to classify a hand, a wall and an empty frame.  A press cannot
+  // be wrong about that, so the press is the default and the watcher is opt-in.
+  const [autoWatch, setAutoWatch] = useState(false);
   const [warming, setWarming] = useState(false);
   // 0..1 while the room is being learned, null once the camera is ready.  Shown
   // as a badge on the preview: without it the visitor cannot tell whether the
@@ -641,6 +646,101 @@ export function SortWaste() {
     }
   }, []);
 
+  /**
+   * Classify once, on demand.
+   *
+   * The automatic path decides for itself what is being shown, and in a room
+   * with a person in it that decision is wrong often enough to be worse than
+   * useless: reported as "it classified as thermocol" with nothing in hand. A
+   * press cannot be wrong about whether an item is being shown, because the
+   * person pressing it knows.
+   *
+   * It crops the middle of the picture — where an item held up to the camera
+   * sits — and classifies that, with no reference to the room at all.
+   */
+  const classifyNow = useCallback(async () => {
+    const video = videoRef.current;
+    const classifier = classifierRef.current;
+    if (!video || !classifier || busyRef.current || video.readyState < 2) return;
+    busyRef.current = true;
+    setFrameWarning('');
+    setRecognition(null);
+    setReferralLabel(null);
+    setHazardousLabel(null);
+    try {
+      const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const analysisContext = analysis.getContext('2d');
+      const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
+      const cropContext = crop.getContext('2d');
+      if (!analysisContext || !cropContext) return;
+
+      // A stored backdrop is still worth subtracting -- it is the booth case and
+      // it is not what fails here.
+      let backgrounds: Uint8ClampedArray[] = backgroundRef.current.map((f) => f.data);
+      if (backgrounds.length === 0) {
+        const memory = sceneRef.current;
+        if (sceneReady(memory)) backgrounds = [memory.background];
+      }
+
+      const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, 0.8);
+      const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
+      const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
+      const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
+      cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
+      cropContext.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, CROP_SIZE, CROP_SIZE);
+
+      analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+      const mask = backgrounds.length > 0
+        ? objectMask(backgrounds, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, box)
+        : null;
+      if (mask) {
+        const maskCanvas = ensureCanvas(maskCanvasRef, mask.width, mask.height);
+        const maskContext = maskCanvas.getContext('2d');
+        if (maskContext) {
+          const painted = maskContext.createImageData(mask.width, mask.height);
+          painted.data.set(mask.data);
+          maskContext.putImageData(painted, 0, 0);
+          cropContext.globalCompositeOperation = 'destination-in';
+          cropContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height, 0, 0, CROP_SIZE, CROP_SIZE);
+          cropContext.globalCompositeOperation = 'destination-over';
+          cropContext.fillStyle = '#ffffff';
+          cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
+          cropContext.globalCompositeOperation = 'source-over';
+        }
+      }
+
+      const raw = await classifier.predict(crop);
+      const all = rankPredictions(
+        raw.map((row) => ({ label: row.className, confidence: row.probability })),
+        raw.length,
+      );
+      const grouped = groupedPrediction(all);
+      predictionsRef.current = all.slice(0, 3);
+      setPredictions(predictionsRef.current);
+      setGroupedTop(grouped);
+      if (!grouped) return;
+      const isBackground = grouped.label.trim().toLowerCase() === 'background';
+      if (isBackground) {
+        setStability({ ...stabilizerRef.current.snapshot(), stable: true });
+        return;
+      }
+      const event: StableEvent = {
+        label: grouped.material ?? grouped.label,
+        category: (grouped.material ?? grouped.label).trim().toLowerCase(),
+        confidence: grouped.confidence,
+        at: Date.now(),
+        material: grouped.material,
+      };
+      await accept(event);
+    } catch (cause) {
+      setRecognitionError(errorMessage(cause));
+    } finally {
+      busyRef.current = false;
+    }
+  }, [accept]);
+
+
   // The model is loaded when the page opens rather than when the camera starts,
   // so the start button can stay disabled until the pipeline can actually
   // answer.  Pressing it into a half-ready page is what made "it is learning the
@@ -652,7 +752,7 @@ export function SortWaste() {
   }, [installed, modelState, loadModel]);
 
   useEffect(() => {
-    if (!cameraOn || modelState !== 'ready') return;
+    if (!cameraOn || modelState !== 'ready' || !autoWatch) return;
     let cancelled = false;
     const timer = setInterval(async () => {
       const video = videoRef.current;
@@ -748,7 +848,7 @@ export function SortWaste() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [cameraOn, modelState, accept, focusOn, captureBackground, focusInput]);
+  }, [cameraOn, modelState, autoWatch, accept, focusOn, captureBackground, focusInput]);
 
   const recognitionId = recognition?.recognition?.id ?? recognition?.recognition_id ?? null;
   const targetCategory =
@@ -809,10 +909,14 @@ export function SortWaste() {
                   <span className="chip chip--warn">
                     Learning the room · {Math.round(sceneProgress * 100)}%
                   </span>
-                ) : waitingRemoval ? (
-                  <span className="chip chip--neutral">Show the next item</span>
+                ) : autoWatch ? (
+                  waitingRemoval ? (
+                    <span className="chip chip--neutral">Show the next item</span>
+                  ) : (
+                    <span className="chip chip--good">Ready — show one item</span>
+                  )
                 ) : (
-                  <span className="chip chip--good">Ready — show one item</span>
+                  <span className="chip chip--good">Ready — press “Check the item”</span>
                 )}
               </div>
             )}
@@ -851,6 +955,22 @@ export function SortWaste() {
                 {installed && modelState !== 'ready' ? 'Preparing the model…' : 'Start Camera'}
               </button>
             )}
+            {cameraOn && (
+              <button
+                type="button"
+                className="btn btn--primary btn--large"
+                onClick={() => void classifyNow()}
+                disabled={!installed || modelState !== 'ready'}
+                title={
+                  installed && modelState === 'ready'
+                    ? 'Classify whatever is in the middle of the picture right now.'
+                    : 'The classifier is still loading.'
+                }
+                data-testid="classify-now"
+              >
+                <IconCheck size={18} /> Check the item
+              </button>
+            )}
             {cameraOn && installed && (
               <div className="focus-controls">
                 <button
@@ -883,6 +1003,15 @@ export function SortWaste() {
                     onChange={(event) => setFocusOn(event.target.checked)}
                   />
                   <span>Focus on the object</span>
+                </label>
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={autoWatch}
+                    onChange={(event) => setAutoWatch(event.target.checked)}
+                    data-testid="auto-watch"
+                  />
+                  <span>Watch automatically</span>
                 </label>
               </div>
             )}
@@ -1007,6 +1136,11 @@ export function SortWaste() {
                   </p>
                 )}
               </>
+            ) : !autoWatch && !recognition ? (
+              <p className="result-sub" data-testid="waste-press-hint">
+                Hold the item up and press <strong>Check the item</strong>. Nothing is
+                classified until you do.
+              </p>
             ) : warming ? (
               <p className="result-sub" data-testid="waste-warming">
                 Learning this room so the background is never classified as an

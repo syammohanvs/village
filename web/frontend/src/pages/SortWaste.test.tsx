@@ -200,6 +200,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
     // predict(image, flipped) returns every class; passing a count mirrored the
@@ -274,6 +277,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const recyclerCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -332,6 +338,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
@@ -416,6 +425,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     expect(await screen.findByTestId('set-background')).toBeInTheDocument();
     expect(screen.getByLabelText(/Focus on the object/i)).toBeChecked();
@@ -467,13 +479,17 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     expect(await screen.findByText(/Nothing to sort/i, {}, { timeout: 4000 })).toBeInTheDocument();
     await waitFor(() => {
       const rows = Array.from(document.querySelectorAll('.prediction-list li'));
       expect(rows[0].textContent).toContain('Not a waste item');
     });
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    // Long enough that a watcher would have learned the room and fired.
+    await new Promise((resolve) => setTimeout(resolve, 6000));
     expect(api.postRecognition).not.toHaveBeenCalled();
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
     expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
@@ -525,6 +541,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const splitCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -567,6 +586,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
+    // The automatic watcher is opt-in now: a press cannot be wrong about whether
+    // an item is being shown, so it is the default.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), { timeout: 6000 });
     expect(stopTrack).not.toHaveBeenCalled();
@@ -618,6 +640,9 @@ describe('Sort Waste — a low guess says what it is', () => {
     const start = await screen.findByTestId('start-camera');
     await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(start);
+    // These suites keep the automatic watcher on: the behaviour they
+    // cover is what happens while the camera is being watched.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     expect(await screen.findByText(/Best guess Paper at 55%/i, {}, { timeout: 5000 })).toBeInTheDocument();
     // It must not claim a bin it is not sure about.
@@ -753,6 +778,9 @@ describe('Sort Waste — the empty table is painted out', () => {
       // The model loads asynchronously; clicking before it is ready does nothing.
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
+      // These suites keep the automatic watcher on: the behaviour they
+      // cover is what happens while the camera is being watched.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
       await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
 
       // The mask was painted and used to punch the picture out.
@@ -823,6 +851,9 @@ describe('Sort Waste — the empty table is painted out', () => {
       const start = await screen.findByTestId('start-camera');
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
+      // These suites keep the automatic watcher on: the behaviour they
+      // cover is what happens while the camera is being watched.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
 
       // The model is still asked, on the whole frame.
       await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
@@ -870,6 +901,9 @@ describe('Sort Waste — the empty table is painted out', () => {
       const start = await screen.findByTestId('start-camera');
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
+      // These suites keep the automatic watcher on: the behaviour they
+      // cover is what happens while the camera is being watched.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
 
       expect(await screen.findByTestId('waste-warming', {}, { timeout: 5000 })).toBeInTheDocument();
       // The room is never sent to the model.
@@ -919,6 +953,9 @@ describe('Sort Waste — the empty table is painted out', () => {
       const start = await screen.findByTestId('start-camera');
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
+      // These suites keep the automatic watcher on: the behaviour they
+      // cover is what happens while the camera is being watched.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
       await screen.findByTestId('waste-warming', {}, { timeout: 5000 });
 
       // Let the room be learned, then present the item.
@@ -978,6 +1015,9 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
     const start = await screen.findByTestId('start-camera');
     await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(start);
+    // These suites keep the automatic watcher on: the behaviour they
+    // cover is what happens while the camera is being watched.
+    fireEvent.click(await screen.findByTestId('auto-watch'));
 
     // The greeting speaks on mount, so look for the classification itself.
     await waitFor(
@@ -1111,6 +1151,9 @@ describe('Sort Waste — the page says whether it is ready', () => {
       expect(screen.queryByTestId('camera-status')).not.toBeInTheDocument();
 
       fireEvent.click(start);
+      // These suites keep the automatic watcher on: the behaviour they
+      // cover is what happens while the camera is being watched.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
       const status = await screen.findByTestId('camera-status');
       expect(status).toHaveTextContent(/learning the room/i);
 
@@ -1118,6 +1161,106 @@ describe('Sort Waste — the page says whether it is ready', () => {
       // without guessing whether the page is watching or ready.
       await waitFor(() => expect(status).toHaveTextContent(/ready/i), { timeout: 10000 });
       expect(status).toHaveTextContent(/show one item/i);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
+  }, 25000);
+});
+
+describe('Sort Waste — nothing is classified unless it is asked for', () => {
+  it('does not classify on its own, and does when the button is pressed', async () => {
+    // Reported: "again I didn't show my hand at all and it classified" — as
+    // thermocol, with nothing in hand. An automatic watcher in a room with a
+    // person in it decides for itself what is "being shown", and that decision
+    // is wrong often enough to be worse than useless. A press cannot be wrong
+    // about it, so it is the default and the watcher is opt-in.
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteClassify).mockClear();
+    vi.mocked(api.postRecognition).mockClear();
+    predictionState.current = [
+      { className: 'Thermocol', probability: 0.78 },
+      { className: 'Paper', probability: 0.1 },
+      { className: 'Background', probability: 0.05 },
+    ];
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    // A frame the page can read, as in a browser.
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = (function () {
+      return {
+        drawImage() {},
+        clearRect() {},
+        putImageData() {},
+        fillRect() {},
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+        getImageData: (_x: number, _y: number, width: number, height: number) => {
+          const data = new Uint8ClampedArray(width * height * 4);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 40;
+            data[i + 1] = 40;
+            data[i + 2] = 40;
+            data[i + 3] = 255;
+          }
+          // Something clearly in the frame: with a watcher running this would be
+          // classified on its own, which is the behaviour being ruled out.
+          for (let y = 40; y < 80; y += 1) {
+            for (let x = 50; x < 110; x += 1) {
+              const i = (y * width + x) * 4;
+              data[i] = 220;
+              data[i + 1] = 220;
+              data[i + 2] = 215;
+            }
+          }
+          return { data, width, height };
+        },
+      };
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    try {
+    render(<App />);
+    const start = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(start);
+
+    // The watcher is off: no request leaves the page, however long it runs.
+    const check = await screen.findByTestId('classify-now');
+    // The default is what makes it safe: the watcher is off, so the loop that
+    // decides what is "being shown" does not run at all.
+    expect(screen.getByTestId('auto-watch')).not.toBeChecked();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(api.wasteClassify).not.toHaveBeenCalled();
+    expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(/press/i);
+
+    // One press, one answer.
+    fireEvent.click(check);
+    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 5000 });
+    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toEqual(
+      expect.objectContaining({ category: 'other', material: 'Thermocol' }),
+    );
     } finally {
       HTMLCanvasElement.prototype.getContext = originalGetContext;
     }
