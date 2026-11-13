@@ -625,6 +625,16 @@ export function SortWaste() {
     }
   }, []);
 
+  // The model is loaded when the page opens rather than when the camera starts,
+  // so the start button can stay disabled until the pipeline can actually
+  // answer.  Pressing it into a half-ready page is what made "it is learning the
+  // room" look like a fault.
+  useEffect(() => {
+    if (!installed) return;
+    if (modelState !== 'idle') return;
+    void loadModel();
+  }, [installed, modelState, loadModel]);
+
   useEffect(() => {
     if (!cameraOn || modelState !== 'ready') return;
     let cancelled = false;
@@ -785,17 +795,20 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void startCamera()}
-                disabled={!cameraSupported}
+                disabled={!cameraSupported || (installed && modelState !== 'ready')}
                 title={
                   !cameraSupported
                     ? 'This browser cannot open a camera in this tab.'
-                    : installed
-                      ? 'Open the camera preview.'
-                      : 'Open the camera preview. Recognition stays off until a model is installed.'
+                    : installed && modelState !== 'ready'
+                      ? 'The classifier is still loading. The camera opens once it is ready.'
+                      : installed
+                        ? 'Open the camera preview.'
+                        : 'Open the camera preview. Recognition stays off until a model is installed.'
                 }
                 data-testid="start-camera"
               >
-                <IconCamera size={18} /> Start Camera
+                <IconCamera size={18} />{' '}
+                {installed && modelState !== 'ready' ? 'Preparing the model…' : 'Start Camera'}
               </button>
             )}
             {cameraOn && installed && (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
@@ -157,7 +157,11 @@ describe('Sort Waste', () => {
     vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: /start camera/i })).toBeEnabled();
+    // Released only once the classifier is ready: pressing it into a
+    // half-prepared page is what made "learning the room" look like a fault.
+    const start = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    expect(start).toHaveTextContent(/start camera/i);
     expect(screen.getByText('How it works')).toBeInTheDocument();
     expect(screen.getByText('Confidence and model details')).toBeInTheDocument();
     expect(screen.getByText(/does not identify people/i)).toBeInTheDocument();
@@ -193,7 +197,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
     // predict(image, flipped) returns every class; passing a count mirrored the
@@ -265,7 +271,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const recyclerCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -321,7 +329,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
@@ -403,7 +413,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     expect(await screen.findByTestId('set-background')).toBeInTheDocument();
     expect(screen.getByLabelText(/Focus on the object/i)).toBeChecked();
@@ -452,7 +464,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     expect(await screen.findByText(/Nothing to sort/i, {}, { timeout: 4000 })).toBeInTheDocument();
     await waitFor(() => {
@@ -508,7 +522,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const splitCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -548,7 +564,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByTestId('start-camera'));
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), { timeout: 6000 });
     expect(stopTrack).not.toHaveBeenCalled();
@@ -981,5 +999,52 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
       top?: Array<{ className: string; probability: number }>;
     };
     expect(sent.top?.[0]).toEqual({ className: 'Metal', probability: 0.91 });
+  }, 15000);
+});
+
+describe('Sort Waste — the camera waits for the model', () => {
+  it('keeps Start Camera disabled until the classifier is ready', async () => {
+    // Asked for at the venue: if the page is still preparing, the button must
+    // not offer to open the camera.  The model is loaded when the page opens,
+    // and the button is released the moment it can answer.
+    // This describe sits outside the shared one, so it carries its own mocks.
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+
+    let resolveLoad: ((value: { installed: boolean; model: string; classes: string[] }) => void) | null = null;
+    const loading = new Promise<{ installed: boolean; model: string; classes: string[] }>((resolve) => {
+      resolveLoad = resolve;
+    });
+    let calls = 0;
+    vi.mocked(api.wasteResnetStatus).mockImplementation(() => {
+      calls += 1;
+      // First call is the page's status query; the second is the model load,
+      // which is held open so the intermediate state is real rather than a race.
+      if (calls === 1) {
+        return Promise.resolve({ installed: true, model: 'resnet50', classes: [] });
+      }
+      return loading;
+    });
+    render(<App />);
+
+    expect(await screen.findByText(/Preparing the model/i)).toBeInTheDocument();
+    const start = screen.getByTestId('start-camera');
+    expect(start).toBeDisabled();
+
+    await act(async () => {
+      resolveLoad?.({ installed: true, model: 'resnet50', classes: [] });
+    });
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    expect(start).toHaveTextContent(/start camera/i);
   }, 15000);
 });
