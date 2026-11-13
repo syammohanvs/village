@@ -40,10 +40,10 @@ export interface StabilizerSnapshot {
 
 const DEFAULTS: Required<StabilizerOptions> = {
   threshold: 0.62,
-  consecutiveFrames: 4,
-  cooldownMs: 8000,
+  consecutiveFrames: 3,
+  cooldownMs: 4000,
   backgroundClasses: ['background', 'unknown', 'none', 'empty', 'nothing'],
-  rearmFrames: 4,
+  rearmFrames: 2,
 };
 
 function normalise(label: string): string {

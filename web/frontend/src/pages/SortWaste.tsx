@@ -159,8 +159,8 @@ export function SortWaste() {
   const previewOnly = !installed;
   const base = modelBase(settings.data?.waste_model_path);
   const confidence = settings.data?.waste_confidence ?? 0.62;
-  const stabilityFrames = settings.data?.waste_stability_frames ?? 4;
-  const cooldownMs = settings.data?.waste_cooldown_ms ?? 8000;
+  const stabilityFrames = settings.data?.waste_stability_frames ?? 3;
+  const cooldownMs = settings.data?.waste_cooldown_ms ?? 4000;
 
   const effectiveCooldown = focusOn && backgroundCount > 0 ? 0 : cooldownMs;
 
@@ -583,7 +583,7 @@ export function SortWaste() {
       } finally {
         busyRef.current = false;
       }
-    }, 600);
+    }, 400);
     return () => {
       cancelled = true;
       clearInterval(timer);
