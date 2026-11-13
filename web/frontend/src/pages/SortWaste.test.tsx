@@ -1173,6 +1173,83 @@ describe('Sort Waste — the page says whether it is ready', () => {
   }, 25000);
 });
 
+describe('Sort Waste — a near-tie is not a decision', () => {
+  it('does not record or light anything when the best guess is under the threshold', async () => {
+    // The handkerchief: Leather 0.24, Paper 0.24, Background 0.22.  A pressed
+    // reading used to skip the confidence threshold, so that tie was recorded
+    // and reported as "leather".  It has to say what it guessed and stop.
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ waste_confidence: 0.5 }));
+    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.postRecognition).mockClear();
+    predictionState.current = [
+      { className: 'Leather', probability: 0.24 },
+      { className: 'Paper', probability: 0.24 },
+      { className: 'Background', probability: 0.22 },
+    ];
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = (function () {
+      return {
+        drawImage() {},
+        clearRect() {},
+        putImageData() {},
+        fillRect() {},
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+        getImageData: (_x: number, _y: number, width: number, height: number) => {
+          const data = new Uint8ClampedArray(width * height * 4);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 60;
+            data[i + 1] = 60;
+            data[i + 2] = 60;
+            data[i + 3] = 255;
+          }
+          return { data, width, height };
+        },
+      };
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    try {
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      // It says what it guessed...
+      expect(
+        await screen.findByText(/Best guess Leather at 24%/i, {}, { timeout: 5000 }),
+      ).toBeInTheDocument();
+      // ...and does not record it as a decision.
+      expect(api.postRecognition).not.toHaveBeenCalled();
+    } finally {
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
+  }, 20000);
+});
+
 describe('Sort Waste — nothing is classified unless it is asked for', () => {
   it('does not classify on its own, and does when the button is pressed', async () => {
     // Reported: "again I didn't show my hand at all and it classified" — as

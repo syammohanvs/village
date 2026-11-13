@@ -726,6 +726,12 @@ export function SortWaste() {
         setStability({ ...stabilizerRef.current.snapshot(), stable: true });
         return;
       }
+      // The threshold applies here too.  A pressed reading used to skip it, so a
+      // three-way tie -- a handkerchief read as Leather 0.24, Paper 0.24,
+      // Background 0.22 -- was recorded and lit nothing, as if the model had
+      // chosen leather. Under the threshold the page names its best guess and
+      // asks for a better look instead.
+      if (grouped.confidence < confidence) return;
       const event: StableEvent = {
         label: grouped.material ?? grouped.label,
         category: (grouped.material ?? grouped.label).trim().toLowerCase(),
@@ -1137,7 +1143,7 @@ export function SortWaste() {
                   </p>
                 )}
               </>
-            ) : !autoWatch && !recognition ? (
+            ) : !autoWatch && !recognition && !top ? (
               <p className="result-sub" data-testid="waste-press-hint">
                 Hold the item up and press <strong>Check the item</strong>. Nothing is
                 classified until you do.

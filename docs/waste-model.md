@@ -631,6 +631,41 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### Why a handkerchief can be called leather, and a cup thermocol
+
+Asked directly: "how is this possible?" The saved captures answer it, because the
+page now keeps every crop and the whole distribution with it. Three examples
+from one session at the venue:
+
+| Said | The model's actual top three |
+| --- | --- |
+| "Leather" | **Leather 0.24 · Paper 0.24 · Background 0.22** |
+| "Thermocol" | **Thermocol 0.70 · Ewaste 0.17 · Glass 0.07** |
+| "Glass" (one side of a phone) | **Glass 0.46 · Thermocol 0.20 · Ewaste 0.17** |
+| "Ewaste" (the other side) | **Ewaste 0.71 · Leather 0.06 · Glass 0.06** |
+
+Three different things are going on, and only one of them is a model error:
+
+1. **The handkerchief was a three-way tie, not a decision.** 0.24 / 0.24 / 0.22
+   is a model saying "I do not know". The page reported it as leather because the
+   one-press reading -- added the same day -- did not apply the confidence
+   threshold the automatic path had always applied. **Fixed:** a pressed reading
+   now obeys the threshold, so a tie is shown as *"Best guess Leather at 24% —
+   not sure enough to choose a bin"* and nothing is recorded or lit.
+2. **The cup is a real confusion, not a bug.** A white ceramic cup with a handle,
+   cropped onto a white plate, is a white curved object at 224×224 — which is
+   what a thermocol cup is. The model has no notion of weight, glaze or
+   thickness; it has 7 000 photographs and the correlations in them. This one
+   needs ceramic photos (class `Glass`, the nearest recyclable material).
+3. **The phone is not wrong on either side.** Its back *is* a glass panel; its
+   front is electronics. Both answers are defensible for the picture they were
+   given, and the material only changes the label — every recycler material goes
+   to the same agent, and no bin lights.
+
+The lesson worth keeping: **look at the distribution, not the top label.** A
+0.24 answer and a 0.71 answer are different kinds of statement, and the page now
+says which one it is.
+
 ### The pipeline's own pictures are now training data (2026-11-14)
 
 The venue's saved captures named both failures in one table — 156 crops, sorted
