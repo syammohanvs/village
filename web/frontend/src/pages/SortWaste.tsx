@@ -12,7 +12,13 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { centreCrop, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import {
+  createSceneMemory,
+  learnScene,
+  resetScene,
+  sceneReady,
+} from '../lib/sceneMemory';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
 import { useVoiceUi } from '../lib/voiceUi';
@@ -45,6 +51,7 @@ interface Classifier {
  */
 type FocusOutcome =
   | { kind: 'empty' }
+  | { kind: 'warming' }
   | { kind: 'whole'; input: HTMLVideoElement; warning?: string }
   | { kind: 'object'; input: HTMLCanvasElement; region: FocusRegion };
 
@@ -121,6 +128,9 @@ export function SortWaste() {
   const [cameraError, setCameraError] = useState('');
   const [modelState, setModelState] = useState<ModelState>('idle');
   const [modelError, setModelError] = useState('');
+  // The room, learned from the live stream when no backdrop was set.
+  const sceneRef = useRef(createSceneMemory(ANALYSIS_WIDTH, ANALYSIS_HEIGHT));
+  const [warming, setWarming] = useState(false);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   // The loop runs on an interval, and `accept` is a callback whose identity must
   // not change per frame, so it read a stale empty list -- which is why every
@@ -293,44 +303,7 @@ export function SortWaste() {
   const focusInput = useCallback(
     (video: HTMLVideoElement): FocusOutcome | null => {
       if (!focusOn) return { kind: 'whole', input: video };
-      const backgrounds = backgroundRef.current;
-      // No stored scene: there is nothing to subtract, but classifying the whole
-      // frame gives the model the room, the table and the hand, and the accuracy
-      // collapses to about 9%.  Cropping to the centre of the frame at least
-      // keeps the item in view, which is where it is held; the page also says
-      // how to do better.
-      if (backgrounds.length === 0) {
-        const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        const context = analysis.getContext('2d');
-        if (!context) return { kind: 'whole', input: video };
-        try {
-          context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        } catch {
-          return { kind: 'whole', input: video };
-        }
-        const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, 0.72);
-        const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
-        const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
-        const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
-        const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
-        const cropContext = crop.getContext('2d');
-        if (!cropContext) return { kind: 'whole', input: video };
-        try {
-          cropContext.drawImage(video, source.x, source.y, source.width, source.height, 0, 0, CROP_SIZE, CROP_SIZE);
-        } catch {
-          return { kind: 'whole', input: video };
-        }
-        return {
-          kind: 'object',
-          input: crop,
-          region: {
-            box,
-            coverage: 0,
-            edgeTouch: false,
-            centre: { x: box.x + box.width / 2, y: box.y + box.height / 2 },
-          },
-        };
-      }
+
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
       if (!context) return { kind: 'whole', input: video };
@@ -341,18 +314,46 @@ export function SortWaste() {
       } catch {
         return { kind: 'whole', input: video };
       }
+
+      // What to compare against.  A backdrop the operator set is used when there
+      // is one; otherwise the room is learned from the live stream, so the venue
+      // never has to clear a table it does not have.  Either way the comparison
+      // below is the same code -- the learned room is simply a background that
+      // maintains itself.
+      const stored = backgroundRef.current;
+      const learning = stored.length === 0;
+      const sceneFrames: Uint8ClampedArray[] = stored.map((background) => background.data);
+      if (learning) {
+        const memory = sceneRef.current;
+        if (!sceneReady(memory)) {
+          // The first frames ARE the room: fold them in outright rather than
+          // diffing against an empty buffer.
+          learnScene(memory, frame.data, { alpha: memory.frames === 0 ? 1 : 0.25 });
+          return { kind: 'warming' };
+        }
+        sceneFrames.push(memory.background);
+      }
       const state = sceneState(
-        backgrounds.map((background) => background.data),
+        sceneFrames,
         frame.data,
         ANALYSIS_WIDTH,
         ANALYSIS_HEIGHT,
       );
-      if (state.kind === 'empty') return { kind: 'empty' };
+      if (state.kind === 'empty') {
+        // Nothing being shown: this frame IS the room, so let the memory drift
+        // towards it (a door opening, the lights changing).
+        if (learning) learnScene(sceneRef.current, frame.data);
+        return { kind: 'empty' };
+      }
       if (state.kind === 'unmatched') {
-        // The stored scene no longer explains this frame: the camera was nudged,
-        // the light changed, or Set background was pressed with an item already
-        // on the table.  Saying “Not a waste item” here is what left the screen
-        // stuck, so say what happened and classify the whole frame instead.
+        // Everything differs.  With a stored backdrop that means the camera was
+        // nudged; with a learned one it means the same, and the cure is to learn
+        // the room again rather than to classify a picture of a moved camera.
+        if (learning) {
+          resetScene(sceneRef.current);
+          learnScene(sceneRef.current, frame.data, { alpha: 1 });
+          return { kind: 'warming' };
+        }
         return {
           kind: 'whole',
           input: video,
@@ -360,6 +361,9 @@ export function SortWaste() {
             'The stored background no longer matches this view. Press Set background again on the empty table, or press Clear backgrounds and show the item in your hand instead.',
         };
       }
+      // Something is being shown.  Freeze the room's memory: an item held up for
+      // a minute must not be folded into the background and then forgotten.
+      if (learning) learnScene(sceneRef.current, frame.data, { frozen: true });
       const region = state.region;
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
@@ -375,7 +379,7 @@ export function SortWaste() {
         // plate and the classifier sees the object on its own.  Measured on 217
         // scenes: item-level accuracy 32.9% (crop only) -> about 60% (crop + this).
         const mask = objectMask(
-          backgrounds.map((background) => background.data),
+          sceneFrames,
           frame.data,
           ANALYSIS_WIDTH,
           ANALYSIS_HEIGHT,
@@ -606,7 +610,20 @@ export function SortWaste() {
         const focused = focusInput(video);
         if (cancelled) return;
         if (!focused) return;
+        if (focused.kind === 'warming') {
+          // The room is being learned.  Nothing is classified yet, on purpose:
+          // classifying a room is what named the wall "textile".
+          setWarming(true);
+          setFrameWarning('');
+          const background = [{ label: 'Background', confidence: 1 }];
+          setPredictions(background);
+          setGroupedTop(background[0]);
+          stabilizerRef.current.push(background);
+          setStability(stabilizerRef.current.snapshot());
+          return;
+        }
         if (focused.kind === 'empty') {
+          setWarming(false);
           // The empty scene (or a moved camera) is not a classification
           // problem: there is no object to sort.  Say so without asking the
           // model to name a material from the room.
@@ -620,6 +637,7 @@ export function SortWaste() {
           return;
         }
         if (focused.kind === 'whole') {
+          setWarming(false);
           // Either focus is off, or the stored background no longer matches the
           // view.  The second case used to report “Not a waste item” and never
           // classify anything; now it says what to fix and still answers.
@@ -639,6 +657,7 @@ export function SortWaste() {
           if (event) void accept(event);
           return;
         }
+        setWarming(false);
         const { input, region } = focused;
         setFrameWarning(
           region?.edgeTouch && region.coverage > 0.18
@@ -908,6 +927,11 @@ export function SortWaste() {
                   </p>
                 )}
               </>
+            ) : warming ? (
+              <p className="result-sub" data-testid="waste-warming">
+                Learning this room so the background is never classified as an
+                item. Hold the item up in a moment.
+              </p>
             ) : removing ? (
               <p className="result-sub" data-testid="waste-remove">
                 Take this item away — the camera re-arms by itself.

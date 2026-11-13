@@ -355,6 +355,36 @@ table at all. The page is built for that:
 The model itself was retrained on hand-held scenes; see
 [showing an item in the hand](#showing-an-item-in-the-hand-model-work) below.
 
+### The room is learned, so it cannot be mistaken for an item
+
+Reported from the venue: *"Sara classified the background as textile and
+ignored the key fob held in hand."* With no stored backdrop the page had no
+reference at all, so it classified whatever the lens saw — and the wall came
+back as a material while the item went unread.
+
+The page now learns the room instead of asking for it
+(`web/frontend/src/lib/sceneMemory.ts`):
+
+- the **first frames are the room** — nothing is classified while it is being
+  learned (about 2.4 s, and the page says so);
+- after that, a **slowly-updated average of the frame** is the reference, and
+  only what differs from it is classified. A door opening or the lights
+  changing drifts into the room instead of becoming an item;
+- the memory **freezes while something is being shown**, so an item held up for
+  a minute is not slowly absorbed into the background and then forgotten;
+- a camera that is knocked or moved makes almost the whole frame differ; the
+  page learns the new room rather than classifying a picture of a moved camera.
+
+This reuses the measured subtraction path rather than adding a second one: the
+learned room is a background that maintains itself, so the crop and the
+paint-out are the same code that was measured at ~60% item accuracy against
+32.9% for the plain crop.
+
+**A skin-colour "is there a hand?" gate was tried first and rejected on
+measurement**: on 60 hand-free product photographs it fired on **46**, so it
+would have let the room through while failing honest frames too. The learned
+room is the reliable signal, not the presence of skin.
+
 ### The optional empty-scene aid
 
 The page can compare each camera frame with one or more **empty-scene

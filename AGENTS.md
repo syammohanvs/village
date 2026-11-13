@@ -322,10 +322,24 @@ The path for a misread is one command now: photos in
 an unreadable file is skipped and named. Then export, restart, re-check with
 `hand_eval.py`.
 
-The empty table is now an **optional aid, not the method**: with no stored scene
-the page classifies every frame (centre crop) and "nothing to sort" comes from
-the model's Background class. The copy no longer tells the operator to clear a
-table they do not have.
+**The room is learned, so it cannot be classified as an item** (2026-11-14).
+Reported from the venue: *"Sara classified the background as textile and ignored
+the key fob held in hand."* With no stored backdrop the page had no reference,
+so it classified the wall. `web/frontend/src/lib/sceneMemory.ts` keeps a
+slowly-updated average of the frame as the reference: the first ~8 frames are
+the room (nothing is classified, the page says so), a door or a lamp drifts in,
+the memory **freezes while an item is shown** so a held item is not absorbed,
+and a moved camera relearns instead of classifying the blur. The crop and the
+paint-out are the existing measured subtraction path — the learned room is just
+a background that maintains itself.
+
+**A skin-colour "is a hand present?" gate was measured and rejected first**: it
+fired on **46 of 60** hand-free product photos, so it would not have stopped the
+room. Do not re-add a skin gate without new evidence.
+
+The empty table is still available as an **optional aid** (**Set background**)
+for a fixed booth; the copy no longer tells the operator to clear a table they
+do not have.
 
 The Sort Waste camera can still **focus on a fixed table and paint it out**:
 `web/frontend/src/lib/focus.ts` diffs each frame against **up to three**

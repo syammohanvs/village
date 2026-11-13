@@ -617,6 +617,9 @@ describe('Sort Waste — the empty table is painted out', () => {
   // whole frame that brightness, which is what a nudged camera or a change of
   // light looks like.
   let frameOverride: number | null = null;
+  // Whether the item is in the frame.  The room is what the page learns; the
+  // item is what it should classify once the room is known.
+  let showItem = true;
 
   class RecordingContext {
     canvas: HTMLCanvasElement;
@@ -639,7 +642,7 @@ describe('Sort Waste — the empty table is painted out', () => {
         data[i + 2] = base;
         data[i + 3] = 255;
       }
-      if (frameOverride === null) {
+      if (frameOverride === null && showItem) {
         // An item sitting in the middle of the analysis frame; everything else
         // is exactly the stored empty scene.
         for (let y = 50; y < 62; y += 1) {
@@ -818,7 +821,10 @@ describe('Sort Waste — the empty table is painted out', () => {
     }
   }, 15000);
 
-  it('leaves the picture alone when no empty scene has been stored', async () => {
+  it('learns the room instead of classifying it', async () => {
+    // The reported failure: with no stored backdrop the page classified the
+    // room itself and called the wall "textile".  The first frames are now the
+    // room, and nothing is classified until it has been learned.
     const canvas = installCanvas();
     try {
       vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
@@ -837,20 +843,81 @@ describe('Sort Waste — the empty table is painted out', () => {
         configurable: true,
         get: () => 2,
       });
+      // An empty room: no item in the picture at all.
+      frameOverride = null;
+      showItem = false;
       vi.mocked(api.wasteClassify).mockClear();
+
       render(<App />);
       const start = await screen.findByTestId('start-camera');
-      // The model loads asynchronously; clicking before it is ready does nothing.
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
-      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
 
-      expect(canvas.ops).not.toContain('putImageData');
-      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(false);
+      expect(await screen.findByTestId('waste-warming', {}, { timeout: 5000 })).toBeInTheDocument();
+      // The room is never sent to the model.
+      expect(api.wasteClassify).not.toHaveBeenCalled();
+
+      // Once learned, the room is "not a waste item" -- still not classified.
+      expect(
+        await screen.findByText(/Nothing to sort/i, {}, { timeout: 8000 }),
+      ).toBeInTheDocument();
+      expect(api.wasteClassify).not.toHaveBeenCalled();
     } finally {
+      frameOverride = null;
+      showItem = true;
       canvas.restore();
     }
-  }, 15000);
+  }, 25000);
+
+  it('classifies an item shown in the learned room, and paints the room out', async () => {
+    const canvas = installCanvas();
+    try {
+      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+      vi.mocked(api.settings).mockResolvedValue(
+        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+      );
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: {
+          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+          enumerateDevices: vi.fn().mockResolvedValue([]),
+        },
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+        configurable: true,
+        value: vi.fn().mockResolvedValue(undefined),
+      });
+      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+        configurable: true,
+        get: () => 2,
+      });
+      // The room first, then somebody holds an item up in it.
+      frameOverride = null;
+      showItem = false;
+      vi.mocked(api.wasteClassify).mockClear();
+      vi.mocked(api.postRecognition).mockClear();
+
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+      await screen.findByTestId('waste-warming', {}, { timeout: 5000 });
+
+      // Let the room be learned, then present the item.
+      await new Promise((resolve) => setTimeout(resolve, 3200));
+      showItem = true;
+
+      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 10000 });
+      // The learned room is subtracted exactly like a stored one, so the model
+      // sees the item on a plain plate rather than the room around it.
+      expect(canvas.ops).toContain('putImageData');
+      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(true);
+    } finally {
+      frameOverride = null;
+      showItem = true;
+      canvas.restore();
+    }
+  }, 30000);
 });
 
 describe('Sort Waste — Sara speaks without waiting on the recording', () => {
