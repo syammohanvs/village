@@ -532,3 +532,37 @@ async def test_the_poll_gap_grows_while_the_controller_is_away(tmp_path):
         # A success resets it.
         gateway._failures = 0
         assert gateway._poll_interval_ms() == pytest.approx(base)
+
+
+@pytest.mark.asyncio
+async def test_the_material_the_model_named_is_kept_with_the_record(tmp_path):
+    """A recycler is posted as "other", so the material has to be recorded too.
+
+    Without it, "the key fob was identified wrongly" cannot be answered after
+    the fact: the row says "other" and the label the visitor saw is gone.
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings, device=RecordingDevice()) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "demo",
+                "category": "other",
+                "confidence": 0.93,
+                "model": "resnet50",
+                "request_id": "material-recorded",
+                "material": "Leather",
+                "top": [
+                    {"className": "Leather", "probability": 0.93},
+                    {"className": "Metal", "probability": 0.04},
+                ],
+            },
+        )
+        assert response.status_code == 200
+        events = await client.get("/api/v1/events", params={"mode": "demo", "limit": 5})
+        rows = events.json()["events"]
+        titled = [row for row in rows if row["title"] == "Recyclable item recognised"]
+        assert titled, rows
+        meta = titled[0]["meta"]
+        assert meta["material"] == "Leather"
+        assert meta["top"][0]["className"] == "Leather"

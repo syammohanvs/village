@@ -562,6 +562,10 @@ export function SortWaste() {
         category: material ? 'other' : hazardous ? 'medical' : event.category,
         confidence: event.confidence,
         model: 'teachable-machine',
+        // Keep what was actually named: "other" alone cannot answer "what did
+        // it call my key fob?" when the session is reviewed afterwards.
+        material: event.label || event.category,
+        top: predictions.map((row) => ({ className: row.label, probability: row.confidence })),
       });
       setRecognition(result);
       const binState = result.bin?.state;

@@ -902,5 +902,10 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
     // ...and the request is genuinely still outstanding, so this was not a
     // lucky ordering.
     expect(api.postRecognition).toHaveBeenCalled();
+    // The material travels with the record: "other" alone could not answer
+    // "what did it call my key fob?" later.
+    expect(api.postRecognition).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'other', material: 'Metal' }),
+    );
   }, 15000);
 });

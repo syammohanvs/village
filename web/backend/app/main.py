@@ -453,6 +453,13 @@ def create_app(
         db: Database = Depends(get_db),
     ):
         category = body.category.strip().lower()
+        # What the model named, kept with the record.  A recycler is posted as
+        # "other", so without this there is no way to answer "what did it call
+        # my key fob?" after the event.
+        observed = {
+            "material": body.material,
+            "top": (body.top or [])[:3],
+        }
         if category not in WASTE_CATEGORIES and category not in {"other", "medical"}:
             raise HTTPException(
                 status_code=422,
@@ -481,7 +488,7 @@ def create_app(
                 "warning",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
-                 "confidence": body.confidence},
+                 "confidence": body.confidence, **observed},
             )
             return {
                 "recognition": record,
@@ -510,7 +517,7 @@ def create_app(
                 "info",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
-                 "confidence": body.confidence},
+                 "confidence": body.confidence, **observed},
             )
             return {
                 "recognition": record,

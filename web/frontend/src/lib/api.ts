@@ -281,6 +281,11 @@ export const api = {
     confidence: number;
     model?: string;
     requestId?: string;
+    /** What the model named. A recycler is posted as "other", so this is the
+     *  only record of the material the visitor was shown. */
+    material?: string | null;
+    /** The best few guesses, for a session that has to be reviewed later. */
+    top?: Array<{ className: string; probability: number }> | null;
   }): Promise<WasteRecognitionResult> {
     return request<WasteRecognitionResult>('/waste/recognition', {
       method: 'POST',
@@ -290,6 +295,8 @@ export const api = {
         confidence: input.confidence,
         model: input.model ?? 'teachable-machine',
         request_id: input.requestId ?? newRequestId(),
+        material: input.material ?? null,
+        top: input.top ?? null,
       },
     });
   },

@@ -72,6 +72,11 @@ class RecognitionRequest(BaseModel):
     model: str = Field(default="teachable-machine", max_length=80)
     request_id: str = Field(min_length=8, max_length=80)
     profile_id: int | None = None
+    # What the model actually named, and its best few guesses.  A recycler is
+    # posted as "other", so without this a session cannot be reviewed afterwards:
+    # "identified wrongly" would have no record of what was said.
+    material: str | None = Field(default=None, max_length=40)
+    top: list[dict[str, Any]] | None = None
 
 
 class DisposalRequest(BaseModel):
