@@ -122,6 +122,10 @@ export function SortWaste() {
   const [modelState, setModelState] = useState<ModelState>('idle');
   const [modelError, setModelError] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  // The loop runs on an interval, and `accept` is a callback whose identity must
+  // not change per frame, so it read a stale empty list -- which is why every
+  // recorded event said `top: []`.  A ref is the frame's guesses as of now.
+  const predictionsRef = useRef<Prediction[]>([]);
   const { language: voiceLanguage } = useVoiceUi();
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
@@ -565,7 +569,10 @@ export function SortWaste() {
         // Keep what was actually named: "other" alone cannot answer "what did
         // it call my key fob?" when the session is reviewed afterwards.
         material: event.label || event.category,
-        top: predictions.map((row) => ({ className: row.label, probability: row.confidence })),
+        top: predictionsRef.current.map((row) => ({
+          className: row.label,
+          probability: row.confidence,
+        })),
       });
       setRecognition(result);
       const binState = result.bin?.state;
@@ -624,7 +631,8 @@ export function SortWaste() {
             raw.length,
           );
           const grouped = groupedPrediction(all);
-          setPredictions(all.slice(0, 3));
+          predictionsRef.current = all.slice(0, 3);
+          setPredictions(predictionsRef.current);
           setGroupedTop(grouped);
           const event = grouped ? stabilizerRef.current.push([grouped]) : null;
           setStability(stabilizerRef.current.snapshot());
@@ -644,7 +652,8 @@ export function SortWaste() {
           raw.length,
         );
         const grouped = groupedPrediction(all);
-        setPredictions(all.slice(0, 3));
+        predictionsRef.current = all.slice(0, 3);
+        setPredictions(predictionsRef.current);
         setGroupedTop(grouped);
         const event = grouped ? stabilizerRef.current.push([grouped]) : null;
         setStability(stabilizerRef.current.snapshot());

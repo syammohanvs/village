@@ -81,6 +81,12 @@ export function createWasteStabilizer(options: StabilizerOptions = {}): WasteSta
   let armed = true;
   let rearmCount = 0;
   let lastEmit = Number.NEGATIVE_INFINITY;
+  // What was handed to the page last time.  Re-arming used to depend entirely
+  // on the model saying "Background", and the hand-trained model now names a
+  // material far more often -- so the camera stayed disarmed while the next
+  // item was already being held up.  A different stable label means the
+  // previous item has gone.
+  let lastLabel: string | null = null;
 
   const topPrediction = (predictions: Prediction[]): Prediction | null => {
     let top: Prediction | null = null;
@@ -113,20 +119,40 @@ export function createWasteStabilizer(options: StabilizerOptions = {}): WasteSta
         return null;
       }
 
-      rearmCount = 0;
+      // Only the item already accepted resets the re-arm counter; a different
+      // label is evidence that the camera is looking at something else now.
+      if (lastLabel !== null && normalise(top.label) === normalise(lastLabel)) {
+        rearmCount = 0;
+      }
       window = [...window, top].slice(-config.consecutiveFrames);
       const stable =
         window.length >= config.consecutiveFrames &&
         window.every((frame) => normalise(frame.label) === normalise(top.label));
 
       if (!stable) return null;
-      if (!armed) return null;
+      if (!armed) {
+        // A *stable* label that is not the one just accepted means the visitor
+        // has put that item down and is showing another.  Waiting for a
+        // "Background" frame instead left the camera dead whenever the model
+        // named the room's contents, which the hand-trained model does.
+        //
+        // `consecutiveFrames` is the hysteresis here: a single frame that
+        // disagrees is a flicker, not a new item, so this cannot double-count
+        // one object read under two names.
+        const different = lastLabel !== null && normalise(top.label) !== normalise(lastLabel);
+        if (different) {
+          armed = true;
+          rearmCount = 0;
+        }
+        return null;
+      }
       if (now - lastEmit < config.cooldownMs) return null;
 
       armed = false;
       rearmCount = 0;
       lastEmit = now;
       const material = top.material ?? top.label;
+      lastLabel = material;
       return {
         label: material,
         category: normalise(material),
@@ -157,6 +183,7 @@ export function createWasteStabilizer(options: StabilizerOptions = {}): WasteSta
       armed = true;
       rearmCount = 0;
       lastEmit = Number.NEGATIVE_INFINITY;
+      lastLabel = null;
     },
   };
 }

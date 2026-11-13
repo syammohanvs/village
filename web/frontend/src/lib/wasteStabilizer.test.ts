@@ -145,3 +145,56 @@ describe('rankPredictions', () => {
     expect(rankPredictions([], 3)).toEqual([]);
   });
 });
+
+describe('re-arming without an empty frame', () => {
+  it('re-arms on a different stable label, not only on "Background"', () => {
+    // Reported from the venue: after a classification the camera never came
+    // back, because re-arming waited for the model to say "Background" and the
+    // hand-trained model almost never does -- it names the room's contents.
+    const s = createWasteStabilizer({ consecutiveFrames: 2, cooldownMs: 0, rearmFrames: 2 });
+    const metal = [{ label: 'Metal', confidence: 0.9 }];
+
+    expect(s.push(metal, 0)).toBeNull();
+    const first = s.push(metal, 100);
+    expect(first?.label).toBe('Metal');
+    expect(s.snapshot(200).phase).toBe('waiting-removal');
+
+    // The same item, still held: nothing new, and it must not be counted twice.
+    expect(s.push(metal, 300)).toBeNull();
+    expect(s.push(metal, 400)).toBeNull();
+    expect(s.snapshot(400).phase).toBe('waiting-removal');
+
+    // A different item is presented.  The streak that proves it is also what
+    // re-arms the camera, so the very next frame is accepted.
+    const paper = [{ label: 'Paper', confidence: 0.8 }];
+    expect(s.push(paper, 500)).toBeNull();   // first frame of the streak
+    expect(s.push(paper, 600)).toBeNull();   // stable + different -> re-armed
+    expect(s.snapshot(600).phase).toBe('armed');
+    expect(s.push(paper, 700)?.label).toBe('Paper');
+  });
+
+  it('still re-arms on the held item going away', () => {
+    const s = createWasteStabilizer({ consecutiveFrames: 2, cooldownMs: 0, rearmFrames: 2 });
+    const cloth = [{ label: 'Textile', confidence: 0.8 }];
+    s.push(cloth, 0);
+    expect(s.push(cloth, 100)?.label).toBe('Textile');
+    const nothing = [{ label: 'Background', confidence: 0.9 }];
+    s.push(nothing, 200);
+    s.push(nothing, 300);
+    expect(s.snapshot(300).phase).toBe('armed');
+  });
+
+  it('does not re-arm on a flicker of the same item under another name', () => {
+    // A single unstable frame must not re-open the door: the streak has to be
+    // stable before the label counts as "a different item".
+    const s = createWasteStabilizer({ consecutiveFrames: 2, cooldownMs: 0, rearmFrames: 2 });
+    const metal = [{ label: 'Metal', confidence: 0.9 }];
+    s.push(metal, 0);
+    s.push(metal, 100);
+    // one Paper frame, then back to Metal: never stable
+    s.push([{ label: 'Paper', confidence: 0.8 }], 200);
+    s.push(metal, 300);
+    s.push(metal, 400);
+    expect(s.snapshot(400).phase).toBe('waiting-removal');
+  });
+});

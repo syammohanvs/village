@@ -907,5 +907,12 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
     expect(api.postRecognition).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'other', material: 'Metal' }),
     );
+    // ...and the guesses that produced it.  These were empty in every event
+    // because `accept` read a stale state list; a review had no way to see that
+    // "Thermocol" was chosen over "Metal 0.04".
+    const sent = vi.mocked(api.postRecognition).mock.calls[0][0] as {
+      top?: Array<{ className: string; probability: number }>;
+    };
+    expect(sent.top?.[0]).toEqual({ className: 'Metal', probability: 0.91 });
   }, 15000);
 });

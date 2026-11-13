@@ -50,6 +50,21 @@ let currentUrl: string | null = null;
 // has already left must not start playing over the one they are on.
 let speakSeq = 0;
 
+/**
+ * Whether the page has had a user gesture.
+ *
+ * Browsers refuse to start an audio element before one, which is why a greeting
+ * that plays on load only ever came out after the visitor pressed something --
+ * usually Start Camera, which read as "Sara only speaks when I press that".
+ */
+function hasUserActivation(): boolean {
+  const activation = (
+    navigator as unknown as { userActivation?: { hasBeenActive?: boolean } }
+  ).userActivation;
+  if (!activation || typeof activation.hasBeenActive !== 'boolean') return true;
+  return activation.hasBeenActive;
+}
+
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
@@ -250,6 +265,17 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   // (Piper is attempted below for every language, so English now follows the
   // same path as Malayalam and Hindi.)
 
+  // Before the first gesture the page cannot start an audio element at all, so
+  // asking Piper first produced a refused play() and then a fallback -- which
+  // is why the greeting only appeared after the visitor pressed something.  The
+  // device voice is allowed without a gesture, so it is tried first in exactly
+  // that case; Piper (the better voice) takes over once there has been a tap.
+  if (!hasUserActivation()) {
+    const spoken = await speakWithDevice(text, language, rate, ticket);
+    if (spoken) return true;
+    if (ticket !== speakSeq) return false;
+  }
+
   // Piper's --length_scale is the inverse of a rate: >1 is slower.
   const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
   try {
@@ -262,9 +288,19 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   }
   if (ticket !== speakSeq) return false;
 
-  // Piper failed (or was blocked by the browser).  For English, try the
-  // device's own Indian-English voice before the generic browser voice.
-  if (language === 'en' && speechSupported()) {
+  // Piper failed (or was blocked by the browser).
+  return speakWithDevice(text, language, rate, ticket);
+}
+
+/** The browser's own voices: an Indian-English one first, then the best match. */
+async function speakWithDevice(
+  text: string,
+  language: string,
+  rate: number,
+  ticket: number,
+): Promise<boolean> {
+  if (!speechSupported()) return false;
+  if (language === 'en') {
     await primeVoices(600);
     const indian = pickIndianEnglishVoice();
     if (indian) {
@@ -273,8 +309,6 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
       if (ticket !== speakSeq) return false;
     }
   }
-
-  if (!speechSupported()) return false;
   await primeVoices();
   const voice = pickVoice(language);
   if (!voice) return false;
