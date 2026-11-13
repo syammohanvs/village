@@ -416,6 +416,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .kpi-reason { color: var(--muted); font-size: 12px; }
 .kpi-not-live { color: var(--warn); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 
+/* The readiness badge sits on the preview, so it is read before an item is
+   shown rather than after. */
+.camera-status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  pointer-events: none;
+}
+
 /* ------------------------------------------------------------------ chips */
 .chip {
   display: inline-flex;

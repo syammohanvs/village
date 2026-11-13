@@ -1048,3 +1048,78 @@ describe('Sort Waste — the camera waits for the model', () => {
     expect(start).toHaveTextContent(/start camera/i);
   }, 15000);
 });
+
+describe('Sort Waste — the page says whether it is ready', () => {
+  it('shows the learned progress, then Ready, before an item is shown', async () => {
+    // Reported: "I could not really see from the webpage any indication whether
+    // you have learned the background or not before showing the key fob."  The
+    // answer belongs on the picture, where it is read *before* the item.
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    // A frame the page can actually read: an empty room, unchanging.
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = (function () {
+      return {
+        drawImage() {},
+        clearRect() {},
+        putImageData() {},
+        fillRect() {},
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+          width,
+          height,
+        }),
+        getImageData: (_x: number, _y: number, width: number, height: number) => {
+          const data = new Uint8ClampedArray(width * height * 4);
+          for (let i = 0; i < data.length; i += 4) {
+            data[i] = 30;
+            data[i + 1] = 30;
+            data[i + 2] = 30;
+            data[i + 3] = 255;
+          }
+          return { data, width, height };
+        },
+      };
+    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+
+    try {
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+
+      // Nothing is claimed while the camera is off.
+      expect(screen.queryByTestId('camera-status')).not.toBeInTheDocument();
+
+      fireEvent.click(start);
+      const status = await screen.findByTestId('camera-status');
+      expect(status).toHaveTextContent(/learning the room/i);
+
+      // Once the room is known the badge says so, so an item can be shown
+      // without guessing whether the page is watching or ready.
+      await waitFor(() => expect(status).toHaveTextContent(/ready/i), { timeout: 10000 });
+      expect(status).toHaveTextContent(/show one item/i);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+    }
+  }, 25000);
+});

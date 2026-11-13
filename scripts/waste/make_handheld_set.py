@@ -378,6 +378,44 @@ def compose(args) -> None:
 
 
 # --------------------------------------------------------------------------
+def plates(args) -> None:
+    """Empty white plates, labelled Background.
+
+    The page paints the room out of the crop and replaces it with a plain white
+    plate, so the classifier is regularly handed a mostly-white picture with an
+    item on it -- and sometimes a nearly empty one, when the paint-out keeps
+    almost nothing. Measured: a plain white 224x224 square is read as **Paper
+    0.69**, and a white plate with a small dark object on it is still Paper
+    0.67. That is why a key fob came back as paper.
+
+    These are negatives: nothing on the plate at all. Teaching the model that an
+    empty plate is Background is what stops the plate from voting for a class.
+    """
+    from PIL import Image, ImageDraw, ImageFilter
+
+    out = Path(args.out).expanduser() / "Background"
+    out.mkdir(parents=True, exist_ok=True)
+    rng = random.Random(args.seed)
+    for i in range(args.count):
+        base = rng.choice([
+            (255, 255, 255), (250, 250, 248), (243, 243, 240),
+            (236, 236, 232), (228, 228, 224),
+        ])
+        plate = Image.new("RGB", (CANVAS, CANVAS), base)
+        draw = ImageDraw.Draw(plate)
+        # A faint shadow or crease: a real plate is never a perfect field.
+        for _ in range(rng.randint(0, 3)):
+            shade = tuple(max(0, min(255, c - rng.randint(2, 14))) for c in base)
+            x0, y0 = rng.randint(-60, CANVAS), rng.randint(-60, CANVAS)
+            draw.ellipse([x0, y0, x0 + rng.randint(80, 320), y0 + rng.randint(80, 320)],
+                         fill=shade)
+        if rng.random() < 0.5:
+            plate = plate.filter(ImageFilter.GaussianBlur(rng.uniform(0.4, 1.6)))
+        plate.resize((224, 224), Image.BILINEAR).save(
+            out / f"empty-plate-{i:04d}.jpg", quality=92)
+    print(f"wrote {args.count} empty plates to {out}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -404,6 +442,12 @@ def main() -> None:
     p.add_argument("--quality", type=int, default=92)
     p.add_argument("--seed", type=int, default=11)
     p.set_defaults(func=compose)
+
+    pl = sub.add_parser("plates", help="empty white plates, labelled Background")
+    pl.add_argument("--out", required=True)
+    pl.add_argument("--count", type=int, default=300)
+    pl.add_argument("--seed", type=int, default=21)
+    pl.set_defaults(func=plates)
 
     args = ap.parse_args()
     args.func(args)

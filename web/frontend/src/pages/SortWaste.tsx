@@ -14,6 +14,7 @@ import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
 import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import {
+  SCENE_WARMUP_FRAMES,
   createSceneMemory,
   learnScene,
   noteScene,
@@ -52,7 +53,7 @@ interface Classifier {
  */
 type FocusOutcome =
   | { kind: 'empty' }
-  | { kind: 'warming' }
+  | { kind: 'warming'; progress: number }
   | { kind: 'whole'; input: HTMLVideoElement; warning?: string }
   | { kind: 'object'; input: HTMLCanvasElement; region: FocusRegion };
 
@@ -132,6 +133,10 @@ export function SortWaste() {
   // The room, learned from the live stream when no backdrop was set.
   const sceneRef = useRef(createSceneMemory(ANALYSIS_WIDTH, ANALYSIS_HEIGHT));
   const [warming, setWarming] = useState(false);
+  // 0..1 while the room is being learned, null once the camera is ready.  Shown
+  // as a badge on the preview: without it the visitor cannot tell whether the
+  // page is ready for an item or still watching the room.
+  const [sceneProgress, setSceneProgress] = useState<number | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   // The loop runs on an interval, and `accept` is a callback whose identity must
   // not change per frame, so it read a stale empty list -- which is why every
@@ -239,6 +244,7 @@ export function SortWaste() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
+    setSceneProgress(null);
     setPredictions([]);
     setGroupedTop(null);
     setFrameWarning('');
@@ -334,7 +340,7 @@ export function SortWaste() {
           // The first frames ARE the room: fold them in outright rather than
           // diffing against an empty buffer.
           learnScene(memory, frame.data, { alpha: memory.frames === 0 ? 1 : 0.25 });
-          return { kind: 'warming' };
+          return { kind: 'warming', progress: Math.min(1, memory.frames / SCENE_WARMUP_FRAMES) };
         }
         sceneFrames.push(memory.background);
       }
@@ -358,9 +364,13 @@ export function SortWaste() {
         // nudged; with a learned one it means the same, and the cure is to learn
         // the room again rather than to classify a picture of a moved camera.
         if (learning) {
+          // The whole view changed: a moved camera, not an item.  Start again.
           resetScene(sceneRef.current);
           learnScene(sceneRef.current, frame.data, { alpha: 1 });
-          return { kind: 'warming' };
+          return {
+            kind: 'warming',
+            progress: Math.min(1, sceneRef.current.frames / SCENE_WARMUP_FRAMES),
+          };
         }
         return {
           kind: 'whole',
@@ -387,7 +397,10 @@ export function SortWaste() {
         if (stale) {
           resetScene(sceneRef.current);
           learnScene(sceneRef.current, frame.data, { alpha: 1 });
-          return { kind: 'warming' };
+          return {
+            kind: 'warming',
+            progress: Math.min(1, sceneRef.current.frames / SCENE_WARMUP_FRAMES),
+          };
         }
         learnScene(sceneRef.current, frame.data, { frozen: true });
       }
@@ -552,6 +565,9 @@ export function SortWaste() {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraOn(true);
+      // Until the first frame has been judged, the honest answer is "learning",
+      // not "ready": the badge must not offer an item it cannot classify yet.
+      setSceneProgress(0);
       setGroupedTop(null);
       setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
@@ -648,6 +664,7 @@ export function SortWaste() {
         if (cancelled) return;
         if (!focused) return;
         if (focused.kind === 'warming') {
+          setSceneProgress(focused.progress);
           // The room is being learned.  Nothing is classified yet, on purpose:
           // classifying a room is what named the wall "textile".
           setWarming(true);
@@ -661,6 +678,7 @@ export function SortWaste() {
         }
         if (focused.kind === 'empty') {
           setWarming(false);
+          setSceneProgress(null);
           // The empty scene (or a moved camera) is not a classification
           // problem: there is no object to sort.  Say so without asking the
           // model to name a material from the room.
@@ -675,6 +693,7 @@ export function SortWaste() {
         }
         if (focused.kind === 'whole') {
           setWarming(false);
+          setSceneProgress(null);
           // Either focus is off, or the stored background no longer matches the
           // view.  The second case used to report “Not a waste item” and never
           // classify anything; now it says what to fix and still answers.
@@ -695,6 +714,7 @@ export function SortWaste() {
           return;
         }
         setWarming(false);
+        setSceneProgress(null);
         const { input, region } = focused;
         setFrameWarning(
           region?.edgeTouch && region.coverage > 0.18
@@ -776,6 +796,26 @@ export function SortWaste() {
         <div className="camera-column">
           <div className="camera-frame camera-frame--large">
             <video ref={videoRef} className="camera-video" playsInline muted aria-label="Waste camera preview" />
+            {/*
+              The one thing a visitor has to know before showing an item: is the
+              page ready?  The result panel below says it in a sentence, but a
+              sentence under the picture is read after the item is already in
+              the air, which is how "I could not tell whether it had learned the
+              background" happened.
+            */}
+            {cameraOn && (
+              <div className="camera-status" data-testid="camera-status">
+                {sceneProgress !== null ? (
+                  <span className="chip chip--warn">
+                    Learning the room · {Math.round(sceneProgress * 100)}%
+                  </span>
+                ) : waitingRemoval ? (
+                  <span className="chip chip--neutral">Show the next item</span>
+                ) : (
+                  <span className="chip chip--good">Ready — show one item</span>
+                )}
+              </div>
+            )}
             {!cameraOn && (
               <div className="camera-placeholder">
                 <IconCamera size={34} />
