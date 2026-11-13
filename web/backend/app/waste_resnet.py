@@ -110,8 +110,9 @@ def _to_tensor(image):
     """
     import numpy as np
     import torch
+    from PIL import Image
 
-    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), 1)
+    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), Image.BILINEAR)
     array = np.asarray(resized, dtype=np.float32) / 255.0
     array = (array - np.array(MEAN, dtype=np.float32)) / np.array(STD, dtype=np.float32)
     array = np.transpose(array, (2, 0, 1))

@@ -68,6 +68,11 @@ const { predictionState } = vi.hoisted(() => {
 });
 
 
+// Every quality argument the page has passed to toDataURL since the last
+// test started.  The JPEG quality is an accuracy knob (measured, see
+// SortWaste.tsx), so it is worth pinning where a test can see it.
+const toDataUrlCalls: unknown[] = [];
+
 beforeEach(() => {
   window.history.pushState({}, '', '/waste');
   // The classifier adapter draws the crop into a canvas and sends it to the
@@ -87,9 +92,13 @@ beforeEach(() => {
       }),
     }),
   });
+  toDataUrlCalls.length = 0;
   Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
     configurable: true,
-    value: () => 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+    value: (_type?: string, quality?: unknown) => {
+      toDataUrlCalls.push(quality);
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRg==';
+    },
   });
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.events).mockResolvedValue({ events: [] });
@@ -719,6 +728,9 @@ describe('Sort Waste — the empty table is painted out', () => {
       // video: the model runs on the laptop now, not in this browser.
       const sent = vi.mocked(api.wasteClassify).mock.calls[0][0];
       expect(sent.startsWith('data:image/jpeg')).toBe(true);
+      // 0.92, not 0.85: the lower quality cost 5 points of hand-held accuracy
+      // for a payload difference of a couple of kilobytes.
+      expect(toDataUrlCalls).toContain(0.92);
     } finally {
       canvas.restore();
     }

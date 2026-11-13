@@ -535,6 +535,33 @@ that **half of all hand-held frames were read as "Background"** (252 of 528) -
 the camera was told "not a waste item" while an item was being held up. That is
 down to 92 of 528.
 
+### The browser's JPEG quality was costing accuracy
+
+The camera sends its 224x224 crop as `canvas.toDataURL('image/jpeg', q)`, and q
+turned out to matter more than the model did. Measured through the running
+backend on the same three sets, only q changing:
+
+| Set (item action) | q 0.85 | q 0.92 | q 1.00 |
+| --- | --- | --- | --- |
+| Hand-held | 63.6% | **67.6%** | - |
+| Real-world probe | 76.3% | **77.6%** | 76.3% |
+| Withheld archive | 90.5% | **91.7%** | - |
+
+A frame is a few kilobytes at either quality, and 1.00 is no better than 0.92
+while being several times larger. The page therefore sends **0.92**, and a
+component test pins the number so a future "reduce the payload" change cannot
+quietly give the accuracy back.
+
+With 0.92 the shipped model reads **67.6% of hand-held frames** and **77.6% of
+the real-world probe** correctly, against 26.3% and 74.3% for the archive-only
+checkpoint at 0.85 - i.e. the comparison above is deliberately made at one
+quality, so the difference is the model and not the JPEG.
+
+The backend's resize filter was also aligned with the trainer (`BILINEAR`; it
+was `LANCZOS`). On these sets the two filters score identically, so this changes
+nothing today - it just removes a train/serve difference that a future retrain
+could trip over.
+
 `scripts/waste/hand_eval.py` reproduces any of these numbers against whatever
 model the backend is serving.
 

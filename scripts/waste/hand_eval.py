@@ -37,10 +37,16 @@ def action(label: str) -> str:
     return label
 
 
-def classify(url: str, image_path: Path) -> list[dict]:
+def classify(url: str, image_path: Path, quality: int = 92) -> list[dict]:
+    """Exactly what the camera does: resize to 224 and post a JPEG data URL.
+
+    `quality` matters more than it looks: the browser sends the frame as
+    `canvas.toDataURL('image/jpeg', q)`, and q is a real accuracy knob, so it is
+    a parameter here rather than a constant.
+    """
     image = Image.open(image_path).convert("RGB").resize((224, 224), Image.BILINEAR)
     buf = io.BytesIO()
-    image.save(buf, format="JPEG", quality=85)
+    image.save(buf, format="JPEG", quality=quality)
     payload = json.dumps({
         "image": "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
     }).encode()
@@ -55,6 +61,8 @@ def main() -> int:
     ap.add_argument("--dir", required=True)
     ap.add_argument("--url", default="http://127.0.0.1:8010/api/v1/waste/classify")
     ap.add_argument("--limit", type=int, default=0, help="photos per class (0 = all)")
+    ap.add_argument("--quality", type=int, default=92,
+                    help="JPEG quality the browser sends (SortWaste uses 0.92)")
     ap.add_argument("--json-out", default="")
     args = ap.parse_args()
 
@@ -74,7 +82,7 @@ def main() -> int:
             continue
         hit_exact = hit_act = 0
         for path in files:
-            predictions = classify(args.url, path)
+            predictions = classify(args.url, path, args.quality)
             top = max(predictions, key=lambda row: row["probability"])
             label = top["className"]
             confidence = float(top["probability"])

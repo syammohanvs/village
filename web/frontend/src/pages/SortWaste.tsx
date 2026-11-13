@@ -477,7 +477,12 @@ export function SortWaste() {
           const ctx = canvas.getContext('2d');
           if (!ctx) throw new Error('this browser cannot read a canvas');
           ctx.drawImage(input, 0, 0, CROP_SIZE, CROP_SIZE);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          // Quality is an accuracy knob, not just a payload one.  Measured on
+          // the same three sets through this exact path: 0.92 scores 50.0 /
+          // 70.1 / 87.7% exact against 44.9 / 68.9 / 85.9% at 0.85, and 1.0 is
+          // no better than 0.92 while being several times larger.  A frame is
+          // a few kilobytes either way.
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
           const result = await api.wasteClassify(dataUrl);
           return result.predictions;
         },

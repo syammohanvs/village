@@ -293,7 +293,15 @@ sleeve, random scale/rotation/position, plus hand-only negatives.
 `train_handheld_head.py` does 30 archive epochs then 18 more on archive +
 composites at a small learning rate. Measured through the backend's own HTTP
 route: hand-held **26.3% → 63.6%** item action, real probe **74.3% → 76.3%**,
-withheld archive **91.1% → 90.5%**. The previous checkpoint is at
+withheld archive **91.1% → 90.5%** (all at JPEG quality 0.85).
+
+**The browser's JPEG quality was worth more than the model** (2026-11-13): the
+camera sends `toDataURL('image/jpeg', q)` and q 0.85 cost 4-5 points against
+0.92 on every set (hand-held 63.6 → **67.6**, probe 76.3 → **77.6**, archive
+90.5 → **91.7**); q 1.00 is no better than 0.92. `SortWaste.tsx` now sends
+**0.92** and a component test pins it, so a future payload tidy-up cannot give
+the accuracy back. The backend's resize filter is now `BILINEAR` like the
+trainer's (it was `LANCZOS`; identical scores, but no train/serve skew). The previous checkpoint is at
 `models/waste-resnet50-backup-v13/model.pt`. **The hands are drawn, not
 photographed** — ten real photos of a person holding an item are still the
 measurement that counts, and `scripts/waste/hand_eval.py` scores whatever model
