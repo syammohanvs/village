@@ -10,6 +10,7 @@ import {
   IconPlay,
   IconPump,
   IconStop,
+  IconSun,
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { Card, Chip, Notice } from '../components/ui';
@@ -60,6 +61,7 @@ export function OurVillage() {
   const soil = sensors?.soil;
   const reservoir = sensors?.reservoir;
   const light = sensors?.light;
+  const solar = sensors?.solar;
   const irrigation = status?.irrigation;
   const pump = status?.actuators?.pump;
   const lights = status?.actuators?.streetlights;
@@ -80,6 +82,7 @@ export function OurVillage() {
     light?.brightness === 'dark' ? 'Dark' : light?.brightness === 'bright' ? 'Bright' : 'Unknown';
 
   const soilPercent = soil?.calibrated && soil.percent !== null ? formatPercent(soil.percent, 0) : null;
+  const solarVolts = hasStatus && solar?.millivolts != null ? (solar.millivolts / 1000).toFixed(2) : null;
 
   const rows = events.data?.events ?? events.data?.items ?? [];
   const latestRecognition = rows.find((row) => {
@@ -449,6 +452,30 @@ export function OurVillage() {
               </p>
             </div>
           </details>
+        </article>
+      </div>
+
+      <div className="village-grid">
+        <article className="vcard" data-testid="card-solar">
+          <header className="vcard-head">
+            <span className="vcard-icon">
+              <IconSun size={20} />
+            </span>
+            <h2>Solar Panel</h2>
+            {levelChip(
+              !hasStatus ? 'Status unknown' : solarVolts ? 'Live' : 'No reading',
+              solarVolts ? 'live' : 'neutral',
+            )}
+          </header>
+          {stateLine(
+            solarVolts ? `${solarVolts} V` : 'No solar reading yet',
+            'neutral',
+          )}
+          <p className="vcard-fact">
+            {solarVolts
+              ? `The panel is producing ${solarVolts} volts right now. Flash a torch at it and watch the number rise.`
+              : 'Connect a solar panel to GPIO 33 and the voltage appears here.'}
+          </p>
         </article>
       </div>
 

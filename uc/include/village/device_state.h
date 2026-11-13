@@ -75,6 +75,10 @@ struct Runtime {
   CommandHistory commands;
   EventLog events;
 
+  // Solar panel (instantaneous voltage on GPIO 33, ADC1).
+  uint16_t solar_raw = 0;
+  uint16_t solar_mv = 0;
+
   uint32_t sample_seq = 0;
   uint32_t boot_ms = 0;
   uint32_t last_contact_ms = 0;

@@ -18,6 +18,7 @@ constexpr uint32_t kBinPeriodMs = 150;
 constexpr uint32_t kReservoirPeriodMs = 2000;
 constexpr uint32_t kReservoirSettleMs = 5;
 constexpr uint8_t kReservoirSamples = 7;
+constexpr uint32_t kSolarPeriodMs = 1000;
 constexpr float kCmPerMicrosecond = 1.0f / 58.0f;
 
 uint32_t g_next_soil = 0;
@@ -32,6 +33,9 @@ uint32_t g_res_phase_ms = 0;
 uint32_t g_res_next_ms = 0;
 uint32_t g_res_sum = 0;
 uint8_t g_res_count = 0;
+
+// Solar panel next read time.
+uint32_t g_next_solar = 0;
 
 // analogRead() leaves the pad configured for the ADC, after which digitalRead()
 // returns 0 for ever.  Every switch between analog and digital light sensing
@@ -75,6 +79,7 @@ void setupSensors() {
   analogSetPinAttenuation(pins::SOIL_MOISTURE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::RESERVOIR_SENSE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::LDR_ADC, ADC_11db);
+  analogSetPinAttenuation(pins::SOLAR_PANEL_ADC, ADC_11db);
   ensureLightPinMode();
 
   const uint32_t now = millis();
@@ -83,6 +88,7 @@ void setupSensors() {
   g_next_bin = now;
   g_res_next_ms = now;
   g_res_phase = ReservoirPhase::Idle;
+  g_next_solar = now;
   releaseReservoirExcitation();
 }
 
@@ -95,7 +101,14 @@ void sampleSensors(uint32_t now) {
     markSample(now);
   }
 
-  // --- light --------------------------------------------------------------
+  // --- solar panel -------------------------------------------------------
+  if (static_cast<int32_t>(now - g_next_solar) >= 0) {
+    g_next_solar = now + kSolarPeriodMs;
+    rt.solar_raw = static_cast<uint16_t>(analogRead(pins::SOLAR_PANEL_ADC));
+    rt.solar_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_PANEL_ADC));
+    markSample(now);
+  }
+
   if (static_cast<int32_t>(now - g_next_light) >= 0) {
     g_next_light = now + kLightPeriodMs;
     ensureLightPinMode();

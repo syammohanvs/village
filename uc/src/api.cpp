@@ -120,6 +120,11 @@ void buildStatus(JsonDocument& doc) {
   l["age_ms"] = light.age_ms;
   if (light.fault != nullptr) l["fault"] = light.fault; else l["fault"] = nullptr;
 
+  JsonObject solar = sensors["solar"].to<JsonObject>();
+  solar["raw"] = rt.solar_raw;
+  solar["millivolts"] = rt.solar_mv;
+  solar["volts"] = static_cast<float>(rt.solar_mv) / 1000.0f;
+
   JsonArray bins = sensors["bins"].to<JsonArray>();
   for (std::size_t i = 0; i < 3; ++i) {
     const BinReading b = rt.bins[i].read(rt.config, i, now);

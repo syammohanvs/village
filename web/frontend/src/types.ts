@@ -58,7 +58,15 @@ export interface BinReading {
   near_blind_zone?: boolean;
 }
 
+export interface SolarReading {
+  raw?: number | null;
+  millivolts?: number | null;
+  volts?: number | null;
+}
+
+
 export interface Sensors {
+  solar?: SolarReading;
   soil?: SoilReading;
   reservoir?: ReservoirReading;
   light?: LightReading;

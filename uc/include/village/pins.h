@@ -150,6 +150,7 @@ inline constexpr bool isSafeAnalog(int gpio) {
 // Analogue sensors (ADC1 only).
 inline constexpr int SOIL_MOISTURE_ADC = 34;   // ADC1_CH6, input-only
 inline constexpr int RESERVOIR_SENSE_ADC = 35; // ADC1_CH7, input-only
+inline constexpr int SOLAR_PANEL_ADC = 33;     // ADC1_CH5, analogue input (solar panel voltage, 0-3.3V)
 inline constexpr int LDR_ADC = 32;             // ADC1_CH4, analogue or digital
 
 // Reservoir probe excitation.  Driven HIGH only for a short measurement,
