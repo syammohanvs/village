@@ -16,6 +16,7 @@ import { objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus
 import {
   createSceneMemory,
   learnScene,
+  noteScene,
   resetScene,
   sceneReady,
 } from '../lib/sceneMemory';
@@ -346,7 +347,10 @@ export function SortWaste() {
       if (state.kind === 'empty') {
         // Nothing being shown: this frame IS the room, so let the memory drift
         // towards it (a door opening, the lights changing).
-        if (learning) learnScene(sceneRef.current, frame.data);
+        if (learning) {
+          noteScene(sceneRef.current, 'empty', Date.now());
+          learnScene(sceneRef.current, frame.data);
+        }
         return { kind: 'empty' };
       }
       if (state.kind === 'unmatched') {
@@ -365,9 +369,28 @@ export function SortWaste() {
             'The stored background no longer matches this view. Press Set background again on the empty table, or press Clear backgrounds and show the item in your hand instead.',
         };
       }
-      // Something is being shown.  Freeze the room's memory: an item held up for
-      // a minute must not be folded into the background and then forgotten.
-      if (learning) learnScene(sceneRef.current, frame.data, { frozen: true });
+      // Something is being shown.
+      //
+      // Two failures came out of freezing here unconditionally. If the reference
+      // had captured the item (somebody was already holding it when the room was
+      // learned), then taking it away never returns to "empty" and the camera
+      // deadlocks -- reported as "it did not re-arm even after I moved the item
+      // away and back". And an item held very still was either absorbed or
+      // frozen out for ever, with no way back.
+      //
+      // So: freeze while this is plausibly an item, and if the same thing has
+      // been "shown" for four seconds, take the frame as the new room and start
+      // again. That is self-healing in both directions, and the camera can never
+      // be permanently stuck.
+      if (learning) {
+        const stale = noteScene(sceneRef.current, 'object', Date.now());
+        if (stale) {
+          resetScene(sceneRef.current);
+          learnScene(sceneRef.current, frame.data, { alpha: 1 });
+          return { kind: 'warming' };
+        }
+        learnScene(sceneRef.current, frame.data, { frozen: true });
+      }
       const region = state.region;
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;

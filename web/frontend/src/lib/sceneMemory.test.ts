@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   SCENE_WARMUP_FRAMES,
+  STALE_OBJECT_MS,
+  noteScene,
   changedShare,
   createSceneMemory,
   learnScene,
@@ -110,5 +112,38 @@ describe('the room the camera learns', () => {
     learnScene(memory, new Uint8ClampedArray(4));
     expect(memory.frames).toBe(0);
     expect(changedShare(memory, new Uint8ClampedArray(4))).toBe(0);
+  });
+});
+
+describe('when the room must be learned again', () => {
+  it('re-learns after something has been "shown" for too long', () => {
+    // Both reported failures come from a reference that holds the item: the
+    // empty room then looks like the object, and the camera never re-arms.
+    const memory = createSceneMemory(4, 4);
+    expect(noteScene(memory, 'object', 0)).toBe(false);
+    expect(noteScene(memory, 'object', STALE_OBJECT_MS - 1)).toBe(false);
+    expect(noteScene(memory, 'object', STALE_OBJECT_MS)).toBe(true);
+  });
+
+  it('does not re-learn while the room is being seen', () => {
+    const memory = createSceneMemory(4, 4);
+    expect(noteScene(memory, 'empty', 0)).toBe(false);
+    expect(noteScene(memory, 'empty', 60000)).toBe(false);
+  });
+
+  it('starts the clock again after the room is seen', () => {
+    const memory = createSceneMemory(4, 4);
+    noteScene(memory, 'object', 0);
+    noteScene(memory, 'empty', 3000);          // item taken away
+    expect(noteScene(memory, 'object', 4000)).toBe(false);  // a new item
+    expect(noteScene(memory, 'object', 4000 + STALE_OBJECT_MS)).toBe(true);
+  });
+
+  it('forgets the clock when the room is reset', () => {
+    const memory = createSceneMemory(4, 4);
+    noteScene(memory, 'object', 0);
+    resetScene(memory);
+    expect(memory.objectSince).toBeNull();
+    expect(noteScene(memory, 'object', 10)).toBe(false);
   });
 });

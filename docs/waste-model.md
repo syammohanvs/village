@@ -371,7 +371,15 @@ The page now learns the room instead of asking for it
   only what differs from it is classified. A door opening or the lights
   changing drifts into the room instead of becoming an item;
 - the memory **freezes while something is being shown**, so an item held up for
-  a minute is not slowly absorbed into the background and then forgotten;
+  a minute is not slowly absorbed into the background and then forgotten —
+  except that **four seconds of the same presentation makes that frame the new
+  room** and the page starts again. Without that exception two failures appeared
+  at the venue: if the item was already being held when the room was first
+  learned, the item became "the room" and the **empty** room then looked like
+  the thing being shown; and because the memory was frozen while an object was
+  present, removing the item never returned to "empty", so the camera never
+  re-armed. Re-learning is self-healing in both directions and means the camera
+  cannot get permanently stuck;
 - a camera that is knocked or moved makes almost the whole frame differ; the
   page learns the new room rather than classifying a picture of a moved camera.
 

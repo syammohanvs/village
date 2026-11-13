@@ -30,6 +30,51 @@ export interface SceneMemory {
   height: number;
   /** How many frames have been folded in. */
   frames: number;
+  /** When the current run of "something is being shown" began, if it is running. */
+  objectSince: number | null;
+}
+
+/**
+ * How long something may be "shown" before the room is learned again.
+ *
+ * Two things go wrong without this, and both were seen at the venue:
+ *
+ * 1. **The reference can capture the item.**  The room is learned from the
+ *    first frames, and if somebody is already holding the item up at that
+ *    moment the item becomes the room — after which the *empty* room looks like
+ *    the thing being shown.
+ * 2. **Freezing while an object is present can deadlock.**  Once the reference
+ *    holds the item, removing it never returns to "empty", and the camera never
+ *    re-arms: reported as "it did not re-arm even after I moved the item away".
+ *
+ * Re-learning after a few seconds of continuous presentation fixes both.  The
+ * cost is that an item genuinely held still for longer than this becomes part
+ * of the room; that is the right trade, because the alternative is a camera
+ * that stops working until somebody reloads the page.
+ */
+export const STALE_OBJECT_MS = 4000;
+
+export type SceneKind = 'object' | 'empty';
+
+/**
+ * Note what the frame is, and say whether the room should be learned again.
+ *
+ * Called once per frame with the answer from `sceneState`.
+ */
+export function noteScene(memory: SceneMemory, kind: SceneKind, now: number): boolean {
+  if (kind === 'empty') {
+    memory.objectSince = null;
+    return false;
+  }
+  if (memory.objectSince === null) {
+    memory.objectSince = now;
+    return false;
+  }
+  if (now - memory.objectSince >= STALE_OBJECT_MS) {
+    memory.objectSince = null;
+    return true;
+  }
+  return false;
 }
 
 export function createSceneMemory(width: number, height: number): SceneMemory {
@@ -38,6 +83,7 @@ export function createSceneMemory(width: number, height: number): SceneMemory {
     width,
     height,
     frames: 0,
+    objectSince: null,
   };
 }
 
@@ -78,6 +124,7 @@ export function sceneReady(memory: SceneMemory, warmup = SCENE_WARMUP_FRAMES): b
 /** Forget the room: the next frame becomes the new reference outright. */
 export function resetScene(memory: SceneMemory): SceneMemory {
   memory.frames = 0;
+  memory.objectSince = null;
   return memory;
 }
 
