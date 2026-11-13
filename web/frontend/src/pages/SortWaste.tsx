@@ -14,6 +14,8 @@ import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
 import { centreCrop, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import { groupedPrediction } from '../lib/wasteActions';
+import { speakText } from '../lib/speech';
+import { useVoiceUi } from '../lib/voiceUi';
 import { WasteWelcome } from '../components/WasteWelcome';
 import {
   clearBackgrounds as clearStoredBackgrounds,
@@ -120,6 +122,7 @@ export function SortWaste() {
   const [modelState, setModelState] = useState<ModelState>('idle');
   const [modelError, setModelError] = useState('');
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const { language: voiceLanguage } = useVoiceUi();
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
   const [referralLabel, setReferralLabel] = useState<string | null>(null);
@@ -529,6 +532,18 @@ export function SortWaste() {
         model: 'teachable-machine',
       });
       setRecognition(result);
+      // Zara reads the result aloud: a bin name for the three bins, or a
+      // referral to the operator for anything else.
+      const spokenCategory = result.category ?? event.category;
+      const isRecycler = Boolean(material);
+      const isHazardous = Boolean(hazardous);
+      const spoken =
+        isHazardous
+          ? 'Hazardous waste. Do not put it in the bins. Hand it to the operator.'
+          : isRecycler
+            ? `Classified as ${event.category}. Please contact the operator.`
+            : `Classified as ${spokenCategory}. Put it in the ${spokenCategory} bin.`;
+      void speakText(spoken, voiceLanguage, 0.95);
       const binState = result.bin?.state;
       setAlert(
         result.alert ??
