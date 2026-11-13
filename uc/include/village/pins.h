@@ -151,6 +151,7 @@ inline constexpr bool isSafeAnalog(int gpio) {
 inline constexpr int SOIL_MOISTURE_ADC = 34;   // ADC1_CH6, input-only
 inline constexpr int RESERVOIR_SENSE_ADC = 35; // ADC1_CH7, input-only
 inline constexpr int SOLAR_PANEL_ADC = 33;     // ADC1_CH5, analogue input (solar panel voltage, 0-3.3V)
+inline constexpr int SOLAR_CURRENT_ADC = 36;   // ADC1_CH0, input-only (junction between sense resistor and LED)
 inline constexpr int LDR_ADC = 32;             // ADC1_CH4, analogue or digital
 
 // Reservoir probe excitation.  Driven HIGH only for a short measurement,
@@ -181,8 +182,13 @@ inline constexpr int WASTE_LED_PAPER = 23;
 
 // Three HC-SR04 sensors, read one at a time.  Echo lines are 5 V outputs and
 // MUST pass through a divider before reaching these 3.3 V pins.
+//
+// Bin 1's echo moved from GPIO 36 to GPIO 26 when the solar panel's current
+// sense took 36: the panel needs two ADC1 inputs and 36 was the only free
+// ADC1 pin left.  GPIO 26 is an ordinary exposed pin and works as a digital
+// input; the echo still needs its divider.
 inline constexpr int BIN_TRIG[3] = {4, 16, 17};
-inline constexpr int BIN_ECHO[3] = {36, 39, 18};
+inline constexpr int BIN_ECHO[3] = {26, 39, 18};
 
 // Left free on purpose.  GPIO 26 became the named spare when the pump gate
 // moved to 19; the waste LEDs took 21/22/23.  GPIO 2/5/15 are strapping pins
@@ -198,6 +204,10 @@ static_assert(isSafeAnalog(SOIL_MOISTURE_ADC),
 static_assert(isSafeAnalog(RESERVOIR_SENSE_ADC),
               "reservoir sense must be on an exposed ADC1 pin");
 static_assert(isSafeAnalog(LDR_ADC), "LDR must be on an exposed ADC1 pin");
+static_assert(isSafeAnalog(SOLAR_PANEL_ADC),
+              "solar panel voltage must be on an exposed ADC1 pin");
+static_assert(isSafeAnalog(SOLAR_CURRENT_ADC),
+              "solar current sense must be on an exposed ADC1 pin");
 static_assert(isSafeOutput(RESERVOIR_EXCITE),
               "reservoir excitation must be a safe output");
 static_assert(isSafeOutput(PUMP_GATE), "pump gate must be a safe output");
@@ -225,6 +235,7 @@ static_assert(isExposed(BIN_ECHO[2]) && !isFlashPin(BIN_ECHO[2]),
 // Every assigned pin, for the uniqueness check and for diagnostics.
 inline constexpr int kAssignedPins[] = {
     SOIL_MOISTURE_ADC, RESERVOIR_SENSE_ADC, LDR_ADC,
+    SOLAR_PANEL_ADC,   SOLAR_CURRENT_ADC,
     RESERVOIR_EXCITE,  PUMP_GATE,
     STREETLIGHT_LED_PIN,
     WASTE_LED_ORGANIC, WASTE_LED_PLASTIC, WASTE_LED_PAPER,
@@ -245,8 +256,8 @@ constexpr bool assignedPinsAreUnique() {
 static_assert(assignedPinsAreUnique(),
               "the same GPIO must not be assigned to two functions");
 
-static_assert(kAssignedPinCount == 15,
-              "expected 15 assigned GPIOs for this build");
+static_assert(kAssignedPinCount == 17,
+              "expected 17 assigned GPIOs for this build");
 static_assert(kAssignedPinCount < kHeaderPins,
               "the 30-pin header must still have spare pins");
 

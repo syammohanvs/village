@@ -504,6 +504,7 @@ class SimulatedDevice:
                     "soil": self._soil(),
                     "reservoir": self._reservoir(),
                     "light": self._light(),
+                    "solar": self._solar(),
                     "bins": self._bins(),
                 },
                 "actuators": {
@@ -526,6 +527,27 @@ class SimulatedDevice:
                 "faults": self._faults(),
                 "recent_events": list(self.events),
             }
+
+    def _solar(self) -> dict[str, Any]:
+        """A panel in a light-ish room: about 2.4 V across a red LED pair."""
+        panel_mv = 2400
+        junction_mv = 1900
+        sense_ohms = 220
+        drop_mv = panel_mv - junction_mv
+        current_ma = drop_mv / sense_ohms
+        return {
+            "installed": True,
+            "raw": panel_mv,
+            "millivolts": panel_mv,
+            "volts": panel_mv / 1000.0,
+            "junction_raw": junction_mv,
+            "junction_millivolts": junction_mv,
+            "sense_ohms": sense_ohms,
+            "drop_millivolts": drop_mv,
+            "current_ma": current_ma,
+            "power_mw": (panel_mv / 1000.0) * current_ma,
+            "valid": True,
+        }
 
     def _faults(self) -> list[str]:
         faults = []

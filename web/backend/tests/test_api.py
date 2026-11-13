@@ -26,6 +26,19 @@ async def test_health_and_state_are_honest(tmp_path):
         assert status["sensors"]["reservoir"]["state"] in {"available", "low"}
         assert "capacity" not in str(status["sensors"]["reservoir"]).lower()
         assert "litre" not in str(status).lower()
+        # The solar panel reports volts, the drop across its sense resistor,
+        # the current that implies and the power, so the dashboard can show all
+        # three without doing the arithmetic itself.
+        solar = status["sensors"]["solar"]
+        for field in ("millivolts", "junction_millivolts", "sense_ohms", "current_ma", "power_mw"):
+            assert field in solar
+        assert solar["valid"] is True
+        assert solar["current_ma"] == pytest.approx(
+            solar["drop_millivolts"] / solar["sense_ohms"]
+        )
+        assert solar["power_mw"] == pytest.approx(
+            (solar["millivolts"] / 1000.0) * solar["current_ma"]
+        )
 
 
 @pytest.mark.asyncio

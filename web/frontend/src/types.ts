@@ -59,9 +59,17 @@ export interface BinReading {
 }
 
 export interface SolarReading {
+  installed?: boolean;
   raw?: number | null;
   millivolts?: number | null;
   volts?: number | null;
+  junction_raw?: number | null;
+  junction_millivolts?: number | null;
+  sense_ohms?: number | null;
+  current_ma?: number | null;
+  power_mw?: number | null;
+  drop_millivolts?: number | null;
+  valid?: boolean | null;
 }
 
 

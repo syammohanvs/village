@@ -39,7 +39,7 @@ logical order.
 5. Measure the 3.3 V rail under the LED load, and check every analogue input is
    at or below 3.3 V before connecting it.
 
-## 2. GPIO allocation (18 signals)
+## 2. GPIO allocation (20 signals)
 
 | Function | GPIO | Header label | Direction | Why this pin |
 | --- | ---: | --- | --- | --- |
@@ -47,6 +47,8 @@ logical order.
 | Reservoir probe sense | **35** | D35 | ADC input | ADC1_CH7, input-only |
 | Reservoir probe excitation | **25** | D25 | Digital output | Safe output; high-Z between reads |
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
+| Solar panel voltage | **33** | D33 | ADC input | ADC1_CH5 |
+| Solar current sense | **36** | VP | ADC input | ADC1_CH0, input-only |
 | Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
 | Streetlight LED 1 | **13** | D13 | Digital output | Safe output |
 | Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
@@ -56,7 +58,7 @@ logical order.
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
 | Bin 1 trigger (organic) | **4** | D4 | Digital output | Safe output |
-| Bin 1 echo | **36** | VP | Digital input | Input-only; **needs divider** |
+| Bin 1 echo | **26** | D26 | Digital input | Moved from 36 for the solar sense; **needs divider** |
 | Bin 2 trigger (plastic) | **16** | D16 | Digital output | Safe output (WROOM only) |
 | Bin 2 echo | **39** | VN | Digital input | Input-only; **needs divider** |
 | Bin 3 trigger (paper) | **17** | D17 | Digital output | Safe output (WROOM only) |
@@ -522,3 +524,35 @@ After the bench test passes:
 
 If either gate is closed, every irrigation start is rejected with
 `IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED`; the rest of the village still runs.
+
+## 6. Solar panel — GPIO 33 (volts) and GPIO 36 (current)
+
+A small photovoltaic cell lights a red LED through a series resistor. Two ADC
+taps make the power measurable:
+
+```
+ panel + ──┬──────────────[ R ]────────┬────────┐
+           │                            │        │
+        GPIO 33                     GPIO 36   LED anode
+      (panel volts)          (junction volts)   │
+                                                │
+ panel - ── GND ───────────────────────────── LED cathode
+```
+
+- **GPIO 33** reads the panel side of the resistor: the panel's voltage.
+- **GPIO 36** reads the junction between the resistor and the LED.
+- The voltage **across the resistor** is `V33 − V36`, so the current is
+  `I = (V33 − V36) / R` and the power is `V33 × I`.
+
+With a red LED and a 220 Ω resistor in a lit room: panel ≈ 2.4 V, junction
+≈ 1.9 V, drop 0.5 V, current ≈ 2.3 mA, power ≈ 5.5 mW. The dashboard shows all
+three figures and they rise when a torch is shone on the panel.
+
+Both taps must stay **below 3.3 V**. A bare cell is fine; a larger panel needs a
+divider on each tap. `sense_ohms` is part of the stored config (`solar.sense_ohms`,
+default 220) so the same build works with a different resistor.
+
+**Bin 1's echo moved from GPIO 36 to GPIO 26** to make this possible — the board
+has only five usable ADC1 pins and the other four are already soil (34),
+reservoir (35) and the LDR (32). The echo still needs its 5 V → 3.3 V divider;
+only the header it lands on changed.

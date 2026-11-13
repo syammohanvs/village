@@ -80,6 +80,7 @@ void setupSensors() {
   analogSetPinAttenuation(pins::RESERVOIR_SENSE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::LDR_ADC, ADC_11db);
   analogSetPinAttenuation(pins::SOLAR_PANEL_ADC, ADC_11db);
+  analogSetPinAttenuation(pins::SOLAR_CURRENT_ADC, ADC_11db);
   ensureLightPinMode();
 
   const uint32_t now = millis();
@@ -106,6 +107,8 @@ void sampleSensors(uint32_t now) {
     g_next_solar = now + kSolarPeriodMs;
     rt.solar_raw = static_cast<uint16_t>(analogRead(pins::SOLAR_PANEL_ADC));
     rt.solar_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_PANEL_ADC));
+    rt.solar_junction_raw = static_cast<uint16_t>(analogRead(pins::SOLAR_CURRENT_ADC));
+    rt.solar_junction_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_CURRENT_ADC));
     markSample(now);
   }
 

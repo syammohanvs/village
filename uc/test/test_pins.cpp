@@ -3,8 +3,8 @@
 
 using namespace village;
 
-TEST(pin_map_has_fifteen_unique_exposed_pins) {
-  CHECK(pins::kAssignedPinCount == 15);
+TEST(pin_map_has_seventeen_unique_exposed_pins) {
+  CHECK(pins::kAssignedPinCount == 17);
   CHECK(pins::assignedPinsAreUnique());
   for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
     CHECK(pins::isExposed(pins::kAssignedPins[i]));
@@ -16,6 +16,8 @@ TEST(pin_map_uses_adc1_only_for_analogue) {
   CHECK(pins::isSafeAnalog(pins::SOIL_MOISTURE_ADC));
   CHECK(pins::isSafeAnalog(pins::RESERVOIR_SENSE_ADC));
   CHECK(pins::isSafeAnalog(pins::LDR_ADC));
+  CHECK(pins::isSafeAnalog(pins::SOLAR_PANEL_ADC));
+  CHECK(pins::isSafeAnalog(pins::SOLAR_CURRENT_ADC));
   CHECK(!pins::isAdc2(pins::SOIL_MOISTURE_ADC));
   CHECK(!pins::isAdc2(pins::RESERVOIR_SENSE_ADC));
   CHECK(!pins::isAdc2(pins::LDR_ADC));

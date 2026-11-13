@@ -78,6 +78,9 @@ struct Runtime {
   // Solar panel (instantaneous voltage on GPIO 33, ADC1).
   uint16_t solar_raw = 0;
   uint16_t solar_mv = 0;
+  // Junction between the series resistor and the LED (GPIO 36, ADC1).
+  uint16_t solar_junction_raw = 0;
+  uint16_t solar_junction_mv = 0;
 
   uint32_t sample_seq = 0;
   uint32_t boot_ms = 0;

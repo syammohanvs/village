@@ -83,6 +83,8 @@ export function OurVillage() {
 
   const soilPercent = soil?.calibrated && soil.percent !== null ? formatPercent(soil.percent, 0) : null;
   const solarVolts = hasStatus && solar?.millivolts != null ? (solar.millivolts / 1000).toFixed(2) : null;
+  const solarCurrent = hasStatus && solar?.current_ma != null ? solar.current_ma.toFixed(2) : null;
+  const solarPower = hasStatus && solar?.power_mw != null ? solar.power_mw.toFixed(1) : null;
 
   const rows = events.data?.events ?? events.data?.items ?? [];
   const latestRecognition = rows.find((row) => {
@@ -468,13 +470,17 @@ export function OurVillage() {
             )}
           </header>
           {stateLine(
-            solarVolts ? `${solarVolts} V` : 'No solar reading yet',
+            solarVolts
+              ? `${solarVolts} V · ${solarCurrent ?? '0.00'} mA · ${solarPower ?? '0.0'} mW`
+              : 'No solar reading yet',
             'neutral',
           )}
           <p className="vcard-fact">
-            {solarVolts
-              ? `The panel is producing ${solarVolts} volts right now. Flash a torch at it and watch the number rise.`
-              : 'Connect a solar panel to GPIO 33 and the voltage appears here.'}
+            {solar?.valid === false
+              ? 'The current sense reads above the panel voltage, so the two sensor wires may be swapped. The power figure is not shown until they agree.'
+              : solarVolts
+                ? `The panel is delivering ${solarPower ?? '0.0'} milliwatts at ${solarVolts} volts. Flash a torch at it and watch the numbers rise.`
+                : 'Connect a solar panel to GPIO 33 (panel) and GPIO 36 (across the series resistor) and the readings appear here.'}
           </p>
         </article>
       </div>

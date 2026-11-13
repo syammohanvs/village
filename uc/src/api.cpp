@@ -9,6 +9,7 @@
 
 #include "village/build_config.h"
 #include "village/core/irrigation.h"
+#include "village/core/solar.h"
 #include "village/core/time.h"
 #include "village/device_state.h"
 #include "village/net.h"
@@ -121,9 +122,19 @@ void buildStatus(JsonDocument& doc) {
   if (light.fault != nullptr) l["fault"] = light.fault; else l["fault"] = nullptr;
 
   JsonObject solar = sensors["solar"].to<JsonObject>();
+  solar["installed"] = rt.config.solar.installed;
   solar["raw"] = rt.solar_raw;
   solar["millivolts"] = rt.solar_mv;
   solar["volts"] = static_cast<float>(rt.solar_mv) / 1000.0f;
+  solar["junction_raw"] = rt.solar_junction_raw;
+  solar["junction_millivolts"] = rt.solar_junction_mv;
+  solar["sense_ohms"] = rt.config.solar.sense_ohms;
+  const SolarPower power =
+      computeSolarPower(rt.solar_mv, rt.solar_junction_mv, rt.config.solar.sense_ohms);
+  solar["drop_millivolts"] = power.drop_mv;
+  solar["current_ma"] = power.current_ma;
+  solar["power_mw"] = power.power_mw;
+  solar["valid"] = power.valid;
 
   JsonArray bins = sensors["bins"].to<JsonArray>();
   for (std::size_t i = 0; i < 3; ++i) {
@@ -328,6 +339,10 @@ void writeConfig(JsonObject out, const DeviceConfig& c) {
 
   JsonObject waste = out["waste"].to<JsonObject>();
   waste["indicate_ms"] = c.waste.indicate_ms;
+
+  JsonObject solar = out["solar"].to<JsonObject>();
+  solar["installed"] = c.solar.installed;
+  solar["sense_ohms"] = c.solar.sense_ohms;
 }
 
 void buildConfigDoc(JsonDocument& doc) {
@@ -434,6 +449,14 @@ bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
 
   JsonObjectConst waste = c["waste"].as<JsonObjectConst>();
   out.waste.indicate_ms = waste["indicate_ms"] | out.waste.indicate_ms;
+
+  // `solar` is optional: a configuration saved before this existed must still
+  // load, and the defaults (not installed, 220 ohm) are the safe ones.
+  JsonObjectConst solar = c["solar"].as<JsonObjectConst>();
+  if (!solar.isNull()) {
+    out.solar.installed = solar["installed"] | out.solar.installed;
+    out.solar.sense_ohms = solar["sense_ohms"] | out.solar.sense_ohms;
+  }
   return true;
 }
 

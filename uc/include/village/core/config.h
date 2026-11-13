@@ -79,6 +79,15 @@ struct WasteConfig {
   uint16_t indicate_ms = 8000;
 };
 
+// Solar panel: one ADC on the panel side of a series resistor, one on the
+// junction between that resistor and the LED.  The voltage across the resistor
+// gives the current (I = V/R) and the panel voltage times that current is the
+// power it is delivering.
+struct SolarConfig {
+  bool installed = false;
+  uint16_t sense_ohms = 220;  // the series resistor, in ohms
+};
+
 struct DeviceConfig {
   uint32_t revision = 1;
   SoilConfig soil;
@@ -87,6 +96,7 @@ struct DeviceConfig {
   BinConfig bins[3];
   IrrigationConfig irrigation;
   WasteConfig waste;
+  SolarConfig solar;
 };
 
 struct ConfigError {
@@ -269,6 +279,11 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
 
   if (!inRange(c.waste.indicate_ms, 1000, 30000)) {
     return fail("waste.indicate_ms", "Waste indicator duration must be 1000..30000 ms.");
+  }
+  // The series resistor sets the current scale; zero would divide by zero and
+  // an absurd value would silently report nonsense.
+  if (!inRange(c.solar.sense_ohms, 1, 10000)) {
+    return fail("solar.sense_ohms", "Solar sense resistor must be 1..10000 ohms.");
   }
 
   err = ConfigError{};

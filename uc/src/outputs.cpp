@@ -59,6 +59,7 @@ void setupOutputs() {
   analogSetPinAttenuation(pins::RESERVOIR_SENSE_ADC, ADC_11db);
   analogSetPinAttenuation(pins::LDR_ADC, ADC_11db);
   analogSetPinAttenuation(pins::SOLAR_PANEL_ADC, ADC_11db);
+  analogSetPinAttenuation(pins::SOLAR_CURRENT_ADC, ADC_11db);
 
   allOutputsOff();
 }
