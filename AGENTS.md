@@ -70,10 +70,43 @@ missing — check where the cable is plugged in first.
 
 ### Wi-Fi / OTA (verified on this machine, 2026-11-12)
 
-The board joins `ASIANET Giga Fiber` and is normally at **192.168.1.6**; the
-Windows host is **192.168.1.6**. The OTA password is
-`VILLAGE_OTA_PASSWORD` in `uc/include/village/secrets.h` (git-ignored — never
-copy it into this file or a commit).
+The board joins `ASIANET Giga Fiber`. **Its address is DHCP and it moves**: it
+has been 192.168.1.8, then 192.168.1.6, and on **2026-11-13 it was
+192.168.1.4**. The Windows host is **192.168.1.6**. Do not trust a remembered
+address — on 2026-11-13 the board looked "offline" for 90 minutes because the
+backend still pointed at `.6` while the board was answering at `.4` with the
+same `boot_id` it had before. Find it before concluding anything:
+
+```bash
+TOKEN="$(grep -oP 'VILLAGE_DEVICE_TOKEN "\K[^"]+' uc/include/village/secrets.h)"
+# 1. which hosts answer on :80.  The whole /24 is reachable through the WSL
+#    NAT, and the router at 192.168.1.1 answers too, so this also proves
+#    whether the LAN itself is silent.
+python3 - <<'PY'
+import socket, concurrent.futures
+def probe(h):
+    s = socket.socket(); s.settimeout(0.35)
+    try:
+        s.connect((h, 80)); return h
+    except OSError:
+        return None
+    finally:
+        s.close()
+hosts = [f"192.168.1.{i}" for i in range(1, 255)]
+with concurrent.futures.ThreadPoolExecutor(max_workers=64) as pool:
+    print([h for h in pool.map(probe, hosts) if h])
+PY
+# 2. the host that answers the device API with this token IS the board
+curl -s -H "X-Device-Token: $TOKEN" http://<ip>/api/v1/status | head -c 200
+```
+
+Then point `VILLAGE_DEVICE_URL` in `.env` at the address found and restart the
+backend — it reads that variable once at start-up. A DHCP reservation for the
+board's MAC on the router is the permanent fix.
+
+The OTA password is `VILLAGE_OTA_PASSWORD` in
+`uc/include/village/secrets.h` (git-ignored — never copy it into this file or a
+commit).
 
 **Why plain OTA from this container fails** (read this before retrying):
 
@@ -107,7 +140,7 @@ copy it into this file or a commit).
    host IP:
    ```powershell
    Set-Location C:\Users\<you>
-   .\espota.exe -i 192.168.1.6 -p 3232 -I 192.168.1.6 -P 3233 `
+   .\espota.exe -i <board-ip> -p 3232 -I 192.168.1.6 -P 3233 `
      -a "<VILLAGE_OTA_PASSWORD>" -f village-firmware.bin -r
    ```
    Expected output: `Authenticating...OK`, progress, `Result: OK`,
@@ -120,7 +153,7 @@ firewall allowed:
 ```bash
 cd uc
 export VILLAGE_OTA_PASSWORD="$(sed -n 's/.*VILLAGE_OTA_PASSWORD "\(.*\)"/\1/p' include/village/secrets.h)"
-/home/ubuntu/.venvs/pio/bin/pio run -e esp32doit-devkit-v1-ota -t upload --upload-port 192.168.1.6
+/home/ubuntu/.venvs/pio/bin/pio run -e esp32doit-devkit-v1-ota -t upload --upload-port <board-ip>
 ```
 
 From WSL you can invoke Windows tools with `powershell.exe` / `cmd.exe`
