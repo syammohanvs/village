@@ -243,18 +243,12 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   // a late synthesis inert, and this stops audio that has already started.
   stopPlayback();
 
-  // English first: use an Indian voice from this device if one is installed.
-  // The wait is short on purpose — holding the first press for the voice list
-  // is what made a press look like it did nothing.
-  if (language === 'en' && speechSupported()) {
-    await primeVoices(600);
-    const indian = pickIndianEnglishVoice();
-    if (indian) {
-      const spoken = await speakWithVoice(text, indian, rate, ticket);
-      if (spoken) return true;
-      if (ticket !== speakSeq) return false;
-    }
-  }
+  // English: prefer Piper (the same clean local voice used for Malayalam and
+  // Hindi).  The device's own Indian-English voice is only a fallback,
+  // because some of those voices are noisy or robotic and the user reported
+  // English sounding worse than the other two languages.
+  // (Piper is attempted below for every language, so English now follows the
+  // same path as Malayalam and Hindi.)
 
   // Piper's --length_scale is the inverse of a rate: >1 is slower.
   const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
@@ -267,6 +261,18 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
     /* fall through to the browser voice */
   }
   if (ticket !== speakSeq) return false;
+
+  // Piper failed (or was blocked by the browser).  For English, try the
+  // device's own Indian-English voice before the generic browser voice.
+  if (language === 'en' && speechSupported()) {
+    await primeVoices(600);
+    const indian = pickIndianEnglishVoice();
+    if (indian) {
+      const spoken = await speakWithVoice(text, indian, rate, ticket);
+      if (spoken) return true;
+      if (ticket !== speakSeq) return false;
+    }
+  }
 
   if (!speechSupported()) return false;
   await primeVoices();

@@ -224,7 +224,7 @@ describe('Indian English', () => {
     vi.resetModules();
   });
 
-  it('reads English in the device`s Indian voice instead of the American Piper voice', async () => {
+  it('reads English through Piper first, not the device Indian voice', async () => {
     const { synth } = installSpeech(VOICES);
     const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
     vi.doMock('./api', () => ({ api: { speak } }));
@@ -247,11 +247,10 @@ describe('Indian English', () => {
     const ok = await speech.speakText('Hello', 'en');
 
     expect(ok).toBe(true);
-    expect(speak).not.toHaveBeenCalled();
-    expect(synth.speak).toHaveBeenCalledTimes(1);
-    const utterance = (synth.speak as unknown as { mock: { calls: [SpeechSynthesisUtterance][] } }).mock.calls[0][0];
-    expect(utterance.voice?.lang).toBe('en-IN');
-    expect(utterance.voice?.name).toMatch(/Zira/);
+    // Piper (the clean local voice) is tried first, so the device Indian
+    // voice must not be used when Piper succeeds.
+    expect(speak).toHaveBeenCalled();
+    expect(synth.speak).not.toHaveBeenCalled();
     vi.doUnmock('./api');
   });
 
@@ -332,17 +331,20 @@ describe('a voice that has started is never repeated', () => {
       Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: synth });
       Object.defineProperty(globalThis, 'SpeechSynthesisUtterance', { configurable: true, value: FakeUtterance });
 
-      const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
+      const speak = vi.fn(async () => {
+        throw new Error('piper unavailable');
+      });
       vi.doMock('./api', () => ({ api: { speak } }));
 
       const speech = await import('./speech');
       const pending = speech.speakText('Hello', 'en');
       await vi.advanceTimersByTimeAsync(8000);
 
-      // Success once the voice has begun: timing out a running sentence is not
-      // a failure, and treating it as one would speak the words a second time.
+      // Piper is tried first (and fails here), then the device voice starts but
+      // never reports its end.  Timing out a running sentence is not a failure,
+      // and treating it as one would speak the words a second time.
       expect(await pending).toBe(true);
-      expect(speak).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
       vi.doUnmock('./api');
