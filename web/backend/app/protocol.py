@@ -124,3 +124,11 @@ class SpeakRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1200)
     language: Literal["en", "ml", "hi"] = "en"
     length_scale: float = Field(default=1.0, ge=0.5, le=2.0)
+
+
+class WasteClassifyRequest(BaseModel):
+    """A 224x224 frame (data URL or bare base64) to classify with ResNet50."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str = Field(min_length=32, max_length=2_000_000)

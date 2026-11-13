@@ -235,6 +235,19 @@ and `models/waste-v3-20261113/` (best bin accuracy); restoring one is copying
 four files. `evaluate_waste_model.mjs` reproduces the comparison and
 `predict_waste_image.mjs` shows the top classes for one photo.
 
+**The classifier is ResNet50 on the backend now (2026-11-13), not MobileNetV1
+in the browser.** Measured on the same 953 held-out photos it is **91.5% exact,
+95.5% item action, 91.8% bin, 98.5% recycler and 71.6% on the 236-photo probe**,
+against 86.7 / 91.4 / 86.0 / 95.8 / 64.0 for the last MobileNetV1 build. It fixes
+the **business card** (25/25, was 14/25) and improves **pins** (4/8, was 3/8); the
+handkerchief is the one regression (1/8 against 4/8) and stays hard. The model is
+`models/waste-resnet50/model.pt` (~95 MB, git-ignored), loaded by
+`web/backend/app/waste_resnet.py` and served by **`POST /api/v1/waste/classify`**
+(about 50-85 ms per frame on this CPU, no internet). The browser sends the 224x224
+crop as a JPEG data URL; `SortWaste.tsx` no longer imports TensorFlow, and
+`@teachablemachine/image` + `@tensorflow/tfjs` were removed from package.json.
+Reproduce with `scripts/waste/train_resnet50.py` then `export_resnet50.py`.
+
 The Sort Waste camera now **focuses on the object and paints out the table**:
 `web/frontend/src/lib/focus.ts` diffs each frame against **up to three**
 empty-scene snapshots (`diffBoxMulti`), crops the changed box, and then

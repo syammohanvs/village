@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
+from . import waste_resnet
 from .device import (
     DeviceError,
     DeviceGateway,
@@ -36,6 +37,7 @@ from .protocol import (
     ScenarioRequest,
     SpeakRequest,
     SoilCalibrationRequest,
+    WasteClassifyRequest,
 )
 from .simulator import SimulatorError
 from .tts import PiperTts, TtsError
@@ -421,6 +423,28 @@ def create_app(
     @app.get("/api/v1/waste/model-status")
     async def waste_model_status(settings: Settings = Depends(get_settings)):
         return _waste_model_status(settings)
+
+    @app.get("/api/v1/waste/resnet-status")
+    async def waste_resnet_status():
+        return waste_resnet.status()
+
+    @app.post("/api/v1/waste/classify")
+    async def waste_classify(body: WasteClassifyRequest):
+        """Classify one 224x224 frame with ResNet50 on this laptop's CPU.
+
+        The browser cannot load PyTorch, so the camera sends the crop here
+        instead of running MobileNetV1 locally.  Returns the raw 11-class
+        distribution; the grouping into bin / recycler / background happens in
+        the page, exactly as it did for the browser model.
+        """
+        try:
+            predictions = await asyncio.to_thread(waste_resnet.classify, body.image)
+        except waste_resnet.WasteModelError as exc:
+            raise HTTPException(
+                status_code=exc.status,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+        return {"model": "resnet50", "predictions": predictions}
 
     @app.post("/api/v1/waste/recognition")
     async def waste_recognition(

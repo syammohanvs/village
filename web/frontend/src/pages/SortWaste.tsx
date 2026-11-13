@@ -113,7 +113,7 @@ function hazardousMaterial(label: string): string | null {
 
 export function SortWaste() {
   const settings = useApi(['settings'], () => api.settings(), {});
-  const modelStatus = useApi(['waste-model'], () => api.wasteModelStatus(), {});
+  const modelStatus = useApi(['waste-resnet'], () => api.wasteResnetStatus(), {});
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState('');
@@ -463,22 +463,35 @@ export function SortWaste() {
     setModelState('loading');
     setModelError('');
     try {
-      await import('@tensorflow/tfjs');
-      const tm = (await import('@teachablemachine/image')) as unknown as {
-        load: (model: string, metadata: string) => Promise<Classifier>;
+      const status = await api.wasteResnetStatus();
+      if (!status.installed) {
+        throw new Error('the ResNet50 model is not installed on the backend');
+      }
+      // The classifier is now a thin adapter: the frame is sent to the
+      // backend, which runs ResNet50 on the laptop's CPU.
+      classifierRef.current = {
+        async predict(input) {
+          const canvas = document.createElement('canvas');
+          canvas.width = CROP_SIZE;
+          canvas.height = CROP_SIZE;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('this browser cannot read a canvas');
+          ctx.drawImage(input, 0, 0, CROP_SIZE, CROP_SIZE);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const result = await api.wasteClassify(dataUrl);
+          return result.predictions;
+        },
       };
-      const classifier = await tm.load(`${base}model.json`, `${base}metadata.json`);
-      classifierRef.current = classifier;
       setModelState('ready');
       stabilizerRef.current.reset();
     } catch (cause) {
       classifierRef.current = null;
       setModelState('error');
       setModelError(
-        `The model could not be loaded from ${base}. ${errorMessage(cause)} A presenter can check the model files in Setup.`,
+        `The ResNet50 model could not be loaded. ${errorMessage(cause)} A presenter can check the backend.`,
       );
     }
-  }, [installed, modelState, base]);
+  }, [installed, modelState]);
 
   const startCamera = async () => {
     setCameraError('');

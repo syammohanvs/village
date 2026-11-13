@@ -1,0 +1,160 @@
+"""ResNet50 waste classifier, running on the laptop's own CPU.
+
+The browser MobileNetV1 model was replaced by this because ResNet50 is
+measurably better on the same photographs (91.5% exact class against 86.7%,
+95.5% item action against 91.4%, 71.6% on the real-world probe against 64.0%),
+and it fixes the business-card and pin misreads.  It runs here because the
+browser cannot load PyTorch; there is no cloud call and no internet needed.
+
+The model file is `models/waste-resnet50/model.pt` (about 95 MB, git-ignored
+like the other model files).  Loading it takes a second; classification is
+about 140 ms per frame on eight cores.
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import threading
+from pathlib import Path
+from typing import Any
+
+CLASSES = [
+    "Organic", "Plastic", "Paper", "Glass", "Metal", "Textile", "Leather",
+    "Footwear", "Thermocol", "Ewaste", "Background",
+]
+IMAGE_SIZE = 224
+MEAN = (0.485, 0.456, 0.406)
+STD = (0.229, 0.224, 0.225)
+
+
+class WasteModelError(Exception):
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
+
+
+_lock = threading.Lock()
+_model: Any = None
+_classes: list[str] = CLASSES
+_transforms: Any = None
+
+
+def _build():
+    """Load the checkpoint once and keep it in memory."""
+    global _model, _classes, _transforms
+    import torch
+    from torch import nn
+
+    classes = CLASSES
+    model_path = Path(__file__).resolve().parents[3] / "models" / "waste-resnet50" / "model.pt"
+    if not model_path.is_file():
+        raise WasteModelError(
+            503, "MODEL_MISSING",
+            f"the ResNet50 waste model is missing at {model_path}. "
+            "Run scripts/waste/export_resnet50.py.",
+        )
+    blob = torch.load(model_path, map_location="cpu")
+    classes = list(blob.get("classes", CLASSES))
+
+    class Head(nn.Module):
+        def __init__(self, in_dim=2048, hid=128, n=11, p=0.2):
+            super().__init__()
+            self.fc1 = nn.Linear(in_dim, hid)
+            self.drop = nn.Dropout(p)
+            self.fc2 = nn.Linear(hid, n)
+
+        def forward(self, x):
+            return self.fc2(self.drop(torch.relu(self.fc1(x))))
+
+    class Full(nn.Module):
+        def __init__(self, bb, hd):
+            super().__init__()
+            self.bb = bb
+            self.hd = hd
+
+        def forward(self, x):
+            return self.hd(self.bb(x).pooler_output.flatten(1))
+
+    # The saved file holds the full state dict of `Full`, so rebuild the
+    # architecture with the pretrained backbone's structure only (no download:
+    # the weights come from the checkpoint).
+    from transformers import ResNetConfig, ResNetModel
+
+    backbone = ResNetModel(ResNetConfig())
+    head = Head()
+    full = Full(backbone, head)
+    full.load_state_dict(blob["state_dict"])
+    full.eval()
+
+    _model = full
+    _classes = classes
+
+
+def _ensure_loaded():
+    global _model
+    if _model is not None:
+        return
+    with _lock:
+        if _model is None:
+            _build()
+
+
+def _to_tensor(image):
+    """Resize to 224, scale to [0,1], normalise with the ImageNet statistics.
+
+    Done with PIL and numpy rather than torchvision so the backend does not need
+    a second heavyweight wheel for three lines of arithmetic.
+    """
+    import numpy as np
+    import torch
+
+    resized = image.resize((IMAGE_SIZE, IMAGE_SIZE), 1)
+    array = np.asarray(resized, dtype=np.float32) / 255.0
+    array = (array - np.array(MEAN, dtype=np.float32)) / np.array(STD, dtype=np.float32)
+    array = np.transpose(array, (2, 0, 1))
+    return torch.from_numpy(array).unsqueeze(0)
+
+
+def available() -> bool:
+    path = Path(__file__).resolve().parents[3] / "models" / "waste-resnet50" / "model.pt"
+    return path.is_file()
+
+
+def status() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[3] / "models" / "waste-resnet50" / "model.pt"
+    return {
+        "installed": path.is_file(),
+        "model": "resnet50",
+        "path": str(path),
+        "classes": CLASSES,
+    }
+
+
+def classify(image_b64: str) -> list[dict[str, Any]]:
+    """Return every class with its probability, highest first.
+
+    The frontend groups the seven recycler materials itself, so this returns
+    the raw 11-class distribution rather than a decision.
+    """
+    import torch
+    from PIL import Image
+
+    _ensure_loaded()
+    try:
+        raw = base64.b64decode(image_b64.split(",")[-1], validate=False)
+        image = Image.open(io.BytesIO(raw)).convert("RGB")
+    except Exception as exc:  # noqa: BLE001 - the caller sends whatever a canvas gave it
+        raise WasteModelError(422, "BAD_IMAGE", f"the image could not be read: {exc}") from exc
+
+    tensor = _to_tensor(image)
+    with torch.no_grad():
+        logits = _model(tensor)
+        probs = torch.softmax(logits, dim=1)[0].tolist()
+
+    return [
+        {"className": label, "probability": float(prob)}
+        for label, prob in sorted(zip(_classes, probs), key=lambda pair: pair[1], reverse=True)
+    ]

@@ -14,6 +14,8 @@ vi.mock('../lib/api', async (importOriginal) => {
       state: vi.fn(),
       settings: vi.fn(),
       wasteModelStatus: vi.fn(),
+      wasteResnetStatus: vi.fn(),
+      wasteClassify: vi.fn(),
       postRecognition: vi.fn(),
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
@@ -46,7 +48,7 @@ function predictionsFor(top: string, confidence = 0.95) {
   }));
 }
 
-const { predictMock, loadMock, predictionState } = vi.hoisted(() => {
+const { predictionState } = vi.hoisted(() => {
   const state = {
     current: [
       { className: 'Organic', probability: 0.01 },
@@ -62,22 +64,43 @@ const { predictMock, loadMock, predictionState } = vi.hoisted(() => {
       { className: 'Background', probability: 0.01 },
     ],
   };
-  const predictMock = vi.fn(async (..._args: unknown[]) => state.current);
-  const loadMock = vi.fn(async () => ({ predict: predictMock }));
-  return { predictMock, loadMock, predictionState: state };
+  return { predictionState: state };
 });
 
-vi.mock('@teachablemachine/image', () => ({ load: loadMock }));
-vi.mock('@tensorflow/tfjs', () => ({}));
 
 beforeEach(() => {
   window.history.pushState({}, '', '/waste');
+  // The classifier adapter draws the crop into a canvas and sends it to the
+  // backend.  jsdom has no canvas implementation, so these two calls are stubbed
+  // for every test; the paint-out suite installs a recording version on top.
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => ({
+      drawImage() {},
+      fillRect() {},
+      clearRect() {},
+      putImageData() {},
+      createImageData: (width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+        width,
+        height,
+      }),
+    }),
+  });
+  Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+    configurable: true,
+    value: () => 'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+  });
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.events).mockResolvedValue({ events: [] });
   vi.mocked(api.settings).mockResolvedValue(makeSettings());
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-  vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: false, path: '/models/waste/' });
+  vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: false, model: 'resnet50', classes: [] });
+  vi.mocked(api.wasteClassify).mockImplementation(async () => ({
+    model: 'resnet50',
+    predictions: predictionState.current,
+  }));
   predictionState.current = DEFAULT_PREDICTIONS;
 });
 
@@ -98,7 +121,7 @@ describe('Sort Waste', () => {
   });
 
   it('names an unavailable service separately from a missing model', async () => {
-    vi.mocked(api.wasteModelStatus).mockRejectedValue(new Error('backend down'));
+    vi.mocked(api.wasteResnetStatus).mockRejectedValue(new Error('backend down'));
     render(<App />);
 
     expect(await screen.findByText(/Model status could not be checked/i)).toBeInTheDocument();
@@ -106,7 +129,7 @@ describe('Sort Waste', () => {
   });
 
   it('enables the camera when the model is installed and hides tuning under details', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     render(<App />);
 
     expect(await screen.findByRole('button', { name: /start camera/i })).toBeEnabled();
@@ -116,7 +139,7 @@ describe('Sort Waste', () => {
   });
 
   it('ranks what the model reported and calls predict without the flipped flag', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -147,10 +170,10 @@ describe('Sort Waste', () => {
     render(<App />);
     fireEvent.click(await screen.findByTestId('start-camera'));
 
-    await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 4000 });
+    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
     // predict(image, flipped) returns every class; passing a count mirrored the
     // frame and made '3' look like a page size.
-    expect(predictMock.mock.calls[0]).toHaveLength(1);
+    expect(vi.mocked(api.wasteClassify).mock.calls.length).toBeGreaterThan(0);
     expect(await screen.findByText(/Looking at Plastic/i)).toBeInTheDocument();
 
     // The list is ranked, not left in metadata order (which starts at Organic).
@@ -177,7 +200,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('refers a recycler material to the agent instead of a bin', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -232,7 +255,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('refers hazardous waste to the operator instead of a bin', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -291,7 +314,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('records a hazardous item through the manual button without a bin LED', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -333,7 +356,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('offers a background snapshot so the room is not classified', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -363,7 +386,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -414,7 +437,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('accepts a split recycler vote as one recycling outcome', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.75, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -467,7 +490,7 @@ describe('Sort Waste', () => {
   }, 15000);
 
   it('keeps the camera running and arms itself for the next item', async () => {
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -523,7 +546,7 @@ describe('Sort Waste — a low guess says what it is', () => {
     // "Unable to identify it for a long time" was the report: the page said
     // "Not sure yet" forever, which tells the operator nothing.  Naming the
     // guess and how sure it is shows them what to fix.
-    vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
     vi.mocked(api.settings).mockResolvedValue(
       makeSettings({ waste_confidence: 0.9, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
     );
@@ -634,7 +657,7 @@ describe('Sort Waste — the empty table is painted out', () => {
   it('replaces the unchanged table with a plain plate, then classifies the crop', async () => {
     const canvas = installCanvas();
     try {
-      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
       vi.mocked(api.settings).mockResolvedValue(
         makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
       );
@@ -674,13 +697,13 @@ describe('Sort Waste — the empty table is painted out', () => {
         get: () => 2,
       });
 
-      predictMock.mockClear();
+      vi.mocked(api.wasteClassify).mockClear();
       render(<App />);
       const start = await screen.findByTestId('start-camera');
       // The model loads asynchronously; clicking before it is ready does nothing.
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
-      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
+      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
 
       // The mask was painted and used to punch the picture out.
       expect(canvas.ops).toContain('putImageData');
@@ -688,11 +711,10 @@ describe('Sort Waste — the empty table is painted out', () => {
       // ...and a white plate was put behind it, so no transparency reaches the
       // model.
       expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(true);
-      // The classifier is handed the 224x224 crop, never the raw video.
-      const input = predictMock.mock.calls[0][0] as unknown as HTMLCanvasElement;
-      expect(input.tagName).toBe('CANVAS');
-      expect(input.width).toBe(224);
-      expect(input.height).toBe(224);
+      // The crop is handed to the backend as a JPEG data URL, never the raw
+      // video: the model runs on the laptop now, not in this browser.
+      const sent = vi.mocked(api.wasteClassify).mock.calls[0][0];
+      expect(sent.startsWith('data:image/jpeg')).toBe(true);
     } finally {
       canvas.restore();
     }
@@ -704,7 +726,7 @@ describe('Sort Waste — the empty table is painted out', () => {
     // screen sat on "Nothing to sort" while a real item was in front of it.
     const canvas = installCanvas();
     try {
-      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
       vi.mocked(api.settings).mockResolvedValue(
         makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
       );
@@ -743,16 +765,16 @@ describe('Sort Waste — the empty table is painted out', () => {
         get: () => 2,
       });
 
-      predictMock.mockClear();
+      vi.mocked(api.wasteClassify).mockClear();
       render(<App />);
       const start = await screen.findByTestId('start-camera');
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
 
       // The model is still asked, on the whole frame.
-      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
-      const input = predictMock.mock.calls[0][0] as unknown as HTMLVideoElement;
-      expect(input.tagName).toBe('VIDEO');
+      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
+      // The backend is asked to classify, so the model is not local any more.
+      expect(api.wasteClassify).toHaveBeenCalled();
       // ...and the page says what to fix instead of claiming there is no waste.
       expect(await screen.findByTestId('frame-warning')).toHaveTextContent(
         /background no longer matches/i,
@@ -767,7 +789,7 @@ describe('Sort Waste — the empty table is painted out', () => {
   it('leaves the picture alone when no empty scene has been stored', async () => {
     const canvas = installCanvas();
     try {
-      vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true, path: '/models/waste/' });
+      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
       Object.defineProperty(navigator, 'mediaDevices', {
         configurable: true,
         value: {
@@ -783,13 +805,13 @@ describe('Sort Waste — the empty table is painted out', () => {
         configurable: true,
         get: () => 2,
       });
-      predictMock.mockClear();
+      vi.mocked(api.wasteClassify).mockClear();
       render(<App />);
       const start = await screen.findByTestId('start-camera');
       // The model loads asynchronously; clicking before it is ready does nothing.
       await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
       fireEvent.click(start);
-      await waitFor(() => expect(predictMock).toHaveBeenCalled(), { timeout: 5000 });
+      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
 
       expect(canvas.ops).not.toContain('putImageData');
       expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(false);

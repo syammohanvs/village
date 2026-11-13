@@ -42,25 +42,24 @@ because those are still materials a visitor may hand to the camera. Those
 families were simply absent before, which is why a brown paper cover was read
 as e-waste, a bottle cap as e-waste and a ball pen as glass.
 
-Fifteen per cent of each class is held back for validation. The installed model
-scores **86.7% exact class (826/953)** on the common mixed set (studio photos
-plus real-world object photos). Because the seven recycler classes share one
-action, **91.4% of items get the right action**: **356/414 bin items** kept
-their own bin and **499/521 recycler items** were referred.
+Fifteen per cent of each class is held back for validation. **The installed
+classifier is ResNet50, running on the laptop's backend** — see *Where the model
+runs* below. It scores **91.5% exact class (872/953)** on the common mixed set
+(studio photos plus real-world object photos). Because the seven recycler
+classes share one action, **95.5% of items get the right action**.
 
 | Model | Exact (953) | Bin | Recycler | Item action | Probe (236) |
 | --- | --- | --- | --- | --- | --- |
-| V3 (backup) | 85.6% | **91.8%** | 87.5% | 89.4% | 62.3% |
-| V6 (backup) | 85.1% | 87.4% | 93.1% | 90.6% | **64.8%** |
-| **V8 (installed)** | **86.7%** | 86.0% | **95.8%** | **91.4%** | 64.0% |
+| V3 (MobileNetV1) | 85.6% | **91.8%** | 87.5% | 89.4% | 62.3% |
+| V6 (MobileNetV1) | 85.1% | 87.4% | 93.1% | 90.6% | 64.8% |
+| V8 (MobileNetV1) | 86.7% | 86.0% | 95.8% | 91.4% | 64.0% |
+| V12 (MobileNetV1) | 90.9% | 90.6% | 96.7% | 94.0% | 62.7% |
+| **ResNet50 (installed)** | **91.5%** | **91.8%** | **98.5%** | **95.5%** | **71.6%** |
 
-V8 is the best on exact class, on item action and on recycler materials, and it
-is the only one that can recognise a **handkerchief** — see below. It gives up
-about **1.4 points of bin accuracy** against V6 and about 0.8 points on the
-236-photo probe (two photos, which is noise at that size). The two earlier
-models are kept at `models/waste-v3-20261113/` (best bin accuracy) and
-`models/waste-v6-20261113/` (best probe), so any of the three can be restored
-by copying four files.
+ResNet50 is the best build on every measure except the handkerchief (below). The
+MobileNetV1 files are kept in `models/waste/` and `models/waste-v*/`, so any of
+them can be restored by copying four files; they are no longer loaded by the
+running app.
 
 | Class | Exact match | Held-out photos |
 | --- | --- | --- |
@@ -105,6 +104,36 @@ produces **3 Metal, 5 Ewaste — all eight are recycler materials and none is
 Leather**. With the grouped recycler confidence below, all eight are accepted
 even when the top class is only 42–64%: Metal + Ewaste together clear the
 threshold.
+
+### Where the model runs
+
+Until 2026-11-13 the waste classifier was a **MobileNetV1** model that ran in the
+browser (2.5 MB, no backend needed). It is now a **ResNet50** that runs on the
+laptop's backend, because the browser cannot load PyTorch and because ResNet50 is
+measurably better on the same photographs.
+
+| | MobileNetV1 (browser) | ResNet50 (backend) |
+| --- | --- | --- |
+| Exact class | 86.7% | **91.5%** |
+| Item action | 91.4% | **95.5%** |
+| Bin kept | 86.0% | **91.8%** |
+| Recycler referred | 95.8% | **98.5%** |
+| Real-world probe | 64.0% | **71.6%** |
+| Business card | 14/25 | **25/25** |
+| Pin | 3/8 | **4/8** |
+| Handkerchief | **4/8** | 1/8 |
+| Per frame | ~30 ms | ~50-85 ms |
+| Needs the backend | no | yes |
+
+The camera still crops and paints out the table **in the browser**; only the
+classification step is a round trip. `POST /api/v1/waste/classify` takes the
+224x224 crop as a JPEG data URL and returns the 11-class distribution, which the
+page groups into bin / recycler / background exactly as before. No internet is
+needed and nothing leaves the laptop.
+
+The model file is `models/waste-resnet50/model.pt` (~95 MB, git-ignored).
+`scripts/waste/train_resnet50.py` trains the head on a frozen backbone and
+`scripts/waste/export_resnet50.py` writes the single file the backend loads.
 
 ### Specific objects, and why they need photos rather than a bigger model
 

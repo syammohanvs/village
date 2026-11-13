@@ -259,6 +259,23 @@ export const api = {
     return request<ModelStatus>('/waste/model-status', { mode: undefined });
   },
 
+  wasteResnetStatus(): Promise<{ installed: boolean; model: string; classes: string[] }> {
+    return request<{ installed: boolean; model: string; classes: string[] }>(
+      '/waste/resnet-status',
+      { mode: undefined },
+    );
+  },
+
+  wasteClassify(image: string): Promise<{
+    model: string;
+    predictions: { className: string; probability: number }[];
+  }> {
+    return request<{ model: string; predictions: { className: string; probability: number }[] }>(
+      '/waste/classify',
+      { method: 'POST', body: { image }, mode: undefined },
+    );
+  },
+
   postRecognition(input: {
     category: string;
     confidence: number;
