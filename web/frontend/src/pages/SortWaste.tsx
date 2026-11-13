@@ -570,9 +570,10 @@ export function SortWaste() {
         await videoRef.current.play().catch(() => undefined);
       }
       setCameraOn(true);
-      // Until the first frame has been judged, the honest answer is "learning",
-      // not "ready": the badge must not offer an item it cannot classify yet.
-      setSceneProgress(0);
+      // A one-press reading crops the middle of the picture and needs no room
+      // learned, so only the watcher starts a warm-up. Showing "learning the
+      // room 0%" beside a page that will never learn one was a lie.
+      setSceneProgress(autoWatch ? 0 : null);
       setGroupedTop(null);
       setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
@@ -905,7 +906,7 @@ export function SortWaste() {
             */}
             {cameraOn && (
               <div className="camera-status" data-testid="camera-status">
-                {sceneProgress !== null ? (
+                {autoWatch && sceneProgress !== null ? (
                   <span className="chip chip--warn">
                     Learning the room · {Math.round(sceneProgress * 100)}%
                   </span>

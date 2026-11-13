@@ -1151,11 +1151,17 @@ describe('Sort Waste — the page says whether it is ready', () => {
       expect(screen.queryByTestId('camera-status')).not.toBeInTheDocument();
 
       fireEvent.click(start);
-      // These suites keep the automatic watcher on: the behaviour they
-      // cover is what happens while the camera is being watched.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
       const status = await screen.findByTestId('camera-status');
-      expect(status).toHaveTextContent(/learning the room/i);
+      // With the watcher off the page is ready for a press and has no room to
+      // learn. "Learning the room 0%" forever, beside a page that will never
+      // learn one, is the bug that was reported.
+      expect(status).toHaveTextContent(/press/i);
+
+      // Ticking the watcher starts a real warm-up, and the badge says so.
+      fireEvent.click(await screen.findByTestId('auto-watch'));
+      await waitFor(() => expect(status).toHaveTextContent(/learning the room/i), {
+        timeout: 8000,
+      });
 
       // Once the room is known the badge says so, so an item can be shown
       // without guessing whether the page is watching or ready.
