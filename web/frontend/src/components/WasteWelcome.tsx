@@ -49,6 +49,23 @@ export function WasteWelcome() {
     // only decides whether there is still a card to speak from.
   }, [line, language, dismissed]);
 
+  // Browsers refuse to play audio before the first tap on the page.  The mount
+  // attempt above usually works because the visitor arrived here by tapping a
+  // link (sticky user activation), but it does not always, so the first touch
+  // anywhere on the page is a second chance to speak.  It runs once.
+  useEffect(() => {
+    if (dismissed) return;
+    const trySpeak = () => {
+      if (spoken !== 'silent') return;
+      void speakText(line, language, 0.95).then((ok) => {
+        heardRef.current = ok;
+        setSpoken(ok ? 'ok' : 'silent');
+      });
+    };
+    window.addEventListener('pointerdown', trySpeak, { once: true });
+    return () => window.removeEventListener('pointerdown', trySpeak);
+  }, [dismissed, spoken, line, language]);
+
   // Leaving the page must not leave Lia talking to an empty room.
   useEffect(
     () => () => {
