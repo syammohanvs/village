@@ -528,6 +528,6 @@ ignores.
   villager. Profiles are optional **fictional demo records** and require an
   explicit selection.
 - Recognition does not prove that the item was deposited or handed over.
-- Bin fill is estimated from ultrasonic distance, not measured weight or
-  volume.
+- Bin fill is estimated from a laser distance measurement, not measured weight
+  or volume.
 - The app stores classification events, not images or video.

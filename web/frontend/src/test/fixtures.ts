@@ -122,7 +122,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
             fill_pct_estimate: null,
             state: 'unavailable',
             age_ms: 2400,
-            fault: 'no echo',
+            fault: 'no distance reading',
             near_blind_zone: false,
           },
         ],

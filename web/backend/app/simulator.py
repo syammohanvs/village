@@ -382,7 +382,7 @@ class SimulatedDevice:
                         "fill_pct_estimate": None,
                         "state": "unavailable",
                         "age_ms": 9999,
-                        "fault": "simulated echo timeout",
+                        "fault": "simulated sensor timeout",
                         "near_blind_zone": False,
                     }
                 )
@@ -559,7 +559,7 @@ class SimulatedDevice:
             faults.append("light: simulated sensor fault")
         for bin_id in BIN_IDS:
             if self.sensor_fault == f"bin_{bin_id}":
-                faults.append(f"bin {bin_id}: simulated echo timeout")
+                faults.append(f"bin {bin_id}: simulated sensor timeout")
         return faults
 
     # ------------------------------------------------------------------

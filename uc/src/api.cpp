@@ -260,6 +260,8 @@ void buildHealth(JsonDocument& doc) {
   pm["reservoir_excite"] = pins::RESERVOIR_EXCITE;
   pm["reservoir_sense_adc"] = pins::RESERVOIR_SENSE_ADC;
   pm["ldr"] = pins::LDR_ADC;
+  pm["solar_panel_adc"] = pins::SOLAR_PANEL_ADC;
+  pm["solar_current_adc"] = pins::SOLAR_CURRENT_ADC;
   pm["pump_gate"] = pins::PUMP_GATE;
   // All lamps share one pin, so there is only one pin to report.
   JsonArray street = pm["streetlight_leds"].to<JsonArray>();
@@ -268,11 +270,14 @@ void buildHealth(JsonDocument& doc) {
   waste["organic"] = pins::WASTE_LED_ORGANIC;
   waste["plastic"] = pins::WASTE_LED_PLASTIC;
   waste["paper"] = pins::WASTE_LED_PAPER;
-  JsonArray trig = pm["bin_trig"].to<JsonArray>();
-  JsonArray echo = pm["bin_echo"].to<JsonArray>();
+  // The bin rangefinders are VL53L0X time-of-flight modules on one I2C bus.
+  pm["i2c_sda"] = pins::I2C_SDA;
+  pm["i2c_scl"] = pins::I2C_SCL;
+  JsonArray xshut = pm["tof_xshut"].to<JsonArray>();
+  JsonArray addr = pm["tof_address"].to<JsonArray>();
   for (int i = 0; i < 3; ++i) {
-    trig.add(pins::BIN_TRIG[i]);
-    echo.add(pins::BIN_ECHO[i]);
+    xshut.add(pins::TOF_XSHUT[i]);
+    addr.add(pins::TOF_ADDRESS[i]);
   }
 }
 

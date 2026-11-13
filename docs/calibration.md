@@ -90,7 +90,7 @@ distinguish every wiring failure.
 Place the probes at the minimum safe level above the pump intake. Keep the
 reservoir's maximum water surface below the drip outlets to reduce siphoning.
 
-## 3. Bins (three HC-SR04 sensors)
+## 3. Bins (three VL53L0X time-of-flight sensors)
 
 For each bin, measure with a ruler:
 
@@ -101,12 +101,16 @@ Rules:
 
 - `full_cm` must be at least 2 cm below `empty_cm`.
 - `max_range_cm` must be at least the empty distance.
-- Keep the HC-SR04's blind zone (roughly 2–4 cm) in mind; an object inside it
-  is reported as full-at-the-sensor with a flag, not as an empty bin.
-- The firmware reads the three sensors sequentially, filters each with a
-  median, and requires repeated readings before a state change.
-- A missing echo produces **unavailable**, with no distance and no fill
+- The useful range is about **3 cm to 200 cm**. Keep the empty floor inside
+  that; a deeper bin needs the sensor mounted lower, not a longer range.
+- Keep the blind zone (roughly 3 cm) in mind; an object inside it is reported as
+  full-at-the-sensor with a flag, not as an empty bin.
+- The firmware reads the three sensors in turn, filters each with a median, and
+  requires repeated readings before a state change.
+- No reading at all produces **unavailable**, with no distance and no fill
   percentage. It never becomes an empty bin.
+- `max_range_cm` stays a sanity ceiling in centimetres; the VL53L0X will never
+  report a distance near it, so it is safe to leave at the default.
 
 The fill percentage is an **estimated fill height** from the measured
 distance, not a measured waste volume.

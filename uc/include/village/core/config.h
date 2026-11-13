@@ -225,7 +225,7 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
       return fail(kFields[5], "Bin confirmation must be 1..10 readings.");
     }
     if (!inRange(b.timeout_us, 1000, 200000)) {
-      return fail(kFields[6], "Echo timeout must be 1000..200000 microseconds.");
+      return fail(kFields[6], "Sensor timeout must be 1000..200000 microseconds.");
     }
     if (!inRange(b.blind_zone_cm, 1, 10)) {
       return fail(kFields[7], "Blind-zone distance must be 1..10 cm.");

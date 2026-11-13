@@ -3,8 +3,8 @@
 
 using namespace village;
 
-TEST(pin_map_has_seventeen_unique_exposed_pins) {
-  CHECK(pins::kAssignedPinCount == 17);
+TEST(pin_map_has_sixteen_unique_exposed_pins) {
+  CHECK(pins::kAssignedPinCount == 16);
   CHECK(pins::assignedPinsAreUnique());
   for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
     CHECK(pins::isExposed(pins::kAssignedPins[i]));
@@ -49,27 +49,18 @@ TEST(waste_leds_share_the_free_header_side) {
   CHECK(pins::WASTE_LED_PAPER == 23);
   // Moved off the old ADC-capable pin so the lamps and the LDR keep D32/D33.
   CHECK(pins::WASTE_LED_ORGANIC != 33);
-  // The named spare stays free.
-  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_ORGANIC);
-  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_PLASTIC);
-  CHECK(pins::SPARE_SAFE_OUTPUT != pins::WASTE_LED_PAPER);
 }
 
 TEST(pump_gate_shares_the_free_header_side) {
   // The pump gate sits on the free header side, beside the waste LEDs.
   CHECK(pins::PUMP_GATE == 19);
-  CHECK(pins::SPARE_SAFE_OUTPUT == 26);
-  CHECK(pins::PUMP_GATE != 26);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_ORGANIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PLASTIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PAPER);
 }
 
-TEST(pin_map_outputs_and_echoes_are_sane) {
+TEST(pin_map_outputs_are_sane) {
   CHECK(pins::isSafeOutput(pins::PUMP_GATE));
-  CHECK(pins::isSafeOutput(pins::BIN_TRIG[0]));
-  CHECK(pins::isSafeOutput(pins::BIN_TRIG[1]));
-  CHECK(pins::isSafeOutput(pins::BIN_TRIG[2]));
   // All five lamps now share one pin (D13), so there is only one pin to
   // check rather than one per lamp.
   CHECK(pins::isSafeLampOutput(pins::STREETLIGHT_LED_PIN));
@@ -87,14 +78,65 @@ TEST(pin_map_outputs_and_echoes_are_sane) {
   CHECK(pins::isSafeOutput(pins::WASTE_LED_ORGANIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PLASTIC));
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PAPER));
-  // Echo pins may be input-only, but they must be exposed and non-flash.
+}
+
+TEST(tof_rangefinders_share_one_i2c_bus) {
+  // The VL53L0X modules are bus devices: two shared lines plus one XSHUT each,
+  // which is five pins instead of the six the ultrasonic pair needed.
+  CHECK(pins::isSafeOutput(pins::I2C_SDA));
+  CHECK(pins::isSafeOutput(pins::I2C_SCL));
+  CHECK(pins::I2C_SDA != pins::I2C_SCL);
   for (int i = 0; i < 3; ++i) {
-    CHECK(pins::isExposed(pins::BIN_ECHO[i]));
-    CHECK(!pins::isFlashPin(pins::BIN_ECHO[i]));
+    CHECK(pins::isSafeOutput(pins::TOF_XSHUT[i]));
+    CHECK(pins::TOF_XSHUT[i] != pins::I2C_SDA);
+    CHECK(pins::TOF_XSHUT[i] != pins::I2C_SCL);
   }
-  // The one remaining safe output is deliberately spare.
-  CHECK(pins::isSafeOutput(pins::SPARE_SAFE_OUTPUT));
-  CHECK(pins::SPARE_SAFE_OUTPUT != pins::PUMP_GATE);
+  CHECK(pins::TOF_XSHUT[0] != pins::TOF_XSHUT[1]);
+  CHECK(pins::TOF_XSHUT[1] != pins::TOF_XSHUT[2]);
+  CHECK(pins::TOF_XSHUT[0] != pins::TOF_XSHUT[2]);
+  // They are not monotonic by accident: the plan is documented in pins.h.
+  CHECK(pins::I2C_SDA == 4);
+  CHECK(pins::I2C_SCL == 16);
+  CHECK(pins::TOF_XSHUT[0] == 17);
+  CHECK(pins::TOF_XSHUT[1] == 18);
+  CHECK(pins::TOF_XSHUT[2] == 26);
+  // Distinct addresses, none of them the factory default every module boots
+  // at, and inside the 7-bit range.
+  for (int i = 0; i < 3; ++i) {
+    CHECK(pins::TOF_ADDRESS[i] != 0x29);
+    CHECK(pins::TOF_ADDRESS[i] < 0x78);
+    for (int j = i + 1; j < 3; ++j) {
+      CHECK(pins::TOF_ADDRESS[i] != pins::TOF_ADDRESS[j]);
+    }
+  }
+}
+
+TEST(no_pin_is_asked_to_do_two_jobs) {
+  // GPIO 36 is the solar current sense.  It used to be bin 1's echo, and the
+  // collision went unnoticed because the solar pins were not in the
+  // assignment list at all -- so the list is what this counts, not the names.
+  int occurrences = 0;
+  for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
+    if (pins::kAssignedPins[i] == pins::SOLAR_CURRENT_ADC) ++occurrences;
+  }
+  CHECK(occurrences == 1);
+  CHECK(pins::SOLAR_CURRENT_ADC == 36);
+  // The bus and the XSHUT lines must not steal an analogue input either.
+  for (int i = 0; i < 3; ++i) {
+    CHECK(pins::TOF_XSHUT[i] != pins::SOLAR_PANEL_ADC);
+    CHECK(pins::TOF_XSHUT[i] != pins::SOLAR_CURRENT_ADC);
+    CHECK(pins::TOF_XSHUT[i] != pins::SOIL_MOISTURE_ADC);
+    CHECK(pins::TOF_XSHUT[i] != pins::RESERVOIR_SENSE_ADC);
+    CHECK(pins::TOF_XSHUT[i] != pins::LDR_ADC);
+  }
+}
+
+TEST(the_last_free_pin_is_input_only) {
+  // Every output-capable pin is used, so the pin named "spare" records the one
+  // that is genuinely left over rather than pretending an output remains.
+  CHECK(pins::SPARE_INPUT == 39);
+  CHECK(pins::isExposed(pins::SPARE_INPUT));
+  CHECK(!pins::isSafeOutput(pins::SPARE_INPUT));
 }
 
 TEST(pin_map_leaves_uart_and_boot_pins_alone) {

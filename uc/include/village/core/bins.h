@@ -31,9 +31,11 @@ struct BinReading {
   bool near_blind_zone = false;
 };
 
-// One ultrasonic bin.  The firmware reads the sensors sequentially and calls
-// observeDistance() or observeTimeout(); this class only filters and
-// classifies.  A missing echo is never an empty bin.
+// One bin.  The firmware reads its rangefinder and calls observeDistance() or
+// observeTimeout(); this class only filters and classifies, so the sensor can
+// be swapped (ultrasonic then, VL53L0X time-of-flight now) without touching
+// the estimation, the confirmation or the thresholds.  No reading is never an
+// empty bin.
 class BinModel {
  public:
   void reset() {
@@ -126,7 +128,7 @@ class BinModel {
     r.age_ms = elapsedMs(now, last_good_ms_);
     if (consecutive_timeouts_ >= 2) {
       r.state = BinState::Unavailable;
-      r.fault = "no echo";
+      r.fault = "no distance reading";
       r.near_blind_zone = near_blind_;
       return r;
     }

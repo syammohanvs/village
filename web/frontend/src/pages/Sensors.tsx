@@ -277,7 +277,7 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
         </Card>
       </div>
 
-      <Card kicker="Ultrasonic" title="Bin distances">
+      <Card kicker="Laser distance" title="Bin distances">
         <div className={cx('bin-reading-grid', inactive && 'is-inactive')}>
           {bins.length === 0 && <p className="hint">No bin readings in the current frame.</p>}
           {bins.map((bin) => (

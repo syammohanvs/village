@@ -1,9 +1,13 @@
 #include "village/sensors.h"
 
+#include <VL53L0X.h>
+#include <Wire.h>
+
 #include <cmath>
 
 #include "village/build_config.h"
 #include "village/core/time.h"
+#include "village/core/tof.h"
 #include "village/device_state.h"
 #include "village/pins.h"
 
@@ -19,7 +23,8 @@ constexpr uint32_t kReservoirPeriodMs = 2000;
 constexpr uint32_t kReservoirSettleMs = 5;
 constexpr uint8_t kReservoirSamples = 7;
 constexpr uint32_t kSolarPeriodMs = 1000;
-constexpr float kCmPerMicrosecond = 1.0f / 58.0f;
+// How long an XSHUT line is held before a module is expected to answer.
+constexpr uint32_t kTofBootMs = 10;
 
 uint32_t g_next_soil = 0;
 uint32_t g_next_light = 0;
@@ -27,6 +32,11 @@ bool g_light_digital = false;
 bool g_light_mode_known = false;
 uint32_t g_next_bin = 0;
 uint8_t g_bin_index = 0;
+
+// One sensor object per bin.  They all power up at the same I2C address, so
+// they are only usable once beginTof() has given each its own.
+VL53L0X g_tof[3];
+bool g_tof_ready[3] = {false, false, false};
 
 ReservoirPhase g_res_phase = ReservoirPhase::Idle;
 uint32_t g_res_phase_ms = 0;
@@ -53,21 +63,61 @@ void releaseReservoirExcitation() {
   pinMode(pins::RESERVOIR_EXCITE, INPUT);  // high impedance, no pull
 }
 
+// The stored timeout is in microseconds (the field outlived the ultrasonic
+// echo timer); tof.h converts it to what the library wants and keeps it inside
+// a band where a slow measurement is not mistaken for a fault.
+uint16_t tofTimeoutMs(std::size_t i) {
+  return tofBusTimeoutMs(rt.config.bins[i].timeout_us);
+}
+
+// Every module boots at address 0x29, so they are released from reset one at a
+// time: hold all XSHUT low, raise one, claim 0x29 for it, give it its own
+// address, move on.  A module that does not answer stays in reset and is
+// reported as a missing sensor rather than as an empty bin.
+void beginTof() {
+  Wire.begin(pins::I2C_SDA, pins::I2C_SCL);
+  Wire.setClock(400000);
+
+  for (int i = 0; i < 3; ++i) {
+    pinMode(pins::TOF_XSHUT[i], OUTPUT);
+    digitalWrite(pins::TOF_XSHUT[i], LOW);
+    g_tof[i].setBus(&Wire);
+    g_tof[i].setTimeout(kTofMaxTimeoutMs);
+    g_tof_ready[i] = false;
+  }
+  delay(kTofBootMs);
+
+  for (int i = 0; i < 3; ++i) {
+    digitalWrite(pins::TOF_XSHUT[i], HIGH);
+    delay(kTofBootMs);
+    g_tof[i].setTimeout(tofTimeoutMs(i));
+    if (!g_tof[i].init()) {
+      digitalWrite(pins::TOF_XSHUT[i], LOW);
+      continue;
+    }
+    g_tof[i].setAddress(pins::TOF_ADDRESS[i]);
+    g_tof[i].setTimeout(tofTimeoutMs(i));
+    g_tof_ready[i] = g_tof[i].getAddress() == pins::TOF_ADDRESS[i];
+    // A module that kept the factory address would answer at the same address
+    // as the next one we release, so it goes back into reset instead.
+    if (!g_tof_ready[i]) digitalWrite(pins::TOF_XSHUT[i], LOW);
+  }
+}
+
 void readBin(uint8_t i, uint32_t now) {
   const BinConfig& cfg = rt.config.bins[i];
-  digitalWrite(pins::BIN_TRIG[i], LOW);
-  delayMicroseconds(3);
-  digitalWrite(pins::BIN_TRIG[i], HIGH);
-  delayMicroseconds(10);
-  digitalWrite(pins::BIN_TRIG[i], LOW);
+  if (!g_tof_ready[i]) {
+    // No usable sensor: a fault, never "the bin is empty".
+    rt.bins[i].observeTimeout(now);
+    markSample(now);
+    return;
+  }
 
-  const unsigned long us =
-      pulseIn(pins::BIN_ECHO[i], HIGH, cfg.timeout_us);
-  if (us == 0) {
+  const uint16_t mm = g_tof[i].readRangeSingleMillimeters();
+  if (g_tof[i].timeoutOccurred() || !tofReadingIsADistance(mm)) {
     rt.bins[i].observeTimeout(now);
   } else {
-    const float cm = static_cast<float>(us) * kCmPerMicrosecond;
-    rt.bins[i].observeDistance(cm, cfg, now);
+    rt.bins[i].observeDistance(static_cast<float>(mm) / 10.0f, cfg, now);
   }
   markSample(now);
 }
@@ -82,6 +132,7 @@ void setupSensors() {
   analogSetPinAttenuation(pins::SOLAR_PANEL_ADC, ADC_11db);
   analogSetPinAttenuation(pins::SOLAR_CURRENT_ADC, ADC_11db);
   ensureLightPinMode();
+  beginTof();
 
   const uint32_t now = millis();
   g_next_soil = now;

@@ -95,13 +95,23 @@ session; local automatic watering continues if the laptop disappears.
 
 ## A bin says unavailable
 
-- Check 5 V, GND, the trigger GPIO and the echo divider (1 kΩ series,
-  2 kΩ to GND). Never connect a 5 V echo directly.
-- A missing echo is **unavailable**, not empty. Measure the distance with a
+The bins now use three **VL53L0X time-of-flight laser modules** on one I²C bus.
+
+- Check that all three modules have **3V3 and GND**, that **SDA is on GPIO 4**
+  and **SCL on GPIO 16**, and that each module's **XSHUT** goes to 17, 18 or 26.
+  A module with no XSHUT connection stays in reset and can never answer.
+- Unplug the other two modules and try one alone. If a single module works, the
+  problem is the address sequence on the third, not the sensor.
+- **Two bins reporting each other's fill** means the XSHUT cables for those two
+  are swapped. The modules are identical, so nothing in software can detect it;
+  relabel the cables.
+- A missing reading is **unavailable**, not empty. Measure the distance with a
   ruler and set `empty_cm`/`full_cm`.
-- The three sensors are read one at a time; keep them apart to reduce
-  cross-talk.
-- Inside the blind zone the bin is reported full-at-the-sensor and flagged.
+- The useful range is about **3 cm to 200 cm**. A reading that is always short
+  and jumpy usually means direct sun or a torch shining into the detector —
+  shade the top of the bin.
+- Inside the blind zone (about 3 cm) the bin is reported full-at-the-sensor and
+  flagged.
 
 ## Streetlights flicker or stay off
 

@@ -39,7 +39,7 @@ logical order.
 5. Measure the 3.3 V rail under the LED load, and check every analogue input is
    at or below 3.3 V before connecting it.
 
-## 2. GPIO allocation (20 signals)
+## 2. GPIO allocation (16 assigned signals)
 
 | Function | GPIO | Header label | Direction | Why this pin |
 | --- | ---: | --- | --- | --- |
@@ -50,20 +50,16 @@ logical order.
 | Solar panel voltage | **33** | D33 | ADC input | ADC1_CH5 |
 | Solar current sense | **36** | VP | ADC input | ADC1_CH0, input-only |
 | Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
-| Streetlight LED 1 | **13** | D13 | Digital output | Safe output |
-| Streetlight LED 2 | **12** | D12 | Digital output | Safe output **only source-wired** (strapping pin) |
-| Streetlight LED 3 | **14** | D14 | Digital output | Safe output |
-| Streetlight LED 4 | **27** | D27 | Digital output | Safe output |
+| Streetlight lamps (all five) | **13** | D13 | Digital output | Safe output; one pin drives the loom |
 | Waste LED — organic | **21** | D21 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
-| Bin 1 trigger (organic) | **4** | D4 | Digital output | Safe output |
-| Bin 1 echo | **26** | D26 | Digital input | Moved from 36 for the solar sense; **needs divider** |
-| Bin 2 trigger (plastic) | **16** | D16 | Digital output | Safe output (WROOM only) |
-| Bin 2 echo | **39** | VN | Digital input | Input-only; **needs divider** |
-| Bin 3 trigger (paper) | **17** | D17 | Digital output | Safe output (WROOM only) |
-| Bin 3 echo | **18** | D18 | Digital input | Safe input; **needs divider** |
-| Spare | 26 | D26 | — | One safe output left free |
+| ToF bus — SDA | **4** | D4 | Digital I/O | Bus line, 3.3 V |
+| ToF bus — SCL | **16** | D16 | Digital output | Bus clock, 3.3 V |
+| ToF 1 XSHUT (organic) | **17** | D17 | Digital output | Safe output |
+| ToF 2 XSHUT (plastic) | **18** | D18 | Digital output | Safe output |
+| ToF 3 XSHUT (paper) | **26** | D26 | Digital output | Safe output |
+| *Left over* | 39 | VN | input only | Nothing else free; cannot drive anything |
 
 ### Why not other pins
 
@@ -73,19 +69,23 @@ logical order.
 | 1, 3 | UART0 TX/RX used by the USB programmer and serial log. |
 | 2, 5, 12, 15 | Boot-strapping pins; 2/15 also pulse at boot. Kept free. |
 | 6–11 | Connected to the SPI flash; not exposed. |
-| 34, 35, 36, 39 | Input-only. Used only for inputs (34/35 analogue, 36/39 echo). |
+| 34, 35, 36, 39 | Input-only. 34/35/36 carry the analogue inputs; 39 is unused. |
 
-All analogue measurements use **ADC1** (GPIO 32, 34, 35). ADC2 shares hardware
-with the Wi-Fi radio and is not reliable while Wi-Fi is active. GPIO 25 and 26
-are ADC2-capable but are used only as digital outputs here, which is safe.
+All analogue measurements use **ADC1** (GPIO 32, 33, 34, 35, 36). ADC2 shares
+hardware with the Wi-Fi radio and is not reliable while Wi-Fi is active.
+GPIO 25 is ADC2-capable but is used only as a digital output here, which is
+safe.
 
 The firmware's `uc/include/village/pins.h` encodes all of this and has
 `static_assert` checks for ADC1, input-only, strapping, flash and duplicate
 pins. A bad edit fails the build.
 
-**GPIO budget:** 25 GPIOs are exposed (23 excluding UART0). **18 are assigned**;
-GPIO 19 (and 21) are spare safe outputs, and the remaining strapping pins are
-avoided. There is no shortage for this build.
+**GPIO budget:** 25 GPIOs are exposed (23 excluding UART0). **16 are assigned**
+and GPIO 39 is the only one left, which is input-only. Replacing the three
+ultrasonic sensors with three time-of-flight ones actually **freed** a pin —
+six trigger/echo lines became five (one bus of two lines plus one XSHUT each) —
+but the solar panel's two analogue taps took the spare ADC pins, so there is no
+output-capable pin in reserve. Anything added next needs a pin given up first.
 
 ## 3. Power
 
@@ -376,30 +376,81 @@ controller still reports no light level.
   according to the measured behaviour. Hysteresis and a 4 s stable delay stop
   the streetlights flickering at dusk.
 
-### HC-SR04 bins
+### Bin rangefinders — three VL53L0X on one I²C bus
 
-- VCC **5 V**, GND common. Trig accepts a 3.3 V pulse.
-- Echo is a **5 V output**. Reduce it before the ESP32:
+The ultrasonic sensors are gone. Each bin now has a **VL53L0X time-of-flight
+laser rangefinder** (sold as the Robocraze VL53LDK breakout), which measures the
+distance to the rubbish below it with a 940 nm laser instead of sound. It is
+faster, does not care about air temperature, does not click, and its readings
+do not drift with humidity.
+
+They are **3.3 V parts**, so they connect to the ESP32 directly — no divider is
+needed anywhere on this page.
+
+| Module pin | To | Note |
+| --- | --- | --- |
+| `VIN` / `VCC` | **3V3** | Some breakouts label a 3–5 V input; the ESP32 side is 3.3 V either way |
+| `GND` | **GND** | Common ground |
+| `SDA` | **GPIO 4** (shared) | One bus, all three modules |
+| `SCL` | **GPIO 16** (shared) | One bus, all three modules |
+| `XSHUT` | **17 / 18 / 26** | One per module, in bin order (organic / plastic / paper) |
 
 ```
- Echo (5 V) ──[ 1 kΩ ]──●── ESP32 GPIO (36 / 39 / 18)
-                        │
-                     [ 2 kΩ ]
-                        │
-                       GND
+                 ESP32                     bin 1        bin 2        bin 3
+          ┌──────────────────┐
+   3V3 ───┤ 3V3              │──── VCC ──────┬────────────┬────────────┐
+   GND ───┤ GND              │──── GND ──────┤            │            │
+ GPIO 4 ──┤ D4   (SDA)       │────────────────┴────────────┴────────────┤
+ GPIO16 ──┤ D16  (SCL)       │────────────────┬────────────┬────────────┤
+ GPIO17 ──┤ D17              │──── XSHUT ─────┘            │            │
+ GPIO18 ──┤ D18              │───────────────── XSHUT ─────┘            │
+ GPIO26 ──┤ D26              │────────────────────────────── XSHUT ────┘
+          └──────────────────┘
 ```
 
-  Vout = 5 × 2 / (1 + 2) = **3.33 V**, within the 3.3 V input range. Do not
-  connect Echo directly to any ESP32 pin.
-- Mount each sensor above its bin looking down. Measure the distance to the
-  **empty floor** (`empty_cm`) and to the **full line** (`full_cm`) with a
-  ruler. The fill figure is an **estimated height**, not a measured volume.
-- Read the three sensors **one at a time**, at least 100 ms apart, to avoid
-  cross-talk. The firmware does this.
-- The HC-SR04 has a near blind zone of roughly 2–4 cm. A reading inside it is
-  treated as “full at the sensor” and flagged, not as a healthy empty bin.
-- A missing echo sets the bin to **unavailable**. It never becomes an empty
-  bin.
+**Why the XSHUT lines exist.** Every VL53L0X powers up answering to the *same*
+I²C address (`0x29`), so three of them on one bus would all reply at once. The
+firmware therefore holds all three in reset, releases them **one at a time** and
+renames each before moving on:
+
+| Bin | Sensor | Address after boot |
+| --- | --- | ---: |
+| organic | 1 | `0x30` |
+| plastic | 2 | `0x31` |
+| paper | 3 | `0x32` |
+
+That sequence is `beginTof()` in `uc/src/sensors.cpp`. A module that does not
+answer is left in reset and reported as a **fault** — never as an empty bin.
+
+**If a module is missing.** Nothing breaks: the other two keep working, the
+missing bin reads *unavailable*, and a restart retries it. That is also how to
+test one sensor alone — unplug the other two.
+
+**Mounting and calibration.**
+
+- Mount each sensor above its bin looking down, with a clear view of the floor
+  and nothing in front of the lens. The emitter and detector windows are the two
+  small squares; keep paint, tape and dust off them.
+- The useful range is **about 3 cm to 200 cm**. Beyond about 2 m in daylight the
+  reading becomes unreliable, so keep the empty floor inside that. A very deep
+  bin needs a baffle or a higher mount rather than a longer range.
+- Measure the distance to the **empty floor** (`empty_cm`) and to the **full
+  line** (`full_cm`) with a ruler, as before. The fill figure is an **estimated
+  height**, not a measured volume.
+- Anything within about **3 cm** of the lens is inside the blind zone
+  (`blind_zone_cm`); the firmware treats that as “full at the sensor” and flags
+  it, not as a healthy empty bin.
+- The three are read **one at a time**, about 150 ms apart. Unlike the
+  ultrasonic pair there is no cross-talk to worry about — a laser does not hear
+  its neighbours — but staggering keeps each measurement bounded.
+- **Sunlight is the one thing to watch.** Direct sun into the detector saturates
+  the sensor. Inside a bin this is rarely an issue; if a bin reads short and
+  jumpy, shade the top of the bin.
+
+**Wiring order matters once:** the XSHUT pin numbers are in `pins.h` as
+`TOF_XSHUT = {17, 18, 26}`. Swap two cables and bins 2 and 3 report each
+other's fill. There is no way for the firmware to tell — the modules are
+identical — so label the cables.
 
 ## 6. LEDs
 
@@ -494,8 +545,9 @@ Do this in order, with the pump **disconnected** until step 7:
 4. Flash the firmware with the pump disabled. Confirm `/api/v1/health` reports
    the expected chip and pin map; confirm the pump gate is LOW at boot.
 5. Test each LED on the Our Village page; measure the resistor current.
-6. Test each HC-SR04 with a hand at 10 cm, 30 cm and beyond range; confirm
-   “unavailable” when disconnected, never “empty”.
+6. Test each ToF rangefinder with a hand at 10 cm, 30 cm and beyond range.
+   Then unplug one module and confirm that bin reads “unavailable”, never
+   “empty”, while the other two keep working.
 7. Test the pump driver with a **dummy load** (a 5 V lamp or a resistor + LED)
    before the pump. Confirm the gate switches, the flyback diode is the right
    way round, and the MOSFET does not overheat.

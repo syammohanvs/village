@@ -33,7 +33,7 @@ reports `source.kind: "esp32"`. The four streetlight lamps and the LDR module
 are wired and working, including automatic lamps in the dark. The soil probe is
 connected but calibrated only against wheat flour so far, so treat its
 percentage as a bench check until it is redone in real soil. The reservoir
-probes, ultrasonic bins and pump are not wired yet; the pump stays disabled by
+probes, bin rangefinders and pump are not wired yet; the pump stays disabled by
 both safety gates.
 
 ## Quick start
@@ -70,8 +70,9 @@ Stop only this project:
   pump has a separate commissioning gate.
 - **Streetlights** — Auto (LDR with hysteresis and a stable delay), Manual On
   and Manual Off. Stale sensor → Auto stays off and says why.
-- **Three bins** — sequential HC-SR04 readings, estimation and confirmation,
-  loud **unavailable** on a missing echo (never “empty”).
+- **Three bins** — three **VL53L0X time-of-flight laser rangefinders** on one
+  I²C bus, read in turn, with estimation and confirmation and a loud
+  **unavailable** when a module does not answer (never “empty”).
 - **Voice** — push-to-talk, English/Malayalam/Hindi, local Whisper, deterministic
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
 - **Sort Waste** — local Teachable Machine model behind a large camera preview,
@@ -119,13 +120,14 @@ cannot affect the site build. A push to `main` triggers the build; see
 
 The purchased board is the **30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1**
 (4 MB flash, AMS1117, micro-USB). The pin map uses GPIO numbers only:
-soil **34**, reservoir sense **35** / excite **25**, LDR **32**, pump gate **19**,
-streetlights **13/12/14/27** (one lamp each), waste LEDs **21/22/23**, bin triggers **4/16/17**,
-bin echoes **36/39/18**. All analogue inputs are **ADC1** because Wi-Fi is
-active. Flash pins, input-only misuse, strapping pins and UART0 are avoided;
-the firmware has `static_assert` checks. See [docs/wiring.md](docs/wiring.md)
-for the power branch, MOSFET/flyback requirements, HC-SR04 dividers, probe
-circuit and the unidentified driver-component warning.
+soil **34**, reservoir sense **35** / excite **25**, LDR **32**, solar panel
+**33** / current sense **36**, pump gate **19**, streetlights **13**, waste LEDs
+**21/22/23**, and the bin rangefinders on an I²C bus — SDA **4**, SCL **16**,
+XSHUT **17/18/26**. All analogue inputs are **ADC1** because Wi-Fi is active.
+Flash pins, input-only misuse, strapping pins and UART0 are avoided; the
+firmware has `static_assert` checks. See [docs/wiring.md](docs/wiring.md) for
+the power branch, MOSFET/flyback requirements, the ToF bus and address
+sequence, probe circuit and the unidentified driver-component warning.
 
 ## Tests run locally
 
@@ -153,7 +155,7 @@ cd web/frontend && npm run typecheck && npm test && npm run build
   [docs/verification.md](docs/verification.md).
 - Hardware: streetlights, LDR, reservoir probes and the pump driver have been
   exercised; the bench checklist in [docs/bench-test.md](docs/bench-test.md)
-  remains the gate for soil and the ultrasonic bins.
+  remains the gate for soil and the bin rangefinders.
 
 ## Models you must supply
 
@@ -185,8 +187,8 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 The app never displays a tank percentage, litres, capacity, household water
 use, pressure, flow, battery charge, solar/wind generation or energy savings.
 The reservoir has two wire probes at one minimum level; bin fill is an
-estimated height from ultrasonic distance; soil moisture is a calibrated
-relative value. The solar panels, windmill and model buildings are static.
+estimated height from a laser distance measurement; soil moisture is a
+calibrated relative value. The solar panels, windmill and model buildings are static.
 An acknowledged command proves the controller decided, not that water flowed.
 
 ## Exhibition checklist

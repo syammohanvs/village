@@ -65,17 +65,23 @@ until step 8.
 - [ ] Probes are at the minimum safe level, above the pump intake.
 - [ ] Maximum water surface is below the drip outlets (no siphon).
 
-## F. HC-SR04 bins
+## F. Bin rangefinders (three VL53L0X)
 
-- [ ] Each echo passes through a divider: **1 kΩ series, 2 kΩ to GND**
-      (10 kΩ / 20 kΩ also gives 3.33 V and is fine).
-- [ ] Trigger and echo GPIOs match the wiring table.
+- [ ] All three modules powered from **3V3**, grounds common.
+- [ ] `SDA` on GPIO 4 and `SCL` on GPIO 16, shared by all three.
+- [ ] XSHUT cables land on GPIO 17 / 18 / 26 **in bin order** and are labelled,
+      because two swapped cables report each other's fill with no other symptom.
 - [ ] Empty distance measured for each bin: organic ____ plastic ____ paper ____
 - [ ] Full distance measured for each bin: organic ____ plastic ____ paper ____
 - [ ] Each bin reports Available/Nearly full/Full as the level changes.
-- [ ] Disconnecting an echo reports **unavailable**, not empty.
-- [ ] Object inside the blind zone is flagged, not treated as healthy.
-- [ ] The three sensors are read sequentially; no cross-talk.
+- [ ] A hand at 10 cm and at 30 cm reads roughly right on each bin (a ruler is
+      the reference; the laser is accurate to a few millimetres).
+- [ ] Unplugging one module reports **unavailable** for that bin only — never
+      empty — and the other two keep reading.
+- [ ] An object inside the blind zone (~3 cm) is flagged, not treated as a
+      healthy bin.
+- [ ] Direct sunlight or a bright torch into the detector does not make the bin
+      report a wildly short distance at the exhibition.
 
 ## G. Pump driver and pump
 

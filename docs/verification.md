@@ -719,8 +719,11 @@ experiment is recorded here so the result is not re-derived.
 
 ## Not verified
 
-- Physical soil and ultrasonic-bin behaviour, and the four lamps beyond the one
-  measured at 100 Ω (Vf 2.93 V). The reservoir probe was exercised by shorting
+- Physical soil and bin-rangefinder behaviour, and the four lamps beyond the one
+  measured at 100 Ω (Vf 2.93 V).  The bin sensors are now three VL53L0X
+  time-of-flight modules; the firmware builds and the pin plan is
+  compile-time checked, but **nothing has been measured on a real bench yet** —
+  no address sequence, no distance, no fault path. The reservoir probe was exercised by shorting
   it (142 mV → available) and by leaving it open (3145 mV → low); the soil probe
   has only been seen open (4095 raw → 0 %).
 - Nothing on the pump path. A **Stop while water is flowing** was measured on
