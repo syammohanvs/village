@@ -32,6 +32,33 @@ backend serves it from disk.
 
 ## ESP32 firmware
 
+> **ALWAYS FLASH AN OTA-CAPABLE IMAGE. This is a standing rule (2026-11-15).**
+> Never write a firmware whose USB image has OTA compiled out, and always check
+> the OTA port is answering after a flash. **The mistake it prevents, measured:**
+> on 2026-11-14 the board was flashed, USB was then disconnected, and the board
+> turned out to be running an image with **no OTA server** — `192.168.1.41:3232`
+> refused six connections over 18 s while `:80` answered. There was no way in: no
+> USB (the CP210x had gone from Windows) and no OTA. Nothing could be updated
+> until a cable was produced. One minute of checking would have avoided it.
+>
+> - The **USB image** must have OTA compiled in — `VILLAGE_ENABLE_OTA` defaults
+>   to 1 in `uc/include/village/build_config.h`; **do not set it to 0** in any
+>   build flag, and check the image carries it:
+>   `python3 -c "print(open('uc/.pio/build/esp32doit-devkit-v1/firmware.bin','rb').read().count(b'[ota] ready on'))"`
+>   must print **1** (0 means that image can never be updated over Wi-Fi).
+> - **After every flash, prove OTA works** before touching anything else:
+>   `python3 -c "import socket;s=socket.socket();s.settimeout(2);s.connect(('<board-ip>',3232));print('OTA up')"`
+>   Open = good. Refused while `:80` answers = the image on the board is not this
+>   source; treat it as a defect and reflash over USB **while the cable is still
+>   in hand**.
+> - **Know which image is running, from the device itself.** The current source
+>   reports `board` and `pins` blocks in `/api/v1/status`. A status payload with
+>   **no `board` block is an old image** — that is how the 2026-11-14 failure was
+>   spotted, and it also tells you whether the build you just made is actually
+>   the one on the board.
+> - **`VILLAGE_OTA_PASSWORD` (16 chars in `secrets.h`) must be present**, or the
+>   board refuses the upload even when the port is open.
+
 ### Build
 
 ```bash
@@ -182,6 +209,9 @@ Check `firmware`, `config_revision`, and
 
 ### Gotchas that cost time
 
+- **A board with no OTA server cannot be updated remotely, and that is
+  self-inflicted.** See the standing rule at the top of this section: build the
+  USB image with OTA in it, and check port 3232 straight after flashing.
 - **A reflash does not reset the stored config.** It lives in NVS and survives
   the update; `config_revision` stays the same. If a firmware default changed,
   save the config once from Setup (or reset the config) to apply it.
