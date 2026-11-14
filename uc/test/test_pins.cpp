@@ -131,12 +131,17 @@ TEST(no_pin_is_asked_to_do_two_jobs) {
   }
 }
 
-TEST(the_last_free_pin_is_input_only) {
-  // Every output-capable pin is used, so the pin named "spare" records the one
-  // that is genuinely left over rather than pretending an output remains.
-  CHECK(pins::SPARE_INPUT == 39);
+TEST(the_free_pin_is_recorded) {
+  // The solar panel voltage moved to VN (39), so D33 is the one genuinely
+  // unassigned pin left.  It is output-capable, unlike the old spare, which is
+  // why this test no longer insists on input-only.
+  CHECK(pins::SPARE_INPUT == 33);
+  CHECK(pins::SOLAR_PANEL_ADC == 39);
   CHECK(pins::isExposed(pins::SPARE_INPUT));
-  CHECK(!pins::isSafeOutput(pins::SPARE_INPUT));
+  // ...and it is genuinely free: not one of the assigned pins.
+  for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
+    CHECK(pins::kAssignedPins[i] != pins::SPARE_INPUT);
+  }
 }
 
 TEST(pin_map_leaves_uart_and_boot_pins_alone) {

@@ -47,7 +47,7 @@ logical order.
 | Reservoir probe sense | **35** | D35 | ADC input | ADC1_CH7, input-only |
 | Reservoir probe excitation | **25** | D25 | Digital output | Safe output; high-Z between reads |
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
-| Solar panel voltage | **33** | D33 | ADC input | ADC1_CH5 |
+| Solar panel voltage | **39** | VN | ADC input | ADC1_CH3, input-only |
 | Solar current sense | **36** | VP | ADC input | ADC1_CH0, input-only |
 | Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
 | Streetlight lamps (all five) | **13** | D13 | Digital output | Safe output; one pin drives the loom |
@@ -59,7 +59,7 @@ logical order.
 | ToF 1 XSHUT (organic) | **17** | D17 | Digital output | Safe output |
 | ToF 2 XSHUT (plastic) | **18** | D18 | Digital output | Safe output |
 | ToF 3 XSHUT (paper) | **26** | D26 | Digital output | Safe output |
-| *Left over* | 39 | VN | input only | Nothing else free; cannot drive anything |
+| *Left over* | 33 | D33 | ADC/digital | Freed when the panel moved to VN; can also drive an output |
 
 ### Why not other pins
 
@@ -577,14 +577,14 @@ After the bench test passes:
 If either gate is closed, every irrigation start is rejected with
 `IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED`; the rest of the village still runs.
 
-## 10. Solar panel — GPIO 33 (volts) and GPIO 36 (current)
+## 10. Solar panel — VN/GPIO 39 (volts) and VP/GPIO 36 (current)
 
 A small photovoltaic cell lights a red LED, and two ADC taps make the power it
 generates measurable. **Two parallel branches**, not one series chain: the
 resistor into an ADC pin carries no current, so it is protection only.
 
 ```
-                    ┌─── 10 kΩ ─────────────► GPIO 33   (D33)  panel volts
+                    ┌─── 10 kΩ ─────────────► GPIO 39   (VN)   panel volts
  panel + ───────────┤
                     │
                     └─── 330 Ω ────┬────────► GPIO 36   (VP)   LED anode
@@ -594,7 +594,7 @@ resistor into an ADC pin carries no current, so it is protection only.
  panel − ──────────────────────── GND
 ```
 
-- **GPIO 33 (`D33`)** reads the **panel voltage**. The 10 kΩ in front of it is
+- **GPIO 39 (`VN`)** reads the **panel voltage**. The 10 kΩ in front of it is
   the *only* thing between the panel and the pin, and it carries no current
   because an ADC input draws almost none. Its job is protection: if the panel
   slips above 3.3 V the pin clamps, and the 10 kΩ limits that fault current to
@@ -624,6 +624,8 @@ scale accordingly. The ESP32's ADC is also non-linear over roughly the top
 200 mV: a panel that sits right at 3.3 V reads ~4095 and stops rising, which is
 another reason to leave headroom with a divider.
 
-**`GPIO 36` is silkscreened `VP`, not `D36`** — it and `GPIO 39` (`VN`) are the
-two input-only ADC1 pins, with no internal pull-ups and no 5 V tolerance. See
-§1 for the header order; `VP` is the pin immediately right of `EN`.
+**`GPIO 36` is silkscreened `VP` and `GPIO 39` is `VN`, not `D36`/`D39`** — they
+are the two input-only ADC1 pins, with no internal pull-ups and no 5 V
+tolerance, and they sit next to each other so both taps leave the board on one
+edge. See §1 for the header order; `VP` is immediately right of `EN`, `VN` is
+next to that.

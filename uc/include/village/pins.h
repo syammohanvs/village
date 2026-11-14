@@ -150,7 +150,10 @@ inline constexpr bool isSafeAnalog(int gpio) {
 // Analogue sensors (ADC1 only).
 inline constexpr int SOIL_MOISTURE_ADC = 34;   // ADC1_CH6, input-only
 inline constexpr int RESERVOIR_SENSE_ADC = 35; // ADC1_CH7, input-only
-inline constexpr int SOLAR_PANEL_ADC = 33;     // ADC1_CH5, analogue input (solar panel voltage, 0-3.3V)
+// VN (GPIO 39) rather than D33: it is input-only like VP, so the two solar taps
+// sit together on the header, and D33 goes back to being free.  Same 0-3.3 V
+// range and the same 10k protection.
+inline constexpr int SOLAR_PANEL_ADC = 39;     // ADC1_CH3, input-only (solar panel voltage, 0-3.3V)
 inline constexpr int SOLAR_CURRENT_ADC = 36;   // ADC1_CH0, input-only (junction between sense resistor and LED)
 inline constexpr int LDR_ADC = 32;             // ADC1_CH4, analogue or digital
 
@@ -199,10 +202,10 @@ inline constexpr int TOF_XSHUT[3] = {17, 18, 26};
 inline constexpr uint8_t TOF_ADDRESS[3] = {0x30, 0x31, 0x32};
 
 // Every output-capable pin is now spoken for: the ToF XSHUT lines took 17, 18
-// and 26, and 2/5/15 are strapping pins that stay unused.  GPIO 39 is the one
-// genuinely unassigned pin left, and it is input-only, so it is named here for
-// what it is.  GPIO 1/3 remain the USB serial console.
-inline constexpr int SPARE_INPUT = 39;
+// and 26, and 2/5/15 are strapping pins that stay unused.  With the solar panel
+// moved to VN (39), D33 is the one genuinely unassigned pin left; it is named
+// here for what it is.  GPIO 1/3 remain the USB serial console.
+inline constexpr int SPARE_INPUT = 33;
 
 // ---------------------------------------------------------------------------
 // Compile-time checks.  A bad edit fails the build rather than the exhibit.
@@ -223,8 +226,10 @@ static_assert(isSafeOutput(PUMP_GATE), "pump gate must be a safe output");
 static_assert(isSafeOutput(WASTE_LED_ORGANIC), "organic LED must be a safe output");
 static_assert(isSafeOutput(WASTE_LED_PLASTIC), "plastic LED must be a safe output");
 static_assert(isSafeOutput(WASTE_LED_PAPER), "paper LED must be a safe output");
-static_assert(isExposed(SPARE_INPUT) && !isSafeOutput(SPARE_INPUT),
-              "the spare pin must be an exposed input-only pin");
+// The spare used to have to be input-only, because every output-capable pin was
+// taken.  Moving the solar panel to VN (39) freed D33, which can drive things --
+// so the rule is now "exposed and unassigned", not "input-only".
+static_assert(isExposed(SPARE_INPUT), "the spare pin must be on the header");
 
 static_assert(isSafeLampOutput(STREETLIGHT_LED_PIN),
               "the streetlight LED pin must be a safe lamp output");
