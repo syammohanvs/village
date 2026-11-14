@@ -171,18 +171,29 @@ export function AboutHelp() {
             cover the light sensor with your hand. Watch the streetlight LEDs.
           </li>
           <li>
-            Show one item to the camera on <Link to="/waste">Sort Waste</Link>, hold it in your
-            hand near the middle of the picture and press <em>Check the item</em>. It takes about
-            a second, because the page reads three frames before it answers — one frame is what
-            used to change its mind (a brown paper food cover was called foam, then cloth, inside
-            ten seconds). Three readings that agree are one answer; three that disagree are shown
-            as a best guess with “not sure enough”, and nothing lights. If the table is empty you
-            can press <em>Set background</em> first: the camera then ignores the room, and the
-            table around the item is painted out, so only the object is classified. You can store
-            up to three backgrounds for a hall that changes. After an item is recognised, take it
-            away so the camera arms itself for the next one. Ordinary objects are still sorted by
-            material: a phone or key fob is electronic waste, a wallet is leather and sunglasses
-            are glass.
+            Our model knows <strong>three everyday bins</strong>: <strong>organic / food
+            waste</strong>, <strong>plastic</strong> and <strong>paper &amp; cardboard</strong>.
+            Show one item to the camera on <Link to="/waste">Sort Waste</Link>, hold it inside the
+            square and press <em>Check the item</em>. It reads three frames, because one frame is
+            what used to change its mind, and a flip becomes “not sure” instead of a guess. The
+            card then says what the AI thinks it is, where it should go, and one reason — with
+            <em>Scan another item</em> and <em>Contact Gram Sahayak</em> underneath.
+            <br />
+            <br />
+            It suggests; it does not sort. Some things are never put in these three bins: sanitary
+            waste (wrap it and keep it separate), sharps and medical items (do not handle them,
+            ask an adult or the Gram Sahayak), batteries, chemicals and electronics (each needs its
+            own authorised collection), and glass or metal (only when a collection route is set up
+            here). An opaque bag you cannot see into is “Mixed bag / several items” — show one safe
+            item at a time. Confidence is not proof: a confident answer can still be wrong.
+            <br />
+            <br />
+            <span className="hint">
+              For the exhibition, our model demonstrates three selected categories. Real waste
+              systems also handle sanitary and special-care waste separately, and India’s Solid
+              Waste Management Rules keep wet waste, dry waste, sanitary waste and special-care
+              waste apart — plastic and paper are both dry waste.
+            </span>
           </li>
           <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>

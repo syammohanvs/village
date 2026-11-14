@@ -33,6 +33,14 @@ import {
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
 import { cameraErrorMessage, openCameraStream, waitForFrames } from '../lib/camera';
+import {
+  SUPPORT,
+  SUPPORT_ROLE,
+  WORDS,
+  guideFor,
+  spokenFor,
+  type Disposal,
+} from '../lib/wasteGuide';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import {
@@ -58,7 +66,7 @@ interface Classifier {
  *
  * `empty` and `unmatched` are two different facts and must not share an answer:
  * an empty table is “Not a waste item”, while a background that no longer
- * describes the table is something the operator has to fix — and the item in
+ * describes the table is something the Gram Sahayak has to fix — and the item in
  * front of the camera still has to be classified.
  */
 type FocusOutcome =
@@ -105,6 +113,32 @@ function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number,
 
 type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
+/**
+ * The two things a result screen always offers.
+ *
+ * "Contact Gram Sahayak" is only a button when there is a number to call.  With
+ * no number configured it is the desk sentence instead — a press that cannot
+ * work is worse than a sentence that says where to go.
+ */
+function CardActions({ onScanAnother, support }: { onScanAnother: () => void; support: { desk: string; contact: string } }) {
+  return (
+    <div className="camera-actions" data-testid="waste-actions">
+      <button type="button" className="btn btn--primary" onClick={onScanAnother} data-testid="scan-another">
+        Scan another item
+      </button>
+      {support.contact ? (
+        <a className="btn btn--ghost" href={`tel:${support.contact}`} data-testid="contact-sahayak">
+          Contact {SUPPORT_ROLE}
+        </a>
+      ) : (
+        <span className="hint" data-testid="contact-sahayak">
+          {support.desk}
+        </span>
+      )}
+    </div>
+  );
+}
+
 const DEFAULT_PATH = '/models/waste/';
 
 function modelBase(path: string | undefined): string {
@@ -122,7 +156,7 @@ function capitalise(value: string): string {
 
 // The model's last class is the "nothing to sort" side of the camera: the empty
 // table, the room, and ordinary objects (a car key, a phone, a wallet) that are
-// not waste.  "Background" is the engineering name; the operator needs the
+// not waste.  "Background" is the engineering name; the Gram Sahayak needs the
 // plain-English one.
 function displayLabel(label: string): string {
   return label.trim().toLowerCase() === 'background' ? 'Not a waste item' : label;
@@ -209,9 +243,12 @@ export function SortWaste() {
   // The camera's own shape, so the frame shows the WHOLE picture.  A fixed 4:3
   // box with `object-fit: cover` silently hid the left and right edges of a
   // 16:9 camera, so an item could be in shot and not on screen -- and the read
-  // did not match what the operator could see.
+  // did not match what the Gram Sahayak could see.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
+  // A reader's own statement about the item (mixed bag, sanitary waste, a sharp)
+  // is not a model class, so it is kept apart from `recognition`.
+  const [manualGuide, setManualGuide] = useState<Disposal | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
   const [backgroundReady, setBackgroundReady] = useState(false);
   const [focusOn, setFocusOn] = useState(true);
@@ -244,7 +281,7 @@ export function SortWaste() {
       consecutiveFrames: stabilityFrames,
       // With a stored background, the empty-scene frames are the duplicate
       // guard: an item still in view never produces them.  The time cooldown
-      // would otherwise make the operator wait after the item is removed.
+      // would otherwise make the Gram Sahayak wait after the item is removed.
       cooldownMs: effectiveCooldown,
     });
   }, [confidence, stabilityFrames, effectiveCooldown]);
@@ -316,7 +353,7 @@ export function SortWaste() {
       context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       // Keep the newest three.  Adding a fourth at a hall whose background has
-      // changed again should replace the oldest, not lock the operator out.
+      // changed again should replace the oldest, not lock the Gram Sahayak out.
       const next: BackgroundFrame[] = [
         ...backgroundRef.current,
         { width: ANALYSIS_WIDTH, height: ANALYSIS_HEIGHT, data: frame.data },
@@ -373,7 +410,7 @@ export function SortWaste() {
         return { kind: 'whole', input: video };
       }
 
-      // What to compare against.  A backdrop the operator set is used when there
+      // What to compare against.  A backdrop the Gram Sahayak set is used when there
       // is one; otherwise the room is learned from the live stream, so the venue
       // never has to clear a table it does not have.  Either way the comparison
       // below is the same code -- the learned room is simply a background that
@@ -454,7 +491,7 @@ export function SortWaste() {
       const region = state.region;
       // Only the thing held up in front of the camera is an item.
       //
-      // The change has to sit mostly **inside the square the operator is told to
+      // The change has to sit mostly **inside the square the Gram Sahayak is told to
       // use** (`regionInGuide`).  Something held at the edge of the picture is a
       // change too, and without this it was classified as waste with the crop of
       // the middle of the frame answering for it -- reported as "a bottle held
@@ -705,12 +742,8 @@ export function SortWaste() {
     // measured at 19-21 s with the controller switched off, because the record
     // asked the board for its fill levels.  The sentence is already known here:
     // a bin name for the three bins, a referral for anything else.
-    const spoken =
-      hazardous
-        ? 'Hazardous waste. Do not put it in the bins. Hand it to the operator.'
-        : material
-          ? `Classified as ${event.label || event.category}. Please contact the operator.`
-          : `Classified as ${event.category}. Put it in the ${event.category} bin.`;
+    // Lia says what the card says, because both read the one routing table.
+    const spoken = spokenFor(guideFor(hazardous ? 'medical' : event.label || event.category));
     void speakText(spoken, voiceLanguage, 0.95);
 
     try {
@@ -730,15 +763,10 @@ export function SortWaste() {
         })),
       });
       setRecognition(result);
-      const binState = result.bin?.state;
-      setAlert(
-        result.alert ??
-          (binState === 'full'
-            ? `The ${event.category} bin is reported full. Empty it before the next item.`
-            : binState === 'nearly_full'
-              ? `The ${event.category} bin is nearly full.`
-              : ''),
-      );
+      // Bin fullness is not measured on this model (three bins, no distance
+      // sensors), so the only alert worth showing is the one the board itself
+      // raises for a bin it cannot use.
+      setAlert(result.alert ?? '');
     } catch (cause) {
       setRecognitionError(errorMessage(cause));
     } finally {
@@ -1025,6 +1053,13 @@ export function SortWaste() {
       ? (referralLabel ?? 'Recycling agent')
       : resultCategory;
 
+  // A recommendation is a decision about the item, not about the material, so
+  // it comes from the one routing table -- and special-care waste is asked for
+  // by what it is, never by what the classifier named.
+  const disposal = recognition
+    ? guideFor(hazardous ? 'medical' : referred ? (referralLabel ?? '') : (resultCategory ?? ''))
+    : null;
+
   return (
     <div className="page sort-waste">
       <div className="waste-layout">
@@ -1047,7 +1082,7 @@ export function SortWaste() {
             />
             {/*
               The square that will actually be read.  Drawn, not guessed: the
-              same `PRESS_CROP_SHARE` sizes it and the crop, so what the operator
+              same `PRESS_CROP_SHARE` sizes it and the crop, so what the Gram Sahayak
               frames is what the model sees.  Reported three times in a row --
               a bottle held at the edge read as paper, then glass -- because the
               crop took the middle, which was a face.
@@ -1209,6 +1244,35 @@ export function SortWaste() {
                   : 'Show one item to the camera — held in your hand is fine. An empty scene is optional: set one only if the camera looks at a fixed, empty table, and then only the object that appears is classified.'}
               </p>
             )}
+            {cameraOn && (
+              <div className="focus-controls" data-testid="special-choices">
+                <span className="hint">Not one clean item, or not sure?</span>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  data-testid="mixed-bag"
+                  onClick={() => setManualGuide(guideFor('mixed bag', { mixedBag: true }))}
+                >
+                  Mixed bag / several items
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  data-testid="sanitary-waste"
+                  onClick={() => setManualGuide(guideFor('sanitary pad'))}
+                >
+                  Sanitary waste
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  data-testid="sharps"
+                  onClick={() => setManualGuide(guideFor('syringe'))}
+                >
+                  Sharp or medical
+                </button>
+              </div>
+            )}
             {frameWarning && (
               <p className="warn-text" data-testid="frame-warning">
                 {frameWarning}
@@ -1244,52 +1308,78 @@ export function SortWaste() {
           <Card
             className="result-card"
             kicker={
-              hazardous
-                ? 'Hazardous waste'
-                : referred
-                  ? 'Not one of the three bins'
+              disposal
+                ? disposal.separate
+                  ? 'Keep it out of the bins'
                   : 'Suggested bin'
+                : 'Suggested bin'
             }
             title={
-              hazardous
-                ? 'Do not sort here'
-                : referred
-                  ? 'Recycling agent'
-                  : resultCategory ?? (removing ? 'Remove the item' : 'Waiting for an item')
+              disposal?.title ??
+              (manualGuide ? 'Ask the Gram Sahayak' : removing ? 'Remove the item' : 'Waiting for an item')
             }
           >
-            {recognition ? (
+            {manualGuide ? (
+              <>
+                {/*
+                  The reader told the page what the item is — a mixed bag, sanitary
+                  waste, a sharp.  Those are not model classes, and inventing one
+                  for them would be a lie about what the camera can do, so they are
+                  an explicit choice instead.
+                */}
+                <p className="result-big" data-testid="waste-result">
+                  {manualGuide.item}
+                </p>
+                <p className="result-sub" data-testid="waste-destination">
+                  <strong>{manualGuide.title}.</strong> {manualGuide.reason}
+                </p>
+                <CardActions
+                  onScanAnother={() => {
+                    setManualGuide(null);
+                    setRecognition(null);
+                    setPredictions([]);
+                    stabilizerRef.current.reset();
+                  }}
+                  support={SUPPORT}
+                />
+              </>
+            ) : recognition ? (
               <>
                 <p className="result-big" data-testid="waste-result">
                   {shownCategory}
                 </p>
-                {hazardous ? (
-                  <>
-                    <p className="result-sub" data-testid="waste-hazardous">
-                      This is hazardous waste. Do not put it in the organic, plastic or paper bins.
-                      Hand it to the operator and contact the operator.
-                    </p>
-                    <p className="hint">No bin LED is lit for this item.</p>
-                  </>
-                ) : referred ? (
-                  <>
-                    <p className="result-sub" data-testid="waste-referral">
-                      {referralLabel ? `${referralLabel} does` : 'This item does'} not go in the
-                      organic, plastic or paper bins. Hand it to our recycling agent and contact the
-                      operator.
-                    </p>
-                    <p className="hint">No bin LED is lit for this item.</p>
-                  </>
-                ) : (
-                  <p className="result-sub">
-                    Put it in the <strong>{resultCategory?.toLowerCase()}</strong> bin and watch that
-                    bin&apos;s LED.
+                <p className="result-sub" data-testid="waste-destination">
+                  {disposal ? (
+                    <>
+                      <strong>
+                        {disposal.separate
+                          ? disposal.title
+                          : `Put it in the ${disposal.title.toLowerCase()} bin`}
+                        .
+                      </strong>{' '}
+                      {disposal.reason}
+                    </>
+                  ) : (
+                    'No destination could be worked out for this item. Contact the Gram Sahayak.'
+                  )}
+                </p>
+                {disposal?.support && (
+                  <p className="hint" data-testid="waste-support">
+                    {SUPPORT.contact
+                      ? `Call the ${SUPPORT_ROLE} on ${SUPPORT.contact}.`
+                      : SUPPORT.desk}
                   </p>
                 )}
                 {alert && <Notice tone="warn">{alert}</Notice>}
-                <p className="hint">
-                  This is a camera suggestion, not proof that the item was put in the bin.
-                </p>
+                <CardActions
+                  onScanAnother={() => {
+                    setRecognition(null);
+                    setPredictions([]);
+                    stabilizerRef.current.reset();
+                  }}
+                  support={SUPPORT}
+                />
+                <p className="hint">{WORDS.notProof}</p>
                 {stability?.phase === 'waiting-removal' && (
                   <p className="hint" data-testid="waste-rearm">
                     Remove the item; the camera arms itself for the next one.
@@ -1356,7 +1446,7 @@ export function SortWaste() {
               <details className="advanced">
                 <summary>
                   {hazardous
-                    ? 'Record that the operator took it'
+                    ? 'Record that the Gram Sahayak took it'
                     : referred
                       ? 'Record that the recycling agent took it'
                       : 'Record that you put it in the bin'}
@@ -1493,7 +1583,7 @@ export function SortWaste() {
               <p>
                 A label must clear the confidence threshold for several consecutive frames before it
                 is accepted. The camera then stops itself, so one bottle is not counted on every
-                frame and the next item gets a fresh session when the operator starts it again.
+                frame and the next item gets a fresh session when the Gram Sahayak starts it again.
               </p>
               <p className="hint">
                 The camera recognises waste; it does not identify people, measure weight, or prove

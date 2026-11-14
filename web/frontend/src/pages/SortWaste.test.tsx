@@ -290,8 +290,10 @@ describe('Sort Waste', () => {
     expect(recyclerCall.category).toBe('other');
     expect(recyclerCall.confidence).toBeCloseTo(0.945, 6);
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Glass');
-    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
-    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/contact the operator/i);
+    // A material that is not one of the three bins: the card keeps it out and
+    // names the support role, and it never claims a bin.
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/keep separate|ask the gram sahayak/i);
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
     expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
     expect(stopTrack).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
@@ -352,8 +354,8 @@ describe('Sort Waste', () => {
       confidence: 0.9,
     });
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
-    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/hazardous waste/i);
-    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/do not place this in our three bins/i);
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
     expect(screen.queryByText(/Put it in the medical bin/i)).not.toBeInTheDocument();
     // A camera-recognised hazardous item also leaves the camera running; the
     // manual Hazardous button is the one that stops it.
@@ -398,9 +400,9 @@ describe('Sort Waste', () => {
       confidence: 1,
     });
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
-    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/hazardous waste/i);
-    expect(screen.getByTestId('waste-hazardous')).toHaveTextContent(/contact the operator/i);
-    expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/do not place this in our three bins/i);
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
+    expect(screen.getByTestId('waste-destination')).not.toHaveTextContent(/ask the gram sahayak/i);
   }, 15000);
 
   it('offers a background snapshot so the room is not classified', async () => {
@@ -496,7 +498,7 @@ describe('Sort Waste', () => {
     await new Promise((resolve) => setTimeout(resolve, 6000));
     expect(api.postRecognition).not.toHaveBeenCalled();
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('waste-referral')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('waste-destination')).not.toBeInTheDocument();
   }, 15000);
 
   it('accepts a split recycler vote as one recycling outcome', async () => {
@@ -554,7 +556,7 @@ describe('Sort Waste', () => {
     expect(splitCall.category).toBe('other');
     expect(splitCall.confidence).toBeCloseTo(0.86, 6);
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Electronic waste');
-    expect(screen.getByTestId('waste-referral')).toHaveTextContent(/recycling agent/i);
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/keep separate|gram sahayak/i);
   }, 15000);
 
   it('keeps the camera running and arms itself for the next item', async () => {
@@ -1025,7 +1027,7 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
 
     // The greeting speaks on mount, so look for the classification itself.
     await waitFor(
-      () => expect(spoken.some((line) => /Classified as Metal/i.test(line))).toBe(true),
+      () => expect(spoken.some((line) => /keep this item separate/i.test(line))).toBe(true),
       { timeout: 8000 },
     );
     // ...and the request is genuinely still outstanding, so this was not a
