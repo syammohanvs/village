@@ -547,9 +547,28 @@ resistor into an ADC pin carries no current, so it is protection only.
 - The voltage **across the 330 Ω** is `V33 − V36`, so
   `I = (V33 − V36) / 330` and `P = V33 × I`.
 
-With a red LED (~1.8 V forward) and a panel at 3.3 V: junction ≈ 1.8 V, drop
-≈ 1.5 V, current ≈ **4.5 mA**, power ≈ **15 mW**. The dashboard shows all three
-figures, and they rise when a torch is shone on the panel.
+**If the panel reaches 3.3 V** with a red LED (~1.8 V forward): junction
+≈ 1.8 V, drop ≈ 1.5 V, current ≈ **4.5 mA**, power ≈ **15 mW**.
+
+**Measured on this build (2026-11-15), phone torch held on the panel:**
+
+| Tap | Dark | Torch |
+| --- | ---: | ---: |
+| panel (VN) | 142 mV | **2019 mV** |
+| junction (VP) | 142 mV | **1827 mV** |
+| drop across 330 Ω | 0 mV | 192 mV |
+| current | 0 mA | **0.58 mA** |
+| power | 0 mW | **1.17 mW** |
+
+Two things to read from that. The junction sat at **~1.83 V** — a red LED's
+forward drop — while the panel moved, which is the proof the LED is in the load
+path and the polarity is right (a reversed or missing LED would let the junction
+follow the panel). And the current is **0.58 mA, not ~4.5 mA**, because the cell
+only reached **2.0 V** under a phone torch, not 3.3 V: `I = (Vpanel − Vf) / 330`,
+so there is simply less voltage left across the resistor. Brighter light (real
+sun) or a smaller sense resistor both raise it; at 0.58 mA the LED is lit but
+dim. The dashboard shows all five figures and they fall back to zero when the
+light is removed.
 
 **The 330 Ω is the sense resistor, so `sense_ohms` must be 330** — not 10 000.
 `solar.sense_ohms` is part of the stored config (default 330), which is what lets

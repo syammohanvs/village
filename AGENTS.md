@@ -315,6 +315,25 @@ actually flows, and **Not generating** in neutral when the panel reads volts but
 no current — a red LED needs ~1.8 V before it conducts, so a dark panel honestly
 reads 0 mA.
 
+## Solar panel, measured (2026-11-15)
+
+Panel voltage on **VN (GPIO 39)**, LED junction on **VP (GPIO 36)**, 330 Ω in
+series with a red LED, `sense_ohms = 330`. Dark: both taps 142 mV, 0 mA.
+Phone torch on the panel for 10 s:
+
+| panel | junction | drop | current | power |
+| ---: | ---: | ---: | ---: | ---: |
+| 2019 mV | 1827 mV | 192 mV | 0.58 mA | 1.17 mW |
+
+- The junction stopping at **~1.83 V** (red LED Vf) while the panel varied is
+  the check that the LED is in the load path and the polarity is right; a
+  reversed/open LED makes the junction follow the panel.
+- The current is small because the cell only reached **2.0 V** under a phone
+  torch — `I = (Vpanel − Vf)/330`. The 4.5 mA / 15 mW in the wiring doc is the
+  **3.3 V** case, not this one.
+- `solar.installed` is now true (it gates nothing in the app; the card reads the
+  numbers regardless).
+
 ## Soil moisture polarity
 
 The soil probe is read as an analogue value on GPIO 34 (D34).  A bare
