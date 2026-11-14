@@ -26,6 +26,14 @@ import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi'
 import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
 
 type CardKey = 'plants' | 'lights';
+
+// The panel "generates" only when current actually flows through the LED load.
+// A red LED needs about 1.8 V before it conducts, so a dim panel honestly reads
+// 0 mA — that is a true reading, not a fault.  The threshold sits far above the
+// dark noise floor (~0.007 mW here) and far below any real light (a phone torch
+// gives ~15 mW), so it cannot be flipped by ADC jitter.
+const SOLAR_GENERATING_MW = 0.1;
+
 function levelChip(text: string, tone: 'live' | 'warn' | 'bad' | 'neutral' | 'gold') {
   return <Chip tone={tone}>{text}</Chip>;
 }
@@ -82,6 +90,7 @@ export function OurVillage() {
   const solarVolts = hasStatus && solar?.millivolts != null ? (solar.millivolts / 1000).toFixed(2) : null;
   const solarCurrent = hasStatus && solar?.current_ma != null ? solar.current_ma.toFixed(2) : null;
   const solarPower = hasStatus && solar?.power_mw != null ? solar.power_mw.toFixed(1) : null;
+  const solarGenerating = Boolean(solarVolts) && (solar?.power_mw ?? 0) >= SOLAR_GENERATING_MW;
 
   const rows = events.data?.events ?? events.data?.items ?? [];
   const latestRecognition = rows.find((row) => {
@@ -460,8 +469,14 @@ export function OurVillage() {
             </span>
             <h2>Solar Panel</h2>
             {levelChip(
-              !hasStatus ? 'Status unknown' : solarVolts ? 'Live' : 'No reading',
-              solarVolts ? 'live' : 'neutral',
+              !hasStatus
+                ? 'Status unknown'
+                : !solarVolts
+                  ? 'No reading'
+                  : solarGenerating
+                    ? 'Generating'
+                    : 'Not generating',
+              solarGenerating ? 'live' : 'neutral',
             )}
           </header>
           {stateLine(
@@ -473,9 +488,11 @@ export function OurVillage() {
           <p className="vcard-fact">
             {solar?.valid === false
               ? 'The current sense reads above the panel voltage, so the two sensor wires may be swapped. The power figure is not shown until they agree.'
-              : solarVolts
-                ? `The panel is delivering ${solarPower ?? '0.0'} milliwatts at ${solarVolts} volts. Flash a torch at it and watch the numbers rise.`
-                : 'Connect a solar panel to GPIO 33 (panel) and GPIO 36 (across the series resistor) and the readings appear here.'}
+              : !solarVolts
+                ? 'Connect a solar panel to GPIO 39 (VN) and the LED junction to GPIO 36 (VP), and the readings appear here.'
+                : solarGenerating
+                  ? `The panel is delivering ${solarPower ?? '0.0'} milliwatts at ${solarVolts} volts. Cover the panel and the numbers fall back to zero.`
+                  : `The panel reads ${solarVolts} volts but no current is flowing yet. A red LED needs about 1.8 V before it conducts, so a dim panel honestly reads zero. Shine a torch on it and watch.`}
           </p>
         </article>
       </div>

@@ -444,6 +444,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .chip--neutral { color: var(--cream); }
 .chip--danger, .chip--bad { color: #2a0b0f; background: var(--danger); border-color: var(--danger); font-weight: 600; }
 .chip--good { color: #062016; background: var(--success); border-color: var(--success); font-weight: 600; }
+/* `live` is its own chip tone (the dashboard's "Model ready", "Available" and
+   "Generating" pills) but had no rule at all, so it fell back to the base grey
+   chip: a colour that says "nothing is happening" under a word that says the
+   opposite.  It makes the same statement `good` makes, so it is painted the
+   same way — one colour, two names. */
+.chip--live { color: #062016; background: var(--success); border-color: var(--success); font-weight: 600; }
 
 /* ------------------------------------------------------------------ buttons */
 .btn {

@@ -178,6 +178,39 @@ describe('Our Village', () => {
   });
 });
 
+describe('solar pill', () => {
+  it('stays neutral while the panel reads volts but no current flows', async () => {
+    // A dark panel: 142 mV, no current.  That is a true reading, not a fault, and
+    // a green "live" pill here would claim the panel is producing power.
+    render(<App />);
+    const card = within(await screen.findByTestId('card-solar'));
+    const chip = card.getByText('Not generating');
+    expect(chip).toHaveClass('chip', 'chip--neutral');
+    expect(chip).not.toHaveClass('chip--live');
+    expect(card.getByText(/0.14 V · 0.00 mA · 0.0 mW/)).toBeInTheDocument();
+    expect(card.getByText(/needs about 1\.8 V before it conducts/i)).toBeInTheDocument();
+  });
+
+  it('goes green only once the panel is actually making power', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ solarMillivolts: 3200, solarCurrentMa: 4.55, solarPowerMw: 14.6 }),
+    );
+    render(<App />);
+    const card = within(await screen.findByTestId('card-solar'));
+    const chip = card.getByText('Generating');
+    expect(chip).toHaveClass('chip--live');
+    expect(card.getByText(/14\.6 milliwatts at 3\.20 volts/i)).toBeInTheDocument();
+  });
+
+  it('says where the two taps go when there is no reading at all', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ solarMillivolts: null }));
+    render(<App />);
+    const card = within(await screen.findByTestId('card-solar'));
+    expect(card.getByText('No reading')).toBeInTheDocument();
+    expect(card.getByText(/GPIO 39 \(VN\).*GPIO 36 \(VP\)/i)).toBeInTheDocument();
+  });
+});
+
 describe('unknown readings', () => {
   it('never claims Idle, Off or "not commissioned" without a frame', async () => {
     vi.mocked(api.state).mockRejectedValue(new Error('backend down'));

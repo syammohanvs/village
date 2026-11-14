@@ -13,6 +13,11 @@ export interface StateOptions {
   reservoirState?: 'available' | 'low' | 'uncalibrated' | 'unavailable';
   lightBrightness?: 'bright' | 'dark' | 'unknown';
   lightInstalled?: boolean;
+  /** Panel volts on VN. Omit for "no solar reading yet". */
+  solarMillivolts?: number | null;
+  solarCurrentMa?: number;
+  solarPowerMw?: number;
+  solarValid?: boolean;
   lightsMode?: 'auto' | 'manual' | 'unknown';
   lightsCommanded?: boolean;
   lastError?: string | null;
@@ -34,6 +39,10 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     reservoirState = 'available',
     lightBrightness = 'dark',
     lightInstalled = true,
+    solarMillivolts = 142,
+    solarCurrentMa = 0,
+    solarPowerMw = 0,
+    solarValid = true,
     lightsMode = 'auto',
     lightsCommanded = false,
     lastError = null,
@@ -91,6 +100,21 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
           age_ms: 240,
           fault: null,
         },
+        solar:
+          solarMillivolts === null
+            ? undefined
+            : {
+                installed: true,
+                raw: 0,
+                millivolts: solarMillivolts,
+                volts: solarMillivolts / 1000,
+                junction_millivolts: solarCurrentMa > 0 ? 1800 : solarMillivolts,
+                sense_ohms: 330,
+                drop_millivolts: 0,
+                current_ma: solarCurrentMa,
+                power_mw: solarPowerMw,
+                valid: solarValid,
+              },
       },
       actuators: {
         pump: {
