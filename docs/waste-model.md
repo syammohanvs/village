@@ -633,6 +633,75 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### "Thermocol is too frequent" — measured, and it is the opposite (2026-11-14)
+
+Reported: *"pen cap was classified as thermocol. as was colored paper manual. another
+handkerchief shown again classified as thermocol. how can a green handkerchief that is really
+irregular be classified as thermocole? I think thermocole classification is too frequent."*
+
+The hypothesis was reasonable and it is **wrong**, which is worth writing down so it is not
+re-litigated. Thermocol is **6.2% of the top-1 answers across 13 335 recorded frames** — the
+third *rarest* class. And on the 385 held-out archive photographs it is the **most
+conservative** class there is:
+
+| class | recall | precision |
+| --- | --- | --- |
+| Thermocol | **36.8%** (worst of all eleven) | **100.0%** |
+| Plastic | 87.5% | **66.0%** (worst precision) |
+| Paper | 100% | 74.1% |
+
+Precision 100% means it was **never** said about a non-thermocol object in that set, and
+recall 36.8% means it is usually *missed* — eleven of its 24 misses went to Plastic and five
+to Paper. **Reducing thermocol training would have made the weakest class weaker.**
+
+**What is actually true is narrower and more useful: Thermocol wins featureless white
+blobs.** Every complaint is the same picture in different clothes — a white square plate
+(Thermocol 0.52), a glossy colour brochure (0.75), a 40-pixel pen cap in a hand (0.34). Foam
+cups, plates and packaging are white, smooth and textureless, so "white, smooth, no shape" is
+its nearest neighbour. It is a *sink for ambiguity*, not an over-trained class.
+
+**What was tried, and what worked.** 95 freely licensed photographs of the confusable forms
+(glossy brochures and leaflets to Paper, pen caps to Plastic, white ceramic plates to Glass)
+were added and the model retrained. On the venue's own captures that moved **nothing**: the
+manual still read Thermocol 0.75. Generic photographs of other brochures do not transfer to
+*this* brochure, which is the dilution problem in its purest form.
+
+Promoting the venue's own frames to `Paper` — the technique that fixed the brown cover — did
+move it, immediately:
+
+| Venue capture | Before | After |
+| --- | --- | --- |
+| glossy paper manual | Thermocol **0.75** | **Paper 0.92** |
+| glossy manual, second frame | Thermocol 0.56 | **Paper 0.95** |
+| pen cap (40 px in a hand) | Thermocol 0.34 | Paper 0.49 — under threshold, so *no decision* |
+| white plate with food | Thermocol 0.52 | Thermocol 0.56 — **not fixed, and arguably unknowable** |
+| green cloth handkerchief | Textile 0.95 | Textile 0.95 |
+| brown paper cover | Paper 0.86 | Paper 0.86 |
+
+Net effect of the whole pass, measured:
+
+| Set | Before | After |
+| --- | --- | --- |
+| Real-world probe (241) | 70.1% / 77.2% | **74.3% / 80.1%** |
+| Hand-held items (528) | 50.2% / 66.1% | 49.1% / **67.4%** |
+| Handkerchiefs (8) | 3/8 | 3/8 |
+| Thermocol recall / precision | 36.8% / 100% | **42.1% / 88.9%** |
+
+So thermocol's *recall* went up five points and its precision gave up eleven points of a
+100% — it now says "thermocol" for about one object in nine that is not, having never done
+so before. That is the only sense in which the report was right, and it is now visible.
+
+**The two cases that are not fixable this way, stated rather than hidden:**
+
+- **The pen cap** is about 40×15 pixels inside the 224 crop, held between two fingers. There
+  is no classifier on earth that reads a 40-pixel transparent cap; the honest answer is to
+  hold it closer, which the new guide makes obvious. It no longer produces a *confident*
+  wrong answer (0.44 → 0.49, under the threshold).
+- **The white square plate with curry on it.** Ceramic, thermocol and melamine plates are the
+  same picture: a white square. Teaching "white plate → Glass" would break every real foam
+  plate, so it is left alone. It is a genuinely ambiguous object for a camera with no sense
+  of weight or clink.
+
 ### What you see is now what is read (2026-11-14)
 
 Reported: *"business card classified as three different items. my plastic pen also classified
