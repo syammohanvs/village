@@ -108,6 +108,10 @@ beforeEach(() => {
     }),
   });
   toDataUrlCalls.length = 0;
+  // A real camera reports its frame size; jsdom's video reports 0 forever, so
+  // the page's new "did a picture actually arrive?" check would fail them all.
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 640 });
+  Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 480 });
   spoken.length = 0;
   Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
     configurable: true,

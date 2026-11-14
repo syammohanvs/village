@@ -75,6 +75,9 @@ export function cameraErrorMessage(cause: unknown): string {
   if (name === 'NotFoundError' || name === 'OverconstrainedError') {
     return 'No camera answered. Check it is plugged in, then press Start Camera again.';
   }
+  if (name === 'TimeoutError') {
+    return 'The camera opened but never sent a picture. Choose another camera from the list, or close anything else that films (a virtual camera, or another tab), then press Start Camera again.';
+  }
   if (/Timeout starting video source|Could not start video source|NotReadableError/i.test(text) || name === 'NotReadableError') {
     return 'The camera opened but sent no picture. Another app is probably using it — close Zoom, Teams or the Camera app (and any other browser tab showing the camera), then press Start Camera again.';
   }
@@ -82,4 +85,26 @@ export function cameraErrorMessage(cause: unknown): string {
     return 'Another program is using the camera. Close it and press Start Camera again.';
   }
   return `The camera could not start: ${text || 'unknown reason'}.`;
+}
+
+/**
+ * Wait until the stream is really producing pictures.
+ *
+ * `getUserMedia` can hand back a live stream from a device that then delivers
+ * nothing -- a virtual camera, a wedged driver, a device another program is
+ * holding half-open.  The video element then stays black and the page looks
+ * "not loading" with no error at all, which is impossible to act on.  Four
+ * seconds is well past the first frame of any working camera.
+ */
+export async function waitForFrames(
+  video: { videoWidth: number; videoHeight: number },
+  timeoutMs = 4000,
+  stepMs = 100,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (video.videoWidth > 0 && video.videoHeight > 0) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
 }

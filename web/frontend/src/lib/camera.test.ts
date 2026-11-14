@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cameraErrorMessage, cameraLadder, openCameraStream } from './camera';
+import { cameraErrorMessage, cameraLadder, openCameraStream, waitForFrames } from './camera';
 
 const stream = { id: 'fake-stream' } as unknown as MediaStream;
 
@@ -77,5 +77,38 @@ describe('cameraErrorMessage', () => {
 
   it('keeps an unknown failure readable', () => {
     expect(cameraErrorMessage(new Error('weird'))).toMatch(/could not start: weird/);
+  });
+});
+
+describe('waitForFrames', () => {
+  it('accepts a camera that delivers a picture at once', async () => {
+    expect(await waitForFrames({ videoWidth: 640, videoHeight: 480 }, 50, 10)).toBe(true);
+  });
+
+  it('accepts one that starts a moment later', async () => {
+    let polls = 0;
+    const video = {
+      get videoWidth() {
+        polls += 1;
+        return polls > 3 ? 640 : 0;
+      },
+      videoHeight: 480,
+    };
+    expect(await waitForFrames(video, 2000, 5)).toBe(true);
+  });
+
+  it('gives up on a stream that never sends a frame', async () => {
+    // The reported "camera is not loading": a live stream, a black preview, and
+    // nothing on screen to explain it.
+    expect(await waitForFrames({ videoWidth: 0, videoHeight: 0 }, 60, 10)).toBe(false);
+  });
+});
+
+describe('the message for a silent stream', () => {
+  it('names the device list instead of blaming another app', async () => {
+    const silent = Object.assign(new Error('the camera opened but sent no picture'), { name: 'TimeoutError' });
+    const message = cameraErrorMessage(silent);
+    expect(message).toMatch(/never sent a picture/i);
+    expect(message).toMatch(/choose another camera/i);
   });
 });

@@ -32,7 +32,7 @@ import {
 } from '../lib/sceneMemory';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
-import { cameraErrorMessage, openCameraStream } from '../lib/camera';
+import { cameraErrorMessage, openCameraStream, waitForFrames } from '../lib/camera';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import {
@@ -618,6 +618,25 @@ export function SortWaste() {
     }
   }, [installed, modelState]);
 
+  /**
+   * List the cameras without opening one.
+   *
+   * The picker used to be filled only after a stream opened -- so the one
+   * moment a visitor needs it (the camera will not open) is the one moment it
+   * was empty, and a virtual camera sitting first in the browser's order could
+   * not be skipped.  Before permission the labels are blank but the ids are
+   * real, which is enough to choose a different device.
+   */
+  const refreshDevices = useCallback(async () => {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') return;
+    const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    setDevices(list.filter((device) => device.kind === 'videoinput'));
+  }, []);
+
+  useEffect(() => {
+    void refreshDevices();
+  }, [refreshDevices]);
+
   const startCamera = async () => {
     setCameraError('');
     if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
@@ -632,9 +651,20 @@ export function SortWaste() {
       // A device that no longer answers must not be asked for again.
       if (deviceId && !opened.usedDeviceId) setDeviceId('');
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
+      const element = videoRef.current;
+      if (element) {
+        element.srcObject = stream;
+        // A rejected play() used to be swallowed, which left a black preview
+        // with no message -- "the camera is not loading".
+        await element.play();
+        if (!(await waitForFrames(element))) {
+          stream.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          element.srcObject = null;
+          throw Object.assign(new Error('the camera opened but sent no picture'), {
+            name: 'TimeoutError',
+          });
+        }
       }
       setCameraOn(true);
       // A one-press reading crops the middle of the picture and needs no room
@@ -648,6 +678,8 @@ export function SortWaste() {
       if (installed) void loadModel();
     } catch (cause) {
       setCameraError(cameraErrorMessage(cause));
+      // So the picker offers the other cameras after a failure.
+      void refreshDevices();
     }
   };
 
@@ -1001,6 +1033,7 @@ export function SortWaste() {
               className="camera-video"
               playsInline
               muted
+              autoPlay
               aria-label="Waste camera preview"
               onLoadedMetadata={(event) => {
                 const { videoWidth, videoHeight } = event.currentTarget;
