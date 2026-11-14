@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from urllib.parse import urlparse
 
 from .config import Settings
 from .simulator import SimulatedDevice, SimulatorError
@@ -37,16 +38,97 @@ class RequestReuseError(Exception):
     pass
 
 
+def candidate_hosts(base_url: str) -> list[str]:
+    """The addresses worth trying, the configured one first.
+
+    The board's address is DHCP and it moves -- it has been .8, .6 and .4 on this
+    deployment, and every move turned the app dead until somebody edited `.env`
+    and restarted.  A controller that answers `/api/v1/status` with our token is
+    unmistakable, so the way back is to ask the neighbourhood.
+    """
+    try:
+        host = urlparse(base_url).hostname or ""
+    except ValueError:
+        return []
+    parts = host.split(".")
+    if len(parts) != 4 or not all(part.isdigit() for part in parts):
+        return []
+    octets = [int(part) for part in parts]
+    if any(octet < 0 or octet > 255 for octet in octets):
+        return []
+    prefix = octets[:3]
+    rest = [f"{prefix[0]}.{prefix[1]}.{prefix[2]}.{i}" for i in range(1, 255)]
+    rest.remove(host)
+    return [host, *rest]
+
+
+async def discover_device(
+    base_url: str,
+    token: str,
+    *,
+    timeout: float = 0.7,
+    concurrency: int = 48,
+    prober: Callable[[str], Awaitable[bool]] | None = None,
+) -> str | None:
+    """Find the controller that answers our device API, or None.
+
+    Only a `200` from `/api/v1/status` counts, and the request carries the
+    device token, so a printer or a Windows box on the same network is not
+    mistaken for the board.  `prober` exists so the sweep can be tested without
+    a network.
+    """
+    hosts = candidate_hosts(base_url)
+    if not hosts:
+        return None
+    probe = prober or _http_prober(token, timeout)
+    if await probe(hosts[0]):
+        return f"http://{hosts[0]}"
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def one(host: str) -> str | None:
+        async with semaphore:
+            return host if await probe(host) else None
+
+    tasks = [asyncio.create_task(one(host)) for host in hosts[1:]]
+    try:
+        for finished in asyncio.as_completed(tasks):
+            found = await finished
+            if found:
+                return f"http://{found}"
+    finally:
+        for task in tasks:
+            task.cancel()
+    return None
+
+
+def _http_prober(token: str, timeout: float) -> Callable[[str], Awaitable[bool]]:
+    async def probe(host: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=timeout, headers={"X-Device-Token": token}) as client:
+                response = await client.get(f"http://{host}/api/v1/status")
+        except Exception:  # noqa: BLE001 - an address that does not answer is the normal case
+            return False
+        return response.status_code == 200
+
+    return probe
+
+
 class HttpDevice:
     """The real ESP32 over local Wi-Fi.  The token never reaches the browser."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.base_url = settings.device_url
         self._client = httpx.AsyncClient(
             base_url=settings.device_url,
             timeout=settings.device_timeout_s,
             headers={"X-Device-Token": settings.device_token},
         )
+
+    def set_base_url(self, url: str) -> None:
+        """Point the client at an address the sweep found."""
+        self.base_url = url
+        self._client.base_url = url
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         try:
@@ -122,6 +204,7 @@ class DeviceGateway:
         self._command_cache: OrderedDict[tuple[str, str], dict[str, Any]] = OrderedDict()
         self._events: list[dict[str, Any]] = []
         self._last_poll_mono = 0.0
+        self._last_discover_mono = float("-inf")
 
     # ------------------------------------------------------------------
     @property
@@ -197,6 +280,7 @@ class DeviceGateway:
                 message = getattr(exc, "message", str(exc))
                 self._last_error = message
                 self._failures += 1
+                await self._maybe_discover()
                 age_ms = self._age_ms()
                 was_connected = self._connected
                 if age_ms is not None and age_ms > self.settings.disconnect_after_ms:
@@ -241,6 +325,37 @@ class DeviceGateway:
                         "detail": "A new boot id was seen. No old actuator command was replayed.",
                     }
                 )
+
+    async def _maybe_discover(self) -> None:
+        """Look for the board on its own subnet when the configured address dies.
+
+        The address is DHCP: this deployment has seen .8, .6 and .4, and each
+        move left the app pointing at nothing until somebody edited `.env` and
+        restarted.  A sweep only runs while the controller is *not* answering,
+        at most once every `device_discover_interval_s`, so a healthy board
+        costs nothing.
+        """
+        if not self.settings.device_discover:
+            return
+        current = getattr(self.device, "base_url", None)
+        if not current or not hasattr(self.device, "set_base_url"):
+            return
+        now = time.monotonic()
+        if now - self._last_discover_mono < self.settings.device_discover_interval_s:
+            return
+        self._last_discover_mono = now
+        found = await discover_device(current, self.settings.device_token)
+        if not found or found == current:
+            return
+        self.device.set_base_url(found)
+        self._events.append(
+            {
+                "kind": "connection",
+                "severity": "info",
+                "title": "Controller found at a new address",
+                "detail": f"{current} stopped answering; the controller is at {found}.",
+            }
+        )
 
     def _age_ms(self) -> int | None:
         if self._last_success_mono is None:

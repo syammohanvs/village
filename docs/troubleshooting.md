@@ -14,16 +14,31 @@ calibration, pump gate, Whisper, waste model and optional reply audio.
 
 ## The controller is unreachable
 
+First decide which of the two problems it is: **the board is not on the network
+at all**, or **it is, at a different address**.
+
 1. Serial monitor the ESP32 at 115200 baud; note the printed IP.
 2. Set `VILLAGE_DEVICE_MODE=real` and `VILLAGE_DEVICE_URL=http://<that IP>`.
 3. Confirm the token in `.env` exactly equals `VILLAGE_DEVICE_TOKEN` in
    `uc/include/village/secrets.h`.
 4. `curl http://<ip>/api/v1/health` from the laptop. This endpoint is public;
    `/status` requires the token.
-5. If station mode failed, the board starts `Village-Setup` (password in
+5. **The board's address is DHCP and it moves.** When the configured address
+   stops answering the backend now sweeps that subnet for a host answering
+   `/api/v1/status` with the device token (`VILLAGE_DEVICE_DISCOVER`, default
+   on, at most once a minute) and re-points itself, logging *Controller found at
+   a new address*. So a board that came back on a new address heals by itself;
+   no `.env` edit and no restart.
+6. **If the sweep finds nothing, the board is not on that network.** That is not
+   an app fault: check that it is powered, that its Wi-Fi is the *same* network
+   as this machine (a guest network with client isolation blocks it too), and
+   that it is not on a phone hotspot while the laptop is on the home router. On
+   two separate networks the page cannot reach it at all — the two must be
+   joined, or the address made reachable through a tunnel or a port forward.
+7. If station mode failed, the board starts `Village-Setup` (password in
    `secrets.h`). Connect to it only for recovery. The board does not switch
    back automatically; reboot it after fixing the router.
-6. The dashboard shows **stale** and **disconnected** rather than inventing a
+8. The dashboard shows **stale** and **disconnected** rather than inventing a
    zero. That is deliberate.
 
 ## Pump does not start

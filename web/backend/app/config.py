@@ -35,6 +35,14 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _flag(name: str, default: bool) -> bool:
+    """A boolean that treats unset as the default and anything else as itself."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _float(name: str, default: float) -> float:
     try:
         return float(os.getenv(name, str(default)))
@@ -49,6 +57,10 @@ class Settings:
     device_url: str
     device_token: str
     device_timeout_s: float
+    # Look for the controller on its own subnet when the configured address
+    # stops answering.  The board's address is DHCP and it moves.
+    device_discover: bool
+    device_discover_interval_s: float
     poll_interval_ms: int
     stale_after_ms: int
     disconnect_after_ms: int
@@ -106,6 +118,8 @@ class Settings:
             device_url=os.getenv("VILLAGE_DEVICE_URL", "http://192.168.1.50").rstrip("/"),
             device_token=os.getenv("VILLAGE_DEVICE_TOKEN", "dev-village-token-change-me"),
             device_timeout_s=_float("VILLAGE_DEVICE_TIMEOUT_SECS", 3.0),
+            device_discover=_flag("VILLAGE_DEVICE_DISCOVER", True),
+            device_discover_interval_s=_float("VILLAGE_DEVICE_DISCOVER_SECS", 60.0),
             poll_interval_ms=_int("VILLAGE_POLL_INTERVAL_MS", 1000),
             stale_after_ms=_int("VILLAGE_STALE_AFTER_MS", 4000),
             disconnect_after_ms=_int("VILLAGE_DISCONNECT_AFTER_MS", 9000),
