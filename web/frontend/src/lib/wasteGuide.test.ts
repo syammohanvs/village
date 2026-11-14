@@ -4,7 +4,7 @@
  * checks must hold when a reader picks a category by hand.
  */
 import { describe, expect, it } from 'vitest';
-import { BINS, ROUTES, SUPPORT, WORDS, guideFor, spokenFor } from './wasteGuide';
+import { BIN_CONFIDENCE, BINS, ROUTES, SUPPORT, WORDS, confidenceBar, guideFor, spokenFor } from './wasteGuide';
 
 describe('the three demonstrated bins', () => {
   it('sends a banana peel to organic', () => {
@@ -126,5 +126,31 @@ describe('the support role', () => {
     expect(spokenFor(guideFor('plastic'))).toMatch(/plastic bin/i);
     expect(spokenFor(guideFor('paper'))).toMatch(/paper and cardboard bin/i);
     expect(spokenFor(guideFor('syringe'))).toMatch(/keep this item separate/i);
+  });
+});
+
+describe('a bin is held to a higher bar than a referral', () => {
+  it('asks more of an answer that would open a bin', () => {
+    // The pencil: Metal 0.50 / Plastic 0.53 on a real venue press.  Neither is
+    // one of our three bins, and Plastic would have gone in the plastic bin.
+    const plastic = guideFor('plastic');
+    expect(confidenceBar(0.5, plastic)).toBe(BIN_CONFIDENCE);
+    expect(confidenceBar(0.5, guideFor('metal'))).toBe(0.5);
+    expect(confidenceBar(0.5, guideFor('syringe'))).toBe(0.5);
+  });
+
+  it('never lowers a threshold that is already stricter', () => {
+    expect(confidenceBar(0.85, guideFor('plastic'))).toBe(0.85);
+  });
+
+  it('keeps every real venue item above the bar', () => {
+    // Measured through the app's own route at 224 px.
+    const measured: Array<[string, number]> = [
+      ['paper', 0.83], ['paper', 0.95], ['glass', 0.95],
+      ['plastic', 0.92], ['ewaste', 0.91], ['textile', 0.94],
+    ];
+    for (const [label, p] of measured) {
+      expect(p).toBeGreaterThanOrEqual(confidenceBar(0.5, guideFor(label)));
+    }
   });
 });

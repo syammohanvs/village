@@ -81,6 +81,27 @@ export const SUPPORT: { desk: string; contact: string } = {
 /** Whether an authorised collection route is configured for a material. */
 export const ROUTES: { glass: boolean; metal: boolean } = { glass: false, metal: false };
 
+/**
+ * A bin needs a higher bar than a referral does.
+ *
+ * A wrong bin puts an object in the wrong physical bin — that is the mistake
+ * this whole project can actually make.  A wrong "keep it separate" costs a
+ * conversation with the Gram Sahayak and nothing else.  So the three bins ask
+ * for 0.70 and everything else keeps the page's threshold.
+ *
+ * Measured on the venue's own items at 224 px: cover 0.83, glossy manual 0.95,
+ * ceramic cup 0.95, bottle 0.92, phone 0.91, handkerchief 0.94 — every real
+ * item clears 0.70 comfortably.  A pencil, which is not one of our three bins,
+ * came back Plastic 0.53 and would have gone in the plastic bin; it now reads
+ * "not sure, ask the Gram Sahayak".
+ */
+export const BIN_CONFIDENCE = 0.7;
+
+/** The confidence an answer has to reach, given where it would send the item. */
+export function confidenceBar(base: number, disposal: Disposal): number {
+  return disposal.separate ? base : Math.max(base, BIN_CONFIDENCE);
+}
+
 export const WORDS = {
   uncertain:
     'I’m not sure about this item. Please do not put it in a bin yet. Contact Gram Sahayak.',

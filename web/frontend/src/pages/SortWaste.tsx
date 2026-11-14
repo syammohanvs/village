@@ -37,6 +37,7 @@ import {
   SUPPORT,
   SUPPORT_ROLE,
   WORDS,
+  confidenceBar,
   guideFor,
   spokenFor,
   type Disposal,
@@ -897,7 +898,10 @@ export function SortWaste() {
       // Background 0.22 -- was recorded and lit nothing, as if the model had
       // chosen leather. Under the threshold the page names its best guess and
       // asks for a better look instead.
-      if (grouped.confidence < confidence) return;
+      //
+      // A bin is held to a higher bar than a referral (BIN_CONFIDENCE): a wrong
+      // bin has a physical consequence, a wrong "keep it separate" does not.
+      if (grouped.confidence < confidenceBar(confidence, guideFor(grouped.material ?? grouped.label))) return;
       const event: StableEvent = {
         label: grouped.material ?? grouped.label,
         category: (grouped.material ?? grouped.label).trim().toLowerCase(),
