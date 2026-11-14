@@ -1227,6 +1227,43 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     return original;
   }
 
+  it('puts the helper line on the bin card instead of speaking on load', async () => {
+    // Asked for: not to have Sara say what to do as the page opens, and to show
+    // that line on the suggested-bin card instead -- which then carries the
+    // result as soon as there is one.
+    stubCamera();
+    const original = stubCanvas();
+    vi.mocked(api.wasteClassify).mockImplementation(async () => ({
+      model: 'resnet50',
+      predictions: predictionsFor('Paper', 0.94),
+    }));
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'paper',
+      recognition: { id: 9, category: 'paper', confidence: 0.94 },
+      bin: { id: 'paper', state: 'available' },
+    });
+    try {
+      render(<App />);
+      // No greeting card, and nothing spoken on arrival.
+      expect(screen.queryByTestId('waste-welcome')).not.toBeInTheDocument();
+
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+
+      const guidance = await screen.findByTestId('waste-guidance');
+      expect(guidance).toHaveTextContent(/know the bin/i);
+
+      // A reading replaces it with the usual bin card.
+      fireEvent.click(await screen.findByTestId('classify-now'));
+      expect(await screen.findByTestId('waste-result', {}, { timeout: 10000 })).toBeInTheDocument();
+      expect(screen.queryByTestId('waste-guidance')).not.toBeInTheDocument();
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+    }
+  }, 30000);
+
   it('draws the square that will be read, sized from the camera', async () => {
     // Reported: a bottle held at the edge of the picture read as paper, then
     // glass.  Two things caused it, and this is the first: the preview was a

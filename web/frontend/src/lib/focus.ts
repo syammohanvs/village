@@ -433,6 +433,45 @@ export function cropGuide(
 }
 
 
+/**
+ * Is this changed region the thing being held up, or just the person in the room?
+ *
+ * Reported from the venue: *"in auto mode even when I am not showing anything in
+ * hand it is classifying."*  The automatic path decides "something is being
+ * shown" by comparing with the learned room, and a person standing in front of
+ * the camera is *also* a change — so a face at the edge of the frame became an
+ * item, and the crop of the middle of the frame answered anyway.
+ *
+ * The page already tells the operator where to hold the item (the drawn square),
+ * so the same square can decide: a change that is mostly **outside** it is not
+ * the item being presented.  `inside` is the share of the region that falls in
+ * the square, and the answer is `ok` only when most of it does.
+ *
+ * This is deliberately not a skin test.  A skin-colour gate was measured and
+ * rejected on 60 hand-free product photos, and the item here is legitimately
+ * held in a hand -- what separates the two cases is *where* the change is, not
+ * what colour it is.
+ */
+export function regionInGuide(
+  box: Box,
+  width: number,
+  height: number,
+  share: number,
+  minInside = 0.55,
+): { inside: number; ok: boolean } {
+  if (width <= 0 || height <= 0 || box.width <= 0 || box.height <= 0) {
+    return { inside: 0, ok: false };
+  }
+  const guide = centreCrop(width, height, share);
+  const left = Math.max(box.x, guide.x);
+  const top = Math.max(box.y, guide.y);
+  const right = Math.min(box.x + box.width, guide.x + guide.width);
+  const bottom = Math.min(box.y + box.height, guide.y + guide.height);
+  const overlap = Math.max(0, right - left) * Math.max(0, bottom - top);
+  const inside = overlap / (box.width * box.height);
+  return { inside, ok: inside >= minInside };
+}
+
 /** Map a box measured on the small analysis frame onto the video frame. */
 export function scaleBox(box: Box, fromWidth: number, fromHeight: number, toWidth: number, toHeight: number): Box {
   const sx = toWidth / Math.max(1, fromWidth);

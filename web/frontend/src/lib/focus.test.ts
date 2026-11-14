@@ -6,6 +6,7 @@ import {
   diffBoxMulti,
   focusRegion,
   objectMask,
+  regionInGuide,
   scaleBox,
   sceneState,
   squareCrop,
@@ -325,5 +326,36 @@ describe('cropGuide', () => {
   it('says nothing before it knows the camera shape', () => {
     expect(cropGuide(0)).toBeNull();
     expect(cropGuide(Number.NaN)).toBeNull();
+  });
+});
+
+describe('regionInGuide', () => {
+  // 160x120 frame, 0.7 share -> the square is 84 px, from (38, 18) to (122, 102).
+  const W = 160;
+  const H = 120;
+
+  it('accepts the thing held up in the middle', () => {
+    const held = { x: 70, y: 50, width: 12, height: 12 };
+    expect(regionInGuide(held, W, H, 0.7)).toMatchObject({ ok: true });
+    expect(regionInGuide(held, W, H, 0.7).inside).toBeCloseTo(1, 6);
+  });
+
+  it('refuses a change that is mostly at the edge', () => {
+    // A face at the right-hand edge: reported as "a bottle at the edge read as
+    // paper, then glass", because the crop took the middle instead.
+    const face = { x: 130, y: 20, width: 30, height: 80 };
+    expect(regionInGuide(face, W, H, 0.7).ok).toBe(false);
+  });
+
+  it('accepts an item that fills the square, even if it runs past it', () => {
+    // Held close: the box is bigger than the guide but its middle is inside.
+    const close = { x: 30, y: 10, width: 100, height: 100 };
+    const { ok, inside } = regionInGuide(close, W, H, 0.7);
+    expect(ok).toBe(true);
+    expect(inside).toBeGreaterThan(0.5);
+  });
+
+  it('says no to a box that is not a box', () => {
+    expect(regionInGuide({ x: 0, y: 0, width: 0, height: 0 }, W, H, 0.7).ok).toBe(false);
   });
 });

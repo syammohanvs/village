@@ -13,7 +13,15 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { centreCrop, cropGuide, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import {
+  centreCrop,
+  cropGuide,
+  objectMask,
+  regionInGuide,
+  scaleBox,
+  sceneState,
+  type FocusRegion,
+} from '../lib/focus';
 import {
   SCENE_WARMUP_FRAMES,
   createSceneMemory,
@@ -24,8 +32,8 @@ import {
 } from '../lib/sceneMemory';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
+import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
-import { WasteWelcome } from '../components/WasteWelcome';
 import {
   clearBackgrounds as clearStoredBackgrounds,
   loadBackgrounds,
@@ -84,6 +92,7 @@ const CROP_SIZE = 224;
 const PRESS_CROP_SHARE = 0.7;
 const PRESS_FRAMES = 3;
 const PRESS_FRAME_GAP_MS = 250;
+
 
 function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
   if (!ref.current) ref.current = document.createElement('canvas');
@@ -442,6 +451,31 @@ export function SortWaste() {
         learnScene(sceneRef.current, frame.data, { frozen: true });
       }
       const region = state.region;
+      // Only the thing held up in front of the camera is an item.
+      //
+      // The change has to sit mostly **inside the square the operator is told to
+      // use** (`regionInGuide`).  Something held at the edge of the picture is a
+      // change too, and without this it was classified as waste with the crop of
+      // the middle of the frame answering for it -- reported as "a bottle held
+      // at the edge read as paper, then glass".
+      //
+      // Honest limit: this does not stop a person *standing in front of* the
+      // camera from being read as an object, because the person is the change
+      // and they are in the middle.  Nothing in this pipeline can tell a held
+      // item from a nearby person; that is why a press is the default and the
+      // watcher is opt-in.
+      //
+      // A frame that fails is treated as the room: the memory drifts towards it,
+      // so somebody standing there becomes part of the learned background
+      // instead of being read as an object over and over.
+      const guided = regionInGuide(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
+      if (!guided.ok) {
+        if (learning) {
+          noteScene(sceneRef.current, 'empty', Date.now());
+          learnScene(sceneRef.current, frame.data);
+        }
+        return { kind: 'empty' };
+      }
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
       const source = scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
@@ -884,7 +918,7 @@ export function SortWaste() {
         const { input, region } = focused;
         setFrameWarning(
           region?.edgeTouch && region.coverage > 0.18
-            ? 'A hand or person is in the picture. Place the item on the table and step back so the camera sees only the waste.'
+            ? 'A hand or person fills most of the picture. Hold the item inside the square and keep the rest of you out of it.'
             : '',
         );
         const raw = await classifier.predict(input);
@@ -957,7 +991,6 @@ export function SortWaste() {
 
   return (
     <div className="page sort-waste">
-      <WasteWelcome />
       <div className="waste-layout">
         <div className="camera-column">
           <div
@@ -1237,10 +1270,21 @@ export function SortWaste() {
                 )}
               </>
             ) : !autoWatch && !recognition && !top ? (
-              <p className="result-sub" data-testid="waste-press-hint">
-                Hold the item up and press <strong>Check the item</strong>. Nothing is
-                classified until you do.
-              </p>
+              <>
+                {/*
+                  Sara used to say this out loud as soon as the page opened, which
+                  is a greeting nobody asked for and a voice competing with the
+                  camera.  The same sentence is now on the card, where the answer
+                  appears, and it goes as soon as there is an item to report.
+                */}
+                <p className="result-sub" data-testid="waste-guidance">
+                  {LIA_COPY[voiceLanguage].wasteWelcome}
+                </p>
+                <p className="result-sub" data-testid="waste-press-hint">
+                  Hold the item up and press <strong>Check the item</strong>. Nothing is
+                  classified until you do.
+                </p>
+              </>
             ) : warming ? (
               <p className="result-sub" data-testid="waste-warming">
                 Learning this room so the background is never classified as an

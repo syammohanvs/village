@@ -633,6 +633,48 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### Auto mode cannot know, and the page stops pretending (2026-11-14)
+
+Reported: *"in auto mode even when I am not showing anything in hand it is classifying. Why
+can't you say to the model to classify only the object held by the hand and fingers?"*
+
+The second half is the honest part of the answer: **a material classifier cannot be told which
+object is the subject.** It answers "what material is this picture", and the page decides what
+picture to give it. So the page has to be the one that knows where the item is — and the
+measurement says it only partly can.
+
+What was done:
+
+- **A change has to sit inside the square the operator is told to use** (`regionInGuide`). An
+  item held at the edge of the frame is now "nothing to sort" instead of being read as paper
+  with the crop of the middle of the frame answering for it — the reported
+  *"a bottle held at the edge read as paper, then glass"*.
+- **The stale re-learn still applies**, so a person who stays in shot becomes part of the
+  learned room rather than an object forever.
+- **The watcher stays opt-in** and a press stays the default, because of the limit below.
+
+**The limit, stated plainly: auto mode cannot tell a held item from a nearby person.** The
+person *is* the change and they are in the middle of the frame. Nothing in this pipeline
+separates them: the room diff cannot (both are different from the empty room), the mask cannot
+(both survive it), and the classifier cannot (it is answering about the crop, not about hands).
+That is why the page moved to press-to-check, and why "nothing in hand but it classified" can
+still happen when the watcher is left on with somebody in front of the camera.
+
+**Measured and not adopted: Florence-2 as a hand/object locator.** The suggestion was a
+vision-language model that can locate regions for a text phrase ("hand holding an object"),
+which would in principle be the right tool. It was tried:
+
+| | result |
+| --- | --- |
+| loading `microsoft/Florence-2-base` (MIT) | **fails** with the installed transformers 5.22: `Florence2LanguageConfig has no attribute forced_bos_token_id` — its remote code targets an older API |
+| cost if it had loaded | 0.23 B-parameter generative model; on this box's 4 CPU threads a grounded generation is seconds per image, while a press already reads three frames in about one second |
+| its own documented caveat | "may misidentify unfamiliar objects or misunderstand which object is being held" — which is the exact failure being fixed |
+
+So it is not adopted. A GPU and a pinned transformers would be the prerequisite, and even then
+it would answer a *second* question about the same crop rather than make the classifier
+honest about hands. The cheap, measured alternative that did work is the square: it makes the
+operator's intent visible instead of guessing at it.
+
 ### The bead texture is the right cue, and it does not survive 224 px (2026-11-14)
 
 Advice offered for thermocol (EPS) identification: its strongest visual cue is the **fused-bead
