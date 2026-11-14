@@ -760,6 +760,9 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .camera-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .camera-frame { position: relative; border-radius: 14px; overflow: hidden; background: #080606; border: 1px solid var(--line); aspect-ratio: 4 / 3; }
 .camera-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The square that will be read, dimming everything it will not.  Drawn from the
+   same share the crop uses, so the preview and the model agree. */
+.crop-guide { position: absolute; border: 2px dashed rgba(255, 255, 255, .8); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .32); pointer-events: none; }
 .camera-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; padding: 20px; }
 .prediction-list { display: flex; flex-direction: column; gap: 6px; }
 .prediction-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }

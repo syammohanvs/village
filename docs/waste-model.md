@@ -633,6 +633,56 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### What you see is now what is read (2026-11-14)
+
+Reported: *"business card classified as three different items. my plastic pen also classified
+differently. plastic bottle classified as glass once plastic other two times."* The saved
+crops explain all three, and one of them was a plain bug in the page.
+
+**The preview hid part of the picture.** The camera frame was a fixed `4 / 3` box with
+`object-fit: cover`. A 16:9 webcam in a 4:3 box has its left and right edges **cut off the
+screen** — while the crop that is classified comes from the *whole* video frame. So an item
+held near the edge could be in shot, be visible to the person holding it in the room, and be
+invisible in the preview; and the square that was read was not the square anyone was
+looking at. The frame now takes the camera's own shape (`videoWidth / videoHeight`), and
+**the square that will be read is drawn on it** (`cropGuide`, 0.7 of the short side, dimming
+everything else). What is inside the square is what the model sees.
+
+The second cause is the same as the cover's: the item was held to one side, and the
+middle of the frame was a face.
+
+| Capture | What it shows | Reading |
+| --- | --- | --- |
+| bottle, 05:55:09 | bottle at the right edge, face in the middle | Paper 0.31 |
+| bottle, 05:55:09 | same second, bottle better framed | Plastic 0.92 |
+| bottle, 05:55:12 | bottle filling the square | Plastic 0.83 |
+| pen, 05:53:42 | thin transparent pen across a face | Thermocol 0.54 |
+
+A **sliding window was measured and rejected**: nine crops over the frame, keep the most
+confidently named non-background one. On the same 66 held-out scenes it scored **56.1% exact
+/ 72.7% item action** against **57.6% / 77.3%** for the plain centre crop — worse, because
+*max confidence over windows always finds something*: on an empty scene it named Ewaste
+0.54, Paper 0.74 and Textile 0.67 in three different windows. Finding the item by asking
+the classifier to be confident is what the classifier is worst at.
+
+**The pen was a real gap in the training set.** `Plastic` held bottles, containers and bags —
+not a transparent pen, which is thin, see-through and usually photographed held in a hand.
+Sixty photographs of ballpoint and plastic pens were added, and the venue's own frame moved:
+
+| Venue capture | Before | After |
+| --- | --- | --- |
+| pen (Ewaste 0.42 · Plastic 0.28) | Ewaste 0.42 | **Plastic 0.69** |
+| pen (Thermocol 0.54) | Thermocol 0.54 | Plastic 0.46 |
+
+Thirty business-card photographs were added to `Paper` in the same pass. The pen is
+verified; the business card is not, because no capture of it was identified in the index —
+its evidence is the same mechanism that fixed the pen (an object family the class had never
+contained), not a measurement.
+
+Costs, measured: real-world probe 70.5 → **70.1** exact / 77.2 action, hand-held 49.8 →
+**50.2** / 65.5 → 66.1, handkerchiefs unchanged at 3/8, and the three covers still read
+**Paper 0.88 / 0.83 / 0.67** at the crop the press now uses.
+
 ### A press is a short video, and the crop is tighter (2026-11-14)
 
 Reported again from the venue: *"the KFC brown cover was again misclassified … I think

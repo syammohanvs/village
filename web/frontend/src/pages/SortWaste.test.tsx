@@ -1227,6 +1227,44 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     return original;
   }
 
+  it('draws the square that will be read, sized from the camera', async () => {
+    // Reported: a bottle held at the edge of the picture read as paper, then
+    // glass.  Two things caused it, and this is the first: the preview was a
+    // fixed 4:3 box with `object-fit: cover`, so a 16:9 camera's side edges
+    // were hidden -- the item could be in shot and not on screen.  The frame
+    // now takes the camera's shape, and the square that will be classified is
+    // drawn on it, from the same number the crop uses.
+    stubCamera();
+    const originalWidth = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoWidth');
+    const originalHeight = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'videoHeight');
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 640 });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 360 });
+    const original = stubCanvas();
+    try {
+      render(<App />);
+      const start = await screen.findByTestId('start-camera');
+      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(start);
+
+      const video = document.querySelector('video');
+      expect(video).not.toBeNull();
+      fireEvent.loadedMetadata(video as HTMLVideoElement);
+
+      const guide = await screen.findByTestId('crop-guide');
+      // 0.7 of the short side: 70% tall, and 39.38% wide on a 16:9 camera.
+      // (jsdom prints "70%" for "70.00%", so compare the numbers.)
+      expect(parseFloat(guide.style.height)).toBeCloseTo(70, 2);
+      expect(parseFloat(guide.style.width)).toBeCloseTo(39.38, 2);
+      // The frame is the camera's shape, so nothing is cropped out of view.
+      const frame = (video as HTMLVideoElement).closest('.camera-frame') as HTMLElement;
+      expect(frame.getAttribute('style') ?? '').toContain('aspect-ratio');
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+      if (originalWidth) Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', originalWidth);
+      if (originalHeight) Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', originalHeight);
+    }
+  }, 20000);
+
   it('reads three frames and makes one decision when they agree', async () => {
     // The venue's brown paper cover was Thermocol 0.91, then Thermocol 0.60,
     // then Textile 0.70 within ten seconds.  A press is now a short video: three

@@ -13,7 +13,7 @@ import {
 } from '../lib/wasteStabilizer';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import { centreCrop, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
+import { centreCrop, cropGuide, objectMask, scaleBox, sceneState, type FocusRegion } from '../lib/focus';
 import {
   SCENE_WARMUP_FRAMES,
   createSceneMemory,
@@ -196,6 +196,11 @@ export function SortWaste() {
   // A press reads three frames now, so it takes about a second.  The button
   // says so instead of looking like it did nothing.
   const [reading, setReading] = useState(false);
+  // The camera's own shape, so the frame shows the WHOLE picture.  A fixed 4:3
+  // box with `object-fit: cover` silently hid the left and right edges of a
+  // 16:9 camera, so an item could be in shot and not on screen -- and the read
+  // did not match what the operator could see.
+  const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
   const [backgroundReady, setBackgroundReady] = useState(false);
@@ -955,8 +960,42 @@ export function SortWaste() {
       <WasteWelcome />
       <div className="waste-layout">
         <div className="camera-column">
-          <div className="camera-frame camera-frame--large">
-            <video ref={videoRef} className="camera-video" playsInline muted aria-label="Waste camera preview" />
+          <div
+            className="camera-frame camera-frame--large"
+            style={videoAspect ? { aspectRatio: String(videoAspect) } : undefined}
+          >
+            <video
+              ref={videoRef}
+              className="camera-video"
+              playsInline
+              muted
+              aria-label="Waste camera preview"
+              onLoadedMetadata={(event) => {
+                const { videoWidth, videoHeight } = event.currentTarget;
+                if (videoWidth > 0 && videoHeight > 0) setVideoAspect(videoWidth / videoHeight);
+              }}
+            />
+            {/*
+              The square that will actually be read.  Drawn, not guessed: the
+              same `PRESS_CROP_SHARE` sizes it and the crop, so what the operator
+              frames is what the model sees.  Reported three times in a row --
+              a bottle held at the edge read as paper, then glass -- because the
+              crop took the middle, which was a face.
+            */}
+            {cameraOn && videoAspect !== null ? (
+              (() => {
+                const guide = cropGuide(videoAspect, PRESS_CROP_SHARE);
+                if (!guide) return null;
+                return (
+                  <div
+                    className="crop-guide"
+                    data-testid="crop-guide"
+                    style={guide}
+                    aria-hidden="true"
+                  />
+                );
+              })()
+            ) : null}
             {/*
               The one thing a visitor has to know before showing an item: is the
               page ready?  The result panel below says it in a sentence, but a

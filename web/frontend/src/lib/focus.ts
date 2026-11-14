@@ -399,6 +399,40 @@ export function centreCrop(width: number, height: number, share = 0.72): Box {
   };
 }
 
+/**
+ * Where that square sits inside the preview, as percentages of the box.
+ *
+ * The page draws this on the video so the operator can see *exactly* which part
+ * of the picture will be read.  It matters because the preview and the crop used
+ * to disagree: the video is drawn with `object-fit: cover` in a 4:3 frame, so a
+ * 16:9 camera's left and right edges were hidden — an item could be held inside
+ * the picture, be visible to the person holding it in the room, and be cropped
+ * out of the preview and partly out of the read.
+ *
+ * `aspect` is the video's own `videoWidth / videoHeight`, and the caller sizes
+ * the frame to the same ratio, so a percentage of the box is a percentage of the
+ * frame and the numbers here are the numbers `centreCrop` uses.
+ */
+export function cropGuide(
+  aspect: number,
+  share = 0.72,
+): { left: string; top: string; width: string; height: string } | null {
+  if (!Number.isFinite(aspect) || aspect <= 0) return null;
+  const side = Math.min(1, Math.max(0.2, share));
+  // The square is `share` of the shorter side, so one of the two percentages is
+  // always exactly `share` and the other shrinks with the aspect.
+  const width = aspect >= 1 ? side / aspect : side;
+  const height = aspect >= 1 ? side : side * aspect;
+  const pct = (value: number) => `${(value * 100).toFixed(2)}%`;
+  return {
+    left: pct((1 - width) / 2),
+    top: pct((1 - height) / 2),
+    width: pct(width),
+    height: pct(height),
+  };
+}
+
+
 /** Map a box measured on the small analysis frame onto the video frame. */
 export function scaleBox(box: Box, fromWidth: number, fromHeight: number, toWidth: number, toHeight: number): Box {
   const sx = toWidth / Math.max(1, fromWidth);

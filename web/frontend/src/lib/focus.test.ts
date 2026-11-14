@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   centreCrop,
+  cropGuide,
   diffBox,
   diffBoxMulti,
   focusRegion,
@@ -287,5 +288,42 @@ describe('painting out the stored background', () => {
     expect(mask!.width).toBe(10);
     expect(mask!.height).toBe(10);
     expect(mask!.data.length).toBe(10 * 10 * 4);
+  });
+});
+
+describe('cropGuide', () => {
+  it('is a square that is the share of the shorter side, landscape', () => {
+    // 16:9 camera drawn at 16:9, so the percentages are of the frame itself.
+    const guide = cropGuide(16 / 9, 0.7)!;
+    expect(guide.height).toBe('70.00%');
+    // Two decimals of a percentage: 39.375 rounds to 39.38.
+    expect(guide.width).toBe('39.38%');
+    expect(guide.top).toBe('15.00%');
+  });
+
+  it('turns with a portrait camera', () => {
+    const guide = cropGuide(3 / 4, 0.7)!;
+    expect(guide.width).toBe('70.00%');
+    expect(guide.height).toBe('52.50%');
+    expect(guide.left).toBe('15.00%');
+  });
+
+  it('agrees with centreCrop on the same frame', () => {
+    // The whole point of the guide: what is on screen is what is read.  Both
+    // are `share` of the short side, so the square's side must be the same.
+    const width = 640;
+    const height = 360;
+    const box = centreCrop(width, height, 0.7);
+    const guide = cropGuide(width / height, 0.7)!;
+    // The guide is rounded to 0.01% and the crop to whole pixels, so they can
+    // differ by a fraction of a pixel -- never by a pixel.
+    expect(Math.abs((parseFloat(guide.height) / 100) * height - box.height)).toBeLessThan(0.5);
+    expect(Math.abs((parseFloat(guide.width) / 100) * width - box.width)).toBeLessThan(0.5);
+    expect(box.width).toBe(box.height);
+  });
+
+  it('says nothing before it knows the camera shape', () => {
+    expect(cropGuide(0)).toBeNull();
+    expect(cropGuide(Number.NaN)).toBeNull();
   });
 });
