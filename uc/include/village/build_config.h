@@ -10,7 +10,7 @@
 #define VILLAGE_PUMP_COMMISSIONED 1
 #endif
 
-#define VILLAGE_FIRMWARE_VERSION "0.2.0"
+#define VILLAGE_FIRMWARE_VERSION "0.2.1"
 #define VILLAGE_PROTOCOL_VERSION 1
 
 // How long the controller refuses any irrigation start after boot.  It also

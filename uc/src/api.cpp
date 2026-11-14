@@ -1,6 +1,8 @@
 #include "village/api.h"
 
 #include <ArduinoJson.h>
+
+#include "village/config_json.h"
 #include <WiFi.h>
 #include <WebServer.h>
 
@@ -260,143 +262,12 @@ void buildHealth(JsonDocument& doc) {
   waste["paper"] = pins::WASTE_LED_PAPER;
 }
 
-void writeConfig(JsonObject out, const DeviceConfig& c) {
-  out["revision"] = c.revision;
-
-  JsonObject soil = out["soil"].to<JsonObject>();
-  soil["dry_raw"] = c.soil.dry_raw;
-  soil["wet_raw"] = c.soil.wet_raw;
-  soil["min_span_raw"] = c.soil.min_span_raw;
-  soil["samples"] = c.soil.samples;
-  soil["max_age_ms"] = c.soil.max_age_ms;
-  soil["calibrated"] = c.soil.calibrated;
-
-  JsonObject res = out["reservoir"].to<JsonObject>();
-  res["wet_threshold_mv"] = c.reservoir.wet_threshold_mv;
-  res["dry_threshold_mv"] = c.reservoir.dry_threshold_mv;
-  res["confirm_readings"] = c.reservoir.confirm_readings;
-  res["max_age_ms"] = c.reservoir.max_age_ms;
-  res["calibrated"] = c.reservoir.calibrated;
-
-  JsonObject light = out["light"].to<JsonObject>();
-  light["installed"] = c.light.installed;
-  light["sensor_fitted"] = c.light.sensor_fitted;
-  light["output_type"] = c.light.digital ? "digital" : "analog";
-  light["analog_bright_high"] = c.light.analog_bright_high;
-  light["digital_dark_when_high"] = c.light.digital_dark_when_high;
-  light["dark_threshold"] = c.light.dark_threshold;
-  light["bright_threshold"] = c.light.bright_threshold;
-  light["stable_ms"] = c.light.stable_ms;
-  light["max_age_ms"] = c.light.max_age_ms;
-
-  JsonObject irr = out["irrigation"].to<JsonObject>();
-  irr["auto_enabled"] = c.irrigation.auto_enabled;
-  irr["pump_enabled"] = c.irrigation.pump_enabled;
-  irr["dry_start_pct"] = c.irrigation.dry_start_pct;
-  irr["stop_pct"] = c.irrigation.stop_pct;
-  irr["dry_confirm_ms"] = c.irrigation.dry_confirm_ms;
-  irr["pulse_ms"] = c.irrigation.pulse_ms;
-  irr["max_pulse_ms"] = c.irrigation.max_pulse_ms;
-  irr["soak_ms"] = c.irrigation.soak_ms;
-  irr["max_cumulative_ms"] = c.irrigation.max_cumulative_ms;
-  irr["max_pulses"] = c.irrigation.max_pulses;
-  irr["cooldown_ms"] = c.irrigation.cooldown_ms;
-  irr["link_timeout_ms"] = c.irrigation.link_timeout_ms;
-
-  JsonObject waste = out["waste"].to<JsonObject>();
-  waste["indicate_ms"] = c.waste.indicate_ms;
-
-  JsonObject solar = out["solar"].to<JsonObject>();
-  solar["installed"] = c.solar.installed;
-  solar["sense_ohms"] = c.solar.sense_ohms;
-}
-
 void buildConfigDoc(JsonDocument& doc) {
   JsonObject root = doc.to<JsonObject>();
   root["protocol_version"] = VILLAGE_PROTOCOL_VERSION;
   root["device_id"] = g_device_id;
   root["config_revision"] = rt.config.revision;
-  writeConfig(root["config"].to<JsonObject>(), rt.config);
-}
-
-bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
-  if (c.isNull()) {
-    err = "missing config object";
-    return false;
-  }
-  if (c["soil"].isNull() || c["reservoir"].isNull() || c["light"].isNull() ||
-      c["irrigation"].isNull() || c["waste"].isNull()) {
-    err = "config must contain soil, reservoir, light, irrigation and waste";
-    return false;
-  }
-
-  JsonObjectConst soil = c["soil"].as<JsonObjectConst>();
-  out.soil.dry_raw = soil["dry_raw"] | out.soil.dry_raw;
-  out.soil.wet_raw = soil["wet_raw"] | out.soil.wet_raw;
-  out.soil.min_span_raw = soil["min_span_raw"] | out.soil.min_span_raw;
-  out.soil.samples = soil["samples"] | out.soil.samples;
-  out.soil.max_age_ms = soil["max_age_ms"] | out.soil.max_age_ms;
-  out.soil.calibrated = soil["calibrated"] | out.soil.calibrated;
-
-  JsonObjectConst res = c["reservoir"].as<JsonObjectConst>();
-  out.reservoir.wet_threshold_mv =
-      res["wet_threshold_mv"] | out.reservoir.wet_threshold_mv;
-  out.reservoir.dry_threshold_mv =
-      res["dry_threshold_mv"] | out.reservoir.dry_threshold_mv;
-  out.reservoir.confirm_readings =
-      res["confirm_readings"] | out.reservoir.confirm_readings;
-  out.reservoir.max_age_ms =
-      res["max_age_ms"] | out.reservoir.max_age_ms;
-  out.reservoir.calibrated = res["calibrated"] | out.reservoir.calibrated;
-
-  JsonObjectConst light = c["light"].as<JsonObjectConst>();
-  out.light.installed = light["installed"] | out.light.installed;
-  out.light.sensor_fitted = light["sensor_fitted"] | out.light.sensor_fitted;
-  const char* output_type = light["output_type"] | "analog";
-  out.light.digital = std::strcmp(output_type, "digital") == 0;
-  out.light.analog_bright_high =
-      light["analog_bright_high"] | out.light.analog_bright_high;
-  out.light.digital_dark_when_high =
-      light["digital_dark_when_high"] | out.light.digital_dark_when_high;
-  out.light.dark_threshold =
-      light["dark_threshold"] | out.light.dark_threshold;
-  out.light.bright_threshold =
-      light["bright_threshold"] | out.light.bright_threshold;
-  out.light.stable_ms = light["stable_ms"] | out.light.stable_ms;
-  out.light.max_age_ms = light["max_age_ms"] | out.light.max_age_ms;
-
-  JsonObjectConst irr = c["irrigation"].as<JsonObjectConst>();
-  out.irrigation.auto_enabled =
-      irr["auto_enabled"] | out.irrigation.auto_enabled;
-  out.irrigation.pump_enabled =
-      irr["pump_enabled"] | out.irrigation.pump_enabled;
-  out.irrigation.dry_start_pct =
-      irr["dry_start_pct"] | out.irrigation.dry_start_pct;
-  out.irrigation.stop_pct = irr["stop_pct"] | out.irrigation.stop_pct;
-  out.irrigation.dry_confirm_ms =
-      irr["dry_confirm_ms"] | out.irrigation.dry_confirm_ms;
-  out.irrigation.pulse_ms = irr["pulse_ms"] | out.irrigation.pulse_ms;
-  out.irrigation.max_pulse_ms =
-      irr["max_pulse_ms"] | out.irrigation.max_pulse_ms;
-  out.irrigation.soak_ms = irr["soak_ms"] | out.irrigation.soak_ms;
-  out.irrigation.max_cumulative_ms =
-      irr["max_cumulative_ms"] | out.irrigation.max_cumulative_ms;
-  out.irrigation.max_pulses = irr["max_pulses"] | out.irrigation.max_pulses;
-  out.irrigation.cooldown_ms = irr["cooldown_ms"] | out.irrigation.cooldown_ms;
-  out.irrigation.link_timeout_ms =
-      irr["link_timeout_ms"] | out.irrigation.link_timeout_ms;
-
-  JsonObjectConst waste = c["waste"].as<JsonObjectConst>();
-  out.waste.indicate_ms = waste["indicate_ms"] | out.waste.indicate_ms;
-
-  // `solar` is optional: a configuration saved before this existed must still
-  // load, and the defaults (not installed, 220 ohm) are the safe ones.
-  JsonObjectConst solar = c["solar"].as<JsonObjectConst>();
-  if (!solar.isNull()) {
-    out.solar.installed = solar["installed"] | out.solar.installed;
-    out.solar.sense_ohms = solar["sense_ohms"] | out.solar.sense_ohms;
-  }
-  return true;
+  writeConfigJson(root["config"].to<JsonObject>(), rt.config);
 }
 
 String ackJson(const String& id, const String& type, CommandResult result,
@@ -473,8 +344,8 @@ void handleConfigPut() {
   }
   DeviceConfig incoming = rt.config;
   incoming.revision = rt.config.revision + 1;
-  String parseError;
-  if (!parseConfig(doc["config"].as<JsonObjectConst>(), incoming, parseError)) {
+  const char* parseError = nullptr;
+  if (!readConfigJson(doc["config"].as<JsonObjectConst>(), incoming, &parseError)) {
     sendError(400, "CONFIG_INVALID", parseError);
     return;
   }

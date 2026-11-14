@@ -36,6 +36,13 @@ void setup() {
   rt.boot_ms = millis();
 
   const bool loaded = loadStateFromNvs(rt.config, rt.commands);
+  if (!loaded) {
+    // Say it out loud: a board that comes up uncalibrated looks like a broken
+    // sensor, and the real answer ("no saved configuration was found") belongs
+    // on the dashboard, not only in the serial log.
+    rt.events.add(millis(), "CONFIG_DEFAULTS",
+                  "No saved configuration was found, so defaults are in use. Save from Setup to keep the calibration.");
+  }
   setupOutputs();
   setupSensors();
   rt.irrigation.begin(millis(), rt.config.irrigation,

@@ -222,6 +222,14 @@ Check `firmware`, `config_revision`, and
 
 ### Gotchas that cost time
 
+- **Never `erase_flash` to prove which image is running — it wipes NVS.**  On
+  2026-11-15 I erased the chip while chasing a false "the board is running an
+  old image" diagnosis (the real answer was that `/api/v1/status` does not carry
+  `pin_map`).  The erase threw away the soil and LDR calibration, the lamp
+  flags and the config revision, and nothing could restore them: the backend
+  logs only "Revision N acknowledged", not the values.  Read `firmware` from
+  `/api/v1/health` or `/api/v1/status` instead; the only honest reason to erase
+  is a genuinely corrupt flash, and even then say so before doing it.
 - **A board with no OTA server cannot be updated remotely, and that is
   self-inflicted.** See the standing rule at the top of this section: build the
   USB image with OTA in it, and check port 3232 straight after flashing.
@@ -257,10 +265,18 @@ plastic D22, paper D23) say which category the camera last recognised.
   assigned; the pin map is `1.6.0-30pin`.
 - The backend records no bin state and raises no bin alert; the dashboard,
   the Sensors page and Sara's narration no longer mention fill.
-- The stored config blob changed size, so the NVS `sizeof` check discards it
-  once on the first boot after this update.  On this board it was already at
-  defaults, so nothing was lost — but check `config_revision` and the soil
-  calibration after such a change, and re-save them if the struct moved.
+- Settings now live in NVS as **JSON** (0.2.1), not as a raw `DeviceConfig`
+  dump.  The dump was tied to `sizeof(DeviceConfig)`, so adding the solar block
+  (2026-11-13) and removing the bin settings (2026-11-15) each made the stored
+  bytes unreadable and the next boot silently replaced every calibration with
+  defaults.  JSON is self-describing: a missing key keeps its default, so a
+  field may come or go without losing the rest.  `revision` is stored beside
+  the settings (not inside them) so the optimistic-concurrency check survives a
+  reboot.
+- If a boot finds no stored configuration it adds a **`CONFIG_DEFAULTS`** event
+  ("No saved configuration was found, so defaults are in use…").  A board that
+  comes up uncalibrated now says so on the dashboard instead of looking like a
+  dead sensor.
 - A sensor that is deliberately **not fitted** is not a fault: the light fault
   line only appears when `light.sensor_fitted` is true.
 
@@ -278,7 +294,10 @@ light:
 - thresholds are on the **metric**, not the raw: `dark_threshold = 1500`
   (raw ≥ 2595) and `bright_threshold = 2800` (raw ≤ 1295), `stable_ms = 4000`
 - `light.sensor_fitted = true` must be saved or the board reports no brightness
-  at all (by design: a floating pin reads plausible noise)
+  at all (by design: a floating pin reads plausible noise); `light.installed`
+  is the **separate** fact that the five streetlight lamps are wired
+- on this build both are now **true** (set 2026-11-15), so Auto drives D13 and
+  the "lights not installed" event is gone; soil calibration is still pending
 
 Opposite wiring (LDR to 3.3 V, resistor to GND) needs
 `analog_bright_high = true`. See `docs/wiring.md` § "LDR (light sensor)".
