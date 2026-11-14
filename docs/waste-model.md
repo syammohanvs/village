@@ -682,21 +682,45 @@ subsets:
 
 Half the accuracy of a trained head, so it is not an alternative.
 
-**But it is excellent at the one question that keeps being asked.** Given the *same*
-venue crops that ResNet called foam or cloth, CLIP answered:
+**And the "0.96 for a brown paper bag" figure was an artefact of the prompt set.** The
+first measurement offered CLIP six item prompts and five non-item prompts, and scored it
+with a softmax over those eleven — so the bag won because the alternatives were a curtain
+and a face, not because it had recognised the bag *against the other ten materials*. Asked
+the fair question, with a prompt per class (twenty prompts over the eleven classes), the
+margin collapses:
 
-| Crop | ResNet50 | CLIP, prompted for a bag |
+| Crop (truth: Paper) | CLIP, 11-prompt set | CLIP, full class set | SigLIP2, full class set |
+| --- | --- | --- | --- |
+| cover A | a brown paper bag **0.96** | Paper 0.30 · Textile 0.27 · Leather 0.26 | Paper 0.13 · Leather 0.09 |
+| cover B | a brown paper bag **0.98** | Paper 0.29 · Textile 0.24 · Organic 0.24 | Paper 0.14 · Leather 0.10 |
+| cover C | a brown paper bag **0.98** | Paper 0.30 · Plastic 0.27 · Textile 0.25 | Paper 0.14 · Leather 0.08 |
+
+(Those are cosine similarities, not probabilities — the two models are on the same scale,
+so they compare, but none of the numbers is a confidence.)
+
+Both models do put **Paper first on all three covers**, which is why the narrow question
+looked so convincing. But the margin over Leather and Footwear is a few hundredths, which
+is a weak preference and not something to hang a bin on.
+
+**SigLIP2 is not better than CLIP here, and neither is close to the trained head.** Same
+prompt set, same photographs, one prompt per class, top-1 on the real-world probe:
+
+| Model | top-1 on the probe subset | notes |
 | --- | --- | --- |
-| cover A | Thermocol 0.91 | **a brown paper bag 0.96** |
-| cover B | Thermocol 0.60 | **a brown paper bag 0.98** |
-| cover C | Textile 0.70 | **a brown paper bag 0.98** |
-| a venue capture ResNet called Textile | Textile | **a folded cloth handkerchief 0.87** |
+| ResNet50 head (installed) | **~72%** | trained on these eleven classes |
+| CLIP ViT-B/32 (MIT) | 43% (29/68) | 600 MB, 175 s for 68 images on this CPU |
+| SigLIP2 base patch16-224 (Apache-2.0) | 37% (25/68) | 1.5 GB, 13 s for 68 images |
 
-So the useful shape is a **verifier, not a classifier**: ResNet decides, and CLIP is asked
-one narrow question about a named confusion. That is a real option and it is not wired in
-yet — it means a ~600 MB optional download and a routing change (a confident "paper bag"
-would move an item from *recycling agent* to the *paper bin*), which is a bigger decision
-than a crop. Recorded here so it is not re-derived.
+So SigLIP2 is **faster** and **worse**, not better. Its strengths (better multilingual and
+fine-grained retrieval on big benchmarks) do not survive being asked to separate eleven
+household materials on a phone camera.
+
+**Verdict: neither model is worth adding as a verifier.** The measured gain is a weak
+preference on the one object that caused trouble, the cost is a 600 MB–1.5 GB download,
+and the risk is a confident text match moving an item into a *different bin* for the wrong
+reason. The crop and the three-frame average fix the same failure for nothing. Recorded
+here with the numbers so it is not re-derived — and so the earlier 0.96 figure is corrected
+rather than quoted again.
 
 **YOLO would fix less than it looks.** COCO's 80 classes include *cup*, *bottle* and *cell
 phone*, which would have settled the ceramic cup and the phone outright — but there is no
