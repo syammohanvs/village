@@ -242,18 +242,56 @@ Check `firmware`, `config_revision`, and
   the browser). A bare `curl http://192.168.1.6/api/v1/state` returning
   `unknown endpoint` is expected, not a dead board.
 
+## Bins are indicator LEDs only (2026-11-15)
+
+There is **no waste-level sensing**, and there must not be: no time-of-flight
+or ultrasonic rangefinder, no distance, no fill percentage, no "bin full"
+alert.  A bin is something a person can see into; three LEDs (organic D21,
+plastic D22, paper D23) say which category the camera last recognised.
+
+- Firmware 0.2.0 removed `bins.h`/`tof.h`, `BinState`, `BinConfig`/`BinModel`
+  and the VL53L0X dependency.  `/api/v1/status` has no `sensors.bins`, no
+  `BIN_*` events and no bin faults; `/api/v1/config` has no `bins` section.
+- GPIO **4, 16, 17, 18, 26** are free again and listed in `pins.h` as
+  `kFreePins` (a `static_assert` fails if one is also assigned).  11 pins are
+  assigned; the pin map is `1.6.0-30pin`.
+- The backend records no bin state and raises no bin alert; the dashboard,
+  the Sensors page and Sara's narration no longer mention fill.
+- The stored config blob changed size, so the NVS `sizeof` check discards it
+  once on the first boot after this update.  On this board it was already at
+  defaults, so nothing was lost — but check `config_revision` and the soil
+  calibration after such a change, and re-save them if the struct moved.
+- A sensor that is deliberately **not fitted** is not a fault: the light fault
+  line only appears when `light.sensor_fitted` is true.
+
 ## LDR calibration (this build)
 
-Wiring: `3V3 -> 10 kΩ -> GPIO 32 -> LDR -> GND` (resistor to 3.3 V, LDR to
-ground). The reading falls with light, so:
+The LM393 module was **replaced by a bare LDR and one pull-up resistor**
+(2026-11-15) — the same change the soil probe had.  Wiring:
+`3V3 -> resistor -> GPIO 32 -> LDR -> GND`, so the reading **falls** with
+light:
 
-- `output_type = analog`
-- `analog_bright_high = false`
-- measured raw: **~3090 dark / ~1870 dim / ~730 bright**
-- `dark_threshold = 1500`, `bright_threshold = 2800`, `stable_ms = 4000`
+- `output_type = analog`, `analog_bright_high = false`
+- the pull-up value is not critical (4.7–47 kΩ); this build measures **raw
+  800–890 in a lit room**, i.e. a brightness metric of **3200–3300**
+  (`metric = 4095 − raw`)
+- thresholds are on the **metric**, not the raw: `dark_threshold = 1500`
+  (raw ≥ 2595) and `bright_threshold = 2800` (raw ≤ 1295), `stable_ms = 4000`
+- `light.sensor_fitted = true` must be saved or the board reports no brightness
+  at all (by design: a floating pin reads plausible noise)
 
 Opposite wiring (LDR to 3.3 V, resistor to GND) needs
 `analog_bright_high = true`. See `docs/wiring.md` § "LDR (light sensor)".
+
+**A chip tone is not a style.** `ChipTone` included `live` but `styles.css` had
+no `.chip--live`, so every "Live"/"Available"/"Model ready" pill rendered as the
+base grey chip while saying the opposite.  `web/frontend/src/components/
+chipTones.test.ts` now reads the stylesheet (a CSS import is stubbed under
+vitest, so `?raw` asserts nothing) and fails when a tone has no rule.  The same
+round also made the solar pill say **Generating** in green only when current
+actually flows, and **Not generating** in neutral when the panel reads volts but
+no current — a red LED needs ~1.8 V before it conducts, so a dark panel honestly
+reads 0 mA.
 
 ## Soil moisture polarity
 
