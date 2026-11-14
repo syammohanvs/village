@@ -85,7 +85,10 @@ struct WasteConfig {
 // power it is delivering.
 struct SolarConfig {
   bool installed = false;
-  uint16_t sense_ohms = 220;  // the series resistor, in ohms
+  // The resistor the LED current actually flows through (the 330 ohm in
+  // docs/wiring.md 10).  The 10k in front of each ADC pin is protection and
+  // is deliberately NOT this value: it carries no current.
+  uint16_t sense_ohms = 330;
 };
 
 struct DeviceConfig {

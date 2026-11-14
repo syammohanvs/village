@@ -577,34 +577,53 @@ After the bench test passes:
 If either gate is closed, every irrigation start is rejected with
 `IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED`; the rest of the village still runs.
 
-## 6. Solar panel — GPIO 33 (volts) and GPIO 36 (current)
+## 10. Solar panel — GPIO 33 (volts) and GPIO 36 (current)
 
-A small photovoltaic cell lights a red LED through a series resistor. Two ADC
-taps make the power measurable:
+A small photovoltaic cell lights a red LED, and two ADC taps make the power it
+generates measurable. **Two parallel branches**, not one series chain: the
+resistor into an ADC pin carries no current, so it is protection only.
 
 ```
- panel + ──┬──────────────[ R ]────────┬────────┐
-           │                            │        │
-        GPIO 33                     GPIO 36   LED anode
-      (panel volts)          (junction volts)   │
-                                                │
- panel - ── GND ───────────────────────────── LED cathode
+                    ┌─── 10 kΩ ─────────────► GPIO 33   (D33)  panel volts
+ panel + ───────────┤
+                    │
+                    └─── 330 Ω ────┬────────► GPIO 36   (VP)   LED anode
+                                   │
+                                  LED
+                                   │
+ panel − ──────────────────────── GND
 ```
 
-- **GPIO 33** reads the panel side of the resistor: the panel's voltage.
-- **GPIO 36** reads the junction between the resistor and the LED.
-- The voltage **across the resistor** is `V33 − V36`, so the current is
-  `I = (V33 − V36) / R` and the power is `V33 × I`.
+- **GPIO 33 (`D33`)** reads the **panel voltage**. The 10 kΩ in front of it is
+  the *only* thing between the panel and the pin, and it carries no current
+  because an ADC input draws almost none. Its job is protection: if the panel
+  slips above 3.3 V the pin clamps, and the 10 kΩ limits that fault current to
+  `(V − 3.6) / 10 kΩ` — about 0.24 mA at 6 V. Use a second 10 kΩ in front of
+  **GPIO 36** for the same reason.
+- **GPIO 36 (`VP`)** reads the **LED anode** — the far side of the `330 Ω`.
+- The voltage **across the 330 Ω** is `V33 − V36`, so
+  `I = (V33 − V36) / 330` and `P = V33 × I`.
 
-With a red LED and a 220 Ω resistor in a lit room: panel ≈ 2.4 V, junction
-≈ 1.9 V, drop 0.5 V, current ≈ 2.3 mA, power ≈ 5.5 mW. The dashboard shows all
-three figures and they rise when a torch is shone on the panel.
+With a red LED (~1.8 V forward) and a panel at 3.3 V: junction ≈ 1.8 V, drop
+≈ 1.5 V, current ≈ **4.5 mA**, power ≈ **15 mW**. The dashboard shows all three
+figures, and they rise when a torch is shone on the panel.
 
-Both taps must stay **below 3.3 V**. A bare cell is fine; a larger panel needs a
-divider on each tap. `sense_ohms` is part of the stored config (`solar.sense_ohms`,
-default 220) so the same build works with a different resistor.
+**The 330 Ω is the sense resistor, so `sense_ohms` must be 330** — not 10 000.
+`solar.sense_ohms` is part of the stored config (default 330), which is what lets
+one build work with a different resistor.
 
-**Bin 1's echo moved from GPIO 36 to GPIO 26** to make this possible — the board
-has only five usable ADC1 pins and the other four are already soil (34),
-reservoir (35) and the LDR (32). The echo still needs its 5 V → 3.3 V divider;
-only the header it lands on changed.
+**Do not put the sense resistor after the 10 kΩ.** That is the arrangement this
+section used to draw, and it is worse in every way: the LED current then has to
+pass through the 10 kΩ, so it is ~0.15 mA (invisible LED), the drop across the
+330 Ω is only ~48 mV (about 9 ADC counts, ±20% with noise), and `sense_ohms`
+would have to be 10 330 to get the number right.
+
+**Both taps must stay below 3.3 V.** A bare cell is fine. A larger panel needs a
+divider on each tap — and then the volts shown are the tap, not the panel, so
+scale accordingly. The ESP32's ADC is also non-linear over roughly the top
+200 mV: a panel that sits right at 3.3 V reads ~4095 and stops rising, which is
+another reason to leave headroom with a divider.
+
+**`GPIO 36` is silkscreened `VP`, not `D36`** — it and `GPIO 39` (`VN`) are the
+two input-only ADC1 pins, with no internal pull-ups and no 5 V tolerance. See
+§1 for the header order; `VP` is the pin immediately right of `EN`.

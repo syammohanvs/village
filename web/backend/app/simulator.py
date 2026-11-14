@@ -532,7 +532,7 @@ class SimulatedDevice:
         """A panel in a light-ish room: about 2.4 V across a red LED pair."""
         panel_mv = 2400
         junction_mv = 1900
-        sense_ohms = 220
+        sense_ohms = 330
         drop_mv = panel_mv - junction_mv
         current_ma = drop_mv / sense_ohms
         return {
