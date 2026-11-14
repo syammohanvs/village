@@ -40,7 +40,11 @@ struct LightConfig {
   bool digital = false;              // false = analogue AO, true = digital DO
   bool analog_bright_high = false;   // resistor to 3V3, LDR to GND: voltage falls with light
   bool digital_dark_when_high = true;  // typical LDR module DO
-  uint16_t dark_threshold = 1500;    // metric units, dark at or below
+  // Metric units (brightness = 4095 - raw for the pull-up wiring), dark at
+  // or below.  1800 is measured on this build: a hand over the bare LDR
+  // reaches raw ~2560 (metric ~1536), so the 1500 default was 36 counts
+  // too tight and covering the sensor did nothing.
+  uint16_t dark_threshold = 1800;
   uint16_t bright_threshold = 2800;  // metric units, bright at or above
   uint16_t stable_ms = 4000;
   uint16_t max_age_ms = 5000;

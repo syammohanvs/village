@@ -291,8 +291,11 @@ light:
 - the pull-up value is not critical (4.7–47 kΩ); this build measures **raw
   800–890 in a lit room**, i.e. a brightness metric of **3200–3300**
   (`metric = 4095 − raw`)
-- thresholds are on the **metric**, not the raw: `dark_threshold = 1500`
-  (raw ≥ 2595) and `bright_threshold = 2800` (raw ≤ 1295), `stable_ms = 4000`
+- thresholds are on the **metric**, not the raw: `dark_threshold = 1800`
+  (raw ≥ 2295) and `bright_threshold = 2800` (raw ≤ 1295), `stable_ms = 4000`
+  — 1800 is measured here: a hand over the LDR reaches raw ~2560 (metric
+  ~1536), which the earlier 1500 line missed by 36 counts, so covering the
+  sensor did nothing until it was lowered (2026-11-15)
 - `light.sensor_fitted = true` must be saved or the board reports no brightness
   at all (by design: a floating pin reads plausible noise); `light.installed`
   is the **separate** fact that the five streetlight lamps are wired

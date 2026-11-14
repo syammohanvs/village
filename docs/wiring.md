@@ -354,10 +354,12 @@ One fixed resistor and one LDR make a divider. The resistor is the *pull-up*
   on the 0–4095 scale, which the firmware turns into a brightness metric of
   **3200–3300** (`metric = 4095 − raw`). That reads **bright**, as it should.
 - The thresholds are on the **metric**, not the raw value: `dark_threshold`
-  (default 1500, i.e. raw ≥ 2595) and `bright_threshold` (default 2800, i.e.
-  raw ≤ 1295). Cover the sensor with your hand, read the raw value, and move
-  the thresholds to sit either side of your own two readings if the defaults
-  do not separate them cleanly.
+  (default 1800, i.e. raw ≥ 2295) and `bright_threshold` (default 2800, i.e.
+  raw ≤ 1295). The 1800 default is measured on this build: a hand over the
+  bare LDR reaches raw ~2560 (metric ~1536), and the older 1500 default missed
+  it by 36 counts, so covering the sensor changed nothing. Cover yours, read
+  the raw value, and move the thresholds to sit either side of your own two
+  readings if they do not separate cleanly.
 - A very dark LDR climbs toward raw 4095 (metric 0); a bright one falls toward
   raw 0 (metric 4095). The 4 s `stable_ms` delay stops the lamps flickering at
   dusk.
