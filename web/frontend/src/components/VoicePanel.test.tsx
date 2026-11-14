@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -295,7 +295,7 @@ describe('typed requests use the same parser', () => {
     expect(screen.getAllByText(/please switch the lights off/).length).toBeGreaterThan(0);
   });
 
-  it('ignores the same typed request arriving twice within one gesture', async () => {
+  it('processes one submission once, and lets a later repetition run', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
     vi.mocked(api.voiceInterpret).mockResolvedValue({
       status: 'ok',
@@ -311,15 +311,19 @@ describe('typed requests use the same parser', () => {
     const { user } = await openPanel();
     const box = screen.getByTestId('voice-text');
     await user.type(box, 'switch off the lights');
-    await user.click(screen.getByTestId('voice-send'));
-    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
 
-    // A duplicated event/double submit of the same words must not become a
-    // second physical command.
+    // Two submit events for one gesture (double click, duplicate event) must
+    // not become two commands.
+    const form = screen.getByTestId('voice-send').closest('form')!;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
+    expect(api.voiceInterpret).toHaveBeenCalledTimes(1);
+
+    // A later, deliberate repetition is a new intent and does run.
     await user.type(screen.getByTestId('voice-text'), 'switch off the lights');
     await user.click(screen.getByTestId('voice-send'));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(2));
   });
 
   it('answers a status question without sending anything', async () => {
@@ -340,6 +344,35 @@ describe('typed requests use the same parser', () => {
 
     expect(await screen.findByText(/street lights are off/i)).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('does not trust a stale frame when deciding the lights are already off', async () => {
+    // A cached frame says "off"; the board itself is stale, so the request must
+    // still be sent rather than answered from the cache.
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ stale: true, ageMs: 9000, lightsCommanded: false }),
+    );
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'turn the lights off',
+      already_text: 'The lights are already off.',
+      pending_text: 'Switching the lights off.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'turn the lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    await waitFor(() =>
+      expect(api.sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'LIGHTS_OFF', source: 'voice' }),
+      ),
+    );
+    expect(screen.queryByText('The lights are already off.')).not.toBeInTheDocument();
   });
 
   it('says a command already holds instead of sending it again', async () => {
@@ -449,6 +482,28 @@ describe('typed requests use the same parser', () => {
       (await screen.findAllByText(/Irrigation blocked: reservoir water is low/i)).length,
     ).toBeGreaterThan(0);
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the model does not measure bin fullness', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'status',
+      intent: 'BIN_STATUS',
+      command: null,
+      actuation: false,
+      transcript: 'are the bins full',
+      response_text:
+        'Our model does not measure bin fullness. The three bins have indicator LEDs only.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'are the bins full');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(
+      await screen.findByText(/does not measure bin fullness/i),
+    ).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
   });
 
   it('does not act on a statement or a hypothetical question', async () => {

@@ -273,3 +273,81 @@ async def test_typed_request_uses_the_same_parser(tmp_path) -> None:
             "/api/v1/voice/interpret", json={"text": "", "language": "en"}
         )
         assert bad.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Review points: bin fullness, polite requests vs advice, and the exact
+# Malayalam/Hindi sentences that fail when only sentence endings are inspected.
+# ---------------------------------------------------------------------------
+def test_bin_fullness_is_not_measured(matcher: IntentMatcher) -> None:
+    result = matcher.match("are the bins full", "en")
+    assert result["kind"] == "status"
+    assert result["intent"] == "BIN_STATUS"
+    assert result["command"] is None
+    assert "does not measure bin fullness" in result["response_text"]
+    # and the same answer in the other languages
+    for language, needle in (("ml", "അളക്കുന്നില്ല"), ("hi", "नहीं मापता")):
+        text = "ബിൻ സ്റ്റാറ്റസ്" if language == "ml" else "बिन स्टेटस"
+        assert needle in matcher.match(text, language)["response_text"]
+
+
+def test_polite_requests_are_commands_but_advice_is_not(matcher: IntentMatcher) -> None:
+    for text in (
+        "Can you turn off the streetlights?",
+        "Could you please switch the lights off?",
+        "Would you please turn the lights off?",
+        "Will you switch the lights off?",
+    ):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "command", text
+        assert result["command"] == "LIGHTS_OFF", text
+
+    for text in ("Can I turn off the lights?", "May I switch the lights off?",
+                 "Should I turn off the lights?"):
+        assert matcher.match(text, "en")["kind"] == "hypothetical", text
+
+    # the polite form sits at the end in Malayalam and Hindi
+    assert matcher.match("ലൈറ്റ് ഓഫ് ചെയ്യാമോ?", "ml")["command"] == "LIGHTS_OFF"
+    assert matcher.match("क्या आप लाइट बंद कर सकते हैं?", "hi")["command"] == "LIGHTS_OFF"
+
+
+def test_malayalam_negation_question_and_request(matcher: IntentMatcher) -> None:
+    neg = matcher.match("ലൈറ്റ് ഓഫ് ചെയ്യരുത്", "ml")
+    assert neg["kind"] == "negated" and neg["command"] is None
+
+    question = matcher.match("ലൈറ്റ് ഓഫ് ആണോ?", "ml")
+    assert question["kind"] == "status"
+    assert question["intent"] == "LIGHTS_STATUS"
+    assert question["command"] is None
+
+    request = matcher.match("ലൈറ്റ് ഓഫ് ചെയ്യാമോ?", "ml")
+    assert request["kind"] == "command"
+    assert request["command"] == "LIGHTS_OFF"
+
+
+def test_hindi_negation_question_and_polite_request(matcher: IntentMatcher) -> None:
+    neg = matcher.match("लाइट बंद मत करो", "hi")
+    assert neg["kind"] == "negated" and neg["command"] is None
+
+    question = matcher.match("क्या लाइट बंद है?", "hi")
+    assert question["kind"] == "status"
+    assert question["intent"] == "LIGHTS_STATUS"
+    assert question["command"] is None
+
+    request = matcher.match("क्या आप लाइट बंद कर सकते हैं?", "hi")
+    assert request["kind"] == "command"
+    assert request["command"] == "LIGHTS_OFF"
+
+
+def test_a_supported_command_plus_an_unsupported_action_refuses_in_every_language(
+    matcher: IntentMatcher,
+) -> None:
+    for text, language in (
+        ("turn off the lights and open the gate", "en"),
+        ("വിളക്കുകൾ അണയ്ക്കുക ഗേറ്റ് തുറക്കുക", "ml"),
+        ("लाइट बंद करो और गेट खोलो", "hi"),
+    ):
+        result = matcher.match(text, language)
+        assert result["kind"] == "ambiguous", text
+        assert result["command"] is None, text
+        assert result["actuation"] is False, text

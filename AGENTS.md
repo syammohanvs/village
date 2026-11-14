@@ -342,8 +342,9 @@ Phone torch on the panel for 10 s:
 
 ## Voice commands (natural language, 2026-11-15)
 
-Sara understands phrasing, not just exact commands, without any language model
-or cloud call.  The pipeline has four separate steps:
+Sara understands phrasing, not just exact commands, without any **additional**
+language model or cloud call.  Whisper is the only model and it only transcribes;
+the meaning is decided by fixed rules.  The pipeline has four separate steps:
 
 1. **transcription** — the browser records a WAV and posts it to
    `POST /api/v1/voice/transcribe`; the local whisper.cpp server returns text.
@@ -373,26 +374,37 @@ the reply wording, and per-intent example phrases (also used by the help list).
 5. two different states ("on… no, off", "on and off") → ambiguous (a question
    like "are the lights on or off?" is a status query instead);
 6. one device (more than one → ambiguous); pronouns with no device → ask which;
-7. question or status word → the device's status intent, never an action;
+7. question or status word → the device's status intent, never an action.  A
+   polite request is a command, not a question: "Can you turn off the
+   streetlights?" and "…ചെയ്യാമോ?" / "…कर सकते हैं?" execute, while "can I /
+   should I…" is advice and does not;
 8. copula with no imperative ("the lights are off") → statement, never an action;
 9. exactly one device + one state → the command in `device_commands`;
 10. otherwise fall back to whole-phrase catalogue matching (this is what keeps
     the hand-written Malayalam/Hindi phrases working), then UNKNOWN.
 
-**English also refuses sentences with an unaccounted content word**
-(`_unaccounted`), so "turn off the lights and open the gate" sends nothing
-instead of half of it.  Malayalam/Hindi allow inflected leftovers (their
-morphology is richer than the lexicon), which is a documented limit.
+**Every language refuses a sentence with an unaccounted content word**
+(`_unaccounted`), so "turn off the lights and open the gate", "വിളക്കുകൾ
+അണയ്ക്കുക ഗേറ്റ് തുറക്കുക" and "लाइट बंद करो और गेट खोलो" all send nothing
+instead of half of it.  The known-word set is per language, so an unfamiliar
+inflected form is refused rather than guessed.
 
 ### Replies and exact wording
 
 - unrecognised: “Please ask me to control a supported device or check its status.
   For other help, contact Gram Sahayak.”
+- bin fullness: “Our model does not measure bin fullness. The three bins have
+  indicator LEDs only.” — never a number, because nothing measures it.
 - ambiguous between on and off: “Would you like the lights on or off?”
 - statement / hypothetical / negation / disconnected / unconfirmed: in
   `shared/intents.json` under `messages`, translated for all three languages.
 - a matched command carries `pending_text`, `done_text` and `already_text`; the
-  panel says “already off” **without sending** when the frame agrees.
+  panel says “already off” **without sending** only when the frame is connected,
+  not stale and younger than 5 s.  A cached/stale frame never skips an action.
+- one utterance carries one id: the recording's start for speech, the current
+  typed text until the box clears for typing.  A retry of that utterance reuses
+  it (the controller answers DUPLICATE); a later deliberate repetition is a new
+  id and does run.
 
 The parser returns `confidence` as 0.0 or 1.0 only, and the UI no longer shows a
 percentage: this is a deterministic allowlist, not a model, and a percentage
@@ -406,6 +418,9 @@ would invent a probability.
   as unsupported rather than guessed.
 - Whisper transcription errors are the dominant failure mode in a noisy room;
   the parser cannot recover a word it never received.
+- Malayalam/Hindi question detection uses the words (Hindi "क्या" is a word, not
+  a suffix); Malayalam verbs can also carry the question suffix, so both are
+  checked.  Negation is read by meaning, not by removing words.
 - Free-form conversation, questions about the app in general and multi-step
   instructions are out of scope (Help and Sara's topics cover those).
 

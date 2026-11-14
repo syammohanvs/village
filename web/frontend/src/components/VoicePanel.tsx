@@ -137,7 +137,11 @@ export function VoicePanel() {
   // duplicated transcription event and a double submit of typed text.
   const finishingRef = useRef(false);
   const typedBusyRef = useRef(false);
-  const lastRunRef = useRef<{ key: string; at: number } | null>(null);
+  // The id of the words currently in the box.  A retry of the same submission
+  // reuses it, so the controller answers DUPLICATE instead of acting twice; the
+  // box is cleared on a successful send, so a later deliberate repetition gets
+  // a new id and really does run.
+  const typedGestureRef = useRef<{ text: string; id: string } | null>(null);
   const [typed, setTyped] = useState('');
 
   const intents = useApi<VoiceIntentsResponse>(
@@ -261,15 +265,6 @@ export function VoicePanel() {
   ) {
     const kind = kindOf(response);
     const intent = response.intent ?? null;
-    const key = `${language}|${transcript.trim().toLowerCase()}`;
-    const now = Date.now();
-    if (lastRunRef.current && lastRunRef.current.key === key && now - lastRunRef.current.at < 2000) {
-      // The same utterance arrived twice inside one gesture.  The first one is
-      // already being handled; this is not a second command.
-      return;
-    }
-    lastRunRef.current = { key, at: now };
-
     setResult(response);
     setTranscript(transcript);
 
@@ -322,11 +317,14 @@ export function VoicePanel() {
       return;
     }
 
+    // "Already off" may only come from a fresh, connected frame.  A cached or
+    // stale reading must never make Sara skip an action the user asked for.
+    const frameFresh = connected && !stale && (ageMs == null || ageMs < 5000);
     const already = response.already_text
       || (command === 'LIGHTS_OFF' ? 'The lights are already off.'
         : command === 'LIGHTS_ON' ? 'The lights are already on.'
         : '');
-    if (alreadyInState(command, villageStatus) && already) {
+    if (frameFresh && alreadyInState(command, villageStatus) && already) {
       setState('success');
       setMessage(already);
       void speak(already, intent);
@@ -450,12 +448,17 @@ export function VoicePanel() {
     setMicError('');
     setTtsNote('');
     setState('processing');
+    if (typedGestureRef.current?.text !== text) {
+      typedGestureRef.current = { text, id: utteranceId(text, Date.now()) };
+    }
+    const requestId = typedGestureRef.current.id;
     try {
       // Same parser as the microphone: Whisper only changes how the words
       // arrive, never what they mean.
       const response = await api.voiceInterpret(text, language);
       setTyped('');
-      await applyUtterance(response, response.transcript ?? text, utteranceId(text, Date.now()));
+      typedGestureRef.current = null;
+      await applyUtterance(response, response.transcript ?? text, requestId);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;

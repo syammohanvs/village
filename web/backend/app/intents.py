@@ -164,10 +164,16 @@ class IntentMatcher:
 
     def _request(self, tokens: list[str], language: str) -> bool:
         g = self.grammar.get(language, {})
-        # "can you / could you / would you" is a request; "can I / may I" is
-        # handled as a hypothetical before this is consulted.
-        modals = [m for m in g.get("request_modals", []) if not m.startswith(("can i", "may i", "could i"))]
-        return self._starts(tokens, modals) or self._has(tokens, ["please", "kindly", "ദയവായി", "कृपया"])
+        # "can you / could you / would you" is a request; "can I / may I / should
+        # I" is advice and is handled as a hypothetical before this is consulted.
+        modals = [m for m in g.get("request_modals", [])
+                  if not m.startswith(("can i", "may i", "could i", "should i"))]
+        polite = self._has(tokens, ["please", "kindly", "ദയവായി", "कृपया"])
+        if language == "en":
+            return self._starts(tokens, modals) or polite
+        # Malayalam "…ചെയ്യാമോ" and Hindi "…कर सकते हैं" end the sentence, so the
+        # polite form is looked for anywhere rather than only at the start.
+        return self._has(tokens, modals) or polite
 
     # ----------------------------------------------------------------- parse
     def match(self, text: str, language: str) -> dict[str, Any]:
@@ -307,9 +313,10 @@ class IntentMatcher:
         if not command:
             return self._result("unsupported", language, "unknown", device=device, action=action)
 
-        if language == "en" and self._unaccounted(tokens, language):
+        if self._unaccounted(tokens, language):
             # An unknown word after a conjunction is the shape of a second
-            # request ("…and open the gate").  Never execute half of it.
+            # request ("…and open the gate", "…ഗേറ്റ് തുറക്കുക").  Never execute
+            # half of it, in any language.
             return self._result("ambiguous", language, "ambiguous_generic", device=device)
         return self._intent_result(command, language, device=device, action=action)
 
@@ -351,10 +358,10 @@ class IntentMatcher:
         """English words no rule consumed.  A leftover noun means the sentence
         asked for something this build cannot do, so nothing is actuated."""
         g = self.grammar.get(language, {})
-        known: list[str] = list(EN_FILLERS)
-        for group in ("polite", "request_modals", "question_starts", "hypothetical",
-                      "corrections", "negations", "pronouns", "copulas", "verbs",
-                      "status_words", "fillers"):
+        known: list[str] = list(EN_FILLERS) if language == "en" else []
+        for group in ("polite", "request_modals", "question_starts", "question_suffixes",
+                      "hypothetical", "corrections", "negations", "pronouns", "copulas",
+                      "verbs", "status_words", "fillers"):
             known.extend(g.get(group, []))
         known.extend(["help", "commands", "what can you do"])
         for aliases in self.devices.values():

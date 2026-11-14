@@ -6,8 +6,9 @@ what the live sensors can see.
 
 She is deliberately simple:
 
-- **no language model, no cloud and no internet** — every sentence is written
-  and stored in the app;
+- **no additional language model, no cloud and no internet** — Whisper only
+  turns speech into text; the words are understood by fixed rules and every
+  reply is written and stored in the app;
 - **no invented numbers** — if a probe is uncalibrated, stale or missing, Sara
   says so instead of guessing;
 - **optional audio** uses the browser's own speech synthesis, so it works
@@ -78,21 +79,43 @@ The parser reads the *meaning* before it acts: a question, a statement, a
 conditional, a negation, a correction or a sentence with two devices is never
 turned into a command. It also requires **every content word** to be
 understood, so “turn off the lights and open the gate” sends nothing rather than
-half of it. There is no conversation memory: “it”, “that” and “do the same” ask
-you to name the device.
+half of it — and the same rule now applies in Malayalam and Hindi, not only in
+English. There is no conversation memory: “it”, “that” and “do the same” ask you
+to name the device.
+
+A polite request is still a request: **“Can you turn off the streetlights?”**
+and Malayalam “ലൈറ്റ് ഓഫ് ചെയ്യാമോ?” / Hindi “क्या आप लाइट बंद कर सकते हैं?”
+send the command, while **“Can I / should I …?”** is advice and sends nothing.
 
 A reply is only “done” after the controller acknowledges it. If the board is
 offline, or the acknowledgement does not arrive, the panel says so and does not
-claim success. If the controller already reports the requested state, it says
-“already off/on” instead of sending the command again.
+claim success. It says “already off/on” **only from a fresh, connected frame**;
+a stale or cached reading never makes it skip an action you asked for.
+
+**Bin fullness is not measured.** “Are the bins full?” is answered with “Our
+model does not measure bin fullness. The three bins have indicator LEDs only.” —
+never with a number.
 
 ### Languages
 
 The same rules exist in English, Malayalam and Hindi, including the code-mixed
 phrases the catalogue already had (“light off”, “light band karo”, “pump on
 cheyyuka”). Whichever language is selected in the panel is the one Whisper is
-asked for and the one the reply is spoken in. This is not unrestricted
-conversation and it is not every language.
+asked for and the one the reply is spoken in.
+
+Questions are recognised by their words, not by a full stop: Hindi **“क्या” is a
+question word** at the start, while Malayalam can also mark a question on the verb
+(“…ഉണ്ടോ”, “…ആണോ”). Negation is read the same way in meaning — Hindi “मत” and
+Malayalam “വേണ്ട / അരുത്” anywhere in the sentence, because both languages negate
+after the verb. This is not unrestricted conversation and it is not every
+language.
+
+### Repeating a command
+
+One utterance carries one command id. A duplicated event for the same recording
+is therefore answered by the controller as a duplicate instead of acting twice,
+while saying the same thing again later — or retyping it after the box clears —
+is a new request and does run.
 
 ### Where the rules live
 
