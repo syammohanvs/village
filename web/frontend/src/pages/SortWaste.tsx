@@ -32,6 +32,7 @@ import {
 } from '../lib/sceneMemory';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
+import { cameraErrorMessage, openCameraStream } from '../lib/camera';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import {
@@ -624,12 +625,12 @@ export function SortWaste() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
-          : { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' },
-      });
+      // The ladder rather than one request: the rear-camera hint is for a
+      // phone, and a remembered deviceId may name a camera that has gone.
+      const opened = await openCameraStream(navigator.mediaDevices, deviceId);
+      const stream = opened.stream;
+      // A device that no longer answers must not be asked for again.
+      if (deviceId && !opened.usedDeviceId) setDeviceId('');
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -646,9 +647,7 @@ export function SortWaste() {
       setDevices(list.filter((device) => device.kind === 'videoinput'));
       if (installed) void loadModel();
     } catch (cause) {
-      setCameraError(
-        cause instanceof Error ? `The camera could not start: ${cause.message}` : 'The camera could not start.',
-      );
+      setCameraError(cameraErrorMessage(cause));
     }
   };
 
