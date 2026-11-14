@@ -335,6 +335,10 @@ Phone torch on the panel for 10 s:
   **3.3 V** case, not this one.
 - `solar.installed` is now true (it gates nothing in the app; the card reads the
   numbers regardless).
+- **Board off, panel lit, verified on the bench (2026-11-15):** USB unplugged
+  with a torch on the panel, the LED glowed and the board stayed off — no
+  phantom boot, and it came back normally when USB was reconnected.  The 10 kΩ
+  taps limit the clamp current to ~0.26 mA each, which is why.
 
 ## Soil moisture polarity
 

@@ -614,6 +614,11 @@ Two consequences, both harmless:
   not a state to leave it in for months — but at 0.26 mA it cannot damage the
   part, and the board simply stays off.
 
+**Measured on the bench (2026-11-15):** USB unplugged, torch on the panel — the
+red LED glowed and the board stayed off. No phantom boot, no reset when USB was
+reconnected, and the readings returned to normal. That is the whole chain
+working with the controller out of the picture.
+
 If you want the pins electrically isolated when unpowered (the belt-and-braces
 option), a small Schottky in series with each tap — anode to the panel side,
 cathode to the pin — blocks the back-feed. It costs a ~0.2 V drop (so the volts
