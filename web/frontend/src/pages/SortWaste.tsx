@@ -744,7 +744,17 @@ export function SortWaste() {
     // a bin name for the three bins, a referral for anything else.
     // Lia says what the card says, because both read the one routing table.
     const spoken = spokenFor(guideFor(hazardous ? 'medical' : event.label || event.category));
-    void speakText(spoken, voiceLanguage, 0.95);
+    // Speak the sentence in the language it is written in.
+    //
+    // The guide's sentences are English (they live in one routing table), and
+    // this used to hand them to whatever language the reader had chosen -- so a
+    // Hindi voice read English text, which is what "another weird accent" was.
+    // Measured in the log: `language=hi voice=hi_IN-priyamvada-medium
+    // text='Keep this item separate. Contact Gram Sahayak.'`
+    //
+    // When the guide's sentences are translated, this becomes `voiceLanguage`
+    // again and nothing else has to change.
+    void speakText(spoken, 'en', 0.95);
 
     try {
       const result = await api.postRecognition({
