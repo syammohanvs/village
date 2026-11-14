@@ -45,19 +45,19 @@ describe('Our Village', () => {
   it('shows the four everyday cards with honest values', async () => {
     render(<App />);
 
-    expect(await screen.findByText('Plants & Watering')).toBeInTheDocument();
-    expect(screen.getByText('Rainwater Tank')).toBeInTheDocument();
-    expect(screen.getByText('Streetlights')).toBeInTheDocument();
+    expect(await screen.findByText('Watering')).toBeInTheDocument();
+    expect(screen.getByText('Tank')).toBeInTheDocument();
+    expect(screen.getByText('Lights')).toBeInTheDocument();
     expect(screen.getByText('Waste')).toBeInTheDocument();
+    expect(screen.getByText('Solar')).toBeInTheDocument();
 
     expect(screen.getByText(/28%/)).toBeInTheDocument();
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
-    expect(screen.getByText(/light sensor reads dark/i)).toBeInTheDocument();
-    // The bins have indicator LEDs only: the card names them and says outright
-    // that nothing measures how full they are.
-    const waste = within(screen.getByTestId('card-waste'));
-    expect(waste.getByText(/organic \/ food waste, plastic, paper/i)).toBeInTheDocument();
-    expect(waste.getByText(/Nothing measures how full a bin is/i)).toBeInTheDocument();
+    // The Lights card carries the sensor reading as a chip, not a sentence.
+    expect(within(screen.getByTestId('card-lights')).getByText('Dark')).toBeInTheDocument();
+    // Nothing on this page claims to know how full a bin is.
+    expect(screen.queryByText(/distance sensor/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/full/i)).not.toBeInTheDocument();
 
     const body = document.body.textContent ?? '';
     expect(body).not.toMatch(/\d+(?:\.\d+)?\s*(?:l|litres?|liters?)\b/i);
@@ -72,8 +72,10 @@ describe('Our Village', () => {
     );
     render(<App />);
 
-    expect(await screen.findByText(/No light sensor is fitted/i)).toBeInTheDocument();
-    expect(screen.queryByText(/reads dark/i)).not.toBeInTheDocument();
+    const card = within(await screen.findByTestId('card-lights'));
+    expect(card.getByText('No sensor')).toBeInTheDocument();
+    expect(card.queryByText('Dark')).not.toBeInTheDocument();
+    expect(card.queryByText('Bright')).not.toBeInTheDocument();
   });
 
   it('explains why watering is disabled when the tank is low', async () => {
@@ -113,10 +115,12 @@ describe('Our Village', () => {
 
     expect(await screen.findByTestId('offline-banner')).toHaveTextContent(/controller offline/i);
     expect(screen.getByTestId('connection-pill')).toHaveTextContent('Offline');
-    expect(screen.getByText('Plants & Watering')).toBeInTheDocument();
+    expect(screen.getByText('Watering')).toBeInTheDocument();
     expect(screen.getByTestId('water-plants')).toBeDisabled();
     expect(screen.getByTestId('lights-auto')).toBeDisabled();
-    expect(screen.getAllByText(/the controller is offline/i).length).toBeGreaterThan(0);
+    // The shell's banner says the controller is offline once; the page itself
+    // does not repeat it.
+    expect(screen.getByTestId('offline-banner')).toBeInTheDocument();
   });
 
   it('labels simulation and sends demo commands for Water Plants', async () => {
@@ -153,7 +157,7 @@ describe('Our Village', () => {
     expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live');
   });
 
-  it('keeps Stop Watering reachable and reports an unconfirmed result', async () => {
+  it('keeps Stop reachable and reports an unconfirmed result', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
     vi.mocked(api.sendCommand).mockRejectedValue(
       new ApiError(503, 'The controller did not acknowledge the command.', {
@@ -165,7 +169,7 @@ describe('Our Village', () => {
     render(<App />);
 
     const stop = await screen.findByTestId('stop-watering');
-    expect(stop).toHaveTextContent('Stop Watering');
+    expect(stop).toHaveTextContent('Stop');
     await user.click(stop);
 
     await waitFor(() =>
@@ -173,8 +177,10 @@ describe('Our Village', () => {
         expect.objectContaining({ type: 'IRRIGATION_STOP' }),
       ),
     );
-    expect(await screen.findByText('Not confirmed')).toBeInTheDocument();
-    expect(screen.getByText(/Do not assume anything physical happened/i)).toBeInTheDocument();
+    // The card says the controller did not confirm, rather than claiming success.
+    expect(
+      await screen.findByText('The controller did not acknowledge the command.'),
+    ).toBeInTheDocument();
   });
 });
 
@@ -188,7 +194,7 @@ describe('solar pill', () => {
     expect(chip).toHaveClass('chip', 'chip--neutral');
     expect(chip).not.toHaveClass('chip--live');
     expect(card.getByText(/0.14 V · 0.00 mA · 0.0 mW/)).toBeInTheDocument();
-    expect(card.getByText(/needs about 1\.8 V before it conducts/i)).toBeInTheDocument();
+    expect(card.queryByText(/milliwatts/i)).not.toBeInTheDocument();
   });
 
   it('goes green only once the panel is actually making power', async () => {
@@ -199,15 +205,15 @@ describe('solar pill', () => {
     const card = within(await screen.findByTestId('card-solar'));
     const chip = card.getByText('Generating');
     expect(chip).toHaveClass('chip--live');
-    expect(card.getByText(/14\.6 milliwatts at 3\.20 volts/i)).toBeInTheDocument();
+    expect(card.getByText(/3\.20 V · 4\.55 mA · 14\.6 mW/)).toBeInTheDocument();
   });
 
   it('says where the two taps go when there is no reading at all', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ solarMillivolts: null }));
     render(<App />);
     const card = within(await screen.findByTestId('card-solar'));
-    expect(card.getByText('No reading')).toBeInTheDocument();
-    expect(card.getByText(/GPIO 39 \(VN\).*GPIO 36 \(VP\)/i)).toBeInTheDocument();
+    expect(card.getAllByText('No reading').length).toBeGreaterThan(0);
+    expect(card.queryByText(/GPIO/i)).not.toBeInTheDocument();
   });
 });
 

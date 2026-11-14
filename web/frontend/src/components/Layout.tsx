@@ -106,6 +106,7 @@ function TalkToLia({ compact = false }: { compact?: boolean }) {
 export function Layout() {
   const location = useLocation();
   const meta = pageMeta(location.pathname);
+  const isHome = location.pathname === '/';
   const { simulator } = useVillage();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -188,15 +189,22 @@ export function Layout() {
             <IconMenu size={20} />
           </button>
 
-          <div className="appbar-heading">
-            <h1 className="appbar-title">{meta.title}</h1>
-          </div>
+          {/* The home page names itself on the menu and starts with its own
+              round microphone, so the big title and the second talk button are
+              noise there.  Every other page keeps them. */}
+          {!isHome && (
+            <div className="appbar-heading">
+              <h1 className="appbar-title">{meta.title}</h1>
+            </div>
+          )}
 
           <div className="appbar-actions">
             <ConnectionPill />
-            <span className="appbar-lia">
-              <TalkToLia compact />
-            </span>
+            {!isHome && (
+              <span className="appbar-lia">
+                <TalkToLia compact />
+              </span>
+            )}
           </div>
         </header>
 

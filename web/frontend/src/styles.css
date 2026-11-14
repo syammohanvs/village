@@ -1451,6 +1451,50 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* Our Village ------------------------------------------------------- */
 
+/* Minimal home: one round microphone, the language pills, and bare status.
+   No explanatory paragraphs, no "Try / Watch" notes, no activity strip. */
+.village-page--minimal { gap: 16px; }
+.village-simple-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.mic-button {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-2);
+  background: radial-gradient(circle at 32% 26%, var(--gold-2), var(--gold-dim));
+  color: #241a0c;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.38);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.mic-button:hover { transform: translateY(-1px) scale(1.02); }
+.mic-button:active { transform: scale(0.97); }
+.mic-button:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
+.village-simple-langs { margin: 0; }
+.village-simple-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.village-grid--minimal { gap: 12px; }
+.vcard--min {
+  gap: 8px;
+  padding: 13px 15px;
+}
+.vcard--min .vcard-head h2 { font-size: 17px; }
+.vcard--min .vcard-icon { width: 30px; height: 30px; border-radius: 9px; }
+.vcard--min .vcard-state { font-size: 14.5px; }
+.vcard--min .btn { padding: 8px 14px; font-size: 13.5px; }
+.vcard--solar { max-width: none; }
+.vcard-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.vcard-note--warn { color: #f0cf8c; }
+
 .village-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
