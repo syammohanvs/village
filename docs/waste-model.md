@@ -633,6 +633,76 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### The bead texture is the right cue, and it does not survive 224 px (2026-11-14)
+
+Advice offered for thermocol (EPS) identification: its strongest visual cue is the **fused-bead
+texture** — a mosaic of small beads with fine seams — not its whiteness or shape; collect
+lookalikes as hard negatives; measure false positives on held-out lookalikes and pick the
+threshold from that.
+
+The description is correct about real EPS. Whether it is *usable here* is a separate question,
+so it was measured on 224-px crops, which is all the model ever sees.
+
+| class (14 held-out photos each) | fine detail | few-pixel detail | bead periodicity |
+| --- | --- | --- | --- |
+| **Thermocol** | 3.55 | 3.02 | **0.17** |
+| Textile | 4.77 | **3.83** | 0.10 |
+| Background | **5.54** | **4.49** | 0.14 |
+| Paper | 1.74 | 1.55 | 0.07 |
+| Glass | 1.47 | 1.41 | 0.09 |
+
+Thermocol is *not* the most textured class and does not even have the strongest periodicity —
+a patterned room has more. Worse, on the venue's own false positives the ordering inverts:
+
+| crop | bead periodicity |
+| --- | --- |
+| white plate with curry (called Thermocol) | **0.45** |
+| real Thermocol photos (mean) | 0.17 |
+| glossy manual / pen cap (called Thermocol) | 0.05 |
+
+A "thermocol needs a bead pattern" gate would therefore **block real foam and admit the plate**.
+That is the honest reason the cue is not implemented: at this resolution, after JPEG at
+quality 0.92 and a phone held at arm's length, a bead is two or three pixels and the seams are
+gone. **Recorded as measured and rejected**, not as an oversight — a higher-resolution crop
+would be the prerequisite, and 224 px is what the model takes.
+
+A threshold also cannot do this work, which the advice assumes it can: the false positives came
+in at **0.98** (white bread) and 0.99 (tissue) — a *confident* wrong answer, not an uncertain
+one. Only data moves those.
+
+### Hard negatives, which do work (2026-11-14)
+
+So the lookalikes were collected and measured, as advised. Seventy-five freely licensed
+photographs of five lookalike families were added to their *true* classes — white bread to
+`Organic`, tissue to `Paper`, sponge to `Plastic`, white cotton cloth to `Textile`, white ceramic
+bowl to `Glass` — and the head retrained. Same 15 held-out photos per family, before and after:
+
+| lookalike | called Thermocol, before | after |
+| --- | --- | --- |
+| white bread | **11/15** (peak 0.98) | **0/15** (peak 0.36) |
+| tissue paper | 3/15 (peak 0.99) | **1/15** (peak 0.63) |
+| sponge | 3/15 (peak 0.64) | **0/15** (peak 0.07) |
+| white cotton cloth | 0/15 | 0/15 |
+| white ceramic | 0/15 | 0/15 |
+
+The loaf of white bread confidently read as packing foam is exactly the failure this advice
+targets, and it is gone.
+
+It is not free, and the cost is stated: the real-world probe gave up 74.3% -> **70.5%** exact
+(80.1 -> 76.8 action) and hand-held items 49.1 -> 48.9 (67.4 -> 65.7 action). In exchange the
+handkerchiefs went to their **best score yet, 4/8 (50%)**, blank plates stayed 120/120, and
+every venue item kept its answer: cover **Paper 0.90**, glossy manual **Paper 0.91**, ceramic cup
+**Glass 0.94**, bottle **Plastic 0.96**, green handkerchief **Textile 0.95**. The pen weakened
+(0.69 -> 0.40) and now falls under the threshold, which makes it *"not sure"* rather than wrong.
+
+**A second attempt was made and reverted** — forty more gel- and ballpoint-pen photographs to
+restore the pen — and it made everything worse (hand-held 46.2 / 63.3, handkerchiefs 3/8, pen
+0.34). It is recorded because the reflex "add more of the thing that regressed" is what the
+dilution problem punishes, and this is the measurement that says so.
+
+Thermocol's own numbers after the change: recall **34.2%**, precision **92.9%** — it says
+"thermocol" about one time in fourteen that it is not, where before it never did.
+
 ### "Thermocol is too frequent" — measured, and it is the opposite (2026-11-14)
 
 Reported: *"pen cap was classified as thermocol. as was colored paper manual. another
