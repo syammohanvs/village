@@ -105,10 +105,24 @@ describe('waitForFrames', () => {
 });
 
 describe('the message for a silent stream', () => {
-  it('names the device list instead of blaming another app', async () => {
-    const silent = Object.assign(new Error('the camera opened but sent no picture'), { name: 'TimeoutError' });
+  it('names the device that opened and sent nothing', async () => {
+    // The venue case: Chrome shows the camera icon (permission granted, a device
+    // in use) and the preview stays black.  Naming the device is the answer --
+    // "OBS Virtual Camera" and a real webcam are different fixes.
+    const silent = Object.assign(new Error('the camera opened but sent no picture'), {
+      name: 'TimeoutError',
+      deviceLabel: 'OBS Virtual Camera',
+    });
     const message = cameraErrorMessage(silent);
+    expect(message).toContain('OBS Virtual Camera');
     expect(message).toMatch(/never sent a picture/i);
     expect(message).toMatch(/choose another camera/i);
+  });
+
+  it('still says something useful when the device is unnamed', async () => {
+    const silent = Object.assign(new Error('x'), { name: 'TimeoutError' });
+    const message = cameraErrorMessage(silent);
+    expect(message).toMatch(/The camera opened but never sent a picture/);
+    expect(message).toMatch(/virtual camera/i);
   });
 });

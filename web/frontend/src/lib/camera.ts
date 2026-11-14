@@ -76,7 +76,11 @@ export function cameraErrorMessage(cause: unknown): string {
     return 'No camera answered. Check it is plugged in, then press Start Camera again.';
   }
   if (name === 'TimeoutError') {
-    return 'The camera opened but never sent a picture. Choose another camera from the list, or close anything else that films (a virtual camera, or another tab), then press Start Camera again.';
+    // Naming the device is the whole answer here: "OBS Virtual Camera" opening
+    // and sending nothing is a different fix from a real webcam doing it.
+    const label = (cause as { deviceLabel?: string } | null)?.deviceLabel;
+    const which = label ? `“${label}” opened but never sent a picture` : 'The camera opened but never sent a picture';
+    return `${which}. Choose another camera from the list above — a virtual camera (OBS, ManyCam, a screen capture) opens without sending anything — or close the app that owns it, then press Start Camera again.`;
   }
   if (/Timeout starting video source|Could not start video source|NotReadableError/i.test(text) || name === 'NotReadableError') {
     return 'The camera opened but sent no picture. Another app is probably using it — close Zoom, Teams or the Camera app (and any other browser tab showing the camera), then press Start Camera again.';

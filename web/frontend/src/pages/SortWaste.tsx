@@ -652,6 +652,10 @@ export function SortWaste() {
       if (deviceId && !opened.usedDeviceId) setDeviceId('');
       streamRef.current = stream;
       const element = videoRef.current;
+      // `getVideoTracks` is the standard accessor but a stand-in stream (and
+      // some older browsers) only have `getTracks`, so it is asked defensively.
+      const trackLabel =
+        (typeof stream.getVideoTracks === 'function' ? stream.getVideoTracks()[0] : undefined)?.label ?? '';
       if (element) {
         element.srcObject = stream;
         // A rejected play() used to be swallowed, which left a black preview
@@ -663,6 +667,7 @@ export function SortWaste() {
           element.srcObject = null;
           throw Object.assign(new Error('the camera opened but sent no picture'), {
             name: 'TimeoutError',
+            deviceLabel: trackLabel,
           });
         }
       }
