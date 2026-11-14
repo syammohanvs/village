@@ -327,7 +327,9 @@ Phone torch on the panel for 10 s:
 
 - The junction stopping at **~1.83 V** (red LED Vf) while the panel varied is
   the check that the LED is in the load path and the polarity is right; a
-  reversed/open LED makes the junction follow the panel.
+  reversed/open LED makes the junction follow the panel.  **The LED visibly lit
+  at 0.58 mA** — dim, but clearly on — which is the human confirmation of the
+  same fact.
 - The current is small because the cell only reached **2.0 V** under a phone
   torch — `I = (Vpanel − Vf)/330`. The 4.5 mA / 15 mW in the wiring doc is the
   **3.3 V** case, not this one.

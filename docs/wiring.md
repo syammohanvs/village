@@ -566,9 +566,10 @@ path and the polarity is right (a reversed or missing LED would let the junction
 follow the panel). And the current is **0.58 mA, not ~4.5 mA**, because the cell
 only reached **2.0 V** under a phone torch, not 3.3 V: `I = (Vpanel − Vf) / 330`,
 so there is simply less voltage left across the resistor. Brighter light (real
-sun) or a smaller sense resistor both raise it; at 0.58 mA the LED is lit but
-dim. The dashboard shows all five figures and they fall back to zero when the
-light is removed.
+sun) or a smaller sense resistor both raise it. **The red LED visibly lit at
+0.58 mA** (dim but clearly on, confirmed at the bench) — a human check on the
+same fact the junction voltage reports. The dashboard shows all five figures and
+they fall back to zero when the light is removed.
 
 **The 330 Ω is the sense resistor, so `sense_ohms` must be 330** — not 10 000.
 `solar.sense_ohms` is part of the stored config (default 330), which is what lets
