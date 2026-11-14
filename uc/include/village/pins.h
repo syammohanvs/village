@@ -26,7 +26,7 @@ namespace pins {
 inline constexpr const char* kBoardProfile = "esp32doit-devkit-v1";
 inline constexpr const char* kBoardDescription =
     "30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1";
-inline constexpr const char* kPinMapVersion = "1.5.0-30pin";
+inline constexpr const char* kPinMapVersion = "1.6.0-30pin";
 inline constexpr std::size_t kHeaderPins = 30;
 
 inline constexpr bool isAdc1(int gpio) {
@@ -183,29 +183,22 @@ inline constexpr int WASTE_LED_ORGANIC = 21;
 inline constexpr int WASTE_LED_PLASTIC = 22;
 inline constexpr int WASTE_LED_PAPER = 23;
 
-// Three VL53L0X time-of-flight rangefinders on one I2C bus.
+// The bins have INDICATOR LEDS ONLY.  There is no level sensing of any kind:
+// no time-of-flight or ultrasonic rangefinders, no fill percentage and no
+// "bin full" alert.  A bin is a container a person can see into; the three LEDs
+// say which category the camera last recognised, nothing more.
 //
-// The ultrasonic HC-SR04 pair (trig + echo, six pins) is gone.  A ToF sensor
-// needs two bus lines plus one XSHUT per module: the modules all power up at
-// address 0x29, so the firmware holds every XSHUT low, releases them one at a
-// time and gives each a different address before moving on.
+// The five pins the rangefinders used are now free: GPIO 4 and 16 (the old I2C
+// bus) and 17, 18 and 26 (the old XSHUT lines).  They are left unassigned so a
+// later addition has somewhere to go.
 //
-// GPIO 4 and 16 carry the bus; 17, 18 and 26 are the XSHUT lines.  All five
-// were free once the ultrasonic pins were released.  A bus does not care which
-// header it leaves on, and the VL53L0X breakouts carry their own pull-ups.
-inline constexpr int I2C_SDA = 4;
-inline constexpr int I2C_SCL = 16;
-inline constexpr int TOF_XSHUT[3] = {17, 18, 26};
-
-// I2C address assigned to each bin's sensor, in bin order.  Anything from
-// 0x08 to 0x77 works as long as it is not 0x29 (the factory default).
-inline constexpr uint8_t TOF_ADDRESS[3] = {0x30, 0x31, 0x32};
-
-// Every output-capable pin is now spoken for: the ToF XSHUT lines took 17, 18
-// and 26, and 2/5/15 are strapping pins that stay unused.  With the solar panel
-// moved to VN (39), D33 is the one genuinely unassigned pin left; it is named
-// here for what it is.  GPIO 1/3 remain the USB serial console.
+// GPIO 2/5/15 are strapping pins that stay unused, and GPIO 1/3 remain the USB
+// serial console.  D33 is the named spare.
 inline constexpr int SPARE_INPUT = 33;
+
+// Pins deliberately left free for future work.  Kept as a list so a build that
+// starts using one fails the uniqueness check rather than colliding silently.
+inline constexpr int kFreePins[] = {4, 16, 17, 18, 26};
 
 // ---------------------------------------------------------------------------
 // Compile-time checks.  A bad edit fails the build rather than the exhibit.
@@ -234,12 +227,6 @@ static_assert(isExposed(SPARE_INPUT), "the spare pin must be on the header");
 static_assert(isSafeLampOutput(STREETLIGHT_LED_PIN),
               "the streetlight LED pin must be a safe lamp output");
 
-static_assert(isSafeOutput(I2C_SDA) && isSafeOutput(I2C_SCL),
-              "the I2C bus must be on exposed pins");
-static_assert(isSafeOutput(TOF_XSHUT[0]) && isSafeOutput(TOF_XSHUT[1]) &&
-                  isSafeOutput(TOF_XSHUT[2]),
-              "ToF XSHUT lines must be safe outputs");
-
 // Every assigned pin, for the uniqueness check and for diagnostics.
 inline constexpr int kAssignedPins[] = {
     SOIL_MOISTURE_ADC, RESERVOIR_SENSE_ADC, LDR_ADC,
@@ -247,8 +234,6 @@ inline constexpr int kAssignedPins[] = {
     RESERVOIR_EXCITE,  PUMP_GATE,
     STREETLIGHT_LED_PIN,
     WASTE_LED_ORGANIC, WASTE_LED_PLASTIC, WASTE_LED_PAPER,
-    I2C_SDA, I2C_SCL,
-    TOF_XSHUT[0], TOF_XSHUT[1], TOF_XSHUT[2],
 };
 inline constexpr std::size_t kAssignedPinCount =
     sizeof(kAssignedPins) / sizeof(kAssignedPins[0]);
@@ -264,10 +249,21 @@ constexpr bool assignedPinsAreUnique() {
 static_assert(assignedPinsAreUnique(),
               "the same GPIO must not be assigned to two functions");
 
-static_assert(kAssignedPinCount == 16,
-              "expected 16 assigned GPIOs for this build");
+static_assert(kAssignedPinCount == 11,
+              "expected 11 assigned GPIOs for this build (bins are LEDs only)");
 static_assert(kAssignedPinCount < kHeaderPins,
               "the 30-pin header must still have spare pins");
+
+constexpr bool freePinsAreUnassigned() {
+  for (int free : kFreePins) {
+    for (int used : kAssignedPins) {
+      if (free == used) return false;
+    }
+  }
+  return true;
+}
+static_assert(freePinsAreUnassigned(),
+              "a pin listed as free must not also be assigned");
 
 }  // namespace pins
 }  // namespace village

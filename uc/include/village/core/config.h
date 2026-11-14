@@ -46,20 +46,6 @@ struct LightConfig {
   uint16_t max_age_ms = 5000;
 };
 
-struct BinConfig {
-  bool installed = true;
-  uint16_t empty_cm = 60;
-  uint16_t full_cm = 12;
-  uint8_t near_full_pct = 75;
-  uint8_t full_pct = 90;
-  uint8_t median_samples = 5;
-  uint8_t confirm_readings = 3;
-  uint16_t timeout_us = 30000;
-  uint8_t blind_zone_cm = 3;
-  uint16_t max_range_cm = 400;
-  uint16_t max_age_ms = 3000;
-};
-
 struct IrrigationConfig {
   bool auto_enabled = true;
   bool pump_enabled = false;
@@ -96,7 +82,6 @@ struct DeviceConfig {
   SoilConfig soil;
   ReservoirConfig reservoir;
   LightConfig light;
-  BinConfig bins[3];
   IrrigationConfig irrigation;
   WasteConfig waste;
   SolarConfig solar;
@@ -198,48 +183,6 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
   }
   if (!inRange(c.light.max_age_ms, 500, 60000)) {
     return fail("light.max_age_ms", "Light reading age limit must be 500..60000 ms.");
-  }
-
-  // Bins
-  static const char* kBinNames[3] = {"organic", "plastic", "paper"};
-  static const char* kFields[10] = {
-      "bins[].empty_cm",        "bins[].full_cm",       "bins[].near_full_pct",
-      "bins[].full_pct",        "bins[].median_samples", "bins[].confirm_readings",
-      "bins[].timeout_us",      "bins[].blind_zone_cm",  "bins[].max_range_cm",
-      "bins[].max_age_ms"};
-  (void)kBinNames;
-  for (int i = 0; i < 3; ++i) {
-    const BinConfig& b = c.bins[i];
-    if (!inRange(b.empty_cm, 5, 400)) return fail(kFields[0], "Empty distance must be 5..400 cm.");
-    if (!inRange(b.full_cm, 2, 398)) return fail(kFields[1], "Full distance must be 2..398 cm.");
-    if (b.full_cm + 2 > b.empty_cm) {
-      return fail(kFields[1], "Full distance must be at least 2 cm below the empty distance.");
-    }
-    if (!inRange(b.near_full_pct, 10, 98)) {
-      return fail(kFields[2], "Nearly-full percentage must be 10..98.");
-    }
-    if (!inRange(b.full_pct, 11, 100) || b.full_pct <= b.near_full_pct) {
-      return fail(kFields[3], "Full percentage must be above nearly-full and at most 100.");
-    }
-    if (!inRange(b.median_samples, 1, 9)) {
-      return fail(kFields[4], "Bin median samples must be 1..9.");
-    }
-    if (!inRange(b.confirm_readings, 1, 10)) {
-      return fail(kFields[5], "Bin confirmation must be 1..10 readings.");
-    }
-    if (!inRange(b.timeout_us, 1000, 200000)) {
-      return fail(kFields[6], "Sensor timeout must be 1000..200000 microseconds.");
-    }
-    if (!inRange(b.blind_zone_cm, 1, 10)) {
-      return fail(kFields[7], "Blind-zone distance must be 1..10 cm.");
-    }
-    if (!inRange(b.max_range_cm, 20, 400) ||
-        b.max_range_cm < b.empty_cm) {
-      return fail(kFields[8], "Maximum range must be 20..400 cm and not below the empty distance.");
-    }
-    if (!inRange(b.max_age_ms, 500, 60000)) {
-      return fail(kFields[9], "Bin reading age limit must be 500..60000 ms.");
-    }
   }
 
   // Irrigation

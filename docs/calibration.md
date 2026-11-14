@@ -90,30 +90,15 @@ distinguish every wiring failure.
 Place the probes at the minimum safe level above the pump intake. Keep the
 reservoir's maximum water surface below the drip outlets to reduce siphoning.
 
-## 3. Bins (three VL53L0X time-of-flight sensors)
+## 3. Bins — nothing to calibrate
 
-For each bin, measure with a ruler:
+The bins have **indicator LEDs only**. There is no level sensing, no distance
+measurement, no fill percentage and no "bin full" alert, so there are no bin
+thresholds to set and nothing to measure with a ruler.
 
-- `empty_cm`: distance from the sensor to the **empty floor**.
-- `full_cm`: distance from the sensor to the **full line**.
-
-Rules:
-
-- `full_cm` must be at least 2 cm below `empty_cm`.
-- `max_range_cm` must be at least the empty distance.
-- The useful range is about **3 cm to 200 cm**. Keep the empty floor inside
-  that; a deeper bin needs the sensor mounted lower, not a longer range.
-- Keep the blind zone (roughly 3 cm) in mind; an object inside it is reported as
-  full-at-the-sensor with a flag, not as an empty bin.
-- The firmware reads the three sensors in turn, filters each with a median, and
-  requires repeated readings before a state change.
-- No reading at all produces **unavailable**, with no distance and no fill
-  percentage. It never becomes an empty bin.
-- `max_range_cm` stays a sanity ceiling in centimetres; the VL53L0X will never
-  report a distance near it, so it is safe to leave at the default.
-
-The fill percentage is an **estimated fill height** from the measured
-distance, not a measured waste volume.
+(An earlier build calibrated three laser rangefinders per bin. That hardware is
+gone and the firmware no longer has the settings, so an old note about
+`empty_cm` or `full_cm` no longer applies.)
 
 ## 4. Streetlight LDR
 
@@ -124,8 +109,13 @@ distance, not a measured waste volume.
 - For a digital-only module, set `output_type = digital` and
   `digital_dark_when_high` according to the DO behaviour (typical modules
   output HIGH in darkness).
-- `dark_threshold` and `bright_threshold` define the hysteresis band; the
-  bright threshold must be above the dark threshold.
+- `dark_threshold` and `bright_threshold` define the hysteresis band **on the
+  brightness metric** (`4095 − raw` for the pull-up wiring), and the bright
+  threshold must be above the dark threshold. On this build (bare LDR, pull-up
+  to 3.3 V) a daylight-lit room measured raw **800–890** → metric
+  **3200–3300**, comfortably above the bright threshold of 2800; cover the
+  sensor to check the dark end and move the thresholds if your own readings sit
+  between them.
 - `stable_ms` (default 4 s) prevents flicker at dusk. The dashboard reports
   Bright/Dark, the selected mode and the commanded LED state separately.
 - If the reading is stale, auto mode switches the LEDs **off** and says the

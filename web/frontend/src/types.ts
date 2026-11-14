@@ -3,7 +3,6 @@ export type Mode = 'live' | 'demo';
 export type SoilState = 'dry' | 'adequate' | 'wet' | 'uncalibrated' | 'unavailable';
 export type ReservoirState = 'available' | 'low' | 'uncalibrated' | 'unavailable';
 export type Brightness = 'bright' | 'dark' | 'unknown';
-export type BinState = 'available' | 'nearly_full' | 'full' | 'unavailable' | 'not_installed';
 
 export interface Connection {
   connected: boolean;
@@ -46,18 +45,6 @@ export interface LightReading {
   fault: string | null;
 }
 
-export interface BinReading {
-  id: 'organic' | 'plastic' | 'paper' | string;
-  installed: boolean;
-  valid: boolean;
-  distance_cm: number | null;
-  fill_pct_estimate: number | null;
-  state: BinState;
-  age_ms: number | null;
-  fault: string | null;
-  near_blind_zone?: boolean;
-}
-
 export interface SolarReading {
   installed?: boolean;
   raw?: number | null;
@@ -78,7 +65,6 @@ export interface Sensors {
   soil?: SoilReading;
   reservoir?: ReservoirReading;
   light?: LightReading;
-  bins?: BinReading[];
 }
 
 export interface PumpState {
@@ -186,20 +172,6 @@ export interface LightConfig {
   max_age_ms?: number;
 }
 
-export interface BinConfig {
-  id: string;
-  installed: boolean;
-  empty_cm: number;
-  full_cm: number;
-  near_full_pct: number;
-  full_pct: number;
-  median_samples?: number;
-  confirm_readings?: number;
-  timeout_us?: number;
-  blind_zone_cm?: number;
-  max_range_cm?: number;
-}
-
 export interface IrrigationConfig {
   auto_enabled: boolean;
   pump_enabled: boolean;
@@ -223,7 +195,6 @@ export interface DeviceConfig {
   soil: SoilConfig;
   reservoir: ReservoirConfig;
   light: LightConfig;
-  bins: BinConfig[];
   irrigation: IrrigationConfig;
   waste: WasteConfig;
 }
@@ -314,7 +285,6 @@ export interface WasteRecognitionResult {
   recognition_id?: number | string;
   category?: string;
   indicator?: { category?: string; active?: boolean; remaining_ms?: number };
-  bin?: { id?: string; state?: BinState; fill_pct_estimate?: number | null };
   alert?: string | null;
   message?: string;
 }

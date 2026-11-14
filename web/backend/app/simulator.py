@@ -37,7 +37,7 @@ REASONS: dict[str, tuple[str, str]] = {
     "IRRIGATION_STOPPED_LOW_WATER": ("IRRIGATION_STOPPED_LOW_WATER", "Irrigation stopped: reservoir water is low."),
     "IRRIGATION_STOPPED_SENSOR_INVALID": ("IRRIGATION_STOPPED_SENSOR_INVALID", "Irrigation stopped: a required sensor reading became invalid."),
     "IRRIGATION_STOPPED_LINK_LOST": ("IRRIGATION_STOPPED_LINK_LOST", "Irrigation stopped: laptop communication was lost during a manual session."),
-    "IRRIGATION_STOPPED_USER": ("IRRIGATION_STOPPED_USER", "Irrigation stopped by the operator."),
+    "IRRIGATION_STOPPED_USER": ("IRRIGATION_STOPPED_USER", "Irrigation stopped by the Gram Sahayak."),
     "IRRIGATION_STOPPED_PUMP_DISABLED": ("IRRIGATION_STOPPED_PUMP_DISABLED", "Irrigation stopped: the pump was disabled in the configuration."),
     "IRRIGATION_BLOCKED_SOIL_WET": ("IRRIGATION_BLOCKED_SOIL_WET", "Irrigation blocked: the soil is already wet enough."),
     "IRRIGATION_BLOCKED_SOIL_UNCALIBRATED": ("IRRIGATION_BLOCKED_SOIL_UNCALIBRATED", "Irrigation blocked: soil moisture calibration is missing or invalid."),
@@ -67,24 +67,6 @@ def reason(code: str) -> tuple[str, str]:
 
 
 def default_config() -> dict[str, Any]:
-    bins = []
-    for bin_id in BIN_IDS:
-        bins.append(
-            {
-                "id": bin_id,
-                "installed": True,
-                "empty_cm": 60,
-                "full_cm": 12,
-                "near_full_pct": 75,
-                "full_pct": 90,
-                "median_samples": 5,
-                "confirm_readings": 3,
-                "timeout_us": 30000,
-                "blind_zone_cm": 3,
-                "max_range_cm": 400,
-                "max_age_ms": 3000,
-            }
-        )
     return {
         "revision": 1,
         "soil": {
@@ -114,7 +96,6 @@ def default_config() -> dict[str, Any]:
             "stable_ms": 2000,
             "max_age_ms": 5000,
         },
-        "bins": bins,
         "irrigation": {
             "auto_enabled": True,
             "pump_enabled": True,
@@ -161,7 +142,6 @@ class SimulatedDevice:
         self.soil_pct = 28.0
         self.reservoir = "available"
         self.light = "dark"
-        self.bins = {"organic": 35.0, "plastic": 58.0, "paper": 82.0}
         self.sensor_fault: str | None = None
         self.pump_enabled = True
         self.auto_enabled = True
@@ -368,45 +348,6 @@ class SimulatedDevice:
             "fault": None,
         }
 
-    def _bins(self) -> list[dict[str, Any]]:
-        result = []
-        for item in self.config["bins"]:
-            bin_id = item["id"]
-            if self.sensor_fault == f"bin_{bin_id}":
-                result.append(
-                    {
-                        "id": bin_id,
-                        "installed": True,
-                        "valid": False,
-                        "distance_cm": None,
-                        "fill_pct_estimate": None,
-                        "state": "unavailable",
-                        "age_ms": 9999,
-                        "fault": "simulated sensor timeout",
-                        "near_blind_zone": False,
-                    }
-                )
-                continue
-            fill = max(0.0, min(100.0, self.bins.get(bin_id, 0.0)))
-            distance = item["empty_cm"] - (fill / 100.0) * (item["empty_cm"] - item["full_cm"])
-            state = "full" if fill >= item["full_pct"] else (
-                "nearly_full" if fill >= item["near_full_pct"] else "available"
-            )
-            result.append(
-                {
-                    "id": bin_id,
-                    "installed": True,
-                    "valid": True,
-                    "distance_cm": round(distance, 1),
-                    "fill_pct_estimate": round(fill, 1),
-                    "state": state,
-                    "age_ms": 300,
-                    "fault": None,
-                    "near_blind_zone": False,
-                }
-            )
-        return result
-
     def _irrigation_reason(self) -> tuple[str, str]:
         if self.state == "pumping":
             return reason("IRRIGATION_PULSE")
@@ -505,7 +446,6 @@ class SimulatedDevice:
                     "reservoir": self._reservoir(),
                     "light": self._light(),
                     "solar": self._solar(),
-                    "bins": self._bins(),
                 },
                 "actuators": {
                     "pump": {
@@ -557,9 +497,6 @@ class SimulatedDevice:
             faults.append("reservoir: simulated sensor fault")
         if self.sensor_fault == "light":
             faults.append("light: simulated sensor fault")
-        for bin_id in BIN_IDS:
-            if self.sensor_fault == f"bin_{bin_id}":
-                faults.append(f"bin {bin_id}: simulated sensor timeout")
         return faults
 
     # ------------------------------------------------------------------
@@ -614,9 +551,6 @@ class SimulatedDevice:
                     continue
                 if isinstance(values, dict) and isinstance(merged.get(section), dict):
                     merged[section].update(values)
-                elif section == "bins" and isinstance(values, list) and len(values) == 3:
-                    for i, item in enumerate(values):
-                        merged["bins"][i].update(item)
                 else:
                     merged[section] = values
             self._validate(merged)
@@ -652,9 +586,6 @@ class SimulatedDevice:
         res = config["reservoir"]
         if res["dry_threshold_mv"] - res["wet_threshold_mv"] < 100:
             fail("reservoir.wet/dry", "The dry threshold must be at least 100 mV above the wet threshold.")
-        for i, item in enumerate(config["bins"]):
-            if item["full_cm"] + 2 > item["empty_cm"]:
-                fail(f"bins[{i}].full_cm", "Full distance must be below the empty distance.")
 
     # ------------------------------------------------------------------
     def command(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -762,10 +693,6 @@ class SimulatedDevice:
                     self._stop("IRRIGATION_STOPPED_LOW_WATER", 30000)
             if values.get("light") is not None:
                 self.light = values["light"]
-            if values.get("bins") is not None:
-                for bin_id, fill in values["bins"].items():
-                    if bin_id in self.bins:
-                        self.bins[bin_id] = float(fill)
             if "sensor_fault" in values:
                 self.sensor_fault = values["sensor_fault"] or None
             if values.get("pump_enabled") is not None:
@@ -784,7 +711,6 @@ class SimulatedDevice:
             self.soil_pct = 28.0
             self.reservoir = "available"
             self.light = "dark"
-            self.bins = {"organic": 35.0, "plastic": 58.0, "paper": 82.0}
             self.sensor_fault = None
             self.pump_enabled = True
             self.auto_enabled = True

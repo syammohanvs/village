@@ -91,41 +91,6 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
           age_ms: 240,
           fault: null,
         },
-        bins: [
-          {
-            id: 'organic',
-            installed: true,
-            valid: true,
-            distance_cm: 38.4,
-            fill_pct_estimate: 45.5,
-            state: 'available',
-            age_ms: 310,
-            fault: null,
-            near_blind_zone: false,
-          },
-          {
-            id: 'plastic',
-            installed: true,
-            valid: true,
-            distance_cm: 14,
-            fill_pct_estimate: 95.8,
-            state: 'full',
-            age_ms: 760,
-            fault: null,
-            near_blind_zone: false,
-          },
-          {
-            id: 'paper',
-            installed: true,
-            valid: false,
-            distance_cm: null,
-            fill_pct_estimate: null,
-            state: 'unavailable',
-            age_ms: 2400,
-            fault: 'no distance reading',
-            near_blind_zone: false,
-          },
-        ],
       },
       actuators: {
         pump: {
@@ -208,11 +173,6 @@ export function makeConfig(overrides: Partial<DeviceConfig> = {}): DeviceConfig 
       stable_ms: 4000,
       max_age_ms: 5000,
     },
-    bins: [
-      { id: 'organic', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
-      { id: 'plastic', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
-      { id: 'paper', installed: true, empty_cm: 60, full_cm: 12, near_full_pct: 75, full_pct: 90 },
-    ],
     irrigation: {
       auto_enabled: true,
       pump_enabled: false,

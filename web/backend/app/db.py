@@ -215,22 +215,23 @@ class Database:
         category: str,
         confidence: float,
         model: str,
-        bin_state: str,
-        bin_alert: bool,
         indication_confirmed: bool,
         request_id: str,
         profile_id: int | None = None,
     ) -> dict[str, Any]:
+        # The legacy `bin_state` / `bin_alert` columns stay nullable on a
+        # database written by an older build, but nothing writes them now: the
+        # bins are indicator LEDs with no level sensing, so there is no fill
+        # state to record and no "bin full" alert to raise.
         table = _table(mode, "recognitions")
         ts = utc_now()
         await self.db.execute(
             f"""INSERT OR IGNORE INTO {table}
-            (ts, mode, category, confidence, model, bin_state, bin_alert,
+            (ts, mode, category, confidence, model,
              indication_confirmed, request_id, profile_id, confirmed_disposal)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
-            (ts, mode, category, confidence, model, bin_state,
-             1 if bin_alert else 0, 1 if indication_confirmed else 0,
-             request_id, profile_id),
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+            (ts, mode, category, confidence, model,
+             1 if indication_confirmed else 0, request_id, profile_id),
         )
         await self.db.commit()
         rows = await self.db.execute_fetchall(
@@ -386,12 +387,11 @@ class Database:
         soil = sensors.get("soil", {})
         reservoir = sensors.get("reservoir", {})
         light = sensors.get("light", {})
-        bins = {item.get("id"): item.get("state") for item in sensors.get("bins", [])}
+        # The bin_* columns are legacy and stay nullable; bins have no sensing.
         await self.db.execute(
             f"""INSERT INTO {table}
-            (ts, mode, soil_pct, soil_state, reservoir_state, light,
-             bin_organic, bin_plastic, bin_paper)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ts, mode, soil_pct, soil_state, reservoir_state, light)
+            VALUES (?, ?, ?, ?, ?, ?)""",
             (
                 utc_now(),
                 mode,
@@ -399,9 +399,6 @@ class Database:
                 soil.get("state"),
                 reservoir.get("state"),
                 light.get("brightness"),
-                bins.get("organic"),
-                bins.get("plastic"),
-                bins.get("paper"),
             ),
         )
         await self.db.commit()

@@ -206,20 +206,21 @@ export function AboutHelp() {
         )}
       </Card>
 
-      <Card kicker="Display models" title="Solar panels, windmill and buildings">
+      <Card kicker="Display models" title="Solar panel, windmill and buildings">
         <p>
-          The solar panels, the windmill and the model buildings are <strong>display pieces</strong>{' '}
-          built for the exhibit. They are not wired to the sensors, so this app does not report
-          their generation, storage or savings.
+          The windmill and the model buildings are <strong>display pieces</strong>. They are not
+          wired to the sensors, so this app reports nothing about them.
+        </p>
+        <p>
+          <strong>One solar panel is real.</strong> It lights a red LED through a 330 Ω resistor,
+          and two taps measure the panel voltage and the current that flows, so the Solar Panel
+          card reports volts, milliamps and milliwatts. A panel in dim light honestly reads zero: a
+          red LED needs about 1.8 V before any current flows at all.
         </p>
         <p className="hint">
-          The only measured things are soil moisture, the tank&apos;s minimum level, light, the bin
-          distance sensors and the command acknowledgements.
-        </p>
-        <p className="hint">
-          <strong>Planned, not fitted:</strong> one working solar panel with an LED load and its own
-          voltage and current measurement, and time-of-flight sensors for bin fill. Neither is part
-          of this build, so the dashboard reports nothing for them.
+          The only measured things are soil moisture, the tank&apos;s minimum level, light, the
+          solar panel and the command acknowledgements. The bins have <strong>indicator LEDs
+          only</strong> — nothing here measures how full a bin is, and nothing claims to.
         </p>
       </Card>
 

@@ -66,7 +66,6 @@ handle the pump, mains power or dirty waste alone.
 - connection: live, stale (with its age) or offline;
 - soil: the calibrated percentage and state, or "not calibrated";
 - tank: water at the low level, low, or "not calibrated";
-- bins: the estimated fill for each bin that answered;
 - lamps: on or off, or "the light sensor is not fitted";
 - pump: running or off, and "locked for safety" when it is not commissioned;
 - the last message or two recorded by the village.

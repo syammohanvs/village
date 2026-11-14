@@ -43,14 +43,6 @@ void setupOutputs() {
     pinMode(pin, OUTPUT);
   }
 
-  // The bin rangefinders sit on an I2C bus with one XSHUT line each.  They are
-  // held in reset here (inert, no bus traffic) and brought up, one at a time,
-  // by the sensor module -- see beginTof() in sensors.cpp.
-  for (int i = 0; i < 3; ++i) {
-    digitalWrite(pins::TOF_XSHUT[i], LOW);
-    pinMode(pins::TOF_XSHUT[i], OUTPUT);
-  }
-
   // The reservoir excitation pin is high impedance except during a
   // measurement.  No pull-up or pull-down is used.
   pinMode(pins::RESERVOIR_EXCITE, INPUT);
@@ -93,7 +85,6 @@ void allOutputsOff() {
   digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(false));
   digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(false));
   digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(false));
-  for (int i = 0; i < 3; ++i) digitalWrite(pins::TOF_XSHUT[i], LOW);
 }
 
 }  // namespace village

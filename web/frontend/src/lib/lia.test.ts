@@ -98,7 +98,7 @@ describe('Lia preferences', () => {
 });
 
 describe('Lia live narration', () => {
-  it('reads the real soil, tank, bins, lamps and pump', () => {
+  it('reads the real soil, tank, lamps and pump, and never invents a bin level', () => {
     const items = describeVillage(
       { status: status(), connected: true, stale: false, ageMs: 300, demo: false },
       'en',
@@ -106,9 +106,10 @@ describe('Lia live narration', () => {
     const text = items.map((item) => item.text).join(' ');
     expect(text).toContain('The soil is dry (28%)');
     expect(text).toContain('There is water at the low level');
-    expect(text).toContain('Organic bin is about 46% full');
     expect(text).toContain('The street lights are off');
     expect(text).toContain('The pump is off');
+    // Bins have indicator LEDs and no level sensing, so Sara has no fill to read.
+    expect(text).not.toMatch(/full|fill|bin sensor/i);
     expect(text).not.toMatch(/litre|liter/i);
   });
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -53,7 +53,11 @@ describe('Our Village', () => {
     expect(screen.getByText(/28%/)).toBeInTheDocument();
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
     expect(screen.getByText(/light sensor reads dark/i)).toBeInTheDocument();
-    expect(screen.getByText(/Paper: Unavailable/)).toBeInTheDocument();
+    // The bins have indicator LEDs only: the card names them and says outright
+    // that nothing measures how full they are.
+    const waste = within(screen.getByTestId('card-waste'));
+    expect(waste.getByText(/organic \/ food waste, plastic, paper/i)).toBeInTheDocument();
+    expect(waste.getByText(/Nothing measures how full a bin is/i)).toBeInTheDocument();
 
     const body = document.body.textContent ?? '';
     expect(body).not.toMatch(/\d+(?:\.\d+)?\s*(?:l|litres?|liters?)\b/i);

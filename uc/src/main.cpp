@@ -20,17 +20,6 @@ void logCurrentState(uint32_t now) {
 
   const LightOutput lights = rt.lights.output(rt.config, now);
   rt.events.add(now, lights.reason->code, lights.reason->text);
-
-  for (std::size_t i = 0; i < 3; ++i) {
-    const BinReading b = rt.bins[i].read(rt.config, i, now);
-    char code[48];
-    char text[96];
-    std::snprintf(code, sizeof(code), "BIN_%s_%s", binId(i),
-                  toString(b.state));
-    std::snprintf(text, sizeof(text), "%s bin: %s", binId(i),
-                  toString(b.state));
-    rt.events.add(now, code, text);
-  }
 }
 
 }  // namespace

@@ -479,7 +479,7 @@ def create_app(
         if category == "medical":
             # Hazardous waste (syringes, cotton, napkins, diapers, catheters,
             # urine bags) is not one of the three bins and must never be sent
-            # to a bin LED.  It is recorded and referred to the operator.
+            # to a bin LED.  It is recorded and referred to the Gram Sahayak.
             # `allow_poll=False`: the board is a convenience here, not part of
             # the answer.  Waiting for a controller that is switched off held
             # the whole recognition -- and therefore Sara's sentence -- for
@@ -489,12 +489,12 @@ def create_app(
             except Exception:  # noqa: BLE001 - a referral does not need the board
                 snapshot = {}
             record = await db.add_recognition(
-                body.mode, category, body.confidence, body.model, "unavailable",
-                False, False, body.request_id, body.profile_id,
+                body.mode, category, body.confidence, body.model,
+                False, body.request_id, body.profile_id,
             )
             await db.add_event(
                 body.mode, "waste", "Hazardous waste recognised",
-                f"confidence {body.confidence:.2f}; referred to the operator; "
+                f"confidence {body.confidence:.2f}; referred to the Gram Sahayak; "
                 "no bin indicator used",
                 "warning",
                 "camera",
@@ -504,9 +504,8 @@ def create_app(
             return {
                 "recognition": record,
                 "indication": None,
-                "bin_alert": None,
                 "physical": snapshot.get("physical", False),
-                "note": "Hazardous waste. Do not put it in the organic, plastic or paper bins. Hand it to the operator and contact the operator.",
+                "note": "Hazardous waste. Do not put it in the organic, plastic or paper bins. Hand it to the Gram Sahayak.",
             }
         if category == "other":
             # Cloth, leather, footwear, glass, metal, thermocol and electronic
@@ -518,8 +517,8 @@ def create_app(
             except Exception:  # noqa: BLE001 - a referral does not need the board
                 snapshot = {}
             record = await db.add_recognition(
-                body.mode, category, body.confidence, body.model, "unavailable",
-                False, False, body.request_id, body.profile_id,
+                body.mode, category, body.confidence, body.model,
+                False, body.request_id, body.profile_id,
             )
             await db.add_event(
                 body.mode, "waste", "Recyclable item recognised",
@@ -533,25 +532,13 @@ def create_app(
             return {
                 "recognition": record,
                 "indication": None,
-                "bin_alert": None,
                 "physical": snapshot.get("physical", False),
-                "note": "Not one of the three bins. Hand it to the recycling agent and contact the operator.",
+                "note": "Not one of the three bins. Hand it to the recycling agent and contact the Gram Sahayak.",
             }
-        # The bin's fill level decides whether to warn, and the cached reading
-        # is good enough for that; the LED command below is what waits for the
-        # board, and it fails fast and says so.
+        # Bins have indicator LEDs and nothing else: no level sensing, no fill
+        # percentage and no "bin full" alert.  The LED command below is the
+        # whole physical outcome, and it fails fast and says so.
         snapshot = await gateway.snapshot(body.mode, allow_poll=False)
-        status = snapshot.get("status") or {}
-        bins = {item.get("id"): item for item in (status.get("sensors", {}) or {}).get("bins", [])}
-        target = bins.get(category, {})
-        bin_state = target.get("state", "unavailable")
-        bin_alert = None
-        if bin_state == "full":
-            bin_alert = {
-                "bin_id": category,
-                "state": bin_state,
-                "message": f"The {category} bin is full. Do not send this item to a different category.",
-            }
         indication: dict[str, Any]
         try:
             indication = await gateway.send_command(
@@ -566,22 +553,21 @@ def create_app(
         confirmed = bool(indication.get("confirmed") and
                          (indication.get("ack") or {}).get("result") == "ACCEPTED")
         record = await db.add_recognition(
-            body.mode, category, body.confidence, body.model, bin_state,
-            bool(bin_alert), confirmed, body.request_id, body.profile_id,
+            body.mode, category, body.confidence, body.model,
+            confirmed, body.request_id, body.profile_id,
         )
         await db.add_event(
             body.mode, "waste", f"{category.title()} recognised",
-            f"confidence {body.confidence:.2f}; bin {bin_state}; indicator "
+            f"confidence {body.confidence:.2f}; {category} indicator "
             f"{'confirmed' if confirmed else 'NOT confirmed'}",
-            "warning" if bin_alert or not confirmed else "info",
+            "warning" if not confirmed else "info",
             "camera",
             {"recognition_id": record.get("id"), "category": category,
-             "confidence": body.confidence, "bin_state": bin_state},
+             "confidence": body.confidence},
         )
         return {
             "recognition": record,
             "indication": indication,
-            "bin_alert": bin_alert,
             "physical": snapshot.get("physical", False),
             "note": "Recognition is not proof that the item was deposited.",
         }

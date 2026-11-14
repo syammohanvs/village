@@ -65,23 +65,17 @@ until step 8.
 - [ ] Probes are at the minimum safe level, above the pump intake.
 - [ ] Maximum water surface is below the drip outlets (no siphon).
 
-## F. Bin rangefinders (three VL53L0X)
+## F. Bin indicator LEDs (no level sensing)
 
-- [ ] All three modules powered from **3V3**, grounds common.
-- [ ] `SDA` on GPIO 4 and `SCL` on GPIO 16, shared by all three.
-- [ ] XSHUT cables land on GPIO 17 / 18 / 26 **in bin order** and are labelled,
-      because two swapped cables report each other's fill with no other symptom.
-- [ ] Empty distance measured for each bin: organic ____ plastic ____ paper ____
-- [ ] Full distance measured for each bin: organic ____ plastic ____ paper ____
-- [ ] Each bin reports Available/Nearly full/Full as the level changes.
-- [ ] A hand at 10 cm and at 30 cm reads roughly right on each bin (a ruler is
-      the reference; the laser is accurate to a few millimetres).
-- [ ] Unplugging one module reports **unavailable** for that bin only — never
-      empty — and the other two keep reading.
-- [ ] An object inside the blind zone (~3 cm) is flagged, not treated as a
-      healthy bin.
-- [ ] Direct sunlight or a bright torch into the detector does not make the bin
-      report a wildly short distance at the exhibition.
+- [ ] Organic LED on **GPIO 21**, plastic on **22**, paper on **23**, each with
+      its own series resistor and the cathode to GND.
+- [ ] Show a plastic item to the camera: the plastic LED lights and the other
+      two stay off.
+- [ ] The LED goes out by itself after about eight seconds.
+- [ ] A referral (sanitary waste, sharps, a mixed bag, glass/metal/textile and
+      the other recyclables) lights **no** LED — those are handed to a person.
+- [ ] There is no distance sensor to test: no fill percentage, no "bin full"
+      alert, and nothing in the app to calibrate.
 
 ## G. Pump driver and pump
 

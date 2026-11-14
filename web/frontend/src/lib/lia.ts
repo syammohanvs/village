@@ -99,8 +99,6 @@ interface LiveCopy {
   tankLow: string;
   tankUncalibrated: string;
   tankUnavailable: string;
-  binOk: (bin: string, pct: string) => string;
-  binsUnavailable: string;
   lightsOn: string;
   lightsOff: string;
   lightsNoSensor: string;
@@ -111,11 +109,6 @@ interface LiveCopy {
   noEvents: string;
 }
 
-const BIN_NAMES: Record<LiaLanguage, Record<string, string>> = {
-  en: { organic: 'Organic', plastic: 'Plastic', paper: 'Paper' },
-  ml: { organic: 'ഓർഗാനിക്', plastic: 'പ്ലാസ്റ്റിക്', paper: 'പേപ്പർ' },
-  hi: { organic: 'जैविक', plastic: 'प्लास्टिक', paper: 'कागज़' },
-};
 
 const EN: LiaCopy = {
   welcome: 'Hello! I’m Sara. I can help you explore our village.', 
@@ -502,8 +495,6 @@ const LIVE: Record<LiaLanguage, LiveCopy> = {
     tankLow: 'The tank is low. The probes do not feel water.',
     tankUncalibrated: 'The tank probes are not calibrated yet.',
     tankUnavailable: 'The tank probes are not answering.',
-    binOk: (bin, pct) => `The ${bin} bin is about ${pct}% full.`,
-    binsUnavailable: 'The bin sensors are not answering.',
     lightsOn: 'The street lights are on.',
     lightsOff: 'The street lights are off.',
     lightsNoSensor: 'The light sensor is not fitted, so the lamps wait for your command.',
@@ -527,8 +518,6 @@ const LIVE: Record<LiaLanguage, LiveCopy> = {
     tankLow: 'ടാങ്കിൽ വെള്ളം കുറവാണ്. പ്രോബുകൾക്ക് വെള്ളം തൊടാൻ കഴിയുന്നില്ല.',
     tankUncalibrated: 'ടാങ്ക് പ്രോബുകൾ ഇപ്പോഴും കാലിബ്രേറ്റ് ചെയ്തിട്ടില്ല.',
     tankUnavailable: 'ടാങ്ക് പ്രോബുകൾ മറുപടി നൽകുന്നില്ല.',
-    binOk: (bin, pct) => `${bin} ബിൻ ഏകദേശം ${pct}% നിറഞ്ഞിരിക്കുന്നു.`,
-    binsUnavailable: 'ബിൻ സെൻസറുകൾ മറുപടി നൽകുന്നില്ല.',
     lightsOn: 'തെരുവുവിളക്കുകൾ കത്തുന്നു.',
     lightsOff: 'തെരുവുവിളക്കുകൾ അണഞ്ഞിരിക്കുന്നു.',
     lightsNoSensor: 'വെളിച്ച സെൻസർ ഘടിപ്പിച്ചിട്ടില്ല, അതിനാൽ വിളക്കുകൾ നിങ്ങളുടെ നിർദ്ദേശത്തിനായി കാത്തിരിക്കുന്നു.',
@@ -552,8 +541,6 @@ const LIVE: Record<LiaLanguage, LiveCopy> = {
     tankLow: 'टंकी में पानी कम है। प्रोब को पानी नहीं मिल रहा।',
     tankUncalibrated: 'टंकी की प्रोब अभी कैलिब्रेट नहीं हुई है।',
     tankUnavailable: 'टंकी की प्रोब जवाब नहीं दे रही।',
-    binOk: (bin, pct) => `${bin} डिब्बा लगभग ${pct}% भरा है।`,
-    binsUnavailable: 'डिब्बों के सेंसर जवाब नहीं दे रहे।',
     lightsOn: 'सड़क की बत्तियाँ जल रही हैं।',
     lightsOff: 'सड़क की बत्तियाँ बंद हैं।',
     lightsNoSensor: 'रोशनी सेंसर नहीं लगा है, इसलिए बत्तियाँ आपके निर्देश का इंतज़ार करती हैं।',
@@ -647,22 +634,6 @@ export function describeVillage(
         items.push({ icon: 'tank', text: copy.tankLow });
       } else {
         items.push({ icon: 'tank', text: copy.tankUnavailable });
-      }
-    }
-
-    const bins = sensors.bins ?? [];
-    const usable = bins.filter(
-      (bin) => bin.valid && bin.state !== 'unavailable' && typeof bin.fill_pct_estimate === 'number',
-    );
-    if (usable.length === 0) {
-      items.push({ icon: 'bin', text: copy.binsUnavailable });
-    } else {
-      for (const bin of usable) {
-        const name = BIN_NAMES[language][bin.id] ?? bin.id;
-        items.push({
-          icon: 'bin',
-          text: copy.binOk(name, percentText(bin.fill_pct_estimate as number)),
-        });
       }
     }
 

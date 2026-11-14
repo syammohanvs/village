@@ -159,14 +159,12 @@ async def test_duplicate_request_id_is_not_sent_twice(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_waste_recognition_logs_and_warns_full_bin(tmp_path):
+async def test_waste_recognition_lights_the_indicator_without_a_fill_level(tmp_path):
+    """The bins have indicator LEDs only.  A recognition lights the matching
+    LED and records nothing about how full the bin is, because nothing measures
+    that."""
     settings = make_settings(tmp_path)
     async with client_for(settings) as (client, gateway, app):
-        scenario = await client.post(
-            "/api/v1/demo/scenario", json={"bins": {"plastic": 96.0}}
-        )
-        assert scenario.status_code == 200
-
         model = (await client.get("/api/v1/waste/model-status")).json()
         assert model["installed"] is False
         assert model["message"].startswith("Recognition model not installed")
@@ -183,9 +181,9 @@ async def test_waste_recognition_logs_and_warns_full_bin(tmp_path):
         )
         assert response.status_code == 200
         body = response.json()
-        assert body["bin_alert"] is not None
-        assert body["bin_alert"]["bin_id"] == "plastic"
-        # The correct category is still indicated; it is never redirected.
+        assert "bin_alert" not in body
+        assert body["recognition"]["bin_state"] is None
+        # The correct category is indicated; there is no fill state to warn on.
         assert body["indication"]["confirmed"] is True
         assert body["indication"]["ack"]["result"] == "ACCEPTED"
         recognition_id = body["recognition"]["id"]
@@ -319,9 +317,8 @@ async def test_other_waste_is_referred_without_a_bin_command(tmp_path):
         assert response.status_code == 200
         body = response.json()
         assert body["recognition"]["category"] == "other"
-        assert body["recognition"]["bin_state"] == "unavailable"
         assert body["indication"] is None
-        assert body["bin_alert"] is None
+        assert "bin_alert" not in body
         assert "recycling agent" in body["note"]
         # A referral must not touch the controller: no LED can light.
         assert real.calls == []
@@ -392,9 +389,8 @@ async def test_medical_waste_is_referred_without_a_bin_command(tmp_path):
         assert response.status_code == 200
         body = response.json()
         assert body["recognition"]["category"] == "medical"
-        assert body["recognition"]["bin_state"] == "unavailable"
         assert body["indication"] is None
-        assert body["bin_alert"] is None
+        assert "bin_alert" not in body
         assert "Hazardous" in body["note"]
         assert real.calls == []
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]

@@ -1310,6 +1310,6 @@ ignores.
   villager. Profiles are optional **fictional demo records** and require an
   explicit selection.
 - Recognition does not prove that the item was deposited or handed over.
-- Bin fill is estimated from a laser distance measurement, not measured weight
-  or volume.
+- The bins have **no fill sensing at all** — indicator LEDs only. Nothing here
+  measures weight, volume or how full a bin is.
 - The app stores classification events, not images or video.

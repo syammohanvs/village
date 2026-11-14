@@ -115,7 +115,6 @@ class ScenarioRequest(BaseModel):
     soil_pct: float | None = Field(default=None, ge=0, le=100)
     reservoir: Literal["available", "low"] | None = None
     light: Literal["bright", "dark"] | None = None
-    bins: dict[str, float] | None = None
     sensor_fault: str | None = Field(default=None, max_length=40)
     pump_enabled: bool | None = None
     auto_enabled: bool | None = None

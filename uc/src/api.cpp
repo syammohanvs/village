@@ -136,21 +136,6 @@ void buildStatus(JsonDocument& doc) {
   solar["power_mw"] = power.power_mw;
   solar["valid"] = power.valid;
 
-  JsonArray bins = sensors["bins"].to<JsonArray>();
-  for (std::size_t i = 0; i < 3; ++i) {
-    const BinReading b = rt.bins[i].read(rt.config, i, now);
-    JsonObject o = bins.add<JsonObject>();
-    o["id"] = binId(i);
-    o["installed"] = b.installed;
-    o["valid"] = b.valid;
-    addNullableFloat(o, "distance_cm", b.distance_cm);
-    addNullableFloat(o, "fill_pct_estimate", b.fill_pct);
-    o["state"] = toString(b.state);
-    o["age_ms"] = b.age_ms;
-    if (b.fault != nullptr) o["fault"] = b.fault; else o["fault"] = nullptr;
-    o["near_blind_zone"] = b.near_blind_zone;
-  }
-
   const IrrigationStatus irr = rt.irrigation.status(now);
   JsonObject actuators = root["actuators"].to<JsonObject>();
   JsonObject pump = actuators["pump"].to<JsonObject>();
@@ -203,12 +188,10 @@ void buildStatus(JsonDocument& doc) {
   JsonArray faults = root["faults"].to<JsonArray>();
   if (!soil.valid) faults.add(String("soil: ") + (soil.fault ? soil.fault : "invalid"));
   if (!reservoir.valid) faults.add(String("reservoir: ") + (reservoir.fault ? reservoir.fault : "invalid"));
-  if (!light.valid) faults.add(String("light: ") + (light.fault ? light.fault : "invalid"));
-  for (std::size_t i = 0; i < 3; ++i) {
-    const BinReading b = rt.bins[i].read(rt.config, i, now);
-    if (!b.valid) {
-      faults.add(String("bin ") + binId(i) + ": " + (b.fault ? b.fault : "invalid"));
-    }
+  // A sensor that is deliberately not fitted is not a fault.  Reporting one
+  // turned "no LDR on this build" into a fault line on every frame.
+  if (light.installed && !light.valid) {
+    faults.add(String("light: ") + (light.fault ? light.fault : "invalid"));
   }
 
   JsonArray events = root["recent_events"].to<JsonArray>();
@@ -275,15 +258,6 @@ void buildHealth(JsonDocument& doc) {
   waste["organic"] = pins::WASTE_LED_ORGANIC;
   waste["plastic"] = pins::WASTE_LED_PLASTIC;
   waste["paper"] = pins::WASTE_LED_PAPER;
-  // The bin rangefinders are VL53L0X time-of-flight modules on one I2C bus.
-  pm["i2c_sda"] = pins::I2C_SDA;
-  pm["i2c_scl"] = pins::I2C_SCL;
-  JsonArray xshut = pm["tof_xshut"].to<JsonArray>();
-  JsonArray addr = pm["tof_address"].to<JsonArray>();
-  for (int i = 0; i < 3; ++i) {
-    xshut.add(pins::TOF_XSHUT[i]);
-    addr.add(pins::TOF_ADDRESS[i]);
-  }
 }
 
 void writeConfig(JsonObject out, const DeviceConfig& c) {
@@ -314,24 +288,6 @@ void writeConfig(JsonObject out, const DeviceConfig& c) {
   light["bright_threshold"] = c.light.bright_threshold;
   light["stable_ms"] = c.light.stable_ms;
   light["max_age_ms"] = c.light.max_age_ms;
-
-  JsonArray bins = out["bins"].to<JsonArray>();
-  for (int i = 0; i < 3; ++i) {
-    const BinConfig& b = c.bins[i];
-    JsonObject o = bins.add<JsonObject>();
-    o["id"] = binId(i);
-    o["installed"] = b.installed;
-    o["empty_cm"] = b.empty_cm;
-    o["full_cm"] = b.full_cm;
-    o["near_full_pct"] = b.near_full_pct;
-    o["full_pct"] = b.full_pct;
-    o["median_samples"] = b.median_samples;
-    o["confirm_readings"] = b.confirm_readings;
-    o["timeout_us"] = b.timeout_us;
-    o["blind_zone_cm"] = b.blind_zone_cm;
-    o["max_range_cm"] = b.max_range_cm;
-    o["max_age_ms"] = b.max_age_ms;
-  }
 
   JsonObject irr = out["irrigation"].to<JsonObject>();
   irr["auto_enabled"] = c.irrigation.auto_enabled;
@@ -369,8 +325,8 @@ bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
     return false;
   }
   if (c["soil"].isNull() || c["reservoir"].isNull() || c["light"].isNull() ||
-      c["bins"].isNull() || c["irrigation"].isNull() || c["waste"].isNull()) {
-    err = "config must contain soil, reservoir, light, bins, irrigation and waste";
+      c["irrigation"].isNull() || c["waste"].isNull()) {
+    err = "config must contain soil, reservoir, light, irrigation and waste";
     return false;
   }
 
@@ -408,33 +364,6 @@ bool parseConfig(JsonObjectConst c, DeviceConfig& out, String& err) {
       light["bright_threshold"] | out.light.bright_threshold;
   out.light.stable_ms = light["stable_ms"] | out.light.stable_ms;
   out.light.max_age_ms = light["max_age_ms"] | out.light.max_age_ms;
-
-  JsonArrayConst bins = c["bins"].as<JsonArrayConst>();
-  if (bins.isNull() || bins.size() != 3) {
-    err = "bins must contain exactly three entries (organic, plastic, paper)";
-    return false;
-  }
-  for (std::size_t i = 0; i < 3; ++i) {
-    JsonObjectConst b = bins[i].as<JsonObjectConst>();
-    if (b.isNull()) {
-      err = "bin entry is not an object";
-      return false;
-    }
-    out.bins[i].installed = b["installed"] | out.bins[i].installed;
-    out.bins[i].empty_cm = b["empty_cm"] | out.bins[i].empty_cm;
-    out.bins[i].full_cm = b["full_cm"] | out.bins[i].full_cm;
-    out.bins[i].near_full_pct = b["near_full_pct"] | out.bins[i].near_full_pct;
-    out.bins[i].full_pct = b["full_pct"] | out.bins[i].full_pct;
-    out.bins[i].median_samples =
-        b["median_samples"] | out.bins[i].median_samples;
-    out.bins[i].confirm_readings =
-        b["confirm_readings"] | out.bins[i].confirm_readings;
-    out.bins[i].timeout_us = b["timeout_us"] | out.bins[i].timeout_us;
-    out.bins[i].blind_zone_cm =
-        b["blind_zone_cm"] | out.bins[i].blind_zone_cm;
-    out.bins[i].max_range_cm = b["max_range_cm"] | out.bins[i].max_range_cm;
-    out.bins[i].max_age_ms = b["max_age_ms"] | out.bins[i].max_age_ms;
-  }
 
   JsonObjectConst irr = c["irrigation"].as<JsonObjectConst>();
   out.irrigation.auto_enabled =

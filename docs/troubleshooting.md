@@ -108,25 +108,22 @@ session; local automatic watering continues if the laptop disappears.
   values.
 - A calibration of “uncalibrated” blocks irrigation. That is deliberate.
 
-## A bin says unavailable
+## A bin LED does not light
 
-The bins now use three **VL53L0X time-of-flight laser modules** on one I²C bus.
+The bins have **indicator LEDs only** — there is no distance sensor, no fill
+level and no "bin full" alert to troubleshoot.
 
-- Check that all three modules have **3V3 and GND**, that **SDA is on GPIO 4**
-  and **SCL on GPIO 16**, and that each module's **XSHUT** goes to 17, 18 or 26.
-  A module with no XSHUT connection stays in reset and can never answer.
-- Unplug the other two modules and try one alone. If a single module works, the
-  problem is the address sequence on the third, not the sensor.
-- **Two bins reporting each other's fill** means the XSHUT cables for those two
-  are swapped. The modules are identical, so nothing in software can detect it;
-  relabel the cables.
-- A missing reading is **unavailable**, not empty. Measure the distance with a
-  ruler and set `empty_cm`/`full_cm`.
-- The useful range is about **3 cm to 200 cm**. A reading that is always short
-  and jumpy usually means direct sun or a torch shining into the detector —
-  shade the top of the bin.
-- Inside the blind zone (about 3 cm) the bin is reported full-at-the-sensor and
-  flagged.
+- The organic LED is **GPIO 21**, plastic **GPIO 22**, paper **GPIO 23**. Each
+  needs a series resistor and its cathode to GND (see `docs/wiring.md` §6).
+- A recognition only lights an LED for the three real bins. Sanitary waste,
+  sharps, mixed bags and the recyclable materials (glass, metal, textile,
+  leather, footwear, thermocol, e-waste) are referred to a person and
+  deliberately light **nothing**, because there is no bin for them.
+- If the camera suggests the right bin and the LED stays dark, check the board is
+  connected and the command came back accepted: the app records the LED
+  acknowledgement separately and says "not confirmed" when it did not arrive.
+- A LED that is on with no item shown means the command's duration has not
+  expired yet; each recognition lights it for eight seconds.
 
 ## Streetlights flicker or stay off
 

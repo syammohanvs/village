@@ -16,7 +16,7 @@ import { LanguagePicker } from '../components/LanguagePicker';
 import { Card, Chip, Notice } from '../components/ui';
 import { api } from '../lib/api';
 import { useCommands } from '../lib/commands';
-import { binLabel, lightModeLabel, reservoirLabel, soilLabel } from '../lib/explain';
+import { lightModeLabel, reservoirLabel, soilLabel } from '../lib/explain';
 import { cx, formatPercent } from '../lib/format';
 import { openLia } from '../lib/liaUi';
 import { friendlyEvent } from '../lib/timeline';
@@ -24,10 +24,8 @@ import { useApi } from '../lib/useApi';
 import { useVillage } from '../lib/village';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
-import type { BinReading } from '../types';
 
 type CardKey = 'plants' | 'lights';
-
 function levelChip(text: string, tone: 'live' | 'warn' | 'bad' | 'neutral' | 'gold') {
   return <Chip tone={tone}>{text}</Chip>;
 }
@@ -66,7 +64,6 @@ export function OurVillage() {
   const pump = status?.actuators?.pump;
   const lights = status?.actuators?.streetlights;
   const waste = status?.actuators?.waste_indicator;
-  const bins = sensors?.bins ?? [];
 
   // "Known" is a fact about the frame we hold, not about the hardware.  A
   // missing frame must not be turned into "Idle", "Off" or "not commissioned".
@@ -421,11 +418,9 @@ export function OurVillage() {
           )}
 
           <p className="vcard-fact">
-            {bins.length > 0
-              ? bins
-                  .map((bin: BinReading) => `${bin.id.replace(/^\w/, (c) => c.toUpperCase())}: ${binLabel(bin.state)}`)
-                  .join(' · ')
-              : 'Bin fill is unavailable until the distance sensors report.'}
+            Three bins: organic / food waste, plastic, paper &amp; cardboard. The LED beside a bin
+            lights to show the category the camera just recognised. Nothing measures how full a bin
+            is.
           </p>
 
           <div className="vcard-actions">
@@ -449,8 +444,8 @@ export function OurVillage() {
             <summary>How it works</summary>
             <div className="advanced-body">
               <p>
-                The camera suggests a bin; it does not prove that the item was put in it. Bin fill
-                comes from the distance sensors.
+                The camera suggests a bin; it does not prove that the item was put in it. The bins
+                have indicator LEDs only — no level sensing, so nothing here can say a bin is full.
               </p>
             </div>
           </details>

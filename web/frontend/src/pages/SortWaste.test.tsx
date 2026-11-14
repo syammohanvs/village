@@ -180,7 +180,6 @@ describe('Sort Waste', () => {
       ok: true,
       category: 'plastic',
       recognition: { id: 7, category: 'plastic', confidence: 0.95 },
-      bin: { id: 'plastic', state: 'available' },
     });
     const stopTrack = vi.fn();
     const stream = { getTracks: () => [{ stop: stopTrack }] };
@@ -746,7 +745,6 @@ describe('Sort Waste — the empty table is painted out', () => {
         ok: true,
         category: 'plastic',
         recognition: { id: 1, category: 'plastic', confidence: 0.95 },
-        bin: { id: 'plastic', state: 'available' },
       });
       // One stored empty scene, the same 160x120 frame the page analyses.
       const empty = new Uint8ClampedArray(160 * 120 * 4);
@@ -821,7 +819,6 @@ describe('Sort Waste — the empty table is painted out', () => {
         ok: true,
         category: 'plastic',
         recognition: { id: 2, category: 'plastic', confidence: 0.95 },
-        bin: { id: 'plastic', state: 'available' },
       });
       const empty = new Uint8ClampedArray(160 * 120 * 4);
       for (let i = 0; i < empty.length; i += 4) {
@@ -1247,7 +1244,6 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
       ok: true,
       category: 'paper',
       recognition: { id: 9, category: 'paper', confidence: 0.94 },
-      bin: { id: 'paper', state: 'available' },
     });
     try {
       render(<App />);

@@ -5,7 +5,6 @@
 #include <cstdint>
 #include <cstring>
 
-#include "village/core/bins.h"
 #include "village/core/command_history.h"
 #include "village/core/config.h"
 #include "village/core/irrigation.h"
@@ -70,12 +69,11 @@ struct Runtime {
   SoilModel soil;
   ReservoirModel reservoir;
   LightsModel lights;
-  BinModel bins[3];
   WasteIndicator waste;
   CommandHistory commands;
   EventLog events;
 
-  // Solar panel (instantaneous voltage on GPIO 33, ADC1).
+  // Solar panel (instantaneous voltage on VN / GPIO 39, ADC1).
   uint16_t solar_raw = 0;
   uint16_t solar_mv = 0;
   // Junction between the series resistor and the LED (GPIO 36, ADC1).

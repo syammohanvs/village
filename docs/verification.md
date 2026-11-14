@@ -92,7 +92,6 @@ hardware can actually support:
 soil        state "uncalibrated"  percent null
 reservoir   state "uncalibrated"  no percentage
 light       installed false       no reading
-bins        all "unavailable"     no distance
 pump        commissioned false, enabled false, commanded false
 ```
 
@@ -719,13 +718,11 @@ experiment is recorded here so the result is not re-derived.
 
 ## Not verified
 
-- Physical soil and bin-rangefinder behaviour, and the four lamps beyond the one
-  measured at 100 Ω (Vf 2.93 V).  The bin sensors are now three VL53L0X
-  time-of-flight modules; the firmware builds and the pin plan is
-  compile-time checked, but **nothing has been measured on a real bench yet** —
-  no address sequence, no distance, no fault path. The reservoir probe was exercised by shorting
-  it (142 mV → available) and by leaving it open (3145 mV → low); the soil probe
-  has only been seen open (4095 raw → 0 %).
+- Physical soil behaviour, and the four lamps beyond the one measured at 100 Ω
+  (Vf 2.93 V). The reservoir probe was exercised by shorting it
+  (142 mV → available) and by leaving it open (3145 mV → low); the soil probe
+  has only been seen open (4095 raw → 0 %). The bins have no sensing to verify:
+  they are indicator LEDs, and the LED path is exercised through the camera.
 - Nothing on the pump path. A **Stop while water is flowing** was measured on
   2026-11-10: the pump was started, left running, and stopped at **3.5 s** of an
   8 s pulse (`pulse_remaining_ms` still 5 875 when Stop was pressed) with the

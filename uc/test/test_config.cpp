@@ -98,24 +98,6 @@ TEST(config_rejects_bad_irrigation_relation) {
   CHECK(!validateConfig(c, err));
 }
 
-TEST(config_rejects_bad_bin_geometry) {
-  DeviceConfig c = defaults();
-  ConfigError err;
-  c.bins[1].full_cm = 59;
-  c.bins[1].empty_cm = 60;
-  CHECK(!validateConfig(c, err));
-
-  c = defaults();
-  c.bins[2].near_full_pct = 95;
-  c.bins[2].full_pct = 90;
-  CHECK(!validateConfig(c, err));
-
-  c = defaults();
-  c.bins[0].max_range_cm = 30;
-  c.bins[0].empty_cm = 60;
-  CHECK(!validateConfig(c, err));
-}
-
 TEST(config_rejects_inverted_reservoir_and_light_thresholds) {
   DeviceConfig c = defaults();
   ConfigError err;

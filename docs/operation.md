@@ -61,7 +61,7 @@ The full guide, including how to edit its sentences, is in
 - **Reservoir** — Available / Low only. It is not a tank gauge.
 - **Pump** — commanded state, mode, session reason and cumulative runtime.
 - **Streetlights** — mode, Bright/Dark and commanded state.
-- **Bins** — estimated fill height and state; unavailable stays unavailable.
+- **Bins** — one indicator LED per category. No fill level is measured or shown.
 - **Connection** — live, stale, disconnected, last update and last error.
 - **AI services** — whether Whisper and the waste model are ready.
 - **Recent activity** — commands, recognitions, alerts and connection events.

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api, errorMessage } from '../lib/api';
 import { useDemo } from '../lib/demo';
-import { cx, formatAge, formatCm, formatMv, formatPercent, titleCase } from '../lib/format';
-import { binLabel, reservoirLabel, soilLabel } from '../lib/explain';
+import { cx, formatAge, formatMv, formatPercent, titleCase } from '../lib/format';
+import { reservoirLabel, soilLabel } from '../lib/explain';
 import { useApi } from '../lib/useApi';
 import { useVillage } from '../lib/village';
 import { Card, Chip, ErrorBlock, Notice } from '../components/ui';
@@ -37,12 +37,6 @@ function validate(config: DeviceConfig): string | null {
   }
   if (reservoir.wet_threshold_mv >= reservoir.dry_threshold_mv) {
     return 'The wet threshold must be below the dry threshold. A lower millivolt reading means the probes are covered by water.';
-  }
-
-  for (const bin of config.bins) {
-    if (!(bin.full_cm > 0 && bin.empty_cm > bin.full_cm)) {
-      return `${titleCase(bin.id)} bin: the full distance must be smaller than the empty distance, and both must be above zero.`;
-    }
   }
 
   const light = config.light;
@@ -83,7 +77,6 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
   const soil = status?.sensors?.soil;
   const reservoir = status?.sensors?.reservoir;
   const light = status?.sensors?.light;
-  const bins = status?.sensors?.bins ?? [];
   const inactive = !live;
   const dirty = Boolean(saved && draft && JSON.stringify(saved.config) !== JSON.stringify(draft));
 
@@ -277,28 +270,6 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
         </Card>
       </div>
 
-      <Card kicker="Laser distance" title="Bin distances">
-        <div className={cx('bin-reading-grid', inactive && 'is-inactive')}>
-          {bins.length === 0 && <p className="hint">No bin readings in the current frame.</p>}
-          {bins.map((bin) => (
-            <div className="bin-reading" key={bin.id}>
-              <div className="bin-reading-head">
-                <strong>{titleCase(bin.id)}</strong>
-                <Chip tone={bin.state === 'full' ? 'bad' : bin.state === 'unavailable' ? 'neutral' : 'live'}>
-                  {binLabel(bin.state)}
-                </Chip>
-              </div>
-              <p className="bin-reading-distance">{formatCm(bin.distance_cm)}</p>
-              <p className="hint">
-                estimated fill {bin.fill_pct_estimate === null ? 'unavailable' : formatPercent(bin.fill_pct_estimate, 0)} ·{' '}
-                {formatAge(bin.age_ms)}
-              </p>
-              {bin.fault && <p className="error-text">{bin.fault}</p>}
-            </div>
-          ))}
-        </div>
-      </Card>
-
       <form className="config-form" onSubmit={(event) => void handleSubmit(event)}>
         <Card
           kicker="Configuration"
@@ -473,53 +444,6 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                       }
                     />
                   </label>
-                </div>
-              </fieldset>
-
-              <fieldset className="config-section">
-                <legend>Bin distances</legend>
-                <p className="hint">
-                  Empty distance is measured with the bin empty; full distance is where the bin is
-                  considered full. Fill is an estimated height, not a waste weight.
-                </p>
-                <div className="bin-config-grid">
-                  {draft.bins.map((bin) => (
-                    <div className="bin-config" key={bin.id}>
-                      <p className="bin-config-title">{titleCase(bin.id)}</p>
-                      <label className="field">
-                        <span>Empty (cm)</span>
-                        <input
-                          className="input"
-                          type="number"
-                          min={1}
-                          step={0.5}
-                          value={bin.empty_cm}
-                          onChange={(event) =>
-                            update((next) => {
-                              const row = next.bins.find((entry) => entry.id === bin.id);
-                              if (row) row.empty_cm = asNumber(event.target.value);
-                            })
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Full (cm)</span>
-                        <input
-                          className="input"
-                          type="number"
-                          min={0.5}
-                          step={0.5}
-                          value={bin.full_cm}
-                          onChange={(event) =>
-                            update((next) => {
-                              const row = next.bins.find((entry) => entry.id === bin.id);
-                              if (row) row.full_cm = asNumber(event.target.value);
-                            })
-                          }
-                        />
-                      </label>
-                    </div>
-                  ))}
                 </div>
               </fieldset>
 

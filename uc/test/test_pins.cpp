@@ -3,8 +3,9 @@
 
 using namespace village;
 
-TEST(pin_map_has_sixteen_unique_exposed_pins) {
-  CHECK(pins::kAssignedPinCount == 16);
+TEST(pin_map_has_eleven_unique_exposed_pins) {
+  // Bins are indicator LEDs only, so the five rangefinder pins are gone.
+  CHECK(pins::kAssignedPinCount == 11);
   CHECK(pins::assignedPinsAreUnique());
   for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
     CHECK(pins::isExposed(pins::kAssignedPins[i]));
@@ -80,37 +81,6 @@ TEST(pin_map_outputs_are_sane) {
   CHECK(pins::isSafeOutput(pins::WASTE_LED_PAPER));
 }
 
-TEST(tof_rangefinders_share_one_i2c_bus) {
-  // The VL53L0X modules are bus devices: two shared lines plus one XSHUT each,
-  // which is five pins instead of the six the ultrasonic pair needed.
-  CHECK(pins::isSafeOutput(pins::I2C_SDA));
-  CHECK(pins::isSafeOutput(pins::I2C_SCL));
-  CHECK(pins::I2C_SDA != pins::I2C_SCL);
-  for (int i = 0; i < 3; ++i) {
-    CHECK(pins::isSafeOutput(pins::TOF_XSHUT[i]));
-    CHECK(pins::TOF_XSHUT[i] != pins::I2C_SDA);
-    CHECK(pins::TOF_XSHUT[i] != pins::I2C_SCL);
-  }
-  CHECK(pins::TOF_XSHUT[0] != pins::TOF_XSHUT[1]);
-  CHECK(pins::TOF_XSHUT[1] != pins::TOF_XSHUT[2]);
-  CHECK(pins::TOF_XSHUT[0] != pins::TOF_XSHUT[2]);
-  // They are not monotonic by accident: the plan is documented in pins.h.
-  CHECK(pins::I2C_SDA == 4);
-  CHECK(pins::I2C_SCL == 16);
-  CHECK(pins::TOF_XSHUT[0] == 17);
-  CHECK(pins::TOF_XSHUT[1] == 18);
-  CHECK(pins::TOF_XSHUT[2] == 26);
-  // Distinct addresses, none of them the factory default every module boots
-  // at, and inside the 7-bit range.
-  for (int i = 0; i < 3; ++i) {
-    CHECK(pins::TOF_ADDRESS[i] != 0x29);
-    CHECK(pins::TOF_ADDRESS[i] < 0x78);
-    for (int j = i + 1; j < 3; ++j) {
-      CHECK(pins::TOF_ADDRESS[i] != pins::TOF_ADDRESS[j]);
-    }
-  }
-}
-
 TEST(no_pin_is_asked_to_do_two_jobs) {
   // GPIO 36 is the solar current sense.  It used to be bin 1's echo, and the
   // collision went unnoticed because the solar pins were not in the
@@ -121,14 +91,35 @@ TEST(no_pin_is_asked_to_do_two_jobs) {
   }
   CHECK(occurrences == 1);
   CHECK(pins::SOLAR_CURRENT_ADC == 36);
-  // The bus and the XSHUT lines must not steal an analogue input either.
-  for (int i = 0; i < 3; ++i) {
-    CHECK(pins::TOF_XSHUT[i] != pins::SOLAR_PANEL_ADC);
-    CHECK(pins::TOF_XSHUT[i] != pins::SOLAR_CURRENT_ADC);
-    CHECK(pins::TOF_XSHUT[i] != pins::SOIL_MOISTURE_ADC);
-    CHECK(pins::TOF_XSHUT[i] != pins::RESERVOIR_SENSE_ADC);
-    CHECK(pins::TOF_XSHUT[i] != pins::LDR_ADC);
+  // No analogue pin may be shared with anything else either.
+  int solar_panel = 0;
+  int solar_current = 0;
+  for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
+    if (pins::kAssignedPins[i] == pins::SOLAR_PANEL_ADC) ++solar_panel;
+    if (pins::kAssignedPins[i] == pins::SOLAR_CURRENT_ADC) ++solar_current;
   }
+  CHECK(solar_panel == 1);
+  CHECK(solar_current == 1);
+}
+
+TEST(the_freed_rangefinder_pins_stay_free) {
+  // GPIO 4/16 were the I2C bus and 17/18/26 the XSHUT lines.  Nothing uses
+  // them now, and they must not creep into the assignment list unnoticed.
+  for (int free : pins::kFreePins) {
+    CHECK(pins::isExposed(free));
+    for (std::size_t i = 0; i < pins::kAssignedPinCount; ++i) {
+      CHECK(pins::kAssignedPins[i] != free);
+    }
+  }
+}
+
+TEST(the_three_bin_leds_are_the_only_bin_hardware) {
+  CHECK(pins::isSafeOutput(pins::WASTE_LED_ORGANIC));
+  CHECK(pins::isSafeOutput(pins::WASTE_LED_PLASTIC));
+  CHECK(pins::isSafeOutput(pins::WASTE_LED_PAPER));
+  CHECK(pins::WASTE_LED_ORGANIC != pins::WASTE_LED_PLASTIC);
+  CHECK(pins::WASTE_LED_PLASTIC != pins::WASTE_LED_PAPER);
+  CHECK(pins::WASTE_LED_ORGANIC != pins::WASTE_LED_PAPER);
 }
 
 TEST(the_free_pin_is_recorded) {

@@ -1601,7 +1601,8 @@ export function SortWaste() {
               </p>
               <p className="hint">
                 The camera recognises waste; it does not identify people, measure weight, or prove
-                that anything was placed in a bin. Bin fill comes from the distance sensors.
+                that anything was placed in a bin. The bins have indicator LEDs only, so nothing
+                here measures how full one is.
               </p>
             </div>
           </details>
