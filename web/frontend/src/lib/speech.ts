@@ -283,12 +283,21 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
     // A newer call (another language, another view) owns the speakers now.
     if (ticket !== speakSeq) return false;
     if (await playBlob(blob)) return true;
+    if (ticket !== speakSeq) return false;
+    // One retry: a browser occasionally refuses the first play() after a tab
+    // switch, and that is not a reason to change voice.
+    if (await playBlob(blob)) return true;
+    // Piper *has* the audio, so the only thing standing between the reader and
+    // Sara's normal voice is playback.  Reading the same sentence in the
+    // device's voice instead would change accent mid-session -- reported
+    // exactly that way: "she speaks fine, then one line came out in a weird
+    // accent".  Silence is the lesser fault.
+    return false;
   } catch {
-    /* fall through to the browser voice */
+    /* Piper is unavailable for this utterance -- use the browser voice */
   }
   if (ticket !== speakSeq) return false;
 
-  // Piper failed (or was blocked by the browser).
   return speakWithDevice(text, language, rate, ticket);
 }
 

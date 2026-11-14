@@ -669,6 +669,16 @@ def create_app(
     ):
         if body.language not in {"en", "ml", "hi"}:
             raise HTTPException(status_code=422, detail="language must be en, ml or hi")
+        # What was said, and in which voice.  A "weird accent" is a question
+        # about one sentence, and without this line the log can only show that
+        # an utterance was requested, not what it was.
+        log.info(
+            "tts speak language=%s voice=%s chars=%d text=%r",
+            body.language,
+            getattr(tts, "voice_for", lambda _language: "")(body.language) or "-",
+            len(body.text or ""),
+            (body.text or "")[:80],
+        )
         try:
             audio_path = await tts.synthesize(body.text, body.language, body.length_scale)
         except TtsError as exc:

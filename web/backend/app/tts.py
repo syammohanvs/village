@@ -56,6 +56,10 @@ class PiperTts:
         self.cache_dir = settings.piper_cache_dir
 
     # ------------------------------------------------------------------
+    def voice_for(self, language: str) -> str:
+        """Which Piper voice speaks this language, or "" when there is none."""
+        return VOICE_FOR_LANGUAGE.get(language, "")
+
     def _model_path(self, language: str) -> Path | None:
         voice = VOICE_FOR_LANGUAGE.get(language)
         if voice is None:

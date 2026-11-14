@@ -254,6 +254,40 @@ describe('Indian English', () => {
     vi.doUnmock('./api');
   });
 
+  it('never changes accent when the audio it already has cannot be played', async () => {
+    // Reported: "she speaks fine in the same window, then when we showed the
+    // leaf she read that one line in a weird accent".  Piper had answered 200
+    // for every utterance, so the odd line was the DEVICE voice taking over
+    // because a play() hiccup made the caller fall back.  One voice per
+    // session: if Piper's audio exists, a playback failure is silence, not a
+    // different accent.
+    const { synth } = installSpeech(VOICES);
+    const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
+    vi.doMock('./api', () => ({ api: { speak } }));
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        return Promise.reject(new Error('play() was refused'));
+      }
+      pause() {}
+    };
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+
+    const speech = await import('./speech');
+    const ok = await speech.speakText('Classified as Glass. Please contact the operator.', 'en');
+
+    expect(ok).toBe(false);
+    expect(speak).toHaveBeenCalled();
+    expect(synth.speak).not.toHaveBeenCalled();
+    vi.doUnmock('./api');
+  });
+
   it('recognises an Indian voice that is tagged with a wider English code', async () => {
     installSpeech([
       { name: 'Neerja', lang: 'en-GB', default: true, localService: true, voiceURI: 'neerja' },
