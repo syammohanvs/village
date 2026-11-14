@@ -633,6 +633,44 @@ Those crops are photographs of whatever was in front of the camera, hands
 included, so the folder is git-ignored with the rest of `data/` and is not part
 of any backup policy.
 
+### The phone: a class with nothing of its own (2026-11-14)
+
+Reported: *"I showed smartphone but wrongly classified as paper."* The captures confirmed
+it: a black slab held up read **Paper 0.85**, then **Paper 0.50** — a bin, so a real
+misroute, not just a wrong name.
+
+The cause was not tuning. `data/waste-samples/Ewaste` was **empty**: Ewaste had only its
+archive photographs, so the venue's actual appearance — a dark back panel in a hand — had
+never been represented. The class counts said it plainly:
+
+| class | archive photos | venue/fetched photos (before) |
+| --- | --- | --- |
+| Paper | 301 | 173 |
+| Ewaste | 264 | **0** |
+| Textile | 186 | 88 |
+| Thermocol | **38** | **0** |
+
+Four of the phone's own frames plus fifty freely licensed smartphone photographs were added
+to `Ewaste` and the head retrained. On those very frames:
+
+| capture | before | after |
+| --- | --- | --- |
+| phone, screen side | Paper **0.85** | **Ewaste 0.87** |
+| phone, back side | Paper **0.50** | **Ewaste 0.94** |
+
+Nothing else broke: the book that was shown just before still reads **Paper 0.60**, the brown
+cover **Paper 0.87**, the ceramic cup **Glass 0.96**, the bottle **Plastic 0.95**, the
+handkerchief **Textile 0.94**. The real-world probe improved to **71.4% / 78.4%**, hand-held
+items eased to 47.9% / 65.5%, and the eight-photo handkerchief set went from 4/8 to 3/8 —
+one photograph, on the object that is still the hardest thing in the taxonomy.
+
+**One thing the frames taught that is worth more than the retrain: a phone showing a
+photograph is a photograph of that photograph.** The captures taken right after this fix are
+printed posters, a bandana and a newsstand scene — Paper 0.63, Textile 0.89, Textile 0.86 —
+because the camera was reading the picture *on* a screen, not the device holding it. A
+material classifier answers about what it is shown; if the screen is what fills the crop,
+the screen's content is the answer. Show the device itself, screen off or facing away.
+
 ### Auto mode cannot know, and the page stops pretending (2026-11-14)
 
 Reported: *"in auto mode even when I am not showing anything in hand it is classifying. Why
