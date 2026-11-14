@@ -589,6 +589,10 @@ function percentText(value: number): string {
  * available (uncalibrated, stale, missing) are described as unavailable — they
  * are never replaced with a plausible number.
  */
+/** The live narration sentences, for callers that need one line (a status
+ * question read aloud) rather than the whole summary. */
+export const LIVE_COPY = LIVE;
+
 export function describeVillage(
   snapshot: VillageSnapshot,
   language: LiaLanguage,

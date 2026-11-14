@@ -340,6 +340,95 @@ Phone torch on the panel for 10 s:
   phantom boot, and it came back normally when USB was reconnected.  The 10 kΩ
   taps limit the clamp current to ~0.26 mA each, which is why.
 
+## Voice commands (natural language, 2026-11-15)
+
+Sara understands phrasing, not just exact commands, without any language model
+or cloud call.  The pipeline has four separate steps:
+
+1. **transcription** — the browser records a WAV and posts it to
+   `POST /api/v1/voice/transcribe`; the local whisper.cpp server returns text.
+2. **parsing** — `web/backend/app/intents.py` (`IntentMatcher`) decides what the
+   sentence *means*.  Typed text uses the same parser through
+   `POST /api/v1/voice/interpret`, so the two paths cannot disagree.
+3. **validation/execution** — the panel sends the command through
+   `/api/v1/commands` with a **stable request id per utterance**; the firmware's
+   command history answers DUPLICATE for a repeated id, so a double event cannot
+   move anything twice.  All firmware gates (soil, low water, pump limits, kill
+   switch) still apply — speech has no bypass.
+4. **response** — pending / done / already / blocked wording from
+   `shared/intents.json`; a reply is only "done" after the controller acks.
+
+### The parser is a small grammar, not a phrase list
+
+`shared/intents.json` holds the data: languages, **device aliases**, **on/off/
+auto words**, politeness and question markers, negation and correction markers,
+the reply wording, and per-intent example phrases (also used by the help list).
+`intents.py` applies, in this order:
+
+1. silence → NO_SPEECH;
+2. hypothetical/conditional ("what happens if…", "should I…", "can I…") → no action;
+3. explicit correction ("actually", "I mean", "rather", "instead") → ambiguous;
+4. negation (English before the verb; Malayalam/Hindi anywhere, because they
+   negate after it) → NEGATED, nothing sent;
+5. two different states ("on… no, off", "on and off") → ambiguous (a question
+   like "are the lights on or off?" is a status query instead);
+6. one device (more than one → ambiguous); pronouns with no device → ask which;
+7. question or status word → the device's status intent, never an action;
+8. copula with no imperative ("the lights are off") → statement, never an action;
+9. exactly one device + one state → the command in `device_commands`;
+10. otherwise fall back to whole-phrase catalogue matching (this is what keeps
+    the hand-written Malayalam/Hindi phrases working), then UNKNOWN.
+
+**English also refuses sentences with an unaccounted content word**
+(`_unaccounted`), so "turn off the lights and open the gate" sends nothing
+instead of half of it.  Malayalam/Hindi allow inflected leftovers (their
+morphology is richer than the lexicon), which is a documented limit.
+
+### Replies and exact wording
+
+- unrecognised: “Please ask me to control a supported device or check its status.
+  For other help, contact Gram Sahayak.”
+- ambiguous between on and off: “Would you like the lights on or off?”
+- statement / hypothetical / negation / disconnected / unconfirmed: in
+  `shared/intents.json` under `messages`, translated for all three languages.
+- a matched command carries `pending_text`, `done_text` and `already_text`; the
+  panel says “already off” **without sending** when the frame agrees.
+
+The parser returns `confidence` as 0.0 or 1.0 only, and the UI no longer shows a
+percentage: this is a deterministic allowlist, not a model, and a percentage
+would invent a probability.
+
+### Known limits (state them, do not hide them)
+
+- No conversation memory: “it”, “that”, “do the same” ask you to name the device.
+- No arbitrary devices: only lights, pump/watering, and the status surfaces.
+- The lexicon is conservative; a new synonym that is not in the JSON is treated
+  as unsupported rather than guessed.
+- Whisper transcription errors are the dominant failure mode in a noisy room;
+  the parser cannot recover a word it never received.
+- Free-form conversation, questions about the app in general and multi-step
+  instructions are out of scope (Help and Sara's topics cover those).
+
+### Adding a phrase or a device
+
+- A new way to say an existing command: one line in that intent's `phrases`, and
+  (for the structural path) the word in `devices` / `states`.
+- A new device: its aliases in `devices`, a row in `device_commands`, and intents
+  with labels/phrases for any actions. No Python change unless the sentence
+  shape is new.
+
+### Tests
+
+```bash
+cd web/backend && python -m pytest -q tests/test_intents.py   # 19 parser tests
+cd web/frontend && npx vitest run src/components/VoicePanel.test.tsx
+```
+
+The parser tests are hardware-free; the panel tests mock the API and cover the
+typed path, duplicate submission, already-off, disconnected, unconfirmed and a
+rejected pump.  The live check is `POST /api/v1/voice/interpret` on the running
+app (it needs no microphone), plus one real spoken sentence through Whisper.
+
 ## Soil moisture polarity
 
 The soil probe is read as an analogue value on GPIO 34 (D34).  A bare

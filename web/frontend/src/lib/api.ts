@@ -312,6 +312,15 @@ export const api = {
     return request<ProfilesResponse>('/profiles', { mode: undefined });
   },
 
+  voiceInterpret(text: string, language: string): Promise<VoiceTranscribeResponse> {
+    // Typed and spoken requests share one parser, so a keyboard user cannot get
+    // a different answer from the microphone user.
+    return request<VoiceTranscribeResponse>('/voice/interpret', {
+      method: 'POST',
+      body: { text, language, source: 'typed' },
+    });
+  },
+
   voiceTranscribe(audio: Blob, language: string): Promise<VoiceTranscribeResponse> {
     const form = new FormData();
     form.append('audio', audio, 'command.wav');

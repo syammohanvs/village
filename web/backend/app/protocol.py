@@ -130,6 +130,16 @@ class SpeakRequest(BaseModel):
     length_scale: float = Field(default=1.0, ge=0.5, le=2.0)
 
 
+class VoiceInterpretRequest(BaseModel):
+    """A typed request, parsed by the same rules as a spoken transcript."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=300)
+    language: Literal["en", "ml", "hi"] = "en"
+    source: Literal["typed", "voice"] = "typed"
+
+
 class WasteClassifyRequest(BaseModel):
     """A 224x224 frame (data URL or bare base64) to classify with ResNet50."""
 

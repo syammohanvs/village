@@ -1,16 +1,42 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from pathlib import Path
 from typing import Any
 
 
-class IntentMatcher:
-    """Deterministic allowlist matching for the three supported languages.
+SILENT_MARKERS = {"[blank_audio]", "[silence]", "(silence)", "[music]", "[no speech]"}
 
-    This is deliberately not a language model.  It normalises the transcript,
-    rejects any negation, scores whole phrase coverage, and refuses ties.  An
-    unknown or ambiguous result must never actuate anything.
+# Words that carry no instruction and may be ignored when checking that every
+# content word was understood.  Only English uses that check (see _unaccounted).
+EN_FILLERS = {
+    "the", "a", "an", "my", "our", "your", "all", "some", "of", "at", "to", "for",
+    "me", "i", "you", "it", "that", "this", "them", "those", "and", "then", "also",
+    "plus", "please", "kindly", "now", "then", "just", "here", "there", "again",
+    "too", "ok", "okay", "right", "away", "quickly", "immediately", "already",
+    "want", "wanted", "would", "like", "need", "will", "can", "could", "may",
+    "should", "let", "let's", "us", "is", "are", "was", "were", "be", "been",
+    "do", "does", "did", "have", "has", "had", "if", "what", "how", "which",
+    "where", "when", "why", "who", "happens", "happen", "will", "it's", "please.",
+}
+
+# An English verb may arrive inflected; only these regular forms are folded, and
+# only into a verb the grammar already knows.
+EN_SUFFIXES = ("ing", "ed", "es", "s")
+
+
+class IntentMatcher:
+    """Deterministic, rule-based intent parsing for the three supported languages.
+
+    This is deliberately not a language model and not a substring search.  It
+    reads a sentence as a small grammar — sentence type (request, question,
+    statement, hypothetical), device aliases, state words (on/off/auto),
+    negation and correction — and only actuates when exactly one device and one
+    state were understood.  Anything uncertain returns no command at all.
+
+    The same parser serves speech (after Whisper transcribes) and typed input,
+    so both paths cannot disagree about what a sentence means.
     """
 
     def __init__(self, path: Path):
@@ -18,10 +44,16 @@ class IntentMatcher:
         self.data = json.loads(path.read_text(encoding="utf-8"))
         self.languages = [item["code"] for item in self.data["languages"]]
         self.by_id = {item["id"]: item for item in self.data["intents"]}
+        self.grammar = self.data.get("grammar", {})
+        self.devices = self.data.get("devices", {})
+        self.states = self.data.get("states", {})
+        self.device_commands = self.data.get("device_commands", {})
+        self.messages = self.data.get("messages", {})
+        self.watering = self.data.get("watering", {})
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------ text
     def normalize(self, text: str) -> str:
-        text = text.strip().lower()
+        text = unicodedata.normalize("NFKC", (text or "").strip().lower())
         text = text.replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
         out = []
         for ch in text:
@@ -34,22 +66,6 @@ class IntentMatcher:
     def _tokens(self, text: str) -> list[str]:
         return self.normalize(text).split()
 
-    def _phrase_hit(self, tokens: list[str], phrase_tokens: list[str]) -> bool:
-        if not phrase_tokens:
-            return False
-        n = len(phrase_tokens)
-        for i in range(0, len(tokens) - n + 1):
-            if tokens[i : i + n] == phrase_tokens:
-                return True
-        return False
-
-    def is_negated(self, text: str, language: str) -> bool:
-        tokens = self._tokens(text)
-        for phrase in self.data["negations"].get(language, []):
-            if self._phrase_hit(tokens, self._tokens(phrase)):
-                return True
-        return False
-
     def detect_language(self, text: str, fallback: str = "en") -> str:
         if any("\u0d00" <= ch <= "\u0d7f" for ch in text):
             return "ml"
@@ -57,116 +73,470 @@ class IntentMatcher:
             return "hi"
         return fallback
 
-    # ------------------------------------------------------------------
+    # --------------------------------------------------------------- matching
+    def _find(self, tokens: list[str], terms: list[str] | None) -> list[tuple[int, int, str]]:
+        """Every occurrence of a known term, longest term first.
+
+        A term matches only as whole words (token sequences), never as a
+        substring inside a word, so "not" does not match "nothing" and "on"
+        does not match "once".  Overlapping hits are discarded.
+        """
+        if not terms:
+            return []
+        hits: list[tuple[int, int, str]] = []
+        used: set[int] = set()
+        ordered = sorted({t for t in terms if t}, key=lambda t: -len(t.split()))
+        for term in ordered:
+            parts = self._tokens(term) or term.split()
+            n = len(parts)
+            for i in range(0, len(tokens) - n + 1):
+                span = range(i, i + n)
+                if any(index in used for index in span):
+                    continue
+                if tokens[i:i + n] == parts:
+                    hits.append((i, n, term))
+                    used.update(span)
+        return sorted(hits)
+
+    def _has(self, tokens: list[str], terms: list[str] | None) -> bool:
+        return bool(self._find(tokens, terms))
+
+    def _starts(self, tokens: list[str], terms: list[str] | None) -> bool:
+        if not terms:
+            return False
+        for term in terms:
+            parts = term.split()
+            if tokens[:len(parts)] == parts:
+                return True
+        return False
+
+    def _en_verb_hit(self, tokens: list[str], verbs: list[str]) -> list[tuple[int, int, str]]:
+        hits = self._find(tokens, verbs)
+        taken = {i for start, n, _ in hits for i in range(start, start + n)}
+        known = set(verbs)
+        for index, token in enumerate(tokens):
+            if index in taken:
+                continue
+            base = self._en_base(token, known)
+            if base:
+                hits.append((index, 1, token))
+                taken.add(index)
+        return sorted(hits)
+
+    @staticmethod
+    def _en_base(token: str, known: set[str]) -> str | None:
+        for suffix in EN_SUFFIXES:
+            if token.endswith(suffix) and len(token) > len(suffix) + 2:
+                stem = token[: -len(suffix)]
+                if stem in known:
+                    return stem
+                if len(stem) > 2 and stem[-1] == stem[-2] and stem[:-1] in known:
+                    return stem[:-1]
+        return None
+
+    # ------------------------------------------------------------- sentences
+    def is_negated(self, text: str, language: str) -> bool:
+        tokens = self._tokens(text)
+        g = self.grammar.get(language, {})
+        negators = self._find(tokens, g.get("negations"))
+        if not negators:
+            return False
+        state_or_device = (
+            self._find(tokens, [t for values in self.states.values() for t in values.get(language, [])])
+            + self._find(tokens, [t for values in self.devices.values() for t in values.get(language, [])])
+        )
+        if not state_or_device:
+            return True
+        return min(start for start, _, _ in negators) < min(start for start, _, _ in state_or_device)
+
+    def _question(self, text: str, tokens: list[str], language: str) -> bool:
+        if text.rstrip().endswith("?"):
+            return True
+        g = self.grammar.get(language, {})
+        if self._starts(tokens, g.get("question_starts")):
+            return True
+        # Malayalam and Hindi mark a question with a suffix on the verb rather
+        # than by moving a question word to the front ("…ഉണ്ടോ", "…क्या").
+        for suffix in g.get("question_suffixes", []):
+            if any(token.endswith(suffix) and len(token) > len(suffix) for token in tokens):
+                return True
+        return False
+
+    def _request(self, tokens: list[str], language: str) -> bool:
+        g = self.grammar.get(language, {})
+        # "can you / could you / would you" is a request; "can I / may I" is
+        # handled as a hypothetical before this is consulted.
+        modals = [m for m in g.get("request_modals", []) if not m.startswith(("can i", "may i", "could i"))]
+        return self._starts(tokens, modals) or self._has(tokens, ["please", "kindly", "ദയവായി", "कृपया"])
+
+    # ----------------------------------------------------------------- parse
     def match(self, text: str, language: str) -> dict[str, Any]:
         language = language if language in self.languages else "en"
+        g = self.grammar.get(language, {})
         transcript = (text or "").strip()
-        unknown = self.data["unknown"].get(language, self.data["unknown"]["en"])
-        no_speech = self.data["no_speech"].get(language, self.data["no_speech"]["en"])
-
-        lowered = transcript.lower()
-        silent_markers = {"[blank_audio]", "[silence]", "(silence)", "[music]", "[no speech]"}
-        if not transcript or lowered in silent_markers or len(self._tokens(transcript)) == 0:
-            return self._result("NO_SPEECH", "no_speech", 0.0, None, no_speech, language)
-
-        if self.is_negated(transcript, language):
-            return self._result("NEGATED", "negated", 0.0, None, unknown, language)
+        if not transcript or transcript.lower() in SILENT_MARKERS:
+            return self._result("no_speech", language, "no_speech")
 
         tokens = self._tokens(transcript)
+        if not tokens:
+            return self._result("no_speech", language, "no_speech")
+
+        # --- sentence type, in the order that keeps a question from acting ---
+        if self._has(tokens, g.get("hypothetical")) or self._starts(tokens, ["if"]):
+            return self._result("hypothetical", language, "hypothetical")
+
+        # "no" / "नहीं" is both a negator and a correction.  It only counts as a
+        # correction when a second, different state follows it ("on… no, off"),
+        # which is caught below as two states.
+        if self._has(tokens, g.get("corrections")):
+            return self._result("ambiguous", language, "ambiguous_generic", clarify="correction")
+
+        device_hits = self._device_hits(tokens, language)
+        state_hits = self._state_hits(tokens, language)
+        verb_hits = self._verb_hits(tokens, language)
+        status_hits = self._find(tokens, g.get("status_words"))
+        negators = self._find(tokens, g.get("negations"))
+        watering = self._watering(tokens, language)
+
+        # --- pronouns that need a device named -----------------------------
+        pronouns = self._find(tokens, g.get("pronouns"))
+        if pronouns and not device_hits and not watering:
+            return self._result("ambiguous", language, "clarify_device")
+
+        # --- negation, before any state is turned into an action ------------
+        anchors = [start for start, _, _ in state_hits + verb_hits + device_hits]
+        if negators:
+            # English puts the negator before the verb ("don't turn it off"),
+            # so position matters and "no, off" stays a correction.  Malayalam
+            # and Hindi negate after the verb ("…തുടങ്ങുക വേണ്ട"), where a
+            # position test would miss every real refusal.
+            if language != "en" or not anchors or min(start for start, _, _ in negators) < min(anchors):
+                return self._result("negated", language, "negated")
+
+        is_question = self._question(transcript, tokens, language)
+        is_request = self._request(tokens, language)
+
+        # --- two states in one sentence are never a guess --------------------
+        unique_states = {name for _, _, name in state_hits}
+        if len(unique_states) > 1:
+            # "Are the lights on or off?" is a status question, not a command
+            # with two actions.
+            device = device_hits[0][2] if device_hits else None
+            if is_question and not is_request and device:
+                status_command = self.device_commands.get(device, {}).get("status")
+                if status_command:
+                    return self._intent_result(status_command, language, device=device, action="status")
+            # Two different states is never a guess; with watering in the same
+            # sentence it is two requests ("…and start watering"), so the answer
+            # must not pretend the question is only about the lights.
+            if watering:
+                return self._result("ambiguous", language, "ambiguous_generic")
+            return self._result(
+                "ambiguous", language,
+                "ambiguous_lights" if device == "lights" else "ambiguous_generic",
+                device=device,
+            )
+
+        # --- exactly one device ---------------------------------------------
+        devices = sorted({name for _, _, name in device_hits})
+        if watering:
+            # "watering / irrigation / water the plants" names the pump without
+            # saying "pump".  Any *other* device in the same sentence is a second
+            # request ("…and switch off the lights"), never a guess.
+            others = [d for d in devices if d not in ("pump", "water")]
+            if others:
+                return self._result("ambiguous", language, "ambiguous_generic")
+            devices = ["pump"]
+            unique_states = {watering}
+        elif len(devices) > 1:
+            return self._result("ambiguous", language, "ambiguous_generic")
+        device = devices[0] if devices else None
+
+        if device is None:
+            # A bare status word ("status", "what is happening") asks about the
+            # whole village; "help" asks for the catalogue.
+            if self._has(tokens, ["help", "commands", "what can you do"]):
+                return self._intent_result("HELP", language, device=None, action=None)
+            if status_hits and not state_hits:
+                return self._intent_result("VILLAGE_STATUS", language, device="village", action="status")
+            fallback = self._phrase_fallback(tokens, language, allow=not (is_question or negators))
+            if fallback:
+                return fallback
+            # A word that looks like an action but names no known device is a
+            # question about which device, not an instruction.
+            if device_hits or pronouns:
+                return self._result("ambiguous", language, "clarify_device")
+            return self._result("unsupported", language, "unknown")
+
+        command_for_device = self.device_commands.get(device, {})
+
+        # --- a statement or a question is never an action -------------------
+        copula = bool(self._find(tokens, g.get("copulas")))
+        if not unique_states:
+            if status_hits or is_question:
+                status_command = command_for_device.get("status")
+                if status_command:
+                    return self._intent_result(status_command, language, device=device, action="status")
+            if copula and not verb_hits:
+                return self._result("statement", language, "statement", device=device)
+            if verb_hits:
+                return self._result("ambiguous", language, "ambiguous_generic", device=device)
+            if is_request:
+                return self._result("ambiguous", language, "ambiguous_generic", device=device)
+            fallback = self._phrase_fallback(tokens, language, allow=False)
+            if fallback:
+                return fallback
+            return self._result("ambiguous", language, "ambiguous_generic", device=device)
+
+        if is_question and not is_request:
+            status_command = command_for_device.get("status")
+            if status_command:
+                return self._intent_result(status_command, language, device=device, action="status")
+            return self._result("unsupported", language, "unknown", device=device)
+
+        # "the lights are off" / "the pump is running" state a fact.  A
+        # participle ("running", "switched") is not an imperative, so it does
+        # not turn the sentence into an instruction.
+        base_verbs = set(g.get("verbs") or [])
+        imperative = [hit for hit in verb_hits if tokens[hit[0]] in base_verbs]
+        if copula and not is_question and not imperative:
+            return self._result("statement", language, "statement", device=device)
+
+        action = sorted(unique_states)[0]
+        command = command_for_device.get(action)
+        if not command:
+            return self._result("unsupported", language, "unknown", device=device, action=action)
+
+        if language == "en" and self._unaccounted(tokens, language):
+            # An unknown word after a conjunction is the shape of a second
+            # request ("…and open the gate").  Never execute half of it.
+            return self._result("ambiguous", language, "ambiguous_generic", device=device)
+        return self._intent_result(command, language, device=device, action=action)
+
+    # ------------------------------------------------------------- providers
+    def _device_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:
+        hits: list[tuple[int, int, str]] = []
+        for name, aliases in self.devices.items():
+            for start, n, _ in self._find(tokens, aliases.get(language)):
+                hits.append((start, n, name))
+        return sorted(hits)
+
+    def _state_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:
+        hits: list[tuple[int, int, str]] = []
+        for name, aliases in self.states.items():
+            for start, n, _ in self._find(tokens, aliases.get(language)):
+                hits.append((start, n, name))
+        return sorted(hits)
+
+    def _verb_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:
+        g = self.grammar.get(language, {})
+        verbs = g.get("verbs") or []
+        if language == "en":
+            return self._en_verb_hit(tokens, verbs)
+        return self._find(tokens, verbs)
+
+    def _watering(self, tokens: list[str], language: str) -> str | None:
+        spec = self.watering.get(language)
+        if not spec:
+            return None
+        if not self._find(tokens, spec.get("cue")):
+            return None
+        if self._find(tokens, spec.get("stop")):
+            return "off"
+        if self._find(tokens, spec.get("start")):
+            return "on"
+        return "on"
+
+    def _unaccounted(self, tokens: list[str], language: str) -> list[str]:
+        """English words no rule consumed.  A leftover noun means the sentence
+        asked for something this build cannot do, so nothing is actuated."""
+        g = self.grammar.get(language, {})
+        known: list[str] = list(EN_FILLERS)
+        for group in ("polite", "request_modals", "question_starts", "hypothetical",
+                      "corrections", "negations", "pronouns", "copulas", "verbs",
+                      "status_words", "fillers"):
+            known.extend(g.get(group, []))
+        known.extend(["help", "commands", "what can you do"])
+        for aliases in self.devices.values():
+            known.extend(aliases.get(language, []))
+        for aliases in self.states.values():
+            known.extend(aliases.get(language, []))
+        for spec in self.watering.values():
+            for key in ("cue", "start", "stop"):
+                known.extend(spec.get(key, []))
+        covered: set[int] = set()
+        for start, n, _ in self._find(tokens, known):
+            covered.update(range(start, start + n))
+        # inflected English verbs count as understood
+        for index, token in enumerate(tokens):
+            if index in covered:
+                continue
+            if self._en_base(token, set(g.get("verbs") or [])):
+                covered.add(index)
+        return [token for index, token in enumerate(tokens) if index not in covered]
+
+    # -------------------------------------------------------------- fallback
+    def _phrase_fallback(self, tokens: list[str], language: str, allow: bool) -> dict[str, Any] | None:
+        """Exact catalogue phrases, used only where structure found nothing.
+
+        This is what keeps the hand-written Malayalam/Hindi phrases (and a few
+        English ones) working when their word order or inflection is outside the
+        structural rules.  It is whole-phrase coverage, not a substring search,
+        and a question or a negated sentence is never allowed through.
+        """
+        if not allow:
+            return None
         token_set = set(tokens)
-        scored: list[tuple[float, str, str, int]] = []
+        scored: list[tuple[float, str, str]] = []
         for intent in self.data["intents"]:
-            phrases = intent["phrases"].get(language, [])
-            for phrase in phrases:
+            for phrase in intent["phrases"].get(language, []):
                 phrase_tokens = self._tokens(phrase)
                 if not phrase_tokens:
                     continue
-                hits = sum(1 for token in phrase_tokens if token in token_set)
-                coverage = hits / len(phrase_tokens)
-                if coverage < 0.999:
+                if any(token not in token_set for token in phrase_tokens):
                     continue
                 phrase_set = set(phrase_tokens)
                 unmatched = sum(1 for token in tokens if token not in phrase_set)
-                # Prefer a longer, more specific phrase and penalise words the
-                # phrase did not account for (e.g. "bin status" must not be
-                # confused with the generic "status").
                 score = 1.0 + min(len(phrase_tokens), 8) * 0.001 - 0.03 * unmatched
-                scored.append((score, intent["id"], phrase, len(phrase_tokens)))
-
+                scored.append((score, intent["id"], phrase))
         if not scored:
-            return self._result("UNKNOWN", "unsupported", 0.0, None, unknown, language)
-
+            return None
         scored.sort(reverse=True)
-        best_score, best_id, best_phrase, _ = scored[0]
-        candidates = []
-        seen = set()
-        for score, intent_id, phrase, _ in scored:
-            if intent_id in seen:
-                continue
-            seen.add(intent_id)
-            candidates.append({"intent": intent_id, "phrase": phrase, "confidence": 1.0})
-        distinct = [c for c in candidates if c["intent"] != best_id]
-        if distinct:
-            # A second, different intent with an equally complete phrase is
-            # ambiguous.  Never guess between two actions.
-            second = scored[1]
-            if second[1] != best_id and abs(best_score - second[0]) < 0.02:
-                return self._result("AMBIGUOUS", "ambiguous", 0.0, best_phrase, unknown, language)
-
+        best_score, best_id, best_phrase = scored[0]
+        second = next((row for row in scored[1:] if row[1] != best_id), None)
+        if second is not None and abs(best_score - second[0]) < 0.02:
+            return self._result("ambiguous", language, "ambiguous_generic")
         intent = self.by_id[best_id]
+        command = intent.get("command")
+        return self._intent_result(
+            best_id, language,
+            device=None,
+            action=None,
+            matched_phrase=best_phrase,
+            command_override=command,
+        )
+
+    # --------------------------------------------------------------- results
+    def _intent_result(
+        self,
+        intent_id: str,
+        language: str,
+        device: str | None,
+        action: str | None,
+        matched_phrase: str | None = None,
+        command_override: str | None = None,
+    ) -> dict[str, Any]:
+        intent = self.by_id.get(intent_id)
+        if intent is None:
+            return self._result("unsupported", language, "unknown")
+        command = command_override if command_override is not None else intent.get("command")
+        kind = "status" if command is None else "command"
         response = intent.get("response", {}).get(language)
         pending = intent.get("response_pending", {}).get(language)
         done = intent.get("response_done", {}).get(language)
+        already = intent.get("already_text", {}).get(language)
         return {
-            "intent": best_id,
+            "kind": kind,
+            "status": "ok",
+            "intent": intent_id,
             "reason": "matched",
-            "confidence": round(min(best_score, 1.0), 3),
-            "matched_phrase": best_phrase,
+            # Deliberately not a probability: this is a deterministic allowlist
+            # with no model behind it, and showing "93%" would invent one.
+            "confidence": 1.0,
+            "matched_phrase": matched_phrase,
+            "matched_rule": f"device:{device}" if device else "phrase",
             "message": None,
             "language": language,
-            "command": intent.get("command"),
-            "actuation": bool(intent.get("actuation", False)),
-            "label": intent.get("label", {}).get(language, best_id),
-            "response_text": response or pending or "",
+            "device": device,
+            "action": action,
+            "command": command,
+            "actuation": bool(intent.get("actuation", False)) and command is not None,
+            "label": intent.get("label", {}).get(language, intent_id),
+            "response_text": pending or response or "",
             "pending_text": pending or response or "",
             "done_text": done or response or "",
-            "candidates": candidates[:4],
+            "already_text": already or "",
+            "clarify": None,
+            "candidates": [],
             "supported": self.help_list(language),
-            "unknown_message": unknown,
+            "unknown_message": self.unknown_message(language),
         }
 
-    def _result(self, intent: str, reason: str, confidence: float,
-                matched_phrase: str | None, message: str, language: str) -> dict[str, Any]:
+    def _result(
+        self,
+        kind: str,
+        language: str,
+        message_key: str,
+        device: str | None = None,
+        action: str | None = None,
+        clarify: str | None = None,
+    ) -> dict[str, Any]:
+        if message_key == "unknown":
+            message = self.unknown_message(language)
+            kind, status = "unsupported", "unknown"
+        elif message_key == "no_speech":
+            message = self.data["no_speech"].get(language, self.data["no_speech"]["en"])
+            kind, status = "no_speech", "no_speech"
+        else:
+            table = {
+                "ambiguous_lights": "ambiguous",
+                "ambiguous_generic": "ambiguous_generic",
+                "clarify_device": "clarify_device",
+                "statement": "statement",
+                "hypothetical": "hypothetical",
+                "negated": "negated",
+            }
+            message = self.messages.get(table.get(message_key, message_key), {}).get(language, "")
+            status = kind
         return {
-            "intent": intent,
-            "reason": reason,
-            "confidence": confidence,
-            "matched_phrase": matched_phrase,
+            "kind": kind,
+            "status": status,
+            "intent": {
+                "negated": "NEGATED",
+                "ambiguous": "AMBIGUOUS",
+                "statement": "STATEMENT",
+                "hypothetical": "HYPOTHETICAL",
+                "unsupported": "UNKNOWN",
+                "no_speech": "NO_SPEECH",
+            }.get(kind, "UNKNOWN"),
+            "reason": kind,
+            # Deliberately not a probability.  This parser is a deterministic
+            # allowlist; a percentage would invent a model that is not here.
+            "confidence": 0.0,
+            "matched_phrase": None,
+            "matched_rule": None,
             "message": message,
             "language": language,
+            "device": device,
+            "action": action,
             "command": None,
             "actuation": False,
             "label": None,
             "response_text": message,
             "pending_text": "",
             "done_text": "",
+            "already_text": "",
+            "clarify": clarify,
             "candidates": [],
             "supported": self.help_list(language),
             "unknown_message": message,
         }
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------ help
     def help_list(self, language: str) -> list[dict[str, Any]]:
         language = language if language in self.languages else "en"
         result = []
         for intent_id in self.data["help_order"]:
-            intent = self.by_id[intent_id]
+            intent = self.by_id.get(intent_id)
+            if intent is None:
+                continue
             result.append(
                 {
                     "id": intent_id,
                     "label": intent["label"].get(language, intent_id),
                     "actuation": bool(intent.get("actuation", False)),
                     "command": intent.get("command"),
+                    "phrases": intent.get("phrases", {}).get(language, []),
                 }
             )
         return result

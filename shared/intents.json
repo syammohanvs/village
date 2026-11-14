@@ -1,19 +1,47 @@
 {
-  "version": 1,
+  "version": 2,
   "languages": [
-    { "code": "en", "label": "English", "whisper": "en" },
-    { "code": "ml", "label": "മലയാളം", "whisper": "ml" },
-    { "code": "hi", "label": "हिन्दी", "whisper": "hi" }
+    {
+      "code": "en",
+      "label": "English",
+      "whisper": "en"
+    },
+    {
+      "code": "ml",
+      "label": "മലയാളം",
+      "whisper": "ml"
+    },
+    {
+      "code": "hi",
+      "label": "हिन्दी",
+      "whisper": "hi"
+    }
   ],
   "negations": {
-    "en": ["do not", "don't", "dont", "never", "not", "no"],
-    "ml": ["വേണ്ട", "അരുത്", "ചെയ്യരുത്", "ഇല്ല"],
-    "hi": ["मत", "नहीं", "न करें"]
+    "en": [
+      "do not",
+      "don't",
+      "dont",
+      "never",
+      "not",
+      "no"
+    ],
+    "ml": [
+      "വേണ്ട",
+      "അരുത്",
+      "ചെയ്യരുത്",
+      "ഇല്ല"
+    ],
+    "hi": [
+      "मत",
+      "नहीं",
+      "न करें"
+    ]
   },
   "unknown": {
-    "en": "Please use one of the supported commands or contact local support.",
-    "ml": "സഹായിക്കാവുന്ന കമാൻഡുകളിൽ ഒന്ന് പറയുക, അല്ലെങ്കിൽ പ്രാദേശിക സഹായത്തെ സമീപിക്കുക.",
-    "hi": "कृपया समर्थित कमांड में से एक कहें, या स्थानीय सहायता से संपर्क करें।"
+    "en": "Please ask me to control a supported device or check its status. For other help, contact Gram Sahayak.",
+    "ml": "നിയന്ത്രിക്കാവുന്ന ഒരു ഉപകരണം നിയന്ത്രിക്കാനോ അതിന്റെ അവസ്ഥ അറിയാനോ ആവശ്യപ്പെടുക. മറ്റ് സഹായത്തിന് ഗ്രാം സഹായകിനെ സമീപിക്കുക.",
+    "hi": "कृपया किसी समर्थित उपकरण को नियंत्रित करने या उसकी स्थिति पूछने के लिए कहें। अन्य सहायता के लिए ग्राम सहायक से संपर्क करें।"
   },
   "no_speech": {
     "en": "No speech was detected. Hold the button and speak clearly.",
@@ -30,9 +58,11 @@
     "LIGHTS_ON",
     "LIGHTS_OFF",
     "LIGHTS_AUTO",
+    "LIGHTS_STATUS",
     "SOIL_STATUS",
     "IRRIGATION_START",
     "IRRIGATION_STOP",
+    "PUMP_STATUS",
     "WATER_STATUS",
     "BIN_STATUS",
     "HELP"
@@ -123,6 +153,11 @@
         "en": "The streetlights are on.",
         "ml": "തെരുവ് വിളക്കുകൾ കത്തിച്ചു.",
         "hi": "स्ट्रीट लाइट चालू हैं।"
+      },
+      "already_text": {
+        "en": "The lights are already on.",
+        "ml": "വിളക്കുകൾ ഇപ്പോൾത്തന്നെ കത്തുന്നു.",
+        "hi": "लाइटें पहले से जल रही हैं।"
       }
     },
     {
@@ -169,6 +204,11 @@
         "en": "The streetlights are off.",
         "ml": "തെരുവ് വിളക്കുകൾ അണച്ചു.",
         "hi": "स्ट्रीट लाइट बंद हैं।"
+      },
+      "already_text": {
+        "en": "The lights are already off.",
+        "ml": "വിളക്കുകൾ ഇപ്പോൾത്തന്നെ അണഞ്ഞിരിക്കുന്നു.",
+        "hi": "लाइटें पहले से बंद हैं।"
       }
     },
     {
@@ -214,6 +254,11 @@
         "en": "The streetlights follow the light sensor now.",
         "ml": "വിളക്കുകൾ ഇപ്പോൾ പ്രകാശ സെൻസർ അനുസരിച്ച് പ്രവർത്തിക്കും.",
         "hi": "स्ट्रीट लाइट अब लाइट सेंसर के अनुसार चलेंगी।"
+      },
+      "already_text": {
+        "en": "The lights are already in automatic mode.",
+        "ml": "വിളക്കുകൾ ഇപ്പോൾത്തന്നെ ഓട്ടോമാറ്റിക് മോഡിലാണ്.",
+        "hi": "लाइटें पहले से ऑटोमैटिक मोड में हैं।"
       }
     },
     {
@@ -304,6 +349,11 @@
         "en": "The controller accepted the irrigation request.",
         "ml": "കൺട്രോളർ നനയ്ക്കാനുള്ള അഭ്യർത്ഥന സ്വീകരിച്ചു.",
         "hi": "कंट्रोलर ने सिंचाई का अनुरोध स्वीकार किया।"
+      },
+      "already_text": {
+        "en": "A watering pulse is already running.",
+        "ml": "നനയ്ക്കൽ ഇപ്പോൾത്തന്നെ നടക്കുന്നു.",
+        "hi": "पानी देना पहले से चल रहा है।"
       }
     },
     {
@@ -352,6 +402,11 @@
         "en": "The controller stopped the irrigation.",
         "ml": "കൺട്രോളർ നനയ്ക്കൽ നിർത്തി.",
         "hi": "कंट्रोलर ने सिंचाई रोक दी।"
+      },
+      "already_text": {
+        "en": "No watering is running, so there is nothing to stop.",
+        "ml": "നനയ്ക്കൽ നടക്കുന്നില്ല, നിർത്താൻ ഒന്നുമില്ല.",
+        "hi": "पानी देना नहीं चल रहा, रोकने के लिए कुछ नहीं है।"
       }
     },
     {
@@ -476,6 +531,769 @@
         "ml": "ഇവ പറയാം: ഗ്രാമത്തിന്റെ അവസ്ഥ, വിളക്കുകൾ കത്തിക്കുക, വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ ഓട്ടോ, മണ്ണിലെ ഈർപ്പം, നനയ്ക്കാൻ തുടങ്ങുക, നനയ്ക്കുന്നത് നിർത്തുക, വെള്ളം ഉണ്ടോ, ബിന്നിന്റെ അവസ്ഥ, സഹായം.",
         "hi": "आप कह सकते हैं: गाँव की स्थिति, लाइट चालू करो, लाइट बंद करो, लाइट ऑटो, मिट्टी की नमी, सिंचाई शुरू करो, सिंचाई बंद करो, पानी है क्या, बिन की स्थिति, मदद।"
       }
+    },
+    {
+      "id": "LIGHTS_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Lights status",
+        "ml": "വിളക്കുകളുടെ അവസ്ഥ",
+        "hi": "लाइट की स्थिति"
+      },
+      "phrases": {
+        "en": [
+          "lights status",
+          "are the lights on",
+          "are the lights off",
+          "is the light on",
+          "what are the lights doing"
+        ],
+        "ml": [
+          "വിളക്കുകളുടെ അവസ്ഥ",
+          "വിളക്കുകൾ കത്തുന്നുണ്ടോ",
+          "വിളക്കുകൾ അണഞ്ഞിട്ടുണ്ടോ"
+        ],
+        "hi": [
+          "लाइट की स्थिति",
+          "लाइट जल रही है क्या",
+          "लाइट बंद है क्या"
+        ]
+      },
+      "response": {
+        "en": "The Streets card shows whether the lamps are on, and in which mode.",
+        "ml": "വിളക്കുകൾ കത്തുന്നുണ്ടോ ഏത് മോഡിലാണ് എന്ന് സ്ട്രീറ്റ്സ് കാർഡിൽ കാണാം.",
+        "hi": "लाइट जल रही है या नहीं और किस मोड में है, स्ट्रीट्स कार्ड पर दिख रहा है।"
+      }
+    },
+    {
+      "id": "PUMP_STATUS",
+      "command": null,
+      "actuation": false,
+      "label": {
+        "en": "Pump status",
+        "ml": "പമ്പിന്റെ അവസ്ഥ",
+        "hi": "पंप की स्थिति"
+      },
+      "phrases": {
+        "en": [
+          "pump status",
+          "is the pump on",
+          "is the pump running",
+          "is watering on",
+          "is irrigation running"
+        ],
+        "ml": [
+          "പമ്പിന്റെ അവസ്ഥ",
+          "പമ്പ് ഓടുന്നുണ്ടോ",
+          "നനയ്ക്കുന്നുണ്ടോ"
+        ],
+        "hi": [
+          "पंप की स्थिति",
+          "पंप चल रहा है क्या",
+          "पानी देना चल रहा है क्या"
+        ]
+      },
+      "response": {
+        "en": "The Plants & Watering card shows whether a watering pulse is running.",
+        "ml": "നനയ്ക്കൽ നടക്കുന്നുണ്ടോ എന്ന് പ്ലാന്റ്സ് & വാട്ടറിംഗ് കാർഡിൽ കാണാം.",
+        "hi": "पानी देना चल रहा है या नहीं, प्लांट्स और वाटरिंग कार्ड पर दिख रहा है।"
+      }
     }
-  ]
+  ],
+  "messages": {
+    "statement": {
+      "en": "Understood — I haven't changed anything. Tell me what to switch and I will.",
+      "ml": "മനസ്സിലായി — ഞാൻ ഒന്നും മാറ്റിയിട്ടില്ല. എന്ത് മാറ്റണമെന്ന് പറയുക.",
+      "hi": "समझ गया — मैंने कुछ नहीं बदला। क्या बदलना है, बताइए।"
+    },
+    "hypothetical": {
+      "en": "I only act when you ask me to. Say “switch the lights off” and I will send it.",
+      "ml": "നിങ്ങൾ ആവശ്യപ്പെട്ടാൽ മാത്രമേ ഞാൻ ചെയ്യൂ. “വിളക്കുകൾ അണയ്ക്കുക” എന്ന് പറയുക.",
+      "hi": "मैं तभी करती हूँ जब आप कहें। “लाइट बंद करो” कहिए।"
+    },
+    "negated": {
+      "en": "Okay — I won't change anything.",
+      "ml": "ശരി — ഞാൻ ഒന്നും മാറ്റില്ല.",
+      "hi": "ठीक है — मैं कुछ नहीं बदलूँगी।"
+    },
+    "ambiguous": {
+      "en": "Would you like the lights on or off?",
+      "ml": "വിളക്കുകൾ ഓണാക്കണോ ഓഫാക്കണോ?",
+      "hi": "लाइटें चालू करनी हैं या बंद?"
+    },
+    "ambiguous_generic": {
+      "en": "Please say one clear command, for one device.",
+      "ml": "ഒരു ഉപകരണത്തിനായി ഒരു വ്യക്തമായ കമാൻഡ് പറയുക.",
+      "hi": "कृपया एक उपकरण के लिए एक स्पष्ट कमांड कहें।"
+    },
+    "clarify_device": {
+      "en": "Which device? You can say the lights, the pump, or ask about the soil, water or bins.",
+      "ml": "ഏത് ഉപകരണം? വിളക്കുകൾ, പമ്പ്, അല്ലെങ്കിൽ മണ്ണ്, വെള്ളം, ബിൻ എന്നിവയെക്കുറിച്ച് ചോദിക്കാം.",
+      "hi": "कौन सा उपकरण? लाइट, पंप, या मिट्टी, पानी, बिन के बारे में पूछ सकते हैं।"
+    },
+    "disconnected": {
+      "en": "I can't reach the village controller. Please check its connection.",
+      "ml": "വില്ലേജ് കൺട്രോളറുമായി ബന്ധപ്പെടാൻ കഴിയുന്നില്ല. അതിന്റെ കണക്ഷൻ പരിശോധിക്കുക.",
+      "hi": "विलेज कंट्रोलर से संपर्क नहीं हो रहा। कृपया उसका कनेक्शन जाँचें।"
+    },
+    "unconfirmed": {
+      "en": "The controller did not confirm the action. Please check the board and try again.",
+      "ml": "കൺട്രോളർ സ്ഥിരീകരിച്ചില്ല. ബോർഡ് പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "hi": "कंट्रोलर ने पुष्टि नहीं की। बोर्ड जाँचकर फिर कोशिश करें।"
+    }
+  },
+  "devices": {
+    "lights": {
+      "en": [
+        "lights",
+        "light",
+        "streetlights",
+        "street lights",
+        "streetlight",
+        "street light",
+        "lamps",
+        "lamp",
+        "bulbs",
+        "bulb",
+        "leds",
+        "led"
+      ],
+      "ml": [
+        "വിളക്കുകൾ",
+        "വിളക്ക്",
+        "ലൈറ്റ്",
+        "ലൈറ്റുകൾ",
+        "തെരുവ് വിളക്കുകൾ",
+        "തെരുവ് വിളക്ക്",
+        "vilakkukal",
+        "vilakku",
+        "light",
+        "lights"
+      ],
+      "hi": [
+        "लाइट",
+        "लाइटें",
+        "बत्ती",
+        "बत्तियाँ",
+        "स्ट्रीट लाइट",
+        "दीपक",
+        "light",
+        "lights",
+        "batti"
+      ]
+    },
+    "pump": {
+      "en": [
+        "pump",
+        "water pump",
+        "motor"
+      ],
+      "ml": [
+        "പമ്പ്",
+        "മോട്ടോർ",
+        "pump"
+      ],
+      "hi": [
+        "पंप",
+        "मोटर",
+        "pump"
+      ]
+    },
+    "soil": {
+      "en": [
+        "soil",
+        "moisture",
+        "ground"
+      ],
+      "ml": [
+        "മണ്ണ്",
+        "മണ്ണിലെ ഈർപ്പം",
+        "mannu",
+        "mann"
+      ],
+      "hi": [
+        "मिट्टी",
+        "नमी",
+        "mitti"
+      ]
+    },
+    "water": {
+      "en": [
+        "water",
+        "tank",
+        "reservoir",
+        "rainwater",
+        "water level",
+        "water availability"
+      ],
+      "ml": [
+        "വെള്ളം",
+        "ടാങ്ക്",
+        "ജലം",
+        "റിസർവോയർ",
+        "vellam",
+        "tank"
+      ],
+      "hi": [
+        "पानी",
+        "टंकी",
+        "जलाशय",
+        "pani",
+        "tank"
+      ]
+    },
+    "bins": {
+      "en": [
+        "bin",
+        "bins",
+        "waste bin",
+        "dustbin",
+        "dust bin",
+        "garbage bin"
+      ],
+      "ml": [
+        "ബിൻ",
+        "ബിന്നുകൾ",
+        "bin",
+        "bins"
+      ],
+      "hi": [
+        "बिन",
+        "डिब्बा",
+        "कूड़ेदान",
+        "bin",
+        "bins"
+      ]
+    },
+    "village": {
+      "en": [
+        "village",
+        "everything",
+        "system",
+        "overall"
+      ],
+      "ml": [
+        "ഗ്രാമം",
+        "gramam",
+        "village"
+      ],
+      "hi": [
+        "गाँव",
+        "गांव",
+        "gaon",
+        "village"
+      ]
+    }
+  },
+  "states": {
+    "on": {
+      "en": [
+        "on",
+        "enable",
+        "enabled",
+        "start",
+        "started",
+        "run",
+        "running",
+        "activate"
+      ],
+      "ml": [
+        "കത്തിക്കുക",
+        "കത്തിക്കൂ",
+        "ഓൺ",
+        "ഓൺ ചെയ്യുക",
+        "പ്രവർത്തിപ്പിക്കുക",
+        "on",
+        "kathikku"
+      ],
+      "hi": [
+        "चालू",
+        "जलाओ",
+        "ऑन",
+        "चालू करो",
+        "चालू करें",
+        "on",
+        "chalu",
+        "jalo"
+      ]
+    },
+    "off": {
+      "en": [
+        "off",
+        "disable",
+        "disabled",
+        "stop",
+        "stopped",
+        "shut",
+        "halt",
+        "deactivate"
+      ],
+      "ml": [
+        "അണയ്ക്കുക",
+        "അണയ്ക്കൂ",
+        "ഓഫ്",
+        "ഓഫ് ചെയ്യുക",
+        "നിർത്തുക",
+        "നിർത്തൂ",
+        "off",
+        "anaykku",
+        "nirthu"
+      ],
+      "hi": [
+        "बंद",
+        "बुझाओ",
+        "ऑफ",
+        "बंद करो",
+        "बंद करें",
+        "off",
+        "band",
+        "bujhao"
+      ]
+    },
+    "auto": {
+      "en": [
+        "auto",
+        "automatic",
+        "automatic mode",
+        "auto mode",
+        "sensor mode"
+      ],
+      "ml": [
+        "ഓട്ടോ",
+        "ഓട്ടോമാറ്റിക്",
+        "സ്വയം",
+        "auto",
+        "automatic"
+      ],
+      "hi": [
+        "ऑटो",
+        "ऑटोमैटिक",
+        "स्वचालित",
+        "auto",
+        "automatic"
+      ]
+    }
+  },
+  "device_commands": {
+    "lights": {
+      "on": "LIGHTS_ON",
+      "off": "LIGHTS_OFF",
+      "auto": "LIGHTS_AUTO",
+      "status": "LIGHTS_STATUS"
+    },
+    "pump": {
+      "on": "IRRIGATION_START",
+      "off": "IRRIGATION_STOP",
+      "status": "PUMP_STATUS"
+    },
+    "soil": {
+      "status": "SOIL_STATUS"
+    },
+    "water": {
+      "status": "WATER_STATUS"
+    },
+    "bins": {
+      "status": "BIN_STATUS"
+    },
+    "village": {
+      "status": "VILLAGE_STATUS"
+    }
+  },
+  "watering": {
+    "en": {
+      "cue": [
+        "water the plants",
+        "water plants",
+        "watering",
+        "irrigation",
+        "irrigate",
+        "drip"
+      ],
+      "start": [
+        "start",
+        "begin",
+        "water",
+        "irrigate",
+        "give",
+        "run"
+      ],
+      "stop": [
+        "stop",
+        "end",
+        "halt",
+        "cut"
+      ]
+    },
+    "ml": {
+      "cue": [
+        "നനയ്ക്കുക",
+        "നനയ്ക്കൽ",
+        "വെള്ളം ഒഴിക്കുക",
+        "ജലസേചനം",
+        "പമ്പ്"
+      ],
+      "start": [
+        "തുടങ്ങുക",
+        "ഒഴിക്കുക",
+        "നനയ്ക്കുക",
+        "ഓൺ"
+      ],
+      "stop": [
+        "നിർത്തുക",
+        "നിർത്തൂ",
+        "ഓഫ്"
+      ]
+    },
+    "hi": {
+      "cue": [
+        "पानी देना",
+        "सिंचाई",
+        "पानी दो",
+        "पौधों को पानी",
+        "पंप"
+      ],
+      "start": [
+        "शुरू",
+        "चालू",
+        "दो",
+        "चलाओ",
+        "देना"
+      ],
+      "stop": [
+        "बंद",
+        "रोको",
+        "निर्त"
+      ]
+    }
+  },
+  "grammar": {
+    "en": {
+      "polite": [
+        "please",
+        "kindly",
+        "for me"
+      ],
+      "request_modals": [
+        "can you",
+        "could you",
+        "would you",
+        "will you",
+        "please",
+        "kindly",
+        "i want you to",
+        "i would like you to",
+        "i need you to",
+        "i want",
+        "i would like"
+      ],
+      "question_starts": [
+        "are",
+        "is",
+        "was",
+        "were",
+        "do",
+        "does",
+        "did",
+        "how",
+        "what",
+        "which",
+        "where",
+        "when",
+        "why",
+        "who"
+      ],
+      "hypothetical": [
+        "what happens if",
+        "what will happen if",
+        "what would happen if",
+        "what if",
+        "if i",
+        "should i",
+        "is it safe",
+        "can i",
+        "could i",
+        "may i",
+        "how do i",
+        "would it",
+        "will it"
+      ],
+      "corrections": [
+        "actually",
+        "i mean",
+        "rather",
+        "instead",
+        "on second thought",
+        "sorry"
+      ],
+      "negations": [
+        "do not",
+        "don't",
+        "dont",
+        "never",
+        "not",
+        "shouldn't",
+        "should not",
+        "must not",
+        "mustn't",
+        "cannot",
+        "can not"
+      ],
+      "pronouns": [
+        "it",
+        "that",
+        "this",
+        "them",
+        "those",
+        "same"
+      ],
+      "copulas": [
+        "is",
+        "are",
+        "was",
+        "were"
+      ],
+      "verbs": [
+        "turn",
+        "switch",
+        "put",
+        "power",
+        "shut",
+        "cut",
+        "toggle",
+        "set",
+        "keep",
+        "make",
+        "start",
+        "begin",
+        "stop",
+        "end",
+        "halt",
+        "water",
+        "irrigate",
+        "enable",
+        "disable",
+        "change",
+        "give",
+        "run"
+      ],
+      "status_words": [
+        "status",
+        "state",
+        "level",
+        "condition",
+        "reading",
+        "doing",
+        "availability"
+      ],
+      "fillers": [
+        "the",
+        "a",
+        "an",
+        "my",
+        "our",
+        "all",
+        "now",
+        "then",
+        "just",
+        "here",
+        "there",
+        "some",
+        "of",
+        "at",
+        "to",
+        "for",
+        "me",
+        "i",
+        "you",
+        "want",
+        "would",
+        "like",
+        "need",
+        "and",
+        "please",
+        "kindly"
+      ]
+    },
+    "ml": {
+      "polite": [
+        "ദയവായി",
+        "please"
+      ],
+      "request_modals": [
+        "ദയവായി",
+        "please",
+        "ചെയ്യാമോ",
+        "തരാമോ"
+      ],
+      "question_starts": [
+        "എന്ത്",
+        "എന്താണ്",
+        "എങ്ങനെ",
+        "എവിടെ",
+        "ആണോ",
+        "ഉണ്ടോ",
+        "എപ്പോൾ",
+        "ആര്"
+      ],
+      "hypothetical": [
+        "ചെയ്താൽ എന്ത് സംഭവിക്കും",
+        "എന്ത് സംഭവിക്കും",
+        "ഞാൻ ചെയ്യട്ടെ"
+      ],
+      "corrections": [
+        "ക്ഷമിക്കണം",
+        "അതല്ല",
+        "തിരുത്തുക"
+      ],
+      "negations": [
+        "വേണ്ട",
+        "അരുത്",
+        "ഇല്ല",
+        "ചെയ്യരുത്",
+        "അണയ്ക്കരുത്",
+        "നിർത്തരുത്",
+        "ഓഫ് ചെയ്യരുത്"
+      ],
+      "pronouns": [
+        "അത്",
+        "ഇത്",
+        "അവ"
+      ],
+      "copulas": [
+        "ആണ്",
+        "ഉണ്ട്",
+        "ആയിരുന്നു"
+      ],
+      "verbs": [
+        "ചെയ്യുക",
+        "ചെയ്യൂ",
+        "തുടങ്ങുക",
+        "നിർത്തുക",
+        "നിർത്തൂ",
+        "ഓൺ",
+        "ഓഫ്",
+        "അണയ്ക്കുക",
+        "കത്തിക്കുക",
+        "ഒഴിക്കുക",
+        "നനയ്ക്കുക",
+        "cheyyuka",
+        "cheyyoo",
+        "thudanguka",
+        "nirthuka"
+      ],
+      "status_words": [
+        "അവസ്ഥ",
+        "സ്റ്റാറ്റസ്",
+        "നില"
+      ],
+      "fillers": [
+        "ആ",
+        "ഒരു",
+        "എന്റെ",
+        "ഞങ്ങളുടെ",
+        "ഇപ്പോൾ",
+        "ദയവായി"
+      ],
+      "question_suffixes": [
+        "ണ്ടോ",
+        "ാണോ",
+        "വേണോ",
+        "ചെയ്യാമോ",
+        "തരാമോ"
+      ]
+    },
+    "hi": {
+      "polite": [
+        "कृपया",
+        "please"
+      ],
+      "request_modals": [
+        "कृपया",
+        "please",
+        "करो",
+        "करें",
+        "कर दो"
+      ],
+      "question_starts": [
+        "क्या",
+        "कैसे",
+        "कहाँ",
+        "कब",
+        "क्यों",
+        "कौन"
+      ],
+      "hypothetical": [
+        "क्या होगा अगर",
+        "अगर मैं",
+        "क्या मुझे",
+        "क्या करना चाहिए",
+        "क्या मैं",
+        "क्या हम"
+      ],
+      "corrections": [
+        "माफ़ करें",
+        "असल में",
+        "मतलब"
+      ],
+      "negations": [
+        "मत",
+        "नहीं",
+        "कभी नहीं",
+        "न करो",
+        "बंद मत",
+        "चालू मत"
+      ],
+      "pronouns": [
+        "इसे",
+        "उसे",
+        "वह",
+        "यह"
+      ],
+      "copulas": [
+        "है",
+        "हैं",
+        "था",
+        "थे"
+      ],
+      "verbs": [
+        "करो",
+        "करें",
+        "कर",
+        "चालू",
+        "बंद",
+        "जलाओ",
+        "बुझाओ",
+        "शुरू",
+        "रोको",
+        "दो",
+        "चलाओ",
+        "karo",
+        "karein",
+        "kar",
+        "chalao",
+        "band",
+        "chalu"
+      ],
+      "status_words": [
+        "स्थिति",
+        "स्टेटस",
+        "स्तर",
+        "हालत"
+      ],
+      "fillers": [
+        "का",
+        "की",
+        "के",
+        "को",
+        "में",
+        "अभी",
+        "कृपया",
+        "और"
+      ],
+      "question_suffixes": [
+        "क्या"
+      ]
+    }
+  }
 }

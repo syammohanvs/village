@@ -18,6 +18,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       voiceIntents: vi.fn(),
       settings: vi.fn(),
       voiceTranscribe: vi.fn(),
+      voiceInterpret: vi.fn(),
       events: vi.fn(),
     },
   };
@@ -107,6 +108,8 @@ describe('Voice panel', () => {
   });
 
   it('sends exactly one LIGHTS_OFF command for a matched actuation intent', async () => {
+    // The lamps must be on, or the panel correctly answers "already off".
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
     vi.mocked(api.voiceTranscribe).mockResolvedValue({
       status: 'ok',
       intent: 'LIGHTS_OFF',
@@ -232,6 +235,7 @@ describe('voice replies', () => {
   });
 
   it('speaks the done text once the controller confirms a command', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
     vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
     vi.mocked(api.voiceTranscribe).mockResolvedValue({
       status: 'ok',
@@ -256,5 +260,216 @@ describe('voice replies', () => {
         expect.anything(),
       ),
     );
+    // The screen states the confirmed outcome too, not just the intention.
+    expect(await screen.findByText('The streetlights are off.')).toBeInTheDocument();
+  });
+});
+
+describe('typed requests use the same parser', () => {
+  it('sends one command for typed words, and shows the transcript', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'please switch the lights off',
+      pending_text: 'Switching the lights off.',
+      done_text: 'The lights are off.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'please switch the lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    await waitFor(() =>
+      expect(api.voiceInterpret).toHaveBeenCalledWith('please switch the lights off', 'en'),
+    );
+    await waitFor(() =>
+      expect(api.sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'LIGHTS_OFF', source: 'voice' }),
+      ),
+    );
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText(/please switch the lights off/).length).toBeGreaterThan(0);
+  });
+
+  it('ignores the same typed request arriving twice within one gesture', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'switch off the lights',
+      pending_text: 'Switching the lights off.',
+      done_text: 'The lights are off.',
+    });
+
+    const { user } = await openPanel();
+    const box = screen.getByTestId('voice-text');
+    await user.type(box, 'switch off the lights');
+    await user.click(screen.getByTestId('voice-send'));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalledTimes(1));
+
+    // A duplicated event/double submit of the same words must not become a
+    // second physical command.
+    await user.type(screen.getByTestId('voice-text'), 'switch off the lights');
+    await user.click(screen.getByTestId('voice-send'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a status question without sending anything', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: false }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'status',
+      intent: 'LIGHTS_STATUS',
+      command: null,
+      actuation: false,
+      transcript: 'are the lights off',
+      response_text: 'The Streets card shows whether the lamps are on.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'are the lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(await screen.findByText(/street lights are off/i)).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('says a command already holds instead of sending it again', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: false }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'turn the lights off',
+      already_text: 'The lights are already off.',
+      pending_text: 'Switching the lights off.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'turn the lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(await screen.findByText('The lights are already off.')).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('refuses to act when the controller is unreachable', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      // Lamps on, so the request is not short-circuited by "already off".
+      makeState({ connected: false, stale: false, ageMs: 15000, lightsCommanded: true }),
+    );
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'lights off',
+      pending_text: 'Switching the lights off.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(
+      await screen.findByText(/I can't reach the village controller/i),
+    ).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('never announces success when the controller does not confirm', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'lights off',
+      pending_text: 'Switching the lights off.',
+      done_text: 'The lights are off.',
+    });
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: false,
+      mode: 'live',
+      physical: true,
+      ack: null,
+      error: null,
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'lights off');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(await screen.findByText(/did not confirm/i)).toBeInTheDocument();
+    expect(screen.queryByText('The lights are off.')).not.toBeInTheDocument();
+  });
+
+  it('shows the controller’s own reason when it rejects watering', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: false }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'IRRIGATION_START',
+      command: 'IRRIGATION_REQUEST',
+      actuation: true,
+      transcript: 'water the plants',
+      pending_text: 'Sending the irrigation request to the controller.',
+      done_text: 'The controller accepted the irrigation request.',
+    });
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: true,
+      mode: 'live',
+      physical: true,
+      ack: {
+        result: 'REJECTED',
+        reason_code: 'IRRIGATION_BLOCKED_LOW_WATER',
+        reason: 'Irrigation blocked: reservoir water is low.',
+      },
+      error: null,
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'water the plants');
+    await user.click(screen.getByTestId('voice-send'));
+
+    // The reason appears in the message and the outcome line; either is fine.
+    expect(
+      (await screen.findAllByText(/Irrigation blocked: reservoir water is low/i)).length,
+    ).toBeGreaterThan(0);
+    expect(api.sendCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not act on a statement or a hypothetical question', async () => {
+    const { user } = await openPanel();
+    for (const [text, message] of [
+      ['the lights are off', "Understood — I haven't changed anything."],
+      ['what happens if I switch the lights off', 'I only act when you ask me to.'],
+    ]) {
+      vi.mocked(api.voiceInterpret).mockResolvedValue({
+        status: 'statement',
+        kind: text.startsWith('what') ? 'hypothetical' : 'statement',
+        intent: text.startsWith('what') ? 'HYPOTHETICAL' : 'STATEMENT',
+        command: null,
+        actuation: false,
+        transcript: text,
+        message,
+      });
+      await user.type(screen.getByTestId('voice-text'), text);
+      await user.click(screen.getByTestId('voice-send'));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+    }
+    expect(api.sendCommand).not.toHaveBeenCalled();
   });
 });

@@ -312,11 +312,27 @@ export interface VoiceIntentsResponse {
   unknown?: string | Record<string, string>;
   no_speech?: string | Record<string, string>;
   pending?: string | Record<string, string>;
+  /** Fixed replies (disconnected, unconfirmed) in each supported language. */
+  messages?: Record<string, Record<string, string>>;
 }
+
+export type VoiceKind =
+  | 'command'
+  | 'status'
+  | 'statement'
+  | 'hypothetical'
+  | 'negated'
+  | 'ambiguous'
+  | 'unsupported'
+  | 'no_speech';
 
 export interface VoiceTranscribeResponse {
   status?: string;
+  /** What the parser decided the sentence is; only `command` actuates. */
+  kind?: VoiceKind;
   intent?: string | null;
+  device?: string | null;
+  action?: string | null;
   command?: string | null;
   actuation?: boolean;
   text?: string;
@@ -326,9 +342,14 @@ export interface VoiceTranscribeResponse {
   response_text?: string;
   pending_text?: string;
   done_text?: string;
+  /** What to say when the controller already reports the requested state. */
+  already_text?: string;
+  clarify?: string | null;
+  /** Deterministic match flag (0 or 1); never shown as a percentage. */
   confidence?: number;
   language?: string;
   matched_phrase?: string;
+  matched_rule?: string | null;
   available?: boolean;
 }
 

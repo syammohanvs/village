@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { CommandOutcome } from '../lib/commands';
 import { useCommands } from '../lib/commands';
 import { useDemo } from '../lib/demo';
@@ -7,10 +7,10 @@ import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
-import { describeVillage } from '../lib/lia';
+import { LIVE_COPY, describeVillage } from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
-import type { VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
+import type { DeviceStatus, VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
 import { IconClose, IconMic, IconPlug, IconSpeaker, IconSparkle } from './Icons';
 import { LanguagePicker } from './LanguagePicker';
 import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
@@ -23,16 +23,58 @@ const ALLOWED_COMMANDS = new Set([
   'IRRIGATION_STOP',
 ]);
 
-const INTENT_COMMAND: Record<string, string> = {
-  LIGHTS_ON: 'LIGHTS_ON',
-  LIGHTS_OFF: 'LIGHTS_OFF',
-  LIGHTS_AUTO: 'LIGHTS_AUTO',
-  IRRIGATION_START: 'IRRIGATION_REQUEST',
-  IRRIGATION_STOP: 'IRRIGATION_STOP',
-};
 
-const BLOCKED_INTENTS = new Set(['UNKNOWN', 'NEGATED', 'AMBIGUOUS', 'NO_SPEECH']);
-const BLOCKED_STATUS = new Set(['unknown', 'negated', 'ambiguous', 'no_speech', 'no-speech']);
+const NO_ACTION_INTENTS = new Set(['UNKNOWN', 'NEGATED', 'AMBIGUOUS', 'NO_SPEECH', 'STATEMENT', 'HYPOTHETICAL']);
+const NO_ACTION_STATUS = new Set(['unknown', 'negated', 'ambiguous', 'no_speech', 'no-speech',
+  'statement', 'hypothetical']);
+
+/** Older payloads had no `kind`; derive it so both shapes behave the same. */
+function kindOf(response: VoiceTranscribeResponse): string {
+  if (response.kind) return response.kind;
+  const intent = (response.intent ?? '').toUpperCase();
+  const status = (response.status ?? '').toLowerCase();
+  if (intent === 'NEGATED' || status === 'negated') return 'negated';
+  if (intent === 'AMBIGUOUS' || status === 'ambiguous') return 'ambiguous';
+  if (intent === 'NO_SPEECH' || NO_ACTION_STATUS.has(status)) return 'no_speech';
+  if (intent === 'STATEMENT' || status === 'statement') return 'statement';
+  if (intent === 'HYPOTHETICAL' || status === 'hypothetical') return 'hypothetical';
+  if (intent === 'UNKNOWN' || status === 'unknown') return 'unsupported';
+  if (NO_ACTION_INTENTS.has(intent) && !response.command) return 'status';
+  return response.command ? 'command' : 'status';
+}
+
+/** True when the controller already reports the state the command asks for. */
+function alreadyInState(command: string, status: DeviceStatus | null): boolean {
+  const lights = status?.actuators?.streetlights;
+  const irrigation = status?.irrigation;
+  switch (command) {
+    case 'LIGHTS_OFF':
+      return lights?.commanded === false;
+    case 'LIGHTS_ON':
+      return lights?.commanded === true;
+    case 'LIGHTS_AUTO':
+      return lights?.mode === 'auto';
+    case 'IRRIGATION_REQUEST':
+      return irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
+    case 'IRRIGATION_STOP':
+      return irrigation?.state === 'idle';
+    default:
+      return false;
+  }
+}
+
+/**
+ * One stable id per utterance.  A repeated event (a double press, a duplicated
+ * transcription callback, a double submit) therefore becomes the controller's
+ * DUPLICATE answer instead of a second physical command.
+ */
+function utteranceId(text: string, stamp: number): string {
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+  }
+  return `voice-${hash.toString(16)}-${Math.floor(stamp).toString(36)}`;
+}
 
 const MAX_SECONDS = 10;
 
@@ -91,6 +133,12 @@ export function VoicePanel() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(0);
   const speakingRef = useRef(false);
+  // A completed utterance is processed once: these guard the double press, a
+  // duplicated transcription event and a double submit of typed text.
+  const finishingRef = useRef(false);
+  const typedBusyRef = useRef(false);
+  const lastRunRef = useRef<{ key: string; at: number } | null>(null);
+  const [typed, setTyped] = useState('');
 
   const intents = useApi<VoiceIntentsResponse>(
     ['voice-intents', language],
@@ -201,63 +249,55 @@ export function VoicePanel() {
     }
   }
 
-  async function finish() {
-    clearTimer();
-    const recorder = recorderRef.current;
-    recorderRef.current = null;
-    if (!recorder) return;
-    setState('processing');
-    let blob: Blob;
-    try {
-      blob = await recorder.stop();
-    } catch (cause) {
-      setState('idle');
-      setMicError(errorMessage(cause));
+  /**
+   * The one path from an understood sentence to a reply.  Speech (after
+   * Whisper) and typed text both arrive here, so they cannot behave
+   * differently.  Only `kind === 'command'` can reach the controller.
+   */
+  async function applyUtterance(
+    response: VoiceTranscribeResponse,
+    transcript: string,
+    requestId: string,
+  ) {
+    const kind = kindOf(response);
+    const intent = response.intent ?? null;
+    const key = `${language}|${transcript.trim().toLowerCase()}`;
+    const now = Date.now();
+    if (lastRunRef.current && lastRunRef.current.key === key && now - lastRunRef.current.at < 2000) {
+      // The same utterance arrived twice inside one gesture.  The first one is
+      // already being handled; this is not a second command.
       return;
     }
-    if (!blob || blob.size === 0) {
+    lastRunRef.current = { key, at: now };
+
+    setResult(response);
+    setTranscript(transcript);
+
+    if (kind === 'no_speech') {
       setState('rejected');
-      setMessage('No speech was detected. Press Start Speaking again and speak clearly.');
+      const reply = response.message ?? 'No speech was detected. Press Start Speaking again and speak clearly.';
+      setMessage(reply);
+      void speak(reply, intent);
       return;
     }
 
-    try {
-      const response = await api.voiceTranscribe(blob, language);
-      setResult(response);
-      const text = response.text ?? response.transcript ?? '';
-      setTranscript(text);
-      const status = (response.status ?? '').toLowerCase();
-      const intent = response.intent ?? null;
-      const blocked =
-        BLOCKED_STATUS.has(status) ||
-        (intent ? BLOCKED_INTENTS.has(intent.toUpperCase()) : false);
-
-      if (blocked) {
-        setState('rejected');
-        const reply =
-          response.message ??
-          'Please use one of the commands shown, or ask the presenter for help. No command was sent.';
-        setMessage(reply);
-        void speak(reply, intent);
-        return;
-      }
-
-      const command = response.command ?? (intent ? INTENT_COMMAND[intent] ?? null : null);
-      const canAct = Boolean(command && ALLOWED_COMMANDS.has(command) && response.actuation !== false);
-
-      if (!canAct) {
-        setState('success');
-        // The catalogue carries the answer in `response_text`; `message` is
-        // only set for a refusal.  Reading `message` alone threw every
-        // answer-only reply away, which is why "village status" looked inert.
-        let reply =
-          response.response_text ??
-          response.message ??
-          'That one does not move anything. It only answers.';
-        // A status question is better answered from the frame on screen than
-        // from a canned sentence: this reads the current soil, water, light
-        // and pump state aloud in the selected language.
-        if (intent === 'VILLAGE_STATUS' && villageStatus) {
+    if (kind !== 'command') {
+      let reply =
+        response.message ??
+        response.response_text ??
+        'That one does not move anything. It only answers.';
+      // A status question is answered from the frame on screen, in the selected
+      // language, rather than from a canned sentence.
+      if (kind === 'status' && villageStatus) {
+        const copy = LIVE_COPY[language as 'en' | 'ml' | 'hi'] ?? LIVE_COPY.en;
+        if (intent === 'LIGHTS_STATUS') {
+          const lamps = villageStatus.actuators?.streetlights;
+          reply = lamps?.commanded ? copy.lightsOn : copy.lightsOff;
+        } else if (intent === 'PUMP_STATUS') {
+          const irrigation = villageStatus.irrigation;
+          const running = irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
+          reply = running ? copy.pumpOn : copy.pumpOff;
+        } else if (intent === 'VILLAGE_STATUS') {
           const live = describeVillage(
             { status: villageStatus, connected, stale, ageMs, demo: villageDemo },
             language as 'en' | 'ml' | 'hi',
@@ -266,18 +306,51 @@ export function VoicePanel() {
             .join(' ');
           if (live) reply = live;
         }
-        setMessage(reply);
-        void speak(reply, intent);
-        return;
       }
+      setState(kind === 'status' || kind === 'statement' || kind === 'hypothetical' ? 'success' : 'rejected');
+      setMessage(reply);
+      void speak(reply, intent);
+      return;
+    }
 
+    const command = response.command ?? null;
+    if (!command || !ALLOWED_COMMANDS.has(command)) {
+      setState('rejected');
+      const reply = response.message ?? 'That command is not supported here. Nothing was sent.';
+      setMessage(reply);
+      void speak(reply, intent);
+      return;
+    }
+
+    const already = response.already_text
+      || (command === 'LIGHTS_OFF' ? 'The lights are already off.'
+        : command === 'LIGHTS_ON' ? 'The lights are already on.'
+        : '');
+    if (alreadyInState(command, villageStatus) && already) {
       setState('success');
-      setMessage(
-        response.pending_text ??
-          response.message ??
-          'Command understood. Sending it to the village controller.',
-      );
-      const commandOutcome = await send(command as string, {}, 'voice');
+      setMessage(already);
+      void speak(already, intent);
+      return;
+    }
+
+    if (!connected) {
+      const reply =
+        intents.data?.messages?.disconnected?.[language]
+        ?? "I can't reach the village controller. Please check its connection.";
+      setState('disconnected');
+      setMessage(reply);
+      void speak(reply, intent);
+      return;
+    }
+
+    setState('success');
+    setMessage(
+      response.pending_text ??
+        response.message ??
+        'Command understood. Sending it to the village controller.',
+    );
+    try {
+      const commandOutcome = await send(command, {}, 'voice', requestId);
       setOutcome(commandOutcome);
       if (commandOutcome.status === 'rejected') {
         setState('rejected');
@@ -288,12 +361,22 @@ export function VoicePanel() {
       } else if (commandOutcome.status === 'unconfirmed') {
         setState('disconnected');
         setMessage(
-          commandOutcome.reason ??
-            'The controller did not acknowledge the command. Do not assume anything happened.',
+          intents.data?.messages?.unconfirmed?.[language]
+            ?? commandOutcome.reason
+            ?? 'The controller did not confirm the action. Do not assume anything happened.',
         );
       } else if (commandOutcome.status === 'duplicate') {
         setMessage(
           commandOutcome.reason ?? 'This command was already processed. The original decision stands.',
+        );
+      } else if (commandOutcome.status === 'confirmed') {
+        // The pending sentence is true only while it is being sent; once the
+        // controller acknowledges, the panel must state the new state, not the
+        // intention.
+        setMessage(
+          response.done_text ||
+            response.response_text ||
+            'The controller confirmed the command.',
         );
       }
       const done =
@@ -310,9 +393,80 @@ export function VoicePanel() {
       setState(unreachable ? 'disconnected' : 'rejected');
       setMessage(
         unreachable
+          ? (intents.data?.messages?.disconnected?.[language]
+             ?? "I can't reach the village controller. Please check its connection.")
+          : errorMessage(cause),
+      );
+    }
+  }
+
+  async function finish() {
+    clearTimer();
+    if (finishingRef.current) return;
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (!recorder) return;
+    finishingRef.current = true;
+    setState('processing');
+    let blob: Blob;
+    try {
+      blob = await recorder.stop();
+    } catch (cause) {
+      setState('idle');
+      setMicError(errorMessage(cause));
+      finishingRef.current = false;
+      return;
+    }
+    if (!blob || blob.size === 0) {
+      setState('rejected');
+      setMessage('No speech was detected. Press Start Speaking again and speak clearly.');
+      finishingRef.current = false;
+      return;
+    }
+
+    try {
+      const response = await api.voiceTranscribe(blob, language);
+      const text = response.text ?? response.transcript ?? '';
+      await applyUtterance(response, text, utteranceId(text, startedRef.current));
+    } catch (cause) {
+      const apiError = cause instanceof ApiError ? cause : null;
+      const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
+      setState(unreachable ? 'disconnected' : 'rejected');
+      setMessage(
+        unreachable
           ? 'The village service did not answer. No command was sent. Is the laptop backend running?'
           : errorMessage(cause),
       );
+    } finally {
+      finishingRef.current = false;
+    }
+  }
+
+  async function submitTyped(event?: FormEvent) {
+    event?.preventDefault();
+    const text = typed.trim();
+    if (!text || typedBusyRef.current) return;
+    typedBusyRef.current = true;
+    setMicError('');
+    setTtsNote('');
+    setState('processing');
+    try {
+      // Same parser as the microphone: Whisper only changes how the words
+      // arrive, never what they mean.
+      const response = await api.voiceInterpret(text, language);
+      setTyped('');
+      await applyUtterance(response, response.transcript ?? text, utteranceId(text, Date.now()));
+    } catch (cause) {
+      const apiError = cause instanceof ApiError ? cause : null;
+      const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
+      setState(unreachable ? 'disconnected' : 'rejected');
+      setMessage(
+        unreachable
+          ? 'The village service did not answer. No command was sent. Is the laptop backend running?'
+          : errorMessage(cause),
+      );
+    } finally {
+      typedBusyRef.current = false;
     }
   }
 
@@ -368,7 +522,8 @@ export function VoicePanel() {
           <div>
             <h2 className="voice-title">Talk to the village</h2>
             <p className="voice-subtitle">
-              Say one short command in {languageLabel}. Speech is recognised on this laptop.
+              Say one short command in {languageLabel}, or type it below. Speech is recognised on
+              this laptop.
             </p>
           </div>
         </div>
@@ -480,6 +635,37 @@ export function VoicePanel() {
         </div>
       </div>
 
+      <form className="voice-type" onSubmit={(event) => void submitTyped(event)}>
+        <label className="eyebrow" htmlFor="voice-text">
+          Or type it
+        </label>
+        <div className="voice-type-row">
+          <input
+            id="voice-text"
+            className="input"
+            data-testid="voice-text"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder="e.g. please switch the lights off"
+            disabled={state === 'processing' || speaking}
+            autoComplete="off"
+            enterKeyHint="send"
+          />
+          <button
+            className="btn btn--primary"
+            type="submit"
+            data-testid="voice-send"
+            disabled={!typed.trim() || state === 'processing' || speaking}
+          >
+            Send
+          </button>
+        </div>
+        <p className="hint">
+          Typed words use the same rules as speech. A question, a refusal or an unclear
+          request never sends anything.
+        </p>
+      </form>
+
       {transcript && (
         <div className="voice-transcript">
           <p className="eyebrow">You said</p>
@@ -493,7 +679,7 @@ export function VoicePanel() {
             <span className="eyebrow">Intent</span>
             <span className="chip chip--neutral">
               {result.intent ?? 'not matched'}
-              {typeof result.confidence === 'number' && ` · ${Math.round(result.confidence * 100)}%`}
+              {result.kind ? ` · ${result.kind}` : ''}
             </span>
             {result.command && <span className="chip chip--gold">command: {result.command}</span>}
           </div>

@@ -37,6 +37,7 @@ from .protocol import (
     ScenarioRequest,
     SpeakRequest,
     SoilCalibrationRequest,
+    VoiceInterpretRequest,
     WasteClassifyRequest,
 )
 from .simulator import SimulatorError
@@ -630,8 +631,13 @@ def create_app(
             "language": language,
             "languages": matcher.languages_meta(),
             "intents": matcher.help_list(language),
+            "help_order": matcher.data.get("help_order", []),
             "unknown_message": matcher.unknown_message(language),
             "no_speech_message": matcher.data["no_speech"].get(language, ""),
+            # The panel speaks these when the controller is unreachable or does
+            # not confirm; they live beside the rest of the wording so a
+            # language cannot be half-translated.
+            "messages": matcher.data.get("messages", {}),
         }
 
     @app.get("/api/v1/voice/readiness")
@@ -677,6 +683,31 @@ def create_app(
             media_type="audio/wav",
             headers={"Cache-Control": "private, max-age=86400"},
         )
+
+    @app.post("/api/v1/voice/interpret")
+    async def voice_interpret(
+        body: VoiceInterpretRequest,
+        matcher: IntentMatcher = Depends(get_matcher),
+        db: Database = Depends(get_db),
+    ):
+        """Parse typed text with the parser speech uses.
+
+        Kept separate from /translate so a keyboard user is not forced through
+        the microphone, and so both paths provably share one set of rules.
+        """
+        result = matcher.match(body.text, body.language)
+        await db.add_event(
+            "live",
+            "voice",
+            "Text command recognised" if result["reason"] == "matched" else "Text command rejected",
+            f"“{body.text}” → {result['intent']} · {result['reason']}",
+            "info" if result["reason"] == "matched" else "warning",
+            "voice",
+            {"intent": result["intent"], "reason": result["reason"],
+             "kind": result["kind"], "transcript": body.text, "language": body.language},
+        )
+        result["transcript"] = body.text
+        return result
 
     @app.post("/api/v1/voice/transcribe")
     async def voice_transcribe(

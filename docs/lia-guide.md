@@ -49,6 +49,62 @@ sits at the bottom of the sidebar (and in the top bar on a phone), so the guide
 is one press away on every page. The button uses the
 same theme and the same avatar.
 
+## Talking to the village in your own words
+
+The voice panel (the microphone in the sidebar) understands **natural phrasing**,
+not just exact commands. Say or type:
+
+| You say | What happens |
+| --- | --- |
+| “Lights off”, “Please switch the lights off”, “Can you turn off the streetlights?”, “Switch the lights off, please” | the lights-off command |
+| “Turn on the lights”, “Put the lamps on” | the lights-on command |
+| “Set the lights to automatic”, “Auto mode for the lights” | automatic mode |
+| “Start watering”, “Water the plants”, “Start the pump” | the same irrigation request the button sends |
+| “Stop watering”, “Turn off the pump” | the stop command |
+| “Are the lights off?”, “Is the pump running?”, “Are the bins full?” | an answer from the current readings — **no action** |
+| “The lights are off”, “The pump is running” | an acknowledgement — **no action** |
+| “What happens if I switch off the lights?”, “Can I turn on the pump?” | guidance — **no action** |
+| “Don’t switch off the lights”, “Do not water the plants” | nothing is changed |
+| “Turn the lights on… no, off”, “Lights on and lights off” | asks which one, sends nothing |
+| “Turn it off”, “Do the same” | asks which device, sends nothing |
+| “Make me a sandwich”, “Open the gate” | says which devices it can control, sends nothing |
+
+Typed words go through **the same parser** as speech (the box under the
+microphone), so the microphone is never required to test a phrase.
+
+### Why some sentences do nothing
+
+The parser reads the *meaning* before it acts: a question, a statement, a
+conditional, a negation, a correction or a sentence with two devices is never
+turned into a command. It also requires **every content word** to be
+understood, so “turn off the lights and open the gate” sends nothing rather than
+half of it. There is no conversation memory: “it”, “that” and “do the same” ask
+you to name the device.
+
+A reply is only “done” after the controller acknowledges it. If the board is
+offline, or the acknowledgement does not arrive, the panel says so and does not
+claim success. If the controller already reports the requested state, it says
+“already off/on” instead of sending the command again.
+
+### Languages
+
+The same rules exist in English, Malayalam and Hindi, including the code-mixed
+phrases the catalogue already had (“light off”, “light band karo”, “pump on
+cheyyuka”). Whichever language is selected in the panel is the one Whisper is
+asked for and the one the reply is spoken in. This is not unrestricted
+conversation and it is not every language.
+
+### Where the rules live
+
+- `shared/intents.json` — the languages, device aliases, on/off/auto words,
+  politeness and question markers, the wording of every reply, and one list of
+  example phrases per intent (also what the help list shows).
+- `web/backend/app/intents.py` — the parser: sentence type first, then one
+  device and one state, else nothing.
+
+Adding a phrase to an existing intent is a one-line change in the JSON; adding a
+device means adding its aliases and a row in `device_commands`.
+
 ## Topics and steps
 
 Each topic is a small set of steps. Every step has a picture, one short
@@ -99,11 +155,18 @@ by Sara.
 ## Tests
 
 ```bash
-cd web/frontend
+cd web/backend
+python -m pytest -q tests/test_intents.py     # parsing, all three languages
+cd ../frontend
 npm run typecheck
-npm test          # includes lia.test.ts and LiaGuide.test.tsx
+npm test          # includes lia.test.ts, LiaGuide.test.tsx, VoicePanel.test.tsx
 npm run build
 ```
+
+The parser tests need no hardware: they feed sentences to the matcher and assert
+what it returns. The panel tests drive the typed box and the recorded path with
+the API mocked, including a duplicate submission, a disconnected board and an
+unconfirmed command. Only the microphone itself needs the real laptop.
 
 The component test drives the welcome, all six topics, the language switch,
 dismissal and reopening, read-aloud calls, live narration, uncalibrated probes

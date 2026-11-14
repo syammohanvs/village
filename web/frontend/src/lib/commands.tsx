@@ -43,6 +43,7 @@ export interface CommandsContextValue {
     type: string,
     parameters?: Record<string, unknown>,
     source?: 'browser' | 'voice' | 'system',
+    requestId?: string,
   ) => Promise<CommandOutcome>;
   clear: () => void;
 }
@@ -55,7 +56,7 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
   const counter = useRef(0);
 
   const send = useCallback<CommandsContextValue['send']>(
-    async (type, parameters = {}, source = 'browser') => {
+    async (type, parameters = {}, source = 'browser', requestId) => {
       counter.current += 1;
       const id = `cmd-${counter.current}`;
       const entry: CommandLogEntry = {
@@ -76,7 +77,10 @@ export function CommandsProvider({ children }: { children: ReactNode }) {
       };
 
       try {
-        const response = await api.sendCommand({ type, parameters, source, mode });
+        // A caller that can identify the utterance (voice does) passes a
+        // stable id, so a repeated event becomes the device's DUPLICATE answer
+        // instead of a second physical command.
+        const response = await api.sendCommand({ type, parameters, source, mode, requestId });
         let status: CommandStatus;
         if (!response.confirmed) {
           status = 'unconfirmed';

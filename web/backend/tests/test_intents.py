@@ -12,9 +12,17 @@ def matcher() -> IntentMatcher:
     return IntentMatcher(AppSettings.load().intents_path)
 
 
-def test_english_commands_and_status(matcher: IntentMatcher) -> None:
+def kind(result: dict) -> str:
+    return result["kind"]
+
+
+# ---------------------------------------------------------------------------
+# The exact commands that already existed must keep working, unchanged.
+# ---------------------------------------------------------------------------
+def test_existing_exact_commands(matcher: IntentMatcher) -> None:
+    assert matcher.match("lights on", "en")["command"] == "LIGHTS_ON"
+    assert matcher.match("lights off", "en")["command"] == "LIGHTS_OFF"
     assert matcher.match("start irrigation", "en")["intent"] == "IRRIGATION_START"
-    assert matcher.match("please turn on the lights", "en")["intent"] == "LIGHTS_ON"
     assert matcher.match("stop the pump", "en")["intent"] == "IRRIGATION_STOP"
     assert matcher.match("village status", "en")["intent"] == "VILLAGE_STATUS"
     assert matcher.match("is the soil dry", "en")["intent"] == "SOIL_STATUS"
@@ -23,57 +31,245 @@ def test_english_commands_and_status(matcher: IntentMatcher) -> None:
     assert matcher.match("help", "en")["intent"] == "HELP"
 
 
-def test_negated_commands_are_refused(matcher: IntentMatcher) -> None:
+# ---------------------------------------------------------------------------
+# Natural language: the same act, said many ways.
+# ---------------------------------------------------------------------------
+def test_polite_and_natural_requests_are_the_same_action(matcher: IntentMatcher) -> None:
     for text in (
-        "do not start irrigation",
-        "don't turn off the lights",
-        "never stop irrigation",
-        "not water the plants",
+        "Lights off",
+        "Please switch the lights off",
+        "Can you turn off the streetlights?",
+        "Switch the lights off, please",
+        "I want the lights turned off",
+        "Could you please turn off the lights",
+        "Kindly switch off the lamps",
+        "Please turn off the lights now",
+        "turn the lights off",
+        "streetlights off",
     ):
         result = matcher.match(text, "en")
-        assert result["intent"] == "NEGATED"
-        assert result["command"] is None
-        assert result["actuation"] is False
-        assert "supported commands" in result["message"]
+        assert result["kind"] == "command", text
+        assert result["command"] == "LIGHTS_OFF", text
+        assert result["actuation"] is True, text
+
+    for text in (
+        "turn on the lights",
+        "please put the lights on",
+        "switch the lamps on",
+        "can you turn on the street lights?",
+        "I would like the lights turned on",
+    ):
+        assert matcher.match(text, "en")["command"] == "LIGHTS_ON", text
 
 
-def test_unsupported_and_ambiguous_requests_do_nothing(matcher: IntentMatcher) -> None:
-    result = matcher.match("make me a sandwich", "en")
-    assert result["intent"] == "UNKNOWN"
-    assert result["command"] is None
-    assert result["message"] == "Please use one of the supported commands or contact local support."
+def test_device_aliases_are_recognised(matcher: IntentMatcher) -> None:
+    for alias in ("light", "lights", "lamps", "lamp", "street lights", "streetlights", "bulbs"):
+        result = matcher.match(f"turn off the {alias}", "en")
+        assert result["command"] == "LIGHTS_OFF", alias
 
-    result = matcher.match("lights", "en")
-    assert result["intent"] == "UNKNOWN"
 
-    result = matcher.match("lights on and lights off", "en")
-    assert result["intent"] == "AMBIGUOUS"
-    assert result["command"] is None
+def test_automatic_mode(matcher: IntentMatcher) -> None:
+    for text in ("lights automatic", "set the lights to automatic", "auto mode for the lights"):
+        assert matcher.match(text, "en")["command"] == "LIGHTS_AUTO", text
+
+
+def test_watering_variations(matcher: IntentMatcher) -> None:
+    for text in ("start watering", "water the plants", "start the pump", "turn on the pump",
+                 "begin irrigation"):
+        assert matcher.match(text, "en")["command"] == "IRRIGATION_REQUEST", text
+    for text in ("stop watering", "stop the pump", "turn off the pump", "end irrigation"):
+        assert matcher.match(text, "en")["command"] == "IRRIGATION_STOP", text
+
+
+# ---------------------------------------------------------------------------
+# Meaning, not word removal.
+# ---------------------------------------------------------------------------
+def test_negated_requests_do_nothing(matcher: IntentMatcher) -> None:
+    for text in (
+        "Don't switch off the lights",
+        "do not turn off the lights",
+        "never stop irrigation",
+        "not water the plants",
+        "don't water the plants",
+        "please don't turn the lights off",
+    ):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "negated", text
+        assert result["command"] is None, text
+        assert result["actuation"] is False, text
+
+
+def test_status_questions_do_not_act(matcher: IntentMatcher) -> None:
+    for text, intent in (
+        ("Are the lights off?", "LIGHTS_STATUS"),
+        ("are the lights on?", "LIGHTS_STATUS"),
+        ("is the light on?", "LIGHTS_STATUS"),
+        ("what are the lights doing?", "LIGHTS_STATUS"),
+        ("Are the lights on or off?", "LIGHTS_STATUS"),
+        ("is the pump running?", "PUMP_STATUS"),
+        ("is watering on?", "PUMP_STATUS"),
+        ("what is the soil moisture?", "SOIL_STATUS"),
+        ("how much water is in the tank?", "WATER_STATUS"),
+        ("are the bins full?", "BIN_STATUS"),
+    ):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "status", text
+        assert result["intent"] == intent, text
+        assert result["command"] is None, text
+        assert result["actuation"] is False, text
+
+
+def test_statements_do_not_act(matcher: IntentMatcher) -> None:
+    for text in ("The lights are off", "the lights are on", "the pump is running",
+                 "the soil is dry"):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "statement", text
+        assert result["command"] is None, text
+
+
+def test_hypothetical_questions_do_not_act(matcher: IntentMatcher) -> None:
+    for text in (
+        "What happens if I switch off the lights?",
+        "what if I turn on the pump",
+        "should I water the plants",
+        "can I switch off the lights",
+        "how do I turn on the lights",
+        "what happens if the tank is empty",
+    ):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "hypothetical", text
+        assert result["command"] is None, text
+
+
+def test_conflicts_and_multiple_commands_are_refused(matcher: IntentMatcher) -> None:
+    for text in (
+        "Turn the lights on… no, off",
+        "lights on and lights off",
+        "turn off the lights and start watering",
+        "switch off the lights and turn on the fan",
+    ):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "ambiguous", text
+        assert result["command"] is None, text
+
+    correction = matcher.match("Turn the lights on… no, off", "en")
+    assert correction["clarify"] == "correction" or "on or off" in correction["message"]
+
+
+def test_an_unclear_device_asks_which_one(matcher: IntentMatcher) -> None:
+    for text in ("turn it off", "switch that on", "do the same"):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "ambiguous", text
+        assert "Which device" in result["message"], text
+        assert result["command"] is None, text
+
+    bare = matcher.match("lights", "en")
+    assert bare["kind"] == "ambiguous"
+    assert bare["command"] is None
+
+
+def test_unsupported_requests_do_nothing(matcher: IntentMatcher) -> None:
+    for text in ("make me a sandwich", "open the gate", "turn on the fan", "play music"):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "unsupported", text
+        assert result["command"] is None, text
+        assert "Gram Sahayak" in result["message"], text
+        assert result["confidence"] == 0.0
 
 
 def test_no_speech_is_reported(matcher: IntentMatcher) -> None:
     for text in ("", "   ", "[BLANK_AUDIO]", "(silence)"):
         result = matcher.match(text, "en")
-        assert result["intent"] == "NO_SPEECH"
+        assert result["kind"] == "no_speech"
+        assert result["command"] is None
         assert "No speech" in result["message"]
 
 
-def test_malayalam_and_hindi_phrases(matcher: IntentMatcher) -> None:
-    ml = matcher.match("വിളക്കുകൾ കത്തിക്കുക", "ml")
-    assert ml["intent"] == "LIGHTS_ON"
-    assert ml["language"] == "ml"
-    assert "വിളക്കുകൾ" in ml["label"]
-
-    hi = matcher.match("पानी देना बंद करो", "hi")
-    assert hi["intent"] == "IRRIGATION_STOP"
-
+# ---------------------------------------------------------------------------
+# The same rules in the other supported languages.
+# ---------------------------------------------------------------------------
+def test_malayalam(matcher: IntentMatcher) -> None:
+    assert matcher.match("വിളക്കുകൾ അണയ്ക്കുക", "ml")["command"] == "LIGHTS_OFF"
+    assert matcher.match("വിളക്കുകൾ കത്തിക്കുക", "ml")["command"] == "LIGHTS_ON"
+    assert matcher.match("പമ്പ് ഓഫ് ചെയ്യുക", "ml")["command"] == "IRRIGATION_STOP"
+    assert matcher.match("പമ്പ് ഓൺ ചെയ്യുക", "ml")["command"] == "IRRIGATION_REQUEST"
+    assert matcher.match("നനയ്ക്കാൻ തുടങ്ങുക", "ml")["command"] == "IRRIGATION_REQUEST"
+    assert matcher.match("വിളക്കുകൾ കത്തുന്നുണ്ടോ", "ml")["intent"] == "LIGHTS_STATUS"
     neg = matcher.match("നനയ്ക്കാൻ തുടങ്ങുക വേണ്ട", "ml")
-    assert neg["intent"] == "NEGATED"
+    assert neg["kind"] == "negated" and neg["command"] is None
+
+
+def test_hindi(matcher: IntentMatcher) -> None:
+    assert matcher.match("लाइट बंद करो", "hi")["command"] == "LIGHTS_OFF"
+    assert matcher.match("लाइट चालू करो", "hi")["command"] == "LIGHTS_ON"
+    assert matcher.match("पंप बंद करो", "hi")["command"] == "IRRIGATION_STOP"
+    assert matcher.match("सिंचाई शुरू करो", "hi")["command"] == "IRRIGATION_REQUEST"
+    assert matcher.match("पानी देना बंद करो", "hi")["command"] == "IRRIGATION_STOP"
+    assert matcher.match("लाइटें जल रही हैं क्या?", "hi")["intent"] == "LIGHTS_STATUS"
+    hypo = matcher.match("क्या मैं लाइट बंद करूँ", "hi")
+    assert hypo["kind"] == "hypothetical" and hypo["command"] is None
+
+
+def test_code_mixed_phrases(matcher: IntentMatcher) -> None:
+    assert matcher.match("light off", "ml")["command"] == "LIGHTS_OFF"
+    assert matcher.match("light band karo", "hi")["command"] == "LIGHTS_OFF"
+    assert matcher.match("pump on cheyyuka", "ml")["command"] == "IRRIGATION_REQUEST"
+
+
+# ---------------------------------------------------------------------------
+# Result shape and catalogue.
+# ---------------------------------------------------------------------------
+def test_result_shape_is_structured(matcher: IntentMatcher) -> None:
+    result = matcher.match("Please switch the lights off", "en")
+    assert result["kind"] == "command"
+    assert result["device"] == "lights"
+    assert result["action"] == "off"
+    assert result["intent"] == "LIGHTS_OFF"
+    assert result["pending_text"]
+    assert result["done_text"]
+    assert result["already_text"] == "The lights are already off."
+    assert result["language"] == "en"
+    # Deterministic allowlist: a match is 1.0, not a model probability.
+    assert result["confidence"] in (0.0, 1.0)
 
 
 def test_help_lists_every_supported_command(matcher: IntentMatcher) -> None:
     for language in ("en", "ml", "hi"):
         help_list = matcher.help_list(language)
-        assert len(help_list) == 10
+        assert len(help_list) == 12
         assert all(item["label"] for item in help_list)
         assert any(item["id"] == "IRRIGATION_START" for item in help_list)
+        assert any(item["id"] == "LIGHTS_STATUS" for item in help_list)
+
+
+# ---------------------------------------------------------------------------
+# The HTTP route a typed request uses, against the real router.
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_typed_request_uses_the_same_parser(tmp_path) -> None:
+    from tests.conftest import client_for, make_settings
+
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, _gateway, _app):
+        natural = await client.post(
+            "/api/v1/voice/interpret",
+            json={"text": "Could you please switch the lights off?", "language": "en"},
+        )
+        assert natural.status_code == 200
+        body = natural.json()
+        assert body["command"] == "LIGHTS_OFF"
+        assert body["kind"] == "command"
+        assert body["transcript"].startswith("Could you")
+
+        question = await client.post(
+            "/api/v1/voice/interpret",
+            json={"text": "Are the lights off?", "language": "en"},
+        )
+        assert question.status_code == 200
+        assert question.json()["command"] is None
+        assert question.json()["kind"] == "status"
+
+        bad = await client.post(
+            "/api/v1/voice/interpret", json={"text": "", "language": "en"}
+        )
+        assert bad.status_code == 422
