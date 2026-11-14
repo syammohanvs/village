@@ -255,6 +255,11 @@ void buildHealth(JsonDocument& doc) {
   root["pump_commissioned"] = VILLAGE_PUMP_COMMISSIONED == 1;
   root["free_heap"] = ESP.getFreeHeap();
 
+  JsonObject ota = root["ota"].to<JsonObject>();
+  ota["started"] = otaStarted();
+  ota["port"] = 3232;
+  ota["password_set"] = otaPasswordSet();
+
   JsonObject pm = root["pin_map"].to<JsonObject>();
   pm["soil_moisture_adc"] = pins::SOIL_MOISTURE_ADC;
   pm["reservoir_excite"] = pins::RESERVOIR_EXCITE;

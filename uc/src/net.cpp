@@ -94,6 +94,16 @@ void startOta() {
 #endif
 }
 
+bool otaStarted() { return g_ota_started; }
+
+bool otaPasswordSet() {
+#ifdef VILLAGE_OTA_PASSWORD
+  return VILLAGE_OTA_PASSWORD[0] != '\0';
+#else
+  return false;
+#endif
+}
+
 void otaLoop() {
 #if VILLAGE_ENABLE_OTA
   if (g_ota_started) ArduinoOTA.handle();

@@ -46,16 +46,29 @@ backend serves it from disk.
 >   build flag, and check the image carries it:
 >   `python3 -c "print(open('uc/.pio/build/esp32doit-devkit-v1/firmware.bin','rb').read().count(b'[ota] ready on'))"`
 >   must print **1** (0 means that image can never be updated over Wi-Fi).
-> - **After every flash, prove OTA works** before touching anything else:
->   `python3 -c "import socket;s=socket.socket();s.settimeout(2);s.connect(('<board-ip>',3232));print('OTA up')"`
->   Open = good. Refused while `:80` answers = the image on the board is not this
->   source; treat it as a defect and reflash over USB **while the cable is still
->   in hand**.
-> - **Know which image is running, from the device itself.** The current source
->   reports `board` and `pins` blocks in `/api/v1/status`. A status payload with
->   **no `board` block is an old image** — that is how the 2026-11-14 failure was
->   spotted, and it also tells you whether the build you just made is actually
->   the one on the board.
+> - **OTA on this firmware is UDP on 3232, not TCP** — `ArduinoOTA.begin()` opens
+>   `_udp_ota.begin(3232)` and only creates a TCP listener when an update arrives.
+>   So **a TCP connect to 3232 is refused even on a perfectly healthy board**;
+>   probing it that way and concluding "no OTA" is a wrong diagnosis that cost an
+>   hour on 2026-11-15. The honest checks are the device's own report —
+>   `GET /api/v1/health` → `ota: {started, port, password_set}` — and an actual
+>   `espota` run.
+> - **The working upload runs `espota.exe` on the Windows host** (the board must
+>   be able to reach the uploader, and it cannot reach WSL's NAT address):
+>   ```powershell
+>   netsh advfirewall firewall add rule name="village-ota-3233" dir=in action=allow protocol=TCP localport=3233
+>   cd %USERPROFILE%\village-flash
+>   .\espota.exe -i <board-ip> -p 3232 -I 192.168.1.36 -P 3233 -a "<password>" -f ota-firmware.bin -r
+>   ```
+>   Verified end to end 2026-11-15: `Uploading: 100% Done`, board rebooted into the
+>   new image. Build the image with `-e esp32doit-devkit-v1-ota`, copy it plus
+>   `espota.exe` to that folder.
+> - **Know which image is running, from the device itself — and read the right
+>   endpoint.** `/api/v1/health` carries the `board`, `wifi`, `free_heap` and
+>   `pin_map` blocks; **`/api/v1/status` does not, by design** (it stops after
+>   `recent_events`). Checking `status` for `pin_map` and concluding "old image"
+>   is a wrong diagnosis that cost an hour on 2026-11-15. Use `firmware` in
+>   either payload for the version, and `health` for the pin map.
 > - **`VILLAGE_OTA_PASSWORD` (16 chars in `secrets.h`) must be present**, or the
 >   board refuses the upload even when the port is open.
 
