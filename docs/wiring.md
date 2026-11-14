@@ -592,3 +592,33 @@ are the two input-only ADC1 pins, with no internal pull-ups and no 5 V
 tolerance, and they sit next to each other so both taps leave the board on one
 edge. See §1 for the header order; `VP` is immediately right of `EN`, `VN` is
 next to that.
+
+### Leaving the panel connected with the board switched off
+
+It is acceptable with this wiring, but understand what happens.
+
+Each ADC tap has a **10 kΩ series resistor**, and that is what makes it safe: a
+pin's ESD clamp starts to conduct once the pin is more than ~0.3 V above the
+supply rail, and with the board unpowered the rail is 0 V. The clamp current is
+therefore `(Vpanel − 0.7) / 10 kΩ` — about **0.26 mA per tap at 3.3 V**, 0.52 mA
+for both. That is far too little to power the ESP32 (it needs tens of mA to
+run), and far below the few mA an ESD diode tolerates.
+
+Two consequences, both harmless:
+
+- **The red LED still glows in light.** That branch (`panel → 330 Ω → LED →
+  GND`) does not involve the board at all, so the panel lights the LED even with
+  USB unplugged. It is a good demonstration that the cell is doing the work.
+- The ADC pins are being held above their own rail through the clamps. That is
+  outside the datasheet's "no voltage on a pin before VDD" guidance, so it is
+  not a state to leave it in for months — but at 0.26 mA it cannot damage the
+  part, and the board simply stays off.
+
+If you want the pins electrically isolated when unpowered (the belt-and-braces
+option), a small Schottky in series with each tap — anode to the panel side,
+cathode to the pin — blocks the back-feed. It costs a ~0.2 V drop (so the volts
+read low and `sense_ohms`-style scaling would need a correction) and its reverse
+leakage adds a few counts at low light; a low-leakage part (e.g. BAV199) is
+better than a BAT54 here. The simpler answer for an exhibit is a **panel
+disconnect** when it is packed away, or just keep the board powered whenever the
+panel is in the light.
