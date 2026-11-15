@@ -607,6 +607,26 @@ as Textile**. Same frame, same model, two crops: cloth or Thermocol 0.74. A bin
 is held to 0.70 but a *referral* to 0.50, which is why a 0.35 top class is still
 a decided answer. **The crop is the fix, not the model.**
 
+**A class can be a junk drawer, and Thermocol was one** (2026-11-15). A frosted
+plastic box read **Thermocol 0.95**, a scrunchie 0.74, corrugated card 0.45. The
+class held 218 files but only **112 unique** (106 exact duplicates — a silent 2×
+weight) and only ~**25 were thermocol**: the rest were **food photographs** (the
+foam trays were shot *containing* curry, noodles, roast meat, coffee), **street
+scenes and landscapes** (roads, rivers, rooftops, corridors, a bridge), **people**
+(crowds, festivals, athletes), plus a circuit board, a laptop, an AMD chip, docs
+and a truck. It had learned "a plate" and "a place", so anything pale or
+scene-like came back Thermocol. Cleaned 218 → **25** genuine, composites rebuilt
+150 → 96 from the clean 25, val deduplicated, and **50 curated foam photos**
+added (out of 198 fetched: the searches return chemical diagrams, buildings,
+tomatoes, a fire extinguisher). Live on the same 241-photo probe: exact **71.0 →
+72.2%**, item action **78.8 → 80.5%**, Thermocol recall unchanged at **15/27**;
+the box went 0.95 → 0.36 and the scrunchie 0.74 → 0.20. **Do not delete the junk
+without replacing the photos** — an intermediate build at 25 photos dropped
+Thermocol recall to 7/27 and the probe to 75.9%; that build was rejected. The
+hand-held figure is no longer like-for-like (that set lost its junk composites:
+129 photos, not 140).
+
+
 **The room is learned, so it cannot be classified as an item** (2026-11-14).
 Reported from the venue: *"Sara classified the background as textile and ignored
 the key fob held in hand."* With no stored backdrop the page had no reference,

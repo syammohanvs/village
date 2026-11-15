@@ -1412,6 +1412,53 @@ item through two crops, and nothing about the model needs to change for the venu
 case — a good crop is enough. (A bin is held to 0.70; a *referral* is 0.50, which
 is why a 0.35 top class can still be a decided answer.)
 
+### The "Thermocol" class was a junk drawer (2026-11-15)
+
+A frosted plastic box read **Thermocol 0.95**, a cloth scrunchie 0.74, corrugated
+cardboard 0.45. The cause was the class, not the camera: 218 files held **112
+unique images** (106 were exact duplicates, so the class was also weighted 2× by
+accident) and only about **25 of them were thermocol**. The rest were:
+
+- **food photographs** — the foam trays were shot *containing* curry, noodles,
+  roast meat, pastries and coffee;
+- **street scenes and landscapes** — roads, rivers, rooftops, solar panels,
+  corridors, a bridge, a seaside;
+- **people** — crowds, festivals, athletes, children;
+- and a circuit board, a laptop, an AMD chip, documents, a truck.
+
+So the class had learned "a plate" and "a place", which is exactly why anything
+pale, blobby or scene-like came back as Thermocol.
+
+**Cleaned:** 218 → **25** genuine foam photos, its 150 hand-held composites
+rebuilt to 96 from the clean 25, the validation split deduplicated, and **50**
+curated foam photos added (packing peanuts, blocks, cups, trays, boxes, three
+held in a hand) out of 198 fetched — those searches return chemical diagrams,
+buildings, tomatoes, a fire extinguisher and a hedge.
+
+Measured live on the 241-photo probe, the same set both times:
+
+| | before (v15) | after (v18) |
+| --- | --- | --- |
+| probe exact | 71.0% | **72.2%** |
+| probe item action | 78.8% | **80.5%** |
+| Thermocol, exact / action | 15/27, 19/27 | **15/27, 19/27** |
+
+And the items that started it:
+
+| item | before | after |
+| --- | --- | --- |
+| frosted plastic box | Thermocol **0.95** | Thermocol 0.36, Plastic 0.33 — refused |
+| cloth scrunchie | Thermocol 0.74 | Thermocol 0.20, Paper 0.19 |
+| corrugated card, edge-on | Thermocol 0.45 | Paper 0.43 |
+
+**Do not skip the second half of this fix.** An intermediate build with the class
+cleaned but still only 25 photos dropped Thermocol recall to **7/27** and the
+probe to **75.9%** action: deleting the junk takes most of the class with it, so
+the photos have to be replaced. That build was rejected.
+
+The hand-held figure is no longer like-for-like — the junk composites were
+removed from that set too, so it is 129 photos rather than 140.
+
 ## 5. Class mapping
 
 | Model class | Action | LED |
