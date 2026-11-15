@@ -43,12 +43,26 @@ void startMdns() {
 }
 
 void startAccessPoint() {
+  // Read the status BEFORE changing mode: `WiFi.mode(...)` resets the station
+  // status, so asking afterwards answers 255 (WL_NO_SHIELD) and says nothing.
+  const wl_status_t st = WiFi.status();
   WiFi.mode(WIFI_AP);
   const bool ok = WiFi.softAP(VILLAGE_AP_SSID, VILLAGE_AP_PASS);
   rt.ap_mode = true;
   g_fallback_done = true;
-  Serial.printf("[net] station mode failed; AP fallback %s, SSID '%s', IP %s\n",
-                ok ? "started" : "FAILED", VILLAGE_AP_SSID,
+  // Say WHY station mode failed.  Without this the log only ever said "station
+  // mode failed", which is the same sentence for a network that is not visible,
+  // a wrong password and a security type the board cannot do -- and the venue
+  // spent a whole session guessing between them (2026-11-15).
+  const char* why =
+      (st == WL_NO_SSID_AVAIL)   ? "network not found -- check the name and that it is 2.4 GHz"
+      : (st == WL_CONNECT_FAILED) ? "rejected -- wrong password, or a security type this board cannot do"
+      : (st == WL_CONNECTION_LOST) ? "connection lost after joining"
+      : (st == WL_DISCONNECTED)    ? "disconnected"
+      : (st == WL_IDLE_STATUS)     ? "never started"
+                                   : "see the status code";
+  Serial.printf("[net] station mode failed (status %d: %s); AP fallback %s, SSID '%s', IP %s\n",
+                static_cast<int>(st), why, ok ? "started" : "FAILED", VILLAGE_AP_SSID,
                 WiFi.softAPIP().toString().c_str());
 }
 
@@ -131,6 +145,22 @@ void startNetwork() {
   startAccessPoint();
   return;
 #else
+  // One scan at boot, before any join attempt, listing what the radio can see.
+  // A scan during a join fails with -2 (WIFI_SCAN_FAILED), which is why this
+  // lives here and not in the failure path.  Reported at the venue: the phone's
+  // hotspot was visible to the laptop at 89% and the board said "network not
+  // found" -- the only way to tell a spelling difference from a radio problem
+  // is to print what the board itself sees, with the name's exact length.
+  const int seen = WiFi.scanNetworks();
+  Serial.printf("[net] scan: %d network(s) visible\n", seen);
+  for (int i = 0; i < seen && i < 12; ++i) {
+    const String name = WiFi.SSID(i);
+    Serial.printf("[net]   '%s' (len %u) rssi %d ch %d enc %d\n", name.c_str(),
+                  static_cast<unsigned>(name.length()), static_cast<int>(WiFi.RSSI(i)),
+                  static_cast<int>(WiFi.channel(i)),
+                  static_cast<int>(WiFi.encryptionType(i)));
+  }
+  WiFi.scanDelete();
   WiFi.begin(VILLAGE_WIFI_SSID, VILLAGE_WIFI_PASS);
   g_sta_started_ms = millis();
 #endif

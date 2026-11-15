@@ -72,6 +72,37 @@ backend serves it from disk.
 > - **`VILLAGE_OTA_PASSWORD` (16 chars in `secrets.h`) must be present**, or the
 >   board refuses the upload even when the port is open.
 
+### The SSID can carry trailing spaces, and Windows hides them (2026-11-15)
+
+Moving the venue to a phone hotspot cost a session because **`netsh wlan show
+profiles` and the Windows UI both trim trailing whitespace from an SSID**, while
+the ESP32 does not. The hotspot's name is
+
+```
+'motorola edge 30_3782    '   len 25   (four trailing spaces)
+```
+
+The firmware was compiled with the 21-character version and the board answered
+**`station mode failed (status 1: not found)`** while the laptop sat at 89%
+signal — the board was looking for a network that does not exist. The only
+reliable reading is the board's own scan, which now prints at boot:
+
+```
+[net] scan: 5 network(s) visible
+[net]   'motorola edge 30_3782    ' (len 25) rssi -21 ch 1 enc 3
+```
+
+`enc 3` is WPA2-PSK. A phone hotspot that offers only **WPA3-Personal** cannot be
+joined at all — switch it to WPA2-Personal first. Two more things learned the
+hard way: `WiFi.scanNetworks()` **fails with -2 while a join is in progress**, so
+the scan must run at boot before `WiFi.begin`, not in the failure path; and
+`WiFi.mode(WIFI_AP)` **resets the station status**, so `WiFi.status()` must be
+read before it or it answers 255 and says nothing.
+
+The backend finds the board by sweeping the /24 of `VILLAGE_DEVICE_URL`, so point
+that at any address on the current LAN (not the old one) and discovery follows
+the board's DHCP lease.
+
 ### Build
 
 ```bash
