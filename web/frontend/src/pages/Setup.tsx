@@ -691,7 +691,12 @@ function Irrigation() {
         min={min}
         max={max}
         step={key === 'cooldown_ms' ? 1000 : 500}
-        value={Number(cfg?.[key] ?? 0)}
+        // Blank when the configuration is unknown.  It used to fall back to 0,
+        // and every limit then read as zero -- which looks like "the pump has no
+        // time limit" when in fact the page simply has not heard from the board
+        // (reported 2026-11-16).
+        value={cfg?.[key] === undefined ? '' : Number(cfg[key])}
+        placeholder="not read yet"
         disabled={!cfg || busy !== null || physicalDisabled}
         onChange={(event) => {
           const value = Number(event.target.value);

@@ -262,3 +262,22 @@ describe('Setup — test outputs', () => {
     });
   });
 });
+
+
+describe('Setup — pump limits', () => {
+  it('leaves the limits blank when the controller has not answered', async () => {
+    // The boxes used to fall back to 0, so every limit read as "no limit" when
+    // the board was simply offline.
+    vi.mocked(api.deviceConfig).mockRejectedValue(new Error('controller offline'));
+    render(<App />);
+    const pulse = await screen.findByLabelText('Pulse length (ms)');
+    expect(pulse).toHaveValue(null);
+    expect(pulse).toBeDisabled();
+  });
+
+  it('shows the controller values when it has answered', async () => {
+    render(<App />);
+    const pulse = await screen.findByLabelText('Pulse length (ms)');
+    await waitFor(() => expect(pulse).toHaveValue(8000));
+  });
+});
