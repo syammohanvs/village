@@ -486,6 +486,152 @@ function Preferences() {
   );
 }
 
+function TestOutputs() {
+  const { status, connected, reload: reloadVillage } = useVillage();
+  const { demo } = useDemo();
+  const { send, entries } = useCommands();
+  const config = useApi<DeviceConfigDocument>(
+    ['device-config', demo ? 'demo' : 'live'],
+    () => api.deviceConfig(demo ? 'demo' : 'live'),
+    {},
+  );
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [last, setLast] = useState<string | null>(null);
+
+  // The controller's own answer wins: it is what the pins are doing.
+  const test = status?.test;
+  const enabled = Boolean(test?.enabled ?? config.data?.config.test?.enabled ?? false);
+  const physicalDisabled = !connected && !demo;
+
+  const setMode = async (next: boolean) => {
+    if (!config.data) return;
+    setBusy('mode');
+    setError('');
+    setNote('');
+    try {
+      const document: DeviceConfig = clone(config.data.config);
+      document.test = {
+        enabled: next,
+        pump_max_ms: document.test?.pump_max_ms ?? 30000,
+      };
+      const response = await api.putDeviceConfig(
+        config.data.config_revision,
+        document,
+        demo ? 'demo' : 'live',
+      );
+      const revision = response?.config_revision ?? config.data.config_revision + 1;
+      setNote(
+        next
+          ? `Test mode on (revision ${revision}). The pump stops itself when its limit runs out.`
+          : `Test mode off (revision ${revision}). Every hand switch was released.`,
+      );
+      config.reload();
+      reloadVillage();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const drive = async (output: string, on: boolean, label: string) => {
+    setBusy(output);
+    setError('');
+    setNote('');
+    try {
+      const outcome = await send('TEST_OUTPUT', { output, on });
+      setLast(outcome.entry.id);
+      setNote(`${label} ${on ? 'on' : 'off'}.`);
+      reloadVillage();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const leds = [
+    { output: 'led_organic', label: 'Organic LED (D21)', on: Boolean(test?.leds.organic) },
+    { output: 'led_plastic', label: 'Plastic LED (D22)', on: Boolean(test?.leds.plastic) },
+    { output: 'led_paper', label: 'Paper LED (D23)', on: Boolean(test?.leds.paper) },
+    { output: 'streetlights', label: 'Streetlights (D13)', on: Boolean(test?.leds.streetlights) },
+  ];
+  const pumpOn = Boolean(test?.pump);
+  const remaining = Math.max(0, Math.round((test?.pump_remaining_ms ?? 0) / 1000));
+
+  return (
+    <Card kicker="Bench test" title="Test outputs" actions={<IconPlug size={18} />}>
+      <p className="hint" data-testid="test-mode-hint">
+        Drives the hardware by hand, ignoring the sensors. The pump stops by itself after{' '}
+        {Math.round((test?.pump_max_ms ?? config.data?.config.test?.pump_max_ms ?? 30000) / 1000)} s,
+        so a forgotten switch cannot run it dry. Leave this off for the exhibit.
+      </p>
+
+      <div className="setup-row">
+        <div>
+          <div className="field-label">Test mode</div>
+          <p className="hint">Switches below are refused by the controller while this is off.</p>
+        </div>
+        <Toggle
+          id="test-mode"
+          label="Test mode"
+          checked={enabled}
+          disabled={busy !== null || physicalDisabled || !config.data}
+          onChange={(next) => void setMode(next)}
+        />
+      </div>
+
+      {enabled && (
+        <div className="setup-stack">
+          <div className="setup-row">
+            <div>
+              <div className="field-label">Pump / motor (D19)</div>
+              <p className="hint" data-testid="test-pump-state">
+                {pumpOn ? `Running — ${remaining} s left, press again to extend` : 'Stopped'}
+              </p>
+            </div>
+            <button
+              type="button"
+              className={cx('btn', pumpOn ? 'btn--ghost' : 'btn--primary')}
+              data-testid="test-pump-toggle"
+              disabled={busy !== null}
+              onClick={() => void drive('pump', !pumpOn, 'Pump')}
+            >
+              {pumpOn ? 'Stop pump' : 'Run pump'}
+            </button>
+          </div>
+
+          <div className="setup-stack">
+            {leds.map((led) => (
+              <div className="setup-row" key={led.output}>
+                <div className="field-label">{led.label}</div>
+                <Toggle
+                  id={`test-${led.output}`}
+                  label={led.label}
+                  checked={led.on}
+                  disabled={busy !== null}
+                  onChange={(next) => void drive(led.output, next, led.label)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {note && <Notice tone="good">{note}</Notice>}
+      {error && <p className="error-text" data-testid="test-error">{error}</p>}
+      {last && entries.find((row) => row.id === last) && (
+        <CommandResult entry={entries.find((row) => row.id === last)!} />
+      )}
+      {physicalDisabled && (
+        <p className="hint">The controller is offline, so nothing can be driven.</p>
+      )}
+    </Card>
+  );
+}
+
 function Irrigation() {
   const { status, live, connected, reload: reloadVillage } = useVillage();
   const { demo } = useDemo();
@@ -839,6 +985,7 @@ export function Setup() {
         <a href="#connections">Connections</a>
         <a href="#sensors">Sensors &amp; Calibration</a>
         <a href="#voice-camera">Voice &amp; Camera</a>
+        <a href="#test">Test outputs</a>
         <a href="#advanced">Advanced</a>
       </nav>
 
@@ -855,6 +1002,11 @@ export function Setup() {
       <section id="voice-camera" className="setup-section">
         <h2 className="setup-title">Voice &amp; Camera</h2>
         <Preferences />
+      </section>
+
+      <section id="test" className="setup-section">
+        <h2 className="setup-title">Test outputs</h2>
+        <TestOutputs />
       </section>
 
       <section id="advanced" className="setup-section">

@@ -19,6 +19,32 @@ until step 8.
 - [ ] Pump power comes from the 5 V branch through the driver, not from a GPIO
       or the 3.3 V regulator.
 
+## Test mode in the app (Setup → Test outputs)
+
+The bench build flags (`VILLAGE_PUMP_BENCH_DRIVE`, `VILLAGE_WASTE_LEDS_ALWAYS_ON`)
+are for when the app cannot be trusted or the board is not on the network. When
+the board **is** connected, use the app instead: **Setup → Test outputs**.
+
+- **Test mode** must be switched on first. While it is off the controller
+  refuses every `TEST_OUTPUT` command, so a stray click cannot drive hardware.
+- **Pump / motor (D19)** runs **regardless of the soil and water probes**, and
+  the **firmware stops it by itself** after `test.pump_max_ms` (30 s by
+  default, 5–300 s allowed). Press again to extend. Nothing else can stop it:
+  the irrigation controller, the kill switch and the cooldown are all bypassed,
+  which is the point — and the reason it has its own time limit.
+- **Each light output has its own switch**: Organic D21, Plastic D22, Paper D23
+  and the five streetlights on D13. They stay where you put them until you turn
+  them off or turn test mode off.
+- While test mode is on, the normal drivers stand down, so the LEDs show what
+  the panel says and not what was classified. Turning test mode off releases
+  every switch.
+- Every switch is a normal command: it appears in the command log, carries a
+  request id, and the controller's own answer (accepted / refused / why) is
+  shown under the card.
+
+**Leave test mode off for the exhibition.** With it on, the pump can be run by
+anyone who can reach the app.
+
 ## B. LEDs
 
 - [ ] Each of the four streetlight LEDs has its own resistor (**100 Ω** on this

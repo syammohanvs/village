@@ -131,6 +131,21 @@ inline constexpr Reason kWasteUnknown{
     "Unknown waste category. No category indicator was activated."};
 inline constexpr Reason kDuplicate{
     "DUPLICATE_COMMAND", "This command was already processed. No second action was taken."};
+
+// --- test mode -------------------------------------------------------------
+inline constexpr Reason kTestStarted{
+    "TEST_OUTPUT_ON", "Test mode drove that output on."};
+inline constexpr Reason kTestStopped{
+    "TEST_OUTPUT_OFF", "Test mode released that output."};
+inline constexpr Reason kTestDisabled{
+    "TEST_MODE_DISABLED",
+    "Test mode is off. Turn it on in Setup before driving an output by hand."};
+inline constexpr Reason kTestOutputUnknown{
+    "TEST_OUTPUT_UNKNOWN",
+    "Unknown test output. Use pump, led_organic, led_plastic, led_paper or streetlights."};
+inline constexpr Reason kTestPumpTimedOut{
+    "TEST_PUMP_TIMED_OUT",
+    "Test mode stopped the pump when its time limit ran out. Nothing is running."};
 inline constexpr Reason kCommandInvalid{
     "COMMAND_INVALID", "The command type or parameters were not recognised."};
 

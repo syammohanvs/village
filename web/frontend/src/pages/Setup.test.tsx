@@ -23,6 +23,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       putDeviceConfig: vi.fn(),
       events: vi.fn(),
       voiceIntents: vi.fn(),
+      sendCommand: vi.fn(),
     },
   };
 });
@@ -48,6 +49,12 @@ beforeEach(() => {
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true });
   vi.mocked(api.deviceConfig).mockResolvedValue(makeConfigDocument());
+  vi.mocked(api.sendCommand).mockResolvedValue({
+    confirmed: true,
+    physical: true,
+    mode: 'live',
+    ack: { result: 'ACCEPTED', reason_code: 'TEST_OUTPUT_ON', reason: 'Test mode drove that output on.' },
+  } as never);
   vi.mocked(api.putDeviceConfig).mockImplementation(async (revision, config) => ({
     protocol_version: 1,
     device_id: 'village-test',
@@ -211,5 +218,47 @@ describe('spoken language setting', () => {
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     expect(JSON.parse(window.localStorage.getItem('village.lia.v1') ?? '{}').autoRead).toBe(false);
+  });
+});
+
+
+describe('Setup — test outputs', () => {
+  it('keeps every hand switch behind the test-mode switch', async () => {
+    render(<App />);
+    expect(await screen.findByRole('switch', { name: 'Test mode' })).toBeInTheDocument();
+    // Test mode is off, so nothing that drives hardware is offered.
+    expect(screen.queryByTestId('test-pump-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Organic LED (D21)' })).not.toBeInTheDocument();
+  });
+
+  it('writes test mode into the controller configuration', async () => {
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: 'Test mode' });
+    await userEvent.click(toggle);
+    await waitFor(() => expect(api.putDeviceConfig).toHaveBeenCalled());
+    const lastCall = vi.mocked(api.putDeviceConfig).mock.calls.at(-1)!;
+    expect(lastCall[1].test).toEqual({ enabled: true, pump_max_ms: 30000 });
+  });
+
+  it('drives one LED at a time once test mode is on', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
+    render(<App />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Paper LED (D23)' }));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({
+      type: 'TEST_OUTPUT',
+      parameters: { output: 'led_paper', on: true },
+    });
+  });
+
+  it('runs the pump from the panel, and the firmware caps it', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
+    render(<App />);
+    await userEvent.click(await screen.findByTestId('test-pump-toggle'));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({
+      type: 'TEST_OUTPUT',
+      parameters: { output: 'pump', on: true },
+    });
   });
 });

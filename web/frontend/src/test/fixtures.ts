@@ -23,6 +23,8 @@ export interface StateOptions {
   lastError?: string | null;
   sourceKind?: string;
   sourceLabel?: string;
+  testEnabled?: boolean;
+  testPump?: boolean;
 }
 
 export function makeState(options: StateOptions = {}): StateEnvelope {
@@ -48,6 +50,8 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     lastError = null,
     sourceKind = 'esp32',
     sourceLabel = 'ESP32 over Wi-Fi',
+    testEnabled = false,
+    testPump = false,
   } = options;
 
   return {
@@ -72,6 +76,15 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
       uptime_ms: 84_210,
       sample_seq: 512,
       config_revision: 4,
+      // Test mode (Setup → Test outputs): absent in an older payload, so the
+      // page must treat "no block" as off.
+      test: {
+        enabled: testEnabled,
+        pump: testPump,
+        pump_max_ms: 30000,
+        pump_remaining_ms: testPump ? 24000 : 0,
+        leds: { organic: false, plastic: false, paper: false, streetlights: false },
+      },
       sensors: {
         soil: {
           valid: soilState !== 'unavailable',

@@ -2,6 +2,7 @@
 
 #include "village/api.h"
 #include "village/build_config.h"
+#include "village/core/reasons.h"
 #include "village/core/time.h"
 #include "village/device_state.h"
 #include "village/net.h"
@@ -73,6 +74,31 @@ void setup() {
   }
 }
 
+// Test mode (Setup → Test outputs).  Runs AFTER the normal drivers so the
+// hand switches win, and stops the pump itself when its limit runs out -- a
+// switch somebody forgot must not run a dry pump indefinitely.
+static void applyTestOutputs(uint32_t now) {
+  if (!rt.config.test.enabled) {
+    if (rt.test_pump || rt.test_led_organic || rt.test_led_plastic ||
+        rt.test_led_paper || rt.test_streetlights) {
+      // Leaving test mode releases everything it was holding.
+      rt.test_pump = false;
+      rt.test_led_organic = rt.test_led_plastic = rt.test_led_paper = false;
+      rt.test_streetlights = false;
+    }
+    return;
+  }
+  if (rt.test_pump && static_cast<int32_t>(now - rt.test_pump_until_ms) >= 0) {
+    rt.test_pump = false;
+    rt.events.add(now, reasons::kTestPumpTimedOut.code, reasons::kTestPumpTimedOut.text);
+  }
+  if (rt.test_pump) applyPump(true);
+  // In test mode the light outputs belong to the panel alone, so this runs
+  // every pass rather than only when a switch is on.
+  applyTestLeds(rt.test_led_organic, rt.test_led_plastic, rt.test_led_paper,
+                rt.test_streetlights);
+}
+
 void loop() {
   uint32_t now = millis();
 
@@ -94,7 +120,9 @@ void loop() {
   // never turned -- "pin high indefinitely" needs this call to be the only one.
   applyPump(true);
 #else
-  applyPump(rt.irrigation.pumpOn());
+  // Test mode owns the gate while its switch is on; writing pumpOn() here as
+  // well would drop the pin LOW for a moment every pass (relay chatter).
+  if (!(rt.config.test.enabled && rt.test_pump)) applyPump(rt.irrigation.pumpOn());
 #endif
 
 #if VILLAGE_PUMP_BENCH_DRIVE == 1
@@ -111,12 +139,19 @@ void loop() {
   }
 #endif
 
+  // In test mode the four light outputs belong to the panel, so the normal
+  // drivers stand down -- otherwise the two would write the same pins with
+  // different values every pass.
   const LightOutput lights = rt.lights.output(rt.config, now);
-  applyStreetlights(lights.on);
+  if (!rt.config.test.enabled) applyStreetlights(lights.on);
 
   rt.waste.tick(now);
   const WasteLedState waste = rt.waste.read(now);
-  applyWasteCategory(waste.active ? waste.category : WasteCategory::Unknown);
+  if (!rt.config.test.enabled) {
+    applyWasteCategory(waste.active ? waste.category : WasteCategory::Unknown);
+  }
+
+  applyTestOutputs(now);
 
   logCurrentState(now);
 

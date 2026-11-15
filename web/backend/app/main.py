@@ -26,6 +26,7 @@ from .device import (
 from .intents import IntentMatcher
 from .protocol import (
     ALLOWED_COMMANDS,
+    TEST_OUTPUTS,
     WASTE_CATEGORIES,
     AppSettingsUpdate,
     CommandRequest,
@@ -286,6 +287,15 @@ def create_app(
     ):
         if body.type not in ALLOWED_COMMANDS:
             raise HTTPException(status_code=422, detail=f"unsupported command type: {body.type}")
+        if body.type == "TEST_OUTPUT":
+            output = str(body.parameters.get("output", "")).lower()
+            if output not in TEST_OUTPUTS:
+                raise HTTPException(
+                    status_code=422,
+                    detail="TEST_OUTPUT needs output pump, led_organic, led_plastic, led_paper or streetlights",
+                )
+            body.parameters["output"] = output
+            body.parameters["on"] = bool(body.parameters.get("on"))
         if body.type == "INDICATE_WASTE":
             category = str(body.parameters.get("category", "")).lower()
             if category not in WASTE_CATEGORIES:

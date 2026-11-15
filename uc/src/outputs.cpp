@@ -87,4 +87,14 @@ void allOutputsOff() {
   digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(false));
 }
 
+// Test mode drives the light outputs by hand.  The pump goes through
+// applyPump() like every other caller, so the commissioning and polarity rules
+// stay in one place; these four have no such rules beyond the active level.
+void applyTestLeds(bool organic, bool plastic, bool paper, bool streetlights) {
+  digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(organic));
+  digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(plastic));
+  digitalWrite(pins::WASTE_LED_PAPER, wasteLedLevel(paper));
+  digitalWrite(pins::STREETLIGHT_LED_PIN, streetlights ? HIGH : LOW);
+}
+
 }  // namespace village

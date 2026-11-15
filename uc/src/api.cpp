@@ -160,6 +160,20 @@ void buildStatus(JsonDocument& doc) {
   wi["active"] = waste.active;
   wi["remaining_ms"] = waste.remaining_ms;
 
+  // Test mode (Setup → Test outputs).  Reported so the panel can show what is
+  // actually being driven, and how long the pump has left.
+  JsonObject test = root["test"].to<JsonObject>();
+  test["enabled"] = rt.config.test.enabled;
+  test["pump"] = rt.test_pump;
+  test["pump_max_ms"] = rt.config.test.pump_max_ms;
+  test["pump_remaining_ms"] =
+      rt.test_pump ? static_cast<int32_t>(rt.test_pump_until_ms - now) : 0;
+  JsonObject tled = test["leds"].to<JsonObject>();
+  tled["organic"] = rt.test_led_organic;
+  tled["plastic"] = rt.test_led_plastic;
+  tled["paper"] = rt.test_led_paper;
+  tled["streetlights"] = rt.test_streetlights;
+
   JsonObject ir = root["irrigation"].to<JsonObject>();
   ir["auto_enabled"] = irr.auto_enabled;
   ir["pump_enabled"] = irr.pump_enabled;
@@ -465,12 +479,50 @@ void handleCommand() {
         applyWasteCategory(category);
       }
     }
+  } else if (type == "TEST_OUTPUT") {
+    // Bench control from Setup → Test outputs.  Refused outright unless the
+    // operator has switched test mode on, and the pump is capped by
+    // config.test.pump_max_ms (the loop stops it; see applyTestOutputs).
+    if (!rt.config.test.enabled) {
+      result = CommandResult::Rejected;
+      reason = &reasons::kTestDisabled;
+    } else {
+      const String output = doc["parameters"]["output"] | "";
+      const bool on = doc["parameters"]["on"] | false;
+      bool known = true;
+      if (output == "pump") {
+        rt.test_pump = on;
+        rt.test_pump_until_ms = on ? now + rt.config.test.pump_max_ms : 0;
+      } else if (output == "led_organic") {
+        rt.test_led_organic = on;
+      } else if (output == "led_plastic") {
+        rt.test_led_plastic = on;
+      } else if (output == "led_paper") {
+        rt.test_led_paper = on;
+      } else if (output == "streetlights") {
+        rt.test_streetlights = on;
+      } else {
+        known = false;
+      }
+      if (!known) {
+        result = CommandResult::Rejected;
+        reason = &reasons::kTestOutputUnknown;
+      } else {
+        result = CommandResult::Accepted;
+        reason = on ? &reasons::kTestStarted : &reasons::kTestStopped;
+        applyPump(rt.test_pump);
+        applyTestLeds(rt.test_led_organic, rt.test_led_plastic, rt.test_led_paper,
+                      rt.test_streetlights);
+      }
+    }
   }
 
   rt.events.add(now, reason->code, reason->text);
   rt.commands.remember(hash, result, reason->code, reason->text, now);
   saveCommandsToNvs(rt.commands);
-  applyPump(rt.irrigation.pumpOn());
+  if (!(rt.config.test.enabled && rt.test_pump)) {
+    applyPump(rt.irrigation.pumpOn());
+  }
 
   server.send(200, "application/json", ackJson(id, type, result, *reason, now));
 }

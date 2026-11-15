@@ -114,3 +114,23 @@ TEST(config_rejects_inverted_reservoir_and_light_thresholds) {
   c.waste.indicate_ms = 40000;
   CHECK(!validateConfig(c, err));
 }
+
+// Test mode drives hardware by hand, so the two things that must never be true
+// are "on in a fresh configuration" and "no time limit on the pump".
+TEST(config_test_mode_is_off_by_default_and_the_pump_is_bounded) {
+  DeviceConfig c = defaults();
+  ConfigError err;
+  CHECK(c.test.enabled == false);
+  CHECK(validateConfig(c, err));
+
+  c.test.pump_max_ms = 1000;  // under the 5 s floor
+  CHECK(!validateConfig(c, err));
+  CHECK(err.field != nullptr);
+
+  c.test.pump_max_ms = 400000u;  // over the 300 s ceiling
+  CHECK(!validateConfig(c, err));
+
+  c.test.pump_max_ms = 30000;
+  CHECK(validateConfig(c, err));
+  CHECK(c.test.enabled == false);  // still off: separate fact
+}

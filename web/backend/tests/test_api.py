@@ -663,3 +663,40 @@ def test_classify_saves_the_crop_it_judged(tmp_path, monkeypatch):
     assert len(saved) == 1
     assert "paper-0.81" in saved[0].name
     assert saved[0].stat().st_size > 0
+
+
+@pytest.mark.asyncio
+async def test_test_output_is_normalised_and_refused_when_unknown(tmp_path):
+    """Setup → Test outputs: the wire shape is checked here, the gates live in
+    the controller (test mode off, pump time limit)."""
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/commands",
+            json={
+                "mode": "live",
+                "type": "TEST_OUTPUT",
+                "parameters": {"output": "LED_PLASTIC", "on": "truthy"},
+                "request_id": "test-output-0001",
+                "source": "browser",
+            },
+        )
+        assert response.status_code == 200
+        forwarded = real.calls[-1]
+        assert forwarded["type"] == "TEST_OUTPUT"
+        assert forwarded["parameters"]["output"] == "led_plastic"
+        assert forwarded["parameters"]["on"] is True
+
+        bad = await client.post(
+            "/api/v1/commands",
+            json={
+                "mode": "live",
+                "type": "TEST_OUTPUT",
+                "parameters": {"output": "explode"},
+                "request_id": "test-output-0002",
+                "source": "browser",
+            },
+        )
+        assert bad.status_code == 422
+        assert "led_organic" in bad.json()["detail"]

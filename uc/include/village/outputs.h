@@ -15,4 +15,9 @@ void applyStreetlights(bool on);
 void applyWasteCategory(WasteCategory category);
 void allOutputsOff();
 
+// Test mode: drive the three indicator LEDs and the streetlight pin by hand.
+// Cleared by calling applyWasteCategory/applyStreetlights again, which every
+// pass of the main loop does.
+void applyTestLeds(bool organic, bool plastic, bool paper, bool streetlights);
+
 }  // namespace village
