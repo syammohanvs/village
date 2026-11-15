@@ -1255,6 +1255,7 @@ could trip over.
 model the backend is serving.
 
 The previous checkpoints are kept at
+`models/waste-resnet50-backup-v15/model.pt` (installed),
 `models/waste-resnet50-backup-v14/model.pt` (the build that refused the book)
 and `models/waste-resnet50-backup-v13/model.pt`; restoring one is copying that
 file over `models/waste-resnet50/model.pt` and restarting the backend.
@@ -1324,6 +1325,62 @@ Two notes for whoever reads these numbers next:
 - **The "side" view that read Textile 0.84 was not a cloth spine.** The book was
   edge-on and the frame was almost entirely a striped shirt sleeve. The model
   was right about what was in front of it.
+
+### A scrunchie read as Thermocol (2026-11-15) — the photos were not the lever
+
+A cloth scrunchie was read **Thermocol 0.89** and accepted. Two separate things
+were wrong, and only one of them was the classifier's data.
+
+**The crop was the room, not the item.** The five saved frames are a child's
+face, a hand and a blown-out window with the scrunchie maybe a fifth of the
+picture. `SortWaste.tsx` says so itself: *"this does not stop a person standing
+in front of the camera from being read as an object, because the person is the
+change and they are in the middle."* Cropping the same frame to the item alone
+gave a **different** answer:
+
+| what the model was shown | answer |
+| --- | --- |
+| the whole frame (what the app used) | Thermocol **0.89** |
+| right half of the frame | Leather 0.36, Plastic 0.24, **Textile 0.09** |
+| the scrunchie filling the frame | Leather 0.50, Paper 0.14, Plastic 0.13 |
+
+So the confident Thermocol was an artefact of a bright window and bright
+ruffles — but the item alone still was not Textile. Note the second place on the
+cropped reads: **Plastic**, a bin. As Thermocol it went to the recycling agent,
+which was the right action by luck; as Plastic it would have gone in the plastic
+bin.
+
+**Textile held only flat white cloth** — 40 handkerchiefs, 30 cloth napkins, 15
+white cotton prints — and no patterned, bunched or slightly glossy fabric at
+all, which is what a scrunchie is.
+
+**What was tried, and what it cost.** Textile was grown 88 → 131 photos: ten real
+scrunchie / hair-tie photos and 33 printed-or-knitted fabric photos, all curated
+by eye out of 160 fetched (the searches return athletes, buildings, fossils, six
+copies of a man in a suit, rows of bow ties, wooden printing blocks, factory
+looms, a bat, a tunnel and knitting charts — 117 were thrown away).
+
+| | shipped (v15) | with the new Textile (v16) |
+| --- | --- | --- |
+| probe exact | **71.0%** | 68.5% |
+| probe item action | **78.8%** | 77.2% |
+| hand-held, in-process | 53.6% | 55.7% |
+| the five scrunchie frames | Thermocol 0.72–0.89 | Thermocol 0.65–0.85 |
+| the scrunchie cropped to the item | Leather 0.50, Textile 0.09 | Leather 0.40, Textile 0.16 |
+
+**Rejected, and both the model and the samples tree were put back.** The probe
+lost six photos — Plastic −3, Glass −1, Metal −1, Ewaste −1 — because a flat
+printed swatch and a woven sheet are close to plastic and to paper at 224 px, and
+the scrunchie did not move: its frames are pictures of a room, and the item-only
+crop is a ~100-pixel region upscaled to 224, which is mush. Ten photos of one
+object cannot outvote 88 flat-cloth photos and the archive's clothes; what they
+do instead is teach printed fabric as Plastic.
+
+**What will move it, in order:** a clean photo of the item filling the guide
+square with nobody behind it (the only data that would help); and, for the
+framing itself, a guard that declines to classify when the changed region covers
+most of the frame — that would have turned this answer into "show the item on its
+own" instead of a wrong bin.
 
 ## 5. Class mapping
 

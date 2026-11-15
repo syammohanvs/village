@@ -573,6 +573,27 @@ exact resolution the model reads — that gap predates this build (52.9 vs 43.6)
 so compare in-process with in-process and live with live. Checkpoint before this
 change: `models/waste-resnet50-backup-v14/`.
 
+**The frame can be the whole fault, and more photos of the object will not fix
+it** (2026-11-15, the scrunchie). A cloth scrunchie was read Thermocol **0.89**
+and accepted. The five saved frames are a child's face, a hand and a blown-out
+window with the scrunchie a fifth of the picture — and `SortWaste.tsx` already
+says this is a limit it cannot detect ("the person is the change and they are in
+the middle"). Cropped to the item alone the same frame gives a **different**
+answer: Leather 0.50, Paper 0.14, Plastic 0.13, Textile 0.09. So the confident
+Thermocol was the room; and the item was not Textile either, because Textile held
+only flat white cloth — 40 handkerchiefs, 30 napkins, 15 white cotton — with no
+patterned or bunched fabric at all. **Growing Textile 88 → 131 (10 scrunchie /
+hair-tie photos + 33 printed/knitted fabric, curated out of 160 fetched — 117
+discarded: athletes, buildings, fossils, a man in a suit, bow ties, printing
+blocks, looms, a bat, a tunnel) cost the probe 71.0 → 68.5 exact with Plastic
+−3**, and moved the scrunchie frames not at all (Thermocol 0.72–0.89 →
+0.65–0.85). It was **rejected and reverted** — model and samples tree back to
+v15/88. The lesson worth keeping: **before adding photos, check what the
+classifier was actually shown.** A scene crop makes the data irrelevant, and an
+item-only crop upscaled from ~100 px is mush. What works is a clean photo of the
+item filling the guide square with nobody behind it, and (offered, not built) a
+guard that declines when the changed region covers most of the frame.
+
 **The room is learned, so it cannot be classified as an item** (2026-11-14).
 Reported from the venue: *"Sara classified the background as textile and ignored
 the key fob held in hand."* With no stored backdrop the page had no reference,
