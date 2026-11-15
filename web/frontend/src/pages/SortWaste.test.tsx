@@ -1443,6 +1443,10 @@ describe('Sort Waste — a near-tie is not a decision', () => {
       // noise.
       const line = await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 });
       expect(line.textContent).not.toMatch(/Leather/i);
+      // Nor is a material named anywhere else: the per-class readout is for a
+      // decision, and there is none.  This list was the last place "Thermocol
+      // 74%" stayed on screen while nothing had been chosen.
+      expect(document.querySelector('.prediction-list')).toBeNull();
       // ...and does not record it as a decision.
       expect(api.postRecognition).not.toHaveBeenCalled();
     } finally {

@@ -601,10 +601,11 @@ read was the live preview line *"Best guess Thermocol at 59%"*. That is now
 *"Not sure what this is — hold one item on its own, filling the square, and keep
 still."* — no material, because the near-guess is a property of the crop, not of
 the item. The same frame cropped to the scrunchie alone reads **Textile 0.35**
-(0.39 tighter) with nothing close, so **the material is right once the item is
-the crop** — but 0.35 is under the bar, so a good crop still declines a bin
-rather than sending cloth to one. Real recognition needs training photos of the
-item at that size, which do not exist yet.
+(0.39 tighter); grouped the way the app decides a referral, the seven recycler
+materials sum to **0.64**, above the **0.50** referral bar, so **it is accepted
+as Textile**. Same frame, same model, two crops: cloth or Thermocol 0.74. A bin
+is held to 0.70 but a *referral* to 0.50, which is why a 0.35 top class is still
+a decided answer. **The crop is the fix, not the model.**
 
 **The room is learned, so it cannot be classified as an item** (2026-11-14).
 Reported from the venue: *"Sara classified the background as textile and ignored

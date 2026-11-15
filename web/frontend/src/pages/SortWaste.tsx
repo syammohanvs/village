@@ -1528,7 +1528,14 @@ export function SortWaste() {
                     : `Cooldown ${Math.round(cooldownMs / 1000)}s`}
                 </span>
               </div>
-              {predictions.length > 0 ? (
+              {predictions.length === 0 ? (
+                <p className="hint">No predictions yet.</p>
+              ) : strong || topIsBackground ? (
+                // The per-class readout is shown only when the page has reached a
+                // decision.  While it is unsure this list was the only place a
+                // material was still named ("Thermocol 74%") about a crop that is
+                // mostly a face -- reported from the venue as the app insisting on
+                // thermocol when it had in fact chosen nothing.
                 <ul className="prediction-list">
                   {predictions.map((row) => (
                     <li
@@ -1549,9 +1556,7 @@ export function SortWaste() {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className="hint">No predictions yet.</p>
-              )}
+              ) : null}
               <div className="camera-controls">
                 <label className="field">
                   <span>Camera device</span>

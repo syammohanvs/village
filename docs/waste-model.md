@@ -1402,12 +1402,15 @@ still."* The material it nearly said is a property of the crop, not of the item,
 so stating it was a claim the picture could not support. Three component tests
 were rewritten to assert that no material is named and none is recorded.
 
-**The material is right once the item is the crop.** Cropping the last frame to
-the scrunchie alone reads **Textile 0.35** (and 0.39 tighter) with nothing else
-close — so the model does know it is cloth; it was answering about a face. That
-also sets the expectation honestly: 0.35 is under the 0.70 bin bar, so even with
-a good crop the app would decline a bin rather than send cloth there. Recognition
-proper needs training photos of the item at this size, which do not exist yet.
+**The material is right once the item is the crop — and the crop is the whole
+difference.** Cropping the same frame to the scrunchie alone reads **Textile
+0.35**, and the grouped recycler confidence (the seven recycler materials summed,
+which is how the app decides a referral) is **0.64** — above the **0.50** referral
+bar, so the app **accepts it as Textile**. The same frame as the app cropped it
+reads Thermocol 0.74 with a grouped 0.89. So "cloth" and "thermocol" are the same
+item through two crops, and nothing about the model needs to change for the venue
+case — a good crop is enough. (A bin is held to 0.70; a *referral* is 0.50, which
+is why a 0.35 top class can still be a decided answer.)
 
 ## 5. Class mapping
 
