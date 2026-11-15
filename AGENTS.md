@@ -554,6 +554,25 @@ The path for a misread is one command now: photos in
 an unreadable file is skipped and named. Then export, restart, re-check with
 `hand_eval.py`.
 
+**A whole datum can be missing, not just under-represented** (2026-11-15, the
+book). A book was refused at Paper 0.66 (four points under the bar) and accepted
+at 0.79 on a second, better-lit look. The corpus held **no book at all** — 0 of
+24,569 archive views, 0 of 141 Paper composites — and no newspaper or notepad
+either; Paper was packaging (bags, brochures, cards, flyers, tissue, cardboard).
+Seven venue frames plus 49 curated Commons photos went into
+`data/waste-samples/Paper/`, and the served model moved to **71.0% exact / 78.8%
+item action** on the 241-photo probe (was 68.5 / 77.6) with every probe class
+equal or better. Two things to keep: **135 Commons photos were fetched and 86
+discarded** — "newspaper" returns newspaper *offices* and vending boxes,
+"notepad" returns Windows Notepad screenshots, "paperback book" returns scans of
+typography-specimen grids, and a letter-grid would teach a shortcut that collides
+with circuit boards, so a fetched photo is looked at before it is trusted; and
+**the trainer's hand-held figure runs ~9 points above `hand_eval.py`'s** (53.6
+in-process vs 45.7 over HTTP) because q0.92 JPEG hits a 224-px composite at the
+exact resolution the model reads — that gap predates this build (52.9 vs 43.6),
+so compare in-process with in-process and live with live. Checkpoint before this
+change: `models/waste-resnet50-backup-v14/`.
+
 **The room is learned, so it cannot be classified as an item** (2026-11-14).
 Reported from the venue: *"Sara classified the background as textile and ignored
 the key fob held in hand."* With no stored backdrop the page had no reference,

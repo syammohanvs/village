@@ -1254,14 +1254,76 @@ could trip over.
 `scripts/waste/hand_eval.py` reproduces any of these numbers against whatever
 model the backend is serving.
 
-The previous checkpoint is kept at `models/waste-resnet50-backup-v13/model.pt`;
-restoring it is copying one file and restarting the backend.
+The previous checkpoints are kept at
+`models/waste-resnet50-backup-v14/model.pt` (the build that refused the book)
+and `models/waste-resnet50-backup-v13/model.pt`; restoring one is copying that
+file over `models/waste-resnet50/model.pt` and restarting the backend.
 
 **What this does not prove.** The hands are drawn, not photographed. Real hands
 are three-dimensional, cast shadows and have sleeves, cuffs and jewellery that
 this generator does not show. The gain is large and consistent enough to be
 worth shipping, but the venue's own camera is still the measurement that counts:
 put ten real photos of someone holding an item in front of it.
+
+### Books, newspapers and notepads (2026-11-15)
+
+A book shown at the venue was refused on the first look — Paper **0.66**, four
+points under the 0.70 bin bar — and accepted on the second at **0.79**. Reading
+the saved frames showed why the class was thin rather than why the model was
+wrong: **the corpus contained no book at all**, none of the 24,569 archive views
+and none of the 141 Paper composites, and no newspaper or notepad either. Paper
+was packaging only: brown bags, kraft bags, glossy brochures, business cards,
+flyers, tissue paper and corrugated board.
+
+Added to `data/waste-samples/Paper/`, the tree `--extra-train` reads:
+
+| what | photos | where from |
+| --- | --- | --- |
+| a paperback held in the hand | 7 | the venue's own frames |
+| newspaper | 12 | Commons, curated by eye |
+| notepad / notebook / ledger | 24 | Commons, curated by eye |
+| paperback book | 13 | Commons, curated by eye |
+
+**135 photos were fetched for those three searches and 86 were thrown away.**
+Commons returns, for "newspaper", newspaper *offices*, vending boxes and a
+drinks can; for "notepad", screenshots of Windows Notepad; for "paperback book",
+scans of typography-specimen grids of little letter boxes. A wrong label is
+worse than no photo — and a grid of letter boxes would have taught a shortcut
+that collides with circuit boards — so every one of the 135 was looked at and
+only the photos whose dominant subject really is the object were kept. The same
+rule as everywhere else here: the label comes from the person, not the model.
+
+Measured with `hand_eval.py` against the **served** model, same photos, same
+JPEG quality:
+
+| set | before | after |
+| --- | --- | --- |
+| real-world probe (241), exact | 68.5% | **71.0%** |
+| real-world probe (241), item action | 77.6% | **78.8%** |
+| hand-held composites (140), exact | 43.6% | **45.7%** |
+| hand-held composites (140), item action | 62.9% | 62.9% |
+
+Every probe class is equal or better: Plastic 57→59, Metal 5→7, Thermocol
+14→15, Paper 47→48, Ewaste 31→31, Glass 7→7, Leather 4→4. On the hand-held
+set the gains and losses are a photo or two each way, which is noise at 140
+samples.
+
+On the three book frames deliberately **left out** of training, Paper was the
+top class before and after, at 0.35 → **0.72**, 0.34 → 0.55 and 0.33 → 0.57. A
+clear front view now clears the 0.70 bar; an angled or washed-out one still does
+not, and that is the honest limit of a 224-pixel frame.
+
+Two notes for whoever reads these numbers next:
+
+- **The trainer's own hand-held figure is about 9 points above the served
+  model's** (53.6% exact in-process, 45.7% over HTTP for this build). That gap
+  predates this change — the previous build printed 52.9% and served 43.6% — and
+  it is JPEG quality 92 applied to a 224-px composite, where the artefacts land
+  at exactly the resolution the model reads. Compare like with like:
+  in-process with in-process, live with live.
+- **The "side" view that read Textile 0.84 was not a cloth spine.** The book was
+  edge-on and the frame was almost entirely a striped shirt sleeve. The model
+  was right about what was in front of it.
 
 ## 5. Class mapping
 
