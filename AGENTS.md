@@ -594,6 +594,18 @@ item-only crop upscaled from ~100 px is mush. What works is a clean photo of the
 item filling the guide square with nobody behind it, and (offered, not built) a
 guard that declines when the changed region covers most of the frame.
 
+**Follow-up the same day: the not-sure line no longer names a material.** The
+venue reported "still thermocol" three times while the press had chosen **no**
+bin (Thermocol 0.59/0.59/0.40, mean 0.53 — under the 0.70 bar); what was being
+read was the live preview line *"Best guess Thermocol at 59%"*. That is now
+*"Not sure what this is — hold one item on its own, filling the square, and keep
+still."* — no material, because the near-guess is a property of the crop, not of
+the item. The same frame cropped to the scrunchie alone reads **Textile 0.35**
+(0.39 tighter) with nothing close, so **the material is right once the item is
+the crop** — but 0.35 is under the bar, so a good crop still declines a bin
+rather than sending cloth to one. Real recognition needs training photos of the
+item at that size, which do not exist yet.
+
 **The room is learned, so it cannot be classified as an item** (2026-11-14).
 Reported from the venue: *"Sara classified the background as textile and ignored
 the key fob held in hand."* With no stored backdrop the page had no reference,

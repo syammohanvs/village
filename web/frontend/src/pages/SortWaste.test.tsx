@@ -649,7 +649,13 @@ describe('Sort Waste — a low guess says what it is', () => {
     // cover is what happens while the camera is being watched.
     fireEvent.click(await screen.findByTestId('auto-watch'));
 
-    expect(await screen.findByText(/Best guess Paper at 55%/i, {}, { timeout: 5000 })).toBeInTheDocument();
+    // Under the bar it names no material at all.  "Best guess Thermocol at 59%"
+    // read as a classification -- the venue reported a cloth scrunchie as
+    // "recognised as thermocol" three times over, when the press had in fact
+    // chosen no bin.  The guess is a property of the crop, not of the item, so
+    // saying which material it nearly said is a claim the picture cannot support.
+    const line = await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 });
+    expect(line.textContent).not.toMatch(/Paper/i);
     // It must not claim a bin it is not sure about.
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
     expect(api.postRecognition).not.toHaveBeenCalled();
@@ -1359,7 +1365,7 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
       await waitFor(() => expect(vi.mocked(api.wasteClassify).mock.calls.length).toBe(3), {
         timeout: 10000,
       });
-      expect(await screen.findByText(/Best guess/i, {}, { timeout: 5000 })).toBeInTheDocument();
+      expect(await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 })).toBeInTheDocument();
       expect(api.postRecognition).not.toHaveBeenCalled();
     } finally {
       HTMLCanvasElement.prototype.getContext = original;
@@ -1432,10 +1438,11 @@ describe('Sort Waste — a near-tie is not a decision', () => {
       fireEvent.click(start);
       fireEvent.click(await screen.findByTestId('classify-now'));
 
-      // It says what it guessed...
-      expect(
-        await screen.findByText(/Best guess Leather at 24%/i, {}, { timeout: 5000 }),
-      ).toBeInTheDocument();
+      // It says it cannot tell, and names no material — the near-tie is exactly
+      // the case where naming one of the three would be picking a winner out of
+      // noise.
+      const line = await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 });
+      expect(line.textContent).not.toMatch(/Leather/i);
       // ...and does not record it as a decision.
       expect(api.postRecognition).not.toHaveBeenCalled();
     } finally {

@@ -1442,7 +1442,7 @@ export function SortWaste() {
                     ? 'Nothing to sort — this does not look like waste. Show one item, held in your hand is fine.'
                     : strong
                       ? `Looking at ${displayLabel(top.label)}… hold still.`
-                      : `Best guess ${displayLabel(top.label)} at ${Math.round(top.confidence * 100)}% — not sure enough to choose a bin. Move it a little and hold it still.`
+                      : `Not sure what this is — hold one item on its own, filling the square, and keep still.`
                   : 'Waiting for the camera to see something.'}
               </p>
             ) : cameraOn && previewOnly ? (

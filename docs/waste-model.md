@@ -1391,12 +1391,23 @@ in the middle of the room. Training on those would teach noise. The missing
 ingredient is not more photos of *a* scrunchie — it is one photograph of *this*
 scrunchie filling the frame.
 
-**A press under the bar still names its best guess.** The five frames read
-Thermocol 0.59, 0.59 and 0.40 (mean 0.53), so no bin was chosen — but the live
-preview under the camera reads *"Best guess Thermocol at 59% — not sure enough to
-choose a bin"*, and that line is what a reader takes away. If a wrong material
-name in the not-sure state is worse than no name, the line is the thing to
-change, not the model.
+**A press under the bar used to name its best guess, and no longer does.** The
+five frames read Thermocol 0.59, 0.59 and 0.40 (mean 0.53), so no bin was chosen
+— but the live preview under the camera read *"Best guess Thermocol at 59% — not
+sure enough to choose a bin"*, and that line is what a reader takes away. The
+venue reported the scrunchie as "recognised as thermocol" three times over while
+the app had chosen nothing at all, so the line now names **no material**: *"Not
+sure what this is — hold one item on its own, filling the square, and keep
+still."* The material it nearly said is a property of the crop, not of the item,
+so stating it was a claim the picture could not support. Three component tests
+were rewritten to assert that no material is named and none is recorded.
+
+**The material is right once the item is the crop.** Cropping the last frame to
+the scrunchie alone reads **Textile 0.35** (and 0.39 tighter) with nothing else
+close — so the model does know it is cloth; it was answering about a face. That
+also sets the expectation honestly: 0.35 is under the 0.70 bin bar, so even with
+a good crop the app would decline a bin rather than send cloth there. Recognition
+proper needs training photos of the item at this size, which do not exist yet.
 
 ## 5. Class mapping
 
