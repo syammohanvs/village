@@ -236,6 +236,7 @@ export function SortWaste() {
   const backgroundRef = useRef<BackgroundFrame[]>([]);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [backgroundCount, setBackgroundCount] = useState(0);
   // A press reads three frames now, so it takes about a second.  The button
@@ -580,6 +581,20 @@ export function SortWaste() {
         cropContext.globalCompositeOperation = 'source-over';
       } catch {
         return { kind: 'whole', input: video };
+      }
+      // Show exactly the pixels the model will be handed.  Reported from the
+      // venue as "it is looking at my hair and shirt, not what the fingers are
+      // holding" -- and that is precisely what a person-sized change produces:
+      // the visitor is the thing that differs from the room.  Nothing in the
+      // picture can separate a held item from the person holding it (measured:
+      // every non-skin blob in those frames touches the frame edge), so the cure
+      // is to let the operator SEE the box and either move, or set the
+      // background with themselves in the shot so only the item changes.
+      const preview = previewCanvasRef.current;
+      const previewContext = preview?.getContext('2d');
+      if (preview && previewContext) {
+        previewContext.clearRect(0, 0, preview.width, preview.height);
+        previewContext.drawImage(crop, 0, 0, preview.width, preview.height);
       }
       return { kind: 'object', input: crop, region };
     },
@@ -1115,13 +1130,19 @@ export function SortWaste() {
                 );
               })()
             ) : null}
-            {/*
-              The one thing a visitor has to know before showing an item: is the
-              page ready?  The result panel below says it in a sentence, but a
-              sentence under the picture is read after the item is already in
-              the air, which is how "I could not tell whether it had learned the
-              background" happened.
-            */}
+            {/* The exact 224-px square the model will be handed, so a visitor can
+                see their own hair in it before pressing rather than after. */}
+            {cameraOn ? (
+              <figure className="crop-preview" data-testid="crop-preview">
+                <canvas
+                  ref={previewCanvasRef}
+                  width={112}
+                  height={112}
+                  aria-hidden="true"
+                />
+                <figcaption>What it is reading</figcaption>
+              </figure>
+            ) : null}
             {cameraOn && (
               <div className="camera-status" data-testid="camera-status">
                 {autoWatch && sceneProgress !== null ? (

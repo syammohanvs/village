@@ -806,6 +806,15 @@ describe('Sort Waste — the empty table is painted out', () => {
       // 0.92, not 0.85: the lower quality cost 5 points of hand-held accuracy
       // for a payload difference of a couple of kilobytes.
       expect(toDataUrlCalls).toContain(0.92);
+      // The visitor can see the 112-px copy of exactly these pixels.  Reported
+      // from the venue as "it is looking at my hair and shirt, not what the
+      // fingers are holding" -- a person-sized crop, which nothing in the
+      // picture can separate from the person (measured: every non-skin blob in
+      // those frames touches the frame edge).
+      const preview = await screen.findByTestId('crop-preview');
+      expect(preview.querySelector('canvas')).not.toBeNull();
+      expect(preview.textContent).toMatch(/reading/i);
+      expect(canvas.ops).toContain('drawImage:112x112');
     } finally {
       canvas.restore();
     }
