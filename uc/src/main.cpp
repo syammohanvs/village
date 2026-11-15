@@ -87,7 +87,15 @@ void loop() {
 
   const IrrigationInputs inputs = buildIrrigationInputs(now);
   rt.irrigation.tick(now, inputs);
+#if VILLAGE_PUMP_BENCH_DRIVE == 1
+  // Hold the gate high on EVERY pass, not every 2 s.  The bench block used to
+  // write HIGH once per report while the line above wrote pumpOn() (usually
+  // false) on every other pass, so the pin chattered at loop rate and the motor
+  // never turned -- "pin high indefinitely" needs this call to be the only one.
+  applyPump(true);
+#else
   applyPump(rt.irrigation.pumpOn());
+#endif
 
 #if VILLAGE_PUMP_BENCH_DRIVE == 1
   // Bench diagnostic.  The latch and the pad are two different facts: the code
@@ -97,7 +105,6 @@ void loop() {
   static uint32_t bench_report_ms = 0;
   if (now - bench_report_ms >= 2000) {
     bench_report_ms = now;
-    applyPump(true);
     const int readback = digitalRead(pins::PUMP_GATE);
     Serial.printf("[bench] pump gate GPIO %d: latch HIGH, pad %s (%d)\n",
                   pins::PUMP_GATE, readback == HIGH ? "HIGH" : "LOW", readback);

@@ -72,6 +72,43 @@ backend serves it from disk.
 > - **`VILLAGE_OTA_PASSWORD` (16 chars in `secrets.h`) must be present**, or the
 >   board refuses the upload even when the port is open.
 
+### Holding the pump pin high to test the motor (2026-11-15)
+
+There is **no GPIO endpoint** — the board exposes only `health`, `status`,
+`config` and `commands` — so the pump cannot be forced from software. The one
+way to hold the gate high is the compile-time bench build:
+
+```bash
+cd uc
+PLATFORMIO_BUILD_FLAGS="-DVILLAGE_PUMP_BENCH_DRIVE=1" \
+  /home/ubuntu/.venvs/pio/bin/pio run -e esp32doit-devkit-v1-ota
+```
+
+then copy that `firmware.bin` to `%USERPROFILE%\village-flash\bench-ota.bin` and
+run `espota.exe -i <board-ip> -p 3232 -I <windows-ip> -P 3233 -a "<pw>" -f bench-ota.bin -r`.
+`GET /api/v1/health` then reports `board.pump_bench_drive: true`.
+
+**The gate must be written on EVERY pass.** The bench block used to call
+`applyPump(true)` once per 2 s report while the normal line above called
+`applyPump(rt.irrigation.pumpOn())` — false — on every other pass, so the pin
+chattered at loop rate, the relay buzzed and **the motor never turned**. The two
+calls are now mutually exclusive (`#if VILLAGE_PUMP_BENCH_DRIVE == 1 … #else …`),
+so `0` compiles byte-identically to before.
+
+While the bench build runs, `actuators.pump.commanded` in `/api/v1/status` still
+reports false: it is the *controller's* state, not the pin. Only the serial
+readback (`[bench] pump gate GPIO n: latch HIGH, pad HIGH/LOW`) distinguishes
+"the code wrote HIGH" from "the pad is HIGH", and that needs USB.
+
+**Restore immediately afterwards** by OTA-ing `ota-firmware.bin` (the normal
+build, kept in the same folder). This build drives the pump unconditionally —
+that is the point — so nothing else can stop it, including the kill switch.
+
+> **Power the motor from a separate supply.** Driving a pump from the same 5 V
+> bank as the ESP32 browned the board out twice on 2026-11-15: the board
+> rebooted mid-run (new `boot_id`) or vanished entirely until the motor was
+> unplugged.
+
 ### The SSID can carry trailing spaces, and Windows hides them (2026-11-15)
 
 Moving the venue to a phone hotspot cost a session because **`netsh wlan show
