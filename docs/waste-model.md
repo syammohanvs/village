@@ -1382,6 +1382,22 @@ framing itself, a guard that declines to classify when the changed region covers
 most of the frame — that would have turned this answer into "show the item on its
 own" instead of a wrong bin.
 
+**The composite route was tried too, and it does not rescue it.** The ten
+curated scrunchie / hair-tie photos went through `make_handheld_set.py cutouts`
+and `compose` against the archive's 96 room photographs, producing 40 hand-held
+composites. They were **not used**: at this size `u2netp` returns small dark
+blobs, and several cut-outs keep the product photo's own backdrop as a hard disc
+in the middle of the room. Training on those would teach noise. The missing
+ingredient is not more photos of *a* scrunchie — it is one photograph of *this*
+scrunchie filling the frame.
+
+**A press under the bar still names its best guess.** The five frames read
+Thermocol 0.59, 0.59 and 0.40 (mean 0.53), so no bin was chosen — but the live
+preview under the camera reads *"Best guess Thermocol at 59% — not sure enough to
+choose a bin"*, and that line is what a reader takes away. If a wrong material
+name in the not-sure state is worse than no name, the line is the thing to
+change, not the model.
+
 ## 5. Class mapping
 
 | Model class | Action | LED |
