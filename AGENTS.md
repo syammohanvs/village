@@ -322,11 +322,19 @@ light:
 - the pull-up value is not critical (4.7–47 kΩ); this build measures **raw
   800–890 in a lit room**, i.e. a brightness metric of **3200–3300**
   (`metric = 4095 − raw`)
-- thresholds are on the **metric**, not the raw: `dark_threshold = 1800`
-  (raw ≥ 2295) and `bright_threshold = 2800` (raw ≤ 1295), `stable_ms = 4000`
-  — 1800 is measured here: a hand over the LDR reaches raw ~2560 (metric
-  ~1536), which the earlier 1500 line missed by 36 counts, so covering the
-  sensor did nothing until it was lowered (2026-11-15)
+- thresholds are on the **metric**, not the raw: `dark_threshold = 2100` and
+  `bright_threshold = 2500`, `stable_ms = 4000`. **Re-measured 2026-11-15 in the
+  room the board actually stands in**, because the lamps stayed on with the room
+  light on: that room reads **2820–2950 lit** and **1820–1930 with the room light
+  off** (dusk, daylight still coming in). The old `bright 2800` sat *inside* the
+  lit reading, so it hovered at the boundary, the hysteresis kept the last
+  decision ("dark") and the streetlights stayed on. 2100/2500 puts ~400 counts
+  of margin either side of both measured states. A hand over the LDR still
+  reaches metric ~1536, well under 2100, so covering it still means dark.
+  **These numbers are a property of the room, not of the firmware** — a different
+  room or a dimmer bulb needs its own two readings before the thresholds mean
+  anything (`[net] scan`-style measurement: sample raw with the light on, then
+  again with it off, and put the band between them).
 - `light.sensor_fitted = true` must be saved or the board reports no brightness
   at all (by design: a floating pin reads plausible noise); `light.installed`
   is the **separate** fact that the five streetlight lamps are wired
