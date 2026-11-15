@@ -22,6 +22,7 @@ stop_pidfile() {
 
 stop_pidfile data/run/backend.pid "Village backend"
 stop_pidfile data/run/whisper.pid "Whisper server"
+stop_pidfile data/run/vite.pid "Vite dev server"
 
 # A whisper server can outlive its PID file: an interrupted launch, or a newer
 # server overwriting the file, leaves the older process running.  Several then
