@@ -23,13 +23,17 @@ until step 8.
 
 **One master switch, then five output switches:**
 
-1. **Test mode** — the master. Nothing below can move a pin until this is on,
-   so a stray press cannot start the pump. Turning it off releases whatever the
-   five switches were holding and hands every output back to the controller on
-   the next pass.
+1. **Test mode** — the master. Turning it on **switches every output off
+   first** (the streetlights would otherwise be on in a dark room) and takes all
+   five away from the controller, so the bench always starts from a known state.
+   Nothing below can move a pin until it is on, so a stray press cannot start
+   the pump. Turning it off clears the switches, releases the pins and hands
+   every output back to the controller on the next pass.
 2. **Pump / motor (D19)**, **Organic LED (D21)**, **Plastic LED (D22)**,
    **Paper LED (D23)**, **Streetlights (D13)**. Turn one on and that output is
-   driven; turn it off and it is released.
+   driven; turn it off and it is released. Under the pump switch the page shows
+   what **D19 is actually at** (`D19 is HIGH/LOW`), which is the thing to trust
+   if a motor does not turn.
 
 Both levels are **session-only**: a reboot puts the outputs back under normal
 control, so a forgotten switch cannot survive a power cycle.

@@ -183,8 +183,21 @@ POST /api/v1/commands  {"type":"TEST_OUTPUT","parameters":{"output":"pump","on":
 ```
 
 Verified on the board 2026-11-16 over the app's own route: all four LEDs read
-`on=true` then `off=false` in `status.test.leds.{organic,plastic,paper,streetlights}`.
-`status.test` is `{active, pump, leds{...}}`.
+`on=true` then `off=false` in `status.test.leds.{organic,plastic,paper,streetlights}`,
+and the pump reads `pump_pin=true` when switched on. `status.test` is
+`{enabled, pump, pump_pin, leds{...}}`.
+
+**`pump_pin` is `digitalRead(D19)` — the pad, not the intent, and it is why the
+pump switch once looked broken.** `applyPump()` refuses to raise the gate unless
+`VILLAGE_PUMP_COMMISSIONED` **and** `config.irrigation.pump_enabled` are both
+true, and the commissioning gate is deliberately closed, so `TEST_OUTPUT
+pump on` set the switch `true` while D19 stayed LOW (reported 2026-11-16). The
+bench path writes the pad through a separate **`applyPumpDirect()`**, used in
+exactly two places (the loop while test mode owns the outputs, and the
+`TEST_OUTPUT` handler). **Every other caller must keep using `applyPump()`** —
+otherwise the pump could run with the gate closed for reasons nobody asked for.
+Measured after the fix: `TEST_MODE on` → every output off and `pump_pin=false`;
+`pump on` → **`pump_pin=true`**; `pump off` → `false`.
 
 Four things worth knowing before using it:
 
@@ -195,8 +208,11 @@ Four things worth knowing before using it:
   the soil probe, the tank probe, the commissioning gate, the cooldown or the
   kill switch: the pump runs while its switch is on and does not stop by itself
   ("I will take care of any protection manually").
-- **Both levels are session-only** — a reboot clears `test_enabled` as well as
-  `test_active`, so a forgotten master switch cannot survive a power cycle.
+- **Turning the master on forces every output off first**, then takes all five
+  from the normal drivers — otherwise test mode inherits whatever was on (in a
+  dark room, the streetlights), which is not the state anyone bench-tests in.
+- **The master switch is session-only** — a reboot clears `test_enabled`, so a
+  forgotten switch cannot survive a power cycle.
 - **The first `TEST_OUTPUT` latches `rt.test_active`**, after which the normal
   pump / streetlight / waste drivers stand down for the rest of the session —
   otherwise the two would write the same pins every pass and the relay would
