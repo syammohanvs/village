@@ -84,8 +84,9 @@ water physically flowed. The dashboard keeps the two statements separate.
    prediction lights the plastic LED. Move it away; show that repeated frames
    do not count as new items. Point out that recognition is not proof of
    disposal.
-5. **Voice.** Press the microphone, speak one command, show the recognised text
-   and the matched command. Try “do not start irrigation” to show that a
+5. **Voice.** Press the microphone at the top of **Our Village** (the language
+   choices sit directly under it if a visitor wants another language first),
+   speak one command, show the recognised text and the matched command. Try “do not start irrigation” to show that a
    negated request is refused without action.
 6. **What Happened.** Show the command log and the recognition event.
 7. **Demo mode (optional).** Turn it on for a fast scenario demonstration:

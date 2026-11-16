@@ -233,3 +233,27 @@ describe('unknown readings', () => {
     }
   });
 });
+
+describe('Our Village — the microphone stands alone', () => {
+  it('centres the microphone with the language choices under it', async () => {
+    render(<App />);
+    const mic = await screen.findByTestId('start-voice');
+    const languages = await screen.findByRole('group', { name: 'Language' });
+
+    // Both live in the one header, and the language choices follow the
+    // microphone -- the layout is a column, so that is "below".
+    const header = mic.closest('.village-simple-top');
+    expect(header).not.toBeNull();
+    expect(header).toContainElement(languages);
+    expect(mic.compareDocumentPosition(languages) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(languages).toHaveClass('village-simple-langs');
+  });
+
+  it('still offers all three spoken languages under the microphone', async () => {
+    render(<App />);
+    const languages = await screen.findByRole('group', { name: 'Language' });
+    for (const code of ['en', 'ml', 'hi']) {
+      expect(within(languages).getByTestId(`invite-lang-${code}`)).toBeInTheDocument();
+    }
+  });
+});

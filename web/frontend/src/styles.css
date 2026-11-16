@@ -1461,10 +1461,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    No explanatory paragraphs, no "Try / Watch" notes, no activity strip. */
 .village-page--minimal { gap: 16px; }
 .village-simple-top {
+  /* The microphone is this page's one action, so it stands alone in the middle
+     and the language choices sit directly beneath it -- reading left-to-right
+     with the language out at the edge buried the thing the page is for
+     (2026-11-16). */
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
 }
 .mic-button {
   display: grid;
@@ -1482,7 +1488,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .mic-button:hover { transform: translateY(-1px) scale(1.02); }
 .mic-button:active { transform: scale(0.97); }
 .mic-button:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
-.village-simple-langs { margin: 0; }
+.village-simple-langs { margin: 0; justify-content: center; }
 .village-simple-note {
   margin: 0;
   color: var(--muted);

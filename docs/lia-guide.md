@@ -26,9 +26,12 @@ large choices:
 - Talk to the village
 - Help me with a problem
 
-The language is chosen once, in **Setup → Voice & Camera → Spoken language**,
-and the same choice is used by Sara, the voice panel and the invitation on the
-home page. Inside Sara a visitor can still switch language at any time.
+The language is chosen in **Setup → Voice & Camera → Spoken language**, and the
+**Our Village** page now shows the same three choices directly under its
+microphone — the microphone stands alone, centred, with English / മലയാളം / हिन्दी
+beneath it, so a visitor can switch before speaking without leaving the page.
+Whichever place is used, one choice drives Sara, the voice panel and the
+invitation. Inside Sara a visitor can still switch language at any time.
 
 The card also offers a **Read aloud** switch and **Maybe later**. Choosing a
 topic counts as seeing the welcome, so it does not appear again on that
