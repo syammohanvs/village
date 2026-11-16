@@ -64,6 +64,20 @@ visitors cannot be used to press **Water** or change calibration.
   passes or fails by timing — which is exactly how the first version of this
   work went red.
 
+## Voice (whisper + Sara)
+
+- The speech server is started by `scripts/whisper.sh` (`start|status|stop`),
+  called by both `launch.sh` and `dev.sh`. `dev.sh` used not to start it at all,
+  which is why the microphone was disabled with "Whisper server is not
+  reachable" in a dev session (2026-11-17).
+- Model choice and its measured behaviour are in `docs/operation.md` § "The
+  speech server and the model". English is good on `ggml-base.bin`; Malayalam
+  and Hindi recognition is weak on every model that fits this CPU's speed budget
+  — the **parser** understands Malayalam/Hindi text correctly, so do not "fix"
+  `intents.py` for a bad transcript.
+- The panel greets on open ("I am Sara. How may I help you?") in the page's
+  language, once per opening, and stays silent when `tts_enabled` is off.
+
 ## ESP32 firmware
 
 > **ALWAYS FLASH AN OTA-CAPABLE IMAGE. This is a standing rule (2026-11-15).**

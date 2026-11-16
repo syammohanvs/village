@@ -180,6 +180,31 @@ Malayalam and Hindi recognition must be tested with the child's actual speech.
 The phrase dictionary is `shared/intents.json`; add the words the child really
 uses, then re-run the backend.
 
+### The speech server and the model
+
+Speech is recognised by whisper.cpp on this laptop, started by whichever script
+started the app (`./scripts/whisper.sh start` does it on its own; `status` says
+whether it is answering). The model is chosen with `VILLAGE_WHISPER_MODEL` in
+`.env`:
+
+| model | size | a command takes | English | Malayalam and Hindi |
+| --- | --- | --- | --- | --- |
+| `ggml-base.bin` (default) | 148 MB | 1–2 s | good | weak |
+| `ggml-small.bin` | 488 MB | ~3 s | good | weak, sometimes better on accents |
+| `ggml-large-v3-turbo.bin` | 1.6 GB | 18–25 s here | good | weak, and far too slow |
+| `ggml-large-v3.bin` | 3.1 GB | 25–90 s here | good | not usable on this CPU |
+
+Measured 2026-11-17 on this laptop: **English is reliable on every model**, and
+a *synthesized* Malayalam sentence was misheard by all of them (Tamil,
+Devanagari or Gurmukhi script). The parser itself is fine — the same sentence
+typed as Malayalam gives the right command — so the gap is in recognition, and
+it may be the synthetic test voice rather than the model. Test with real speech
+before changing the model; the big ones are unusable at 20 s per command here.
+
+When the speech model returns text in another script, the panel says so plainly
+inside **What will be sent** and keeps the words it heard on screen, instead of
+asking the visitor to name a device it never understood.
+
 ## Shutdown
 
 ```bash
