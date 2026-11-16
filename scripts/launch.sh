@@ -9,6 +9,10 @@ cd "$ROOT"
 mkdir -p data/logs data/run
 
 if [ ! -f .env ]; then cp .env.example .env; fi
+# Before .env is sourced: the board may be on the Windows hotspot, which this
+# container cannot route to, and the relay/address can have changed since the
+# last start.  Best effort -- a missing board must not stop the exhibition.
+./scripts/relay.sh ensure || true
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 

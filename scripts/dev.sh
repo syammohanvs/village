@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [ -f .env ] || cp .env.example .env
+# Before .env is sourced: the board may be on the Windows hotspot, which this
+# container cannot route to, and the relay/address can have changed since the
+# last start.  Best effort -- a missing board must not stop the app.
+./scripts/relay.sh ensure || true
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 VENV="${VILLAGE_VENV:-$ROOT/.venv}"
