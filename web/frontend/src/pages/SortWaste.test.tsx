@@ -1725,4 +1725,47 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(vi.mocked(api.wasteCorrect).mock.calls[0]).toEqual(['capture.jpg', 'plastic']);
     expect(await screen.findByText(/now in the training set for Plastic/)).toBeInTheDocument();
   });
+  it('still answers when the board is offline, and says the LED was not lit', async () => {
+    // The camera and the model run on this laptop; only the bin indicator needs
+    // the board.  This used to be a red error with no answer at all.
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 31, category: 'plastic', confidence: 0.9 },
+      indication: null,
+      physical: false,
+      led_note: 'No bin LED was lit: the controller did not answer. The sorting answer above still applies.',
+    });
+    predictionState.current = predictionsFor('Plastic', 0.95);
+
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
+    fireEvent.click(await screen.findByTestId('auto-watch'));
+
+    expect(await screen.findByTestId('waste-result', {}, { timeout: 8000 })).toHaveTextContent('Plastic');
+    const note = await screen.findByTestId('waste-led-note');
+    expect(note).toHaveTextContent('No bin LED was lit');
+    // The routing is still shown -- that is the point.
+    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/plastic bin/i);
+  });
 });

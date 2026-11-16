@@ -571,7 +571,8 @@ def create_app(
         # percentage and no "bin full" alert.  The LED command below is the
         # whole physical outcome, and it fails fast and says so.
         snapshot = await gateway.snapshot(body.mode, allow_poll=False)
-        indication: dict[str, Any]
+        indication: dict[str, Any] | None
+        led_reason: str | None = None
         try:
             indication = await gateway.send_command(
                 mode=body.mode,
@@ -582,7 +583,16 @@ def create_app(
             )
         except RequestReuseError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        confirmed = bool(indication.get("confirmed") and
+        except Exception as exc:  # noqa: BLE001
+            # The board is a convenience for the LED; the answer is not.  This
+            # used to fail the whole request, so with the controller off the
+            # page showed an error instead of the bin it had just decided on --
+            # while a referral (which never touches the board) answered fine
+            # (reported 2026-11-16).  Classifying without the board is a
+            # legitimate mode: the camera and the model live on this laptop.
+            indication = None
+            led_reason = str(exc) or "the controller did not answer"
+        confirmed = bool(indication and indication.get("confirmed") and
                          (indication.get("ack") or {}).get("result") == "ACCEPTED")
         record = await db.add_recognition(
             body.mode, category, body.confidence, body.model,
@@ -601,6 +611,9 @@ def create_app(
             "recognition": record,
             "indication": indication,
             "physical": snapshot.get("physical", False),
+            "led_note": None if indication else (
+                f"No bin LED was lit: {led_reason}. The sorting answer above still applies."
+            ),
             "note": "Recognition is not proof that the item was deposited.",
         }
 

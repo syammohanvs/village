@@ -1462,6 +1462,11 @@ export function SortWaste() {
                     'No destination could be worked out for this item. Contact the Gram Sahayak.'
                   )}
                 </p>
+                {recognition.led_note && (
+                  <p className="hint" data-testid="waste-led-note">
+                    {recognition.led_note}
+                  </p>
+                )}
                 {disposal?.support && (
                   <p className="hint" data-testid="waste-support">
                     {SUPPORT.contact

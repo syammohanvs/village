@@ -739,3 +739,38 @@ async def test_test_mode_is_the_master_switch_above_the_outputs(tmp_path):
         )
         assert off.status_code == 200
         assert real.calls[-1]["parameters"]["on"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_bin_answer_survives_a_board_that_cannot_be_reached(tmp_path):
+    """Classifying without the board is a legitimate mode.
+
+    The camera and the model live on this laptop; the board only lights the LED.
+    This used to fail the whole request, so with the controller off the page
+    showed an error instead of the bin it had just decided on -- while a referral
+    (which never asks the board anything) answered normally (reported 2026-11-16).
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, gateway, app):
+        async def unreachable(**kwargs):
+            raise RuntimeError("Provider error: controller unreachable")
+
+        gateway.send_command = unreachable  # type: ignore[assignment]
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live",
+                "category": "plastic",
+                "confidence": 0.81,
+                "model": "test",
+                "request_id": "offline-bin-01",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["indication"] is None
+    assert "No bin LED was lit" in body["led_note"]
+    # The answer itself is intact and recorded, marked as not physically shown.
+    assert body["recognition"]["category"] == "plastic"
+    assert body["recognition"]["indication_confirmed"] in (False, 0)

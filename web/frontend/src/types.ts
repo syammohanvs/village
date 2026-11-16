@@ -323,6 +323,17 @@ export interface WasteRecognitionResult {
   category?: string;
   indicator?: { category?: string; active?: boolean; remaining_ms?: number };
   alert?: string | null;
+  /**
+   * Set when the item had an answer but the bin LED could not be lit, e.g. the
+   * controller was offline.  The routing stands; only the lamp is missing.
+   */
+  led_note?: string | null;
+  /** The board's answer about the bin LED, or null when it could not be asked. */
+  indication?: {
+    confirmed?: boolean;
+    ack?: { result?: string; reason?: string; reason_code?: string };
+  } | null;
+  physical?: boolean;
   message?: string;
 }
 

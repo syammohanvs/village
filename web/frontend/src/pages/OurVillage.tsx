@@ -299,6 +299,7 @@ export function OurVillage() {
               className="btn btn--primary"
               onClick={() => navigate('/waste')}
               data-testid="open-sort-waste"
+              title="The camera and the model run on this laptop; only the bin LED needs the board."
             >
               <IconCamera size={16} /> Open camera
             </button>
