@@ -74,6 +74,20 @@ backend serves it from disk.
 
 ### The board on the Windows Mobile Hotspot (2026-11-16)
 
+**The point of this arrangement: it does not matter which Wi-Fi the laptop
+joins.** The board has **one** compiled network credential — the hotspot's SSID
+and password — and those never change. So at any venue (a home router, a phone
+hotspot, a customer's Wi-Fi, no Wi-Fi at all) the board looks for, and finds,
+the same network it always finds. The venue's Wi-Fi only changes **what the
+hotspot shares upstream**; it never changes the hotspot's own subnet
+(`192.168.137.0/24`), so neither the board's neighbourhood nor the relay's
+target depends on where the laptop is. **No internet is needed for any of it** —
+the board and the laptop only need to reach each other.
+
+What does depend on the laptop: the **hotspot must be on**, and the **app must
+be running**. Everything else (lease changes, the relay dying, the WSL address
+moving, the hotspot being switched off) repairs itself — see below.
+
 **Symptom, and it looks exactly like a dead board:** the app says
 `connected false`, the Setup switches answer `DEVICE_UNREACHABLE`, and
 `curl` from this container times out (`http_code 000`, exit 28) — while the
@@ -98,7 +112,7 @@ and in `.env`:
 
 ```
 VILLAGE_DEVICE_URL=http://172.29.192.1:8090   # the relay, from this container
-VILLAGE_DEVICE_DIRECT=http://192.168.137.168  # the board, as Windows sees it
+VILLAGE_DEVICE_DIRECT=http://192.168.137.168  # a first guess for the board's lease
 ```
 
 `172.29.192.1` is the Windows host on the WSL network; `192.168.1.3` (its Wi-Fi
@@ -117,12 +131,21 @@ it to `%USERPROFILE%\village-flash\tcp-relay.py` and starts it hidden.
   permanent fix (it routes from WSL natively). It needs that network's password
   compiled in, and Windows withholds the stored key without elevation.
 
-**Gotchas:** the relay is a **Windows** process, so it dies when the laptop
-reboots or the hotspot is restarted — re-run `./scripts/relay.sh start` and the
-app picks up within a second (it polls at 1 Hz). A board that has moved to a
-different hotspot lease needs `VILLAGE_DEVICE_DIRECT` updated (the DHCP address
-was `.168` here). `scripts/relay.sh status` is the one command that says whether
-the whole chain works.
+**Gotchas, and each one is already handled:**
+
+- The relay is a **Windows** process, so it dies when the laptop reboots. Nothing
+  to remember: `dev.sh`/`launch.sh` call `relay.sh ensure` before the backend
+  reads `.env`, which restarts it if it is gone (and repairs the URL, see the
+  next paragraph).
+- **The board's lease really does move** — it was `.168`, then `.197`, then
+  `.222` within one session. `VILLAGE_DEVICE_DIRECT` is only the **first guess**:
+  the relay probes it and, failing that twice, sweeps the subnet for the device
+  API and switches to whatever it finds. Do not chase a changed address by hand.
+- **The WSL gateway can change** when WSL restarts (the subnet is picked per
+  boot), which is what `ensure` rewrites in `.env` before the backend starts.
+- `scripts/relay.sh status` is the one command that says whether the whole chain
+  works, and `windows hotspot -> Off` in its output is the tell for the failure
+  that looks like a dead board.
 
 ### The hotspot itself is part of the chain (2026-11-16, the powerbank incident)
 
@@ -213,16 +236,13 @@ Four things worth knowing before using it:
   dark room, the streetlights), which is not the state anyone bench-tests in.
 - **The master switch is session-only** — a reboot clears `test_enabled`, so a
   forgotten switch cannot survive a power cycle.
-- **The first `TEST_OUTPUT` latches `rt.test_active`**, after which the normal
-  pump / streetlight / waste drivers stand down for the rest of the session —
+- **Enabling the master switch takes all five outputs at once** (there is no
+  per-output latch: `rt.test_active` was removed in `8fd68b5`, because after the
+  master switch existed it would have been a second flag that had to agree with
+  the first). While it is on, the pump / streetlight / waste drivers stand down,
   otherwise the two would write the same pins every pass and the relay would
-  chatter. Consequence: **after using the page, the waste LEDs and the
-  automatic streetlights stay idle until a reboot** (they were commanded on but
-  the panel owned the pins; the lamps were left OFF in a dark room until the
-  board was reset). Reboot to hand control back — `python read-serial.py` in
-  `%USERPROFILE%\village-flash` pulses RTS, or just power-cycle.
-- **Sending a command to one output latches all five.** That is what makes the
-  first press of any switch stop the drivers fighting it.
+  chatter. Turning the master off — or rebooting — hands them back; no reboot is
+  needed any more just to stop the panel owning the pins.
 - `config.test` **no longer exists** — the gate it carried went with the gating.
   `DeviceConfig` is exactly what it was before test mode was invented, so config
   revision 23 survived the change.
