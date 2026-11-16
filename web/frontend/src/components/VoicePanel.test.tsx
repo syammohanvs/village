@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -637,5 +637,79 @@ describe('when the speech server is not running', () => {
     await user.click(await screen.findByTestId('start-voice'));
 
     await waitFor(() => expect(screen.getByTestId('voice-start')).toBeEnabled());
+  });
+});
+
+describe('Sara greets when the panel opens', () => {
+  it('says who she is and asks how to help, in the chosen language', async () => {
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+
+    await openPanel();
+
+    await waitFor(() =>
+      expect(speech.speakReply).toHaveBeenCalledWith(
+        'I am Sara. How may I help you?',
+        'en',
+        null,
+      ),
+    );
+  });
+
+  it('greets in Malayalam when Malayalam is the language chosen', async () => {
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+
+    // The language is chosen on the page before the panel opens: the greeting
+    // is spoken once per opening, in whatever is chosen then.
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByTestId('invite-lang-ml'));
+    await user.click(screen.getByTestId('start-voice'));
+
+    await waitFor(() =>
+      expect(speech.speakReply).toHaveBeenCalledWith(
+        expect.stringContaining('ഞാൻ സാറയാണ്'),
+        'ml',
+        null,
+      ),
+    );
+  });
+
+  it('stays quiet when reading aloud is switched off', async () => {
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: false }));
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+
+    await openPanel();
+    // Give the effect its chance, then assert nothing was spoken.
+    await waitFor(() => expect(screen.getByTestId('voice-panel')).toBeInTheDocument());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(speech.speakReply).not.toHaveBeenCalled();
+  });
+});
+
+describe('a transcript that came back in the wrong script', () => {
+  it('names it instead of pretending the sentence was understood', async () => {
+    // Whisper answered Malayalam audio in Tamil script on this machine
+    // (2026-11-17).  The parser can only say "not understood", so the panel
+    // says what actually happened and keeps the heard sentence on screen.
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'unknown',
+      kind: 'unknown',
+      transcript: 'விலக்குகள் ஆனக்குக்கா',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+
+    const note = await screen.findByTestId('voice-script-note');
+    expect(note).toHaveTextContent(/did not hear Malayalam clearly/i);
+    // The words that were heard stay visible, so the reader can see why.
+    expect(screen.getByTestId('voice-staged-text')).toHaveTextContent('விலக்குகள்');
   });
 });

@@ -7,7 +7,7 @@ import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
-import { LIVE_COPY, describeVillage } from '../lib/lia';
+import { LIVE_COPY, VOICE_GREETING, describeVillage, inScript } from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
 import type { DeviceStatus, VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
@@ -229,6 +229,32 @@ export function VoicePanel() {
       setSpeaking(false);
     }
   };
+
+  // The greeting must not re-run when a reply changes state; the ref holds the
+  // newest speak() so the effect below depends on `open` and `language` only.
+  const speakRef = useRef(speak);
+  speakRef.current = speak;
+  const greetedRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      greetedRef.current = false;
+      return;
+    }
+    if (greetedRef.current) return;
+    // Wait for the preference before speaking: a greeting that ignores "do not
+    // read aloud" because the settings had not arrived yet is a voice nobody
+    // asked for.
+    if (!settings.data) return;
+    greetedRef.current = true;
+    if (settings.data.tts_enabled === false) return;
+    // "I am Sara. How may I help you?" in the language chosen on the page.
+    // Silence if this laptop has no voice; the greeting is a courtesy, never a
+    // reason to show an error over the command box.
+    if (!speechSupported()) return;
+    void speakRef
+      .current(VOICE_GREETING[language] ?? VOICE_GREETING.en, null)
+      .catch(() => undefined);
+  }, [open, language, settings.data]);
 
   async function start() {
     if (state === 'listening' || state === 'processing' || speaking) return;
@@ -526,6 +552,15 @@ export function VoicePanel() {
   // it (it clears once the answer arrives), else the sentence Whisper heard.
   const typedNow = typed.trim();
   const staged = typedNow || transcript;
+  // Whisper can answer in another script even when told which language it is:
+  // Malayalam audio came back in Tamil script here (2026-11-17).  Saying that
+  // is more useful than a generic "not understood", and the sentence stays on
+  // screen so the reader can see what was actually heard.
+  const wrongScript =
+    !typedNow &&
+    Boolean(transcript) &&
+    language !== 'en' &&
+    !inScript(transcript, language);
 
   if (!open) return null;
 
@@ -691,6 +726,13 @@ export function VoicePanel() {
                 ? 'This is exactly what Send gives the village.'
                 : 'This is the sentence the village was given — Whisper only changes how the words arrive.'}
             </p>
+            {wrongScript && (
+              <p className="voice-blocker" data-testid="voice-script-note">
+                The speech model did not hear {VOICE_LANGUAGE_NAMES[language] ?? language} clearly —
+                that is not {VOICE_LANGUAGE_NAMES[language] ?? language} script. Say it again a
+                little slower, or type it below.
+              </p>
+            )}
           </>
         ) : (
           <p className="voice-heard" data-testid="voice-staged-text">

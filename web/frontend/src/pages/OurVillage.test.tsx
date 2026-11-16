@@ -404,22 +404,6 @@ describe('Waste card — the camera follows the board', () => {
   });
 });
 
-describe('Talk to Sara on the village page', () => {
-  it('sits under the microphone, with the guide behind it', async () => {
-    const user = userEvent.setup();
-    await renderReady();
-
-    const sara = screen.getByTestId('talk-to-lia');
-    expect(sara).toHaveTextContent('Talk to Sara');
-    // Beside the microphone, in the page's own header block -- the one action
-    // the page offers a visitor who wants to ask a question.
-    expect(sara.closest('.village-simple-top')).not.toBeNull();
-
-    await user.click(sara);
-    expect(await screen.findByTestId('lia-guide')).toBeInTheDocument();
-  });
-});
-
 describe('the simulation lab: lamps, the light slider and the pump', () => {
   beforeEach(() => {
     window.localStorage.setItem('village.demoMode', 'demo');
@@ -471,9 +455,11 @@ describe('the simulation lab: lamps, the light slider and the pump', () => {
     await waitFor(() =>
       expect(api.demoScenario).toHaveBeenCalledWith({ light_metric: 3000 }),
     );
-    expect(vi.mocked(api.demoScenario).mock.calls.filter(
-      (call) => (call[0] as { light_metric?: number }).light_metric === 3000,
-    )).toHaveLength(1);
+    expect(
+      vi.mocked(api.demoScenario).mock.calls.filter(
+        (call) => (call[0] as { light_metric?: number }).light_metric === 3000,
+      ),
+    ).toHaveLength(1);
   });
 
   it('says whether the pump is on, so a spoken "water the plants" is visible on the page', async () => {

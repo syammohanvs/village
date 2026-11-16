@@ -12,7 +12,6 @@ import {
   IconWind,
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
-import { TalkToLia } from '../components/TalkToLia';
 import { LightLevelSlider, StreetLampStrip } from '../components/StreetLamps';
 import { Chip } from '../components/ui';
 import { api, errorMessage } from '../lib/api';
@@ -194,9 +193,6 @@ export function OurVillage() {
         >
           <IconMic size={28} />
         </button>
-        {/* Sara sits under the microphone rather than in a menu: on a page with
-            no menu this is the only way to ask the village a question. */}
-        <TalkToLia className="talk-lia--page" />
         <LanguagePicker
           className="village-simple-langs"
           options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}

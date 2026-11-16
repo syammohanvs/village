@@ -725,3 +725,27 @@ export function saveLiaPrefs(prefs: LiaPrefs): void {
     /* storage may be unavailable; the guide still works for this visit */
   }
 }
+
+/**
+ * What Sara says the moment the voice panel slides in.
+ *
+ * Short on purpose: it is a greeting before a command, not the guide's
+ * introduction.  Spoken through the same local voice as every other reply, so
+ * it follows the language chosen on the page.
+ */
+export const VOICE_GREETING: Record<string, string> = {
+  en: 'I am Sara. How may I help you?',
+  ml: 'ഞാൻ സാറയാണ്. എന്ത് സഹായം വേണം?',
+  hi: 'मैं सारा हूँ। मैं आपकी क्या मदद कर सकती हूँ?',
+};
+
+/** True when the text carries at least one character of that language's script. */
+export function inScript(text: string, language: string): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return true;
+  if (language === 'ml') return /[\u0D00-\u0D7F]/.test(value);
+  if (language === 'hi') return /[\u0900-\u097F]/.test(value);
+  if (language === 'en') return /[A-Za-z]/.test(value);
+  // A language this build does not know is not judged.
+  return true;
+}

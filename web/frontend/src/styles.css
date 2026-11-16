@@ -1483,15 +1483,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .talk-lia-label { font-size: 14px; }
 
-/* The village page's copy: an inline pill under the microphone, not a
-   full-width row (a row there would read as another card). */
-.talk-lia--page {
-  width: auto;
-  gap: 9px;
-  padding: 5px 14px 5px 5px;
-  border-radius: 999px;
-  background: rgba(124, 32, 44, 0.32);
-}
 .appbar-lia { display: none; }
 
 .setup-link {
