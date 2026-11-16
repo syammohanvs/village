@@ -4,6 +4,8 @@
 #   ./scripts/relay.sh ensure    # make sure the board is reachable (safe to call every start)
 #   ./scripts/relay.sh status    # is the whole chain working, and where is the board?
 #   ./scripts/relay.sh start     # run the relay on the Windows host
+#   ./scripts/relay.sh hotspot     # is the hotspot on? (the board's only network)
+#   ./scripts/relay.sh hotspot-on  # switch it back on if Windows turned it off
 #   ./scripts/relay.sh stop
 #
 # Why: Windows Mobile Hotspot is ICS.  It gives the board 192.168.137.x and
@@ -81,6 +83,7 @@ find_flash_dir() {
 FLASH_DIR="$(find_flash_dir)"
 RELAY_SCRIPT="$FLASH_DIR/tcp-relay.py"
 RELAY_LOG="$FLASH_DIR/relay.log"
+HOTSPOT_PS1="$FLASH_DIR/windows-hotspot.ps1"
 
 need_interop() {
   if ! command -v powershell.exe >/dev/null 2>&1; then
@@ -109,6 +112,15 @@ start_relay() {
   ps "Start-Process -FilePath python -ArgumentList 'tcp-relay.py','--listen','$LISTEN_PORT','--subnet','$subnet','--upstream','${direct_host}:80','--log','relay.log' -WorkingDirectory '$win_dir' -WindowStyle Hidden"
   echo "  relay started on the Windows host: 0.0.0.0:$LISTEN_PORT -> board on $subnet.0/24"
 }
+
+# The Windows Mobile Hotspot, which is the board's only network.  `state`
+# answers On/Off/NoInternetProfile -- the difference between "the board is off"
+# and "there is nothing for the board to join" is the whole diagnosis.
+hotspot() {
+  cp "$ROOT/scripts/windows-hotspot.ps1" "$HOTSPOT_PS1" 2>/dev/null || true
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$HOTSPOT_PS1")" -Action "$1" 2>&1 | sed 's/\r$//'
+}
+hotspot_state() { hotspot state | grep -oE 'hotspot=[A-Za-z]+' | tail -1 | cut -d= -f2; }
 
 wait_for_board() {
   local tries="${1:-20}" code
@@ -163,6 +175,23 @@ ensure() {
     return 0
   fi
 
+  # Before blaming the board, ask whether there is a network for it to join at
+  # all.  This is the single failure that looks identical to a dead board.
+  local state
+  state="$(hotspot_state)"
+  if [[ "$state" == "Off" ]]; then
+    echo "  the Windows Mobile Hotspot is OFF -- switching it back on"
+    hotspot on | sed 's/^/    /'
+    if wait_for_board "${VILLAGE_RELAY_HOTSPOT_WAIT:-25}"; then
+      echo "  board reachable at $DEVICE_URL (after switching the hotspot on)"
+      return 0
+    fi
+  elif [[ "$state" == "NoInternetProfile" ]]; then
+    echo "  the laptop has no internet connection to share, so the hotspot cannot run." >&2
+    echo "  Join a Wi-Fi network, then: ./scripts/relay.sh hotspot-on" >&2
+    return 0
+  fi
+
   echo "  the relay is up but no board answered." >&2
   echo "  Check that the Windows Mobile Hotspot is ON and the board's LED is on:" >&2
   echo "    powershell.exe \"Invoke-WebRequest -UseBasicParsing http://${direct_host}/api/v1/health\"" >&2
@@ -199,6 +228,9 @@ case "${1:-ensure}" in
     for pid in $pids; do ps "Stop-Process -Id $pid -Force"; done
     echo "relay stopped (was pid $pids)"
     ;;
+  hotspot)      need_interop; hotspot state ;;
+  hotspot-on)   need_interop; hotspot on; if wait_for_board "${VILLAGE_RELAY_HOTSPOT_WAIT:-25}"; then echo "  board reachable at $DEVICE_URL"; else echo "  hotspot on, no board yet (it rejoins by itself)" >&2; fi ;;
+  hotspot-off)  need_interop; hotspot off ;;
   status)
     code="$(probe)"
     printf 'board via %-32s -> HTTP %s %s\n' "$DEVICE_URL" "${code:-000}" \
@@ -206,6 +238,8 @@ case "${1:-ensure}" in
     if command -v powershell.exe >/dev/null 2>&1; then
       pids="$(relay_pids)"
       echo "relay on the Windows host          -> ${pids:-not running}${pids:+ (pid)}"
+      state="$(hotspot_state)"
+      echo "windows hotspot                    -> ${state:-unknown}$([[ "$state" == "Off" ]] && echo '  <- the board has no network; ./scripts/relay.sh hotspot-on')"
       if [[ -f "$RELAY_LOG" ]]; then
         echo "where the relay last found the board:"
         grep -E "found the board|board is at|no board answered|did not accept" "$RELAY_LOG" 2>/dev/null | tail -3 | sed 's/^/  /'
@@ -213,7 +247,7 @@ case "${1:-ensure}" in
     fi
     ;;
   *)
-    echo "usage: $0 {ensure|status|start|stop}" >&2
+    echo "usage: $0 {ensure|status|start|stop|hotspot|hotspot-on|hotspot-off}" >&2
     exit 2
     ;;
 esac

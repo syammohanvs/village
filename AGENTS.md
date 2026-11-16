@@ -124,6 +124,51 @@ different hotspot lease needs `VILLAGE_DEVICE_DIRECT` updated (the DHCP address
 was `.168` here). `scripts/relay.sh status` is the one command that says whether
 the whole chain works.
 
+### The hotspot itself is part of the chain (2026-11-16, the powerbank incident)
+
+The board's **only** network credential is the hotspot's SSID, so when the
+hotspot is switched off the board has no network at all — its Wi-Fi is not
+"down", there is simply nothing to join. That failure is indistinguishable from
+a dead board by looking at the app: `connected false`, no `192.168.137.x`
+address on Windows, no ARP entry, nothing on the subnet. It happened on
+2026-11-16 right after the board was moved to a powerbank; the board was
+perfectly healthy, the **hotspot had been switched off**.
+
+Diagnose it in this order, and do not start re-flashing:
+
+```bash
+./scripts/relay.sh status        # board ✓/✗, relay pid, hotspot On/Off, last discovery
+./scripts/relay.sh hotspot       # just the hotspot state
+./scripts/relay.sh hotspot-on    # switch it on (no admin, no UAC prompt)
+```
+
+`hotspot=NoInternetProfile` is the other case: the laptop has no uplink to
+share, so the hotspot cannot run at all — join a network first.
+
+**`ensure` (called by both start scripts) now fixes this too:** board not
+reachable → ask the hotspot → if it is `Off`, start it and wait again (up to
+`VILLAGE_RELAY_HOTSPOT_WAIT`, default 25 s). Measured end to end: hotspot off,
+`./scripts/relay.sh ensure` alone → hotspot back `On`, board reachable, app
+`connected true` in **39 s** (most of it the board's own ~15 s rejoin, plus the
+relay's 10 s scan cooldown). `hotspot-on` from `Off` took **18 s**.
+
+The hotspot is read and set through `scripts/windows-hotspot.ps1`
+(`NetworkOperatorTetheringManager`, the WinRT API — `netsh wlan` cannot do
+this), which needs no elevation for the interactive user.
+
+**The lease really does move, and discovery is what saves it.** After the
+hotspot came back the board rejoined at **`192.168.137.197`**, not `.168`; the
+relay swept, logged `found the board at 192.168.137.197` and the app
+reconnected with no intervention. That is the concrete reason the relay scans
+rather than trusting `VILLAGE_DEVICE_DIRECT`. Moving the board onto the
+powerbank also **rebooted** it (`boot b-c07581c2`, new boot id) — config
+revision 23 and every calibration survived, as NVS settings should.
+
+Two more facts worth keeping from that incident: a **powerbank is fine** for
+this board (it ran for minutes at ~80–250 mA), and the board's **streetlights
+stay under automatic control** across a power cut — after the reboot
+`actuators.streetlights.commanded` was `true` again with the room dark.
+
 ### Driving the outputs by hand: the Test outputs page (2026-11-16)
 
 **Start here, not with a bench build.** Setup → **Test outputs** in the app is
