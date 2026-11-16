@@ -89,12 +89,22 @@ water physically flowed. The dashboard keeps the two statements separate.
    speak one command, show the recognised text and the matched command. Try “do not start irrigation” to show that a
    negated request is refused without action.
 6. **What Happened.** Show the command log and the recognition event.
-7. **Demo mode (optional).** Turn it on for a fast scenario demonstration:
-   Dry soil, Low water, Night, Fill a bin. The banner says simulated data and
-   physical controls are disabled, and the connection pill reads **Simulation**
-   instead of Live — a simulated page never claims the board is answering.
-   Press **Back to live readings** on the banner, or the pill itself, to leave.
-   Never leave Demo mode on for the real hardware part of the talk.
+   **The connection state is reported once**, by the pill in the top bar:
+   Live / Stale / Offline / Simulation, with the raw reason (and the last frame's
+   age) on hover. There is no second sentence across the top of the page — it
+   said the same thing and pushed the cards down.
+7. **Demo mode (optional).** Turn it on in **Setup → Simulation** for a fast
+   scenario demonstration. The same card carries the scenario buttons —
+   **Reset**, **Dry soil**, **Low water**, **Night** — because the simulator
+   starts dry but gets wet once you water it, and without a reset the Water
+   button stays correctly disabled for the next twenty minutes. The banner says
+   simulated data and physical controls are disabled, and the connection pill
+   reads **Simulation** instead of Live — a simulated page never claims the board
+   is answering. Press **Back to live readings** on the banner, or the pill
+   itself, to leave. Never leave Demo mode on for the real hardware part of the
+   talk.
+   *(There is no "Fill a bin" scenario: nothing measures bin fullness — the bins
+   have indicator LEDs only.)*
 
 ## Buttons and what they mean
 

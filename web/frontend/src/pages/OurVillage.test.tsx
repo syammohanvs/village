@@ -87,12 +87,15 @@ describe('Our Village', () => {
     expect(screen.getByTestId('water-plants')).toBeDisabled();
   });
 
-  it('says when the frame is stale', async () => {
+  it('says a frame is stale once, in the top bar', async () => {
+    // The pill is the one place connection state is reported; a banner saying
+    // the same thing only pushed the cards down (asked for 2026-11-16).
     vi.mocked(api.state).mockResolvedValue(makeState({ stale: true, ageMs: 7200 }));
     render(<App />);
 
-    expect(await screen.findByTestId('stale-banner')).toHaveTextContent(/not live/i);
-    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Stale');
+    const pill = await screen.findByTestId('connection-pill');
+    expect(pill).toHaveTextContent('Stale');
+    expect(screen.queryByTestId('stale-banner')).not.toBeInTheDocument();
   });
 
   it('shows the last frame time while live instead of a flickering millisecond count', async () => {
@@ -114,14 +117,15 @@ describe('Our Village', () => {
     );
     render(<App />);
 
-    expect(await screen.findByTestId('offline-banner')).toHaveTextContent(/controller offline/i);
-    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Offline');
+    const pill = await screen.findByTestId('connection-pill');
+    expect(pill).toHaveTextContent('Offline');
+    // The reason is kept, but on the pill (hover), not as a sentence across the
+    // top of the page.
+    expect(pill.getAttribute('title')).toMatch(/Timed out contacting the controller/);
+    expect(screen.queryByTestId('offline-banner')).not.toBeInTheDocument();
     expect(screen.getByText('Watering')).toBeInTheDocument();
     expect(screen.getByTestId('water-plants')).toBeDisabled();
     expect(screen.getByTestId('lights-auto')).toBeDisabled();
-    // The shell's banner says the controller is offline once; the page itself
-    // does not repeat it.
-    expect(screen.getByTestId('offline-banner')).toBeInTheDocument();
   });
 
   it('labels simulation and sends demo commands for Water Plants', async () => {

@@ -1,13 +1,12 @@
 import { useDemo } from '../lib/demo';
-import { formatAge } from '../lib/format';
 import { useVillage } from '../lib/village';
-import { IconAlert, IconSparkle } from './Icons';
+import { IconSparkle } from './Icons';
 
 // One line at most. The old strip could stack three warnings and push the
 // dashboard below the fold; the cards themselves already say what is unknown.
 export function StatusStrip() {
   const { demo, setMode } = useDemo();
-  const { connected, stale, simulator, ageMs, connection } = useVillage();
+  const { simulator } = useVillage();
 
   if (demo) {
     return (
@@ -44,35 +43,9 @@ export function StatusStrip() {
     );
   }
 
-  if (!connected) {
-    return (
-      <div className="status-strip" aria-live="polite">
-        <div className="banner banner--offline" role="status" data-testid="offline-banner">
-          <IconAlert size={16} />
-          <span>
-            <strong>Controller offline</strong> —{' '}
-            {ageMs === null || ageMs === undefined
-              ? 'no reading has arrived yet.'
-              : `last seen ${formatAge(ageMs)}.`}{' '}
-            {connection?.last_error ?? 'The cards stay visible; actions are disabled.'}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  if (stale) {
-    return (
-      <div className="status-strip" aria-live="polite">
-        <div className="banner banner--stale" role="status" data-testid="stale-banner">
-          <IconAlert size={16} />
-          <span>
-            <strong>Last reading {formatAge(ageMs)}</strong> — stale, not live.
-          </span>
-        </div>
-      </div>
-    );
-  }
-
+  // No banner for offline or stale: the pill in the top bar already says
+  // Offline / Stale / Live, and it carries the raw reason (and the last-frame
+  // age) in its tooltip.  A second sentence saying the same thing pushed the
+  // cards down for no information (asked for 2026-11-16).
   return null;
 }
