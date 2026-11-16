@@ -72,11 +72,102 @@ backend serves it from disk.
 > - **`VILLAGE_OTA_PASSWORD` (16 chars in `secrets.h`) must be present**, or the
 >   board refuses the upload even when the port is open.
 
-### Holding the pump pin high to test the motor (2026-11-15)
+### The board on the Windows Mobile Hotspot (2026-11-16)
 
-There is **no GPIO endpoint** — the board exposes only `health`, `status`,
-`config` and `commands` — so the pump cannot be forced from software. The one
-way to hold the gate high is the compile-time bench build:
+**Symptom, and it looks exactly like a dead board:** the app says
+`connected false`, the Setup switches answer `DEVICE_UNREACHABLE`, and
+`curl` from this container times out (`http_code 000`, exit 28) — while the
+same request from Windows returns **200**. The board is healthy; the path is
+not.
+
+**Cause: Windows Mobile Hotspot is ICS**, and ICS does not route its
+`192.168.137.0/24` from any other subnet. The board answers the Windows host
+and refuses everything arriving from WSL, whose address is `172.29.x`. Do not
+re-flash the board over this, and do not go looking for a fault in the
+firmware.
+
+**The fix in use: a relay on the Windows host.**
+
+```bash
+./scripts/relay.sh status    # is the board reachable through it?
+./scripts/relay.sh start     # copy the relay to Windows and run it
+./scripts/relay.sh stop
+```
+
+and in `.env`:
+
+```
+VILLAGE_DEVICE_URL=http://172.29.192.1:8090   # the relay, from this container
+VILLAGE_DEVICE_DIRECT=http://192.168.137.168  # the board, as Windows sees it
+```
+
+`172.29.192.1` is the Windows host on the WSL network; `192.168.1.3` (its Wi-Fi
+address) works too, because the relay binds `0.0.0.0`. `VILLAGE_DEVICE_DISCOVER`
+must be **false**: the /24 sweep would sweep `172.29.192.0/24` and find nothing.
+The relay source lives in `scripts/windows-device-relay.py`; `relay.sh` copies
+it to `%USERPROFILE%\village-flash\tcp-relay.py` and starts it hidden.
+
+**Why not the obvious alternatives** (each was considered, 2026-11-16):
+
+- `netsh interface portproxy` does the same job but needs **administrator**;
+  the Python relay binds a port with no elevation and no firewall prompt.
+- WSL `networkingMode=mirrored` would also work but restarts WSL — which kills
+  the session you are working in.
+- Connecting the board to a *router* both machine and board are on is the
+  permanent fix (it routes from WSL natively). It needs that network's password
+  compiled in, and Windows withholds the stored key without elevation.
+
+**Gotchas:** the relay is a **Windows** process, so it dies when the laptop
+reboots or the hotspot is restarted — re-run `./scripts/relay.sh start` and the
+app picks up within a second (it polls at 1 Hz). A board that has moved to a
+different hotspot lease needs `VILLAGE_DEVICE_DIRECT` updated (the DHCP address
+was `.168` here). `scripts/relay.sh status` is the one command that says whether
+the whole chain works.
+
+### Driving the outputs by hand: the Test outputs page (2026-11-16)
+
+**Start here, not with a bench build.** Setup → **Test outputs** in the app is
+one on/off switch per output — **Pump / motor D19, Organic LED D21, Plastic LED
+D22, Paper LED D23, Streetlights D13** — and each one goes straight to the pin:
+
+```
+POST /api/v1/commands  {"type":"TEST_OUTPUT","parameters":{"output":"pump","on":true}}
+# output: pump | led_organic | led_plastic | led_paper | streetlights
+```
+
+Verified on the board 2026-11-16 over the app's own route: all four LEDs read
+`on=true` then `off=false` in `status.test.leds.{organic,plastic,paper,streetlights}`.
+`status.test` is `{active, pump, leds{...}}`.
+
+Four things worth knowing before using it:
+
+- **It is deliberately unprotected, at the user's request** ("I will take care
+  of any protection manually"): no gates, no timers, no oversight of the soil
+  probe, the tank probe, the commissioning gate, the cooldown or the kill
+  switch. The pump runs while its switch is on and does not stop by itself.
+- **The first `TEST_OUTPUT` latches `rt.test_active`**, after which the normal
+  pump / streetlight / waste drivers stand down for the rest of the session —
+  otherwise the two would write the same pins every pass and the relay would
+  chatter. Consequence: **after using the page, the waste LEDs and the
+  automatic streetlights stay idle until a reboot** (they were commanded on but
+  the panel owned the pins; the lamps were left OFF in a dark room until the
+  board was reset). Reboot to hand control back — `python read-serial.py` in
+  `%USERPROFILE%\village-flash` pulses RTS, or just power-cycle.
+- **Sending a command to one output latches all five.** That is what makes the
+  first press of any switch stop the drivers fighting it.
+- `config.test` **no longer exists** — the gate it carried went with the gating.
+  `DeviceConfig` is exactly what it was before test mode was invented, so config
+  revision 23 survived the change.
+
+The compile-time bench build below is now the fallback — use it only when the
+app cannot reach the board at all (e.g. no network) and a pin must be held high
+through a reboot.
+
+### Holding the pump pin high to test the motor (2026-11-15, bench build)
+
+The board exposes `health`, `status`, `config` and `commands`; there is still no
+raw GPIO endpoint, so the bench build is the only way to hold the gate high
+**from boot** without the app. Otherwise use the Test outputs page above:
 
 ```bash
 cd uc
