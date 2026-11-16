@@ -65,6 +65,13 @@ void applyPump(bool on) {
   digitalWrite(pins::PUMP_GATE, pumpGateLevel(allowed));
 }
 
+// Test page only.  `applyPump(true)` is answered LOW while the commissioning
+// gate is closed -- correct for the controller, but it made the page's pump
+// switch look broken: the switch read "on" while D19 stayed low (reported
+// 2026-11-16).  The page's master switch is the gate, so this writes the pad
+// directly.
+void applyPumpDirect(bool on) { digitalWrite(pins::PUMP_GATE, pumpGateLevel(on)); }
+
 void applyStreetlights(bool on) {
   const bool allowed = on && rt.config.light.installed;
   // All five lamps share one pin, so one write drives them all.

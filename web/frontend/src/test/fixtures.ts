@@ -80,8 +80,8 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
       // page must treat "no block" as off.
       test: {
         enabled: testEnabled,
-        active: testEnabled,
         pump: testPump,
+        pump_pin: testPump,
         leds: { organic: false, plastic: false, paper: false, streetlights: false },
       },
       sensors: {

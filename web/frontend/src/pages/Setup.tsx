@@ -518,7 +518,14 @@ function TestOutputs() {
   };
 
   const rows = [
-    { output: 'pump', label: 'Pump / motor (D19)', on: Boolean(test?.pump) },
+    {
+      output: 'pump',
+      label: 'Pump / motor (D19)',
+      on: Boolean(test?.pump),
+      // What the pin is actually at, so a switch that is on while the pin is
+      // low cannot go unnoticed again.
+      note: test ? `D19 is ${test.pump_pin ? 'HIGH' : 'LOW'}` : undefined,
+    },
     { output: 'led_organic', label: 'Organic LED (D21)', on: Boolean(test?.leds?.organic) },
     { output: 'led_plastic', label: 'Plastic LED (D22)', on: Boolean(test?.leds?.plastic) },
     { output: 'led_paper', label: 'Paper LED (D23)', on: Boolean(test?.leds?.paper) },
@@ -549,6 +556,7 @@ function TestOutputs() {
         <div className="setting-row" key={row.output}>
           <div>
             <p className="setting-name">{row.label}</p>
+            {'note' in row && row.note && <p className="hint">{row.note}</p>}
           </div>
           <Toggle
             id={`test-${row.output}`}

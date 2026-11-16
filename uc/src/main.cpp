@@ -75,13 +75,13 @@ void setup() {
 }
 
 // Test page (Setup → Test outputs): one switch per output, straight to the pin.
-// Once the page has driven anything it owns the outputs for the rest of the
-// session, so the normal drivers cannot pull a pin back down between writes.
-// Deliberately no gates and no timers -- the operator asked for that and takes
-// the protection on themselves.
+// While its master switch is on the page owns all five outputs, so the normal
+// drivers cannot pull a pin back down between writes.  The pump is written with
+// applyPumpDirect(): the page's master switch is the gate, and the commissioning
+// gate must not quietly veto a switch the operator pressed.
 static void applyTestOutputs(uint32_t) {
-  if (!rt.test_active) return;
-  applyPump(rt.test_pump);
+  if (!rt.test_enabled) return;
+  applyPumpDirect(rt.test_pump);
   applyTestLeds(rt.test_led_organic, rt.test_led_plastic, rt.test_led_paper,
                 rt.test_streetlights);
 }
@@ -109,7 +109,7 @@ void loop() {
 #else
   // The test page owns the gate once it has driven anything; writing pumpOn()
   // here as well would drop the pin LOW for a moment every pass (relay chatter).
-  if (!rt.test_active) applyPump(rt.irrigation.pumpOn());
+  if (!rt.test_enabled) applyPump(rt.irrigation.pumpOn());
 #endif
 
 #if VILLAGE_PUMP_BENCH_DRIVE == 1
@@ -129,11 +129,11 @@ void loop() {
   // Same for the four light outputs: once the test page has driven one, the
   // normal drivers stand down so the two cannot write the same pins every pass.
   const LightOutput lights = rt.lights.output(rt.config, now);
-  if (!rt.test_active) applyStreetlights(lights.on);
+  if (!rt.test_enabled) applyStreetlights(lights.on);
 
   rt.waste.tick(now);
   const WasteLedState waste = rt.waste.read(now);
-  if (!rt.test_active) {
+  if (!rt.test_enabled) {
     applyWasteCategory(waste.active ? waste.category : WasteCategory::Unknown);
   }
 

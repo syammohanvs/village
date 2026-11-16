@@ -90,17 +90,16 @@ struct Runtime {
   bool first_sample_seen = false;
 
   // --- test page (Setup → Test outputs) ------------------------------------
-  // Two levels, both session-only (a reboot puts the outputs back under normal
-  // control, so a forgotten switch cannot survive a power cycle):
-  //   * `test_enabled` is the page's own master switch.  Nothing can be driven
-  //     until it is on, so the five switches cannot be pressed by accident;
-  //   * `test_active` latches when the first output is actually driven, after
-  //     which the normal drivers stand down for the rest of the session so the
-  //     two cannot write the same pins every pass.
-  // Once enabled there are no further gates and no timers: the operator asked
+  // ONE master switch, session-only (a reboot puts the outputs back under
+  // normal control, so a forgotten switch cannot survive a power cycle).
+  //   * ON  takes all five outputs away from the normal drivers and forces
+  //         them OFF, so the bench starts from a known state -- a dark room
+  //         leaves the streetlights on, and test mode must not inherit that;
+  //   * OFF clears the five switches, releases the pins and hands the outputs
+  //         back to the controller.
+  // While it is on there are no further gates and no timers: the operator asked
   // to take the protection on themselves (2026-11-16).
   bool test_enabled = false;
-  bool test_active = false;
   bool test_pump = false;
   bool test_led_organic = false;
   bool test_led_plastic = false;

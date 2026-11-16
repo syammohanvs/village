@@ -126,8 +126,13 @@ export interface DeviceStatus {
   test?: {
     /** The page's master switch: no output can be driven while this is false. */
     enabled: boolean;
-    active: boolean;
     pump: boolean;
+    /**
+     * The actual level of the pump pin (D19), not the switch's intent.  A gate
+     * in the firmware once turned "on" into a LOW pin, and the panel could not
+     * show it; this is the number a meter would read.
+     */
+    pump_pin: boolean;
     leds: { organic: boolean; plastic: boolean; paper: boolean; streetlights: boolean };
   };
   faults?: (string | { code?: string; text?: string })[];

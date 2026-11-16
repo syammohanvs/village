@@ -304,4 +304,29 @@ describe('Setup — test outputs', () => {
       parameters: { output: 'pump', on: false },
     });
   });
+  it('shows what the pump pin is actually at, not just the switch', async () => {
+    // A gate in the firmware once turned "pump on" into a LOW pin while the
+    // switch read on; the panel could not show the difference.
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true, testPump: true }));
+    render(<App />);
+    expect(await screen.findByText('D19 is HIGH')).toBeInTheDocument();
+  });
+
+  it('reads LOW on the pin when the switch is on but the pin is not driven', async () => {
+    const frame = makeState({ testEnabled: true, testPump: true });
+    frame.status!.test!.pump_pin = false;
+    vi.mocked(api.state).mockResolvedValue(frame);
+    render(<App />);
+    expect(await screen.findByText('D19 is LOW')).toBeInTheDocument();
+  });
+
+  it('starts with every output off once test mode is on', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
+    render(<App />);
+    for (const name of OUTPUTS) {
+      await waitFor(async () =>
+        expect(await screen.findByRole('switch', { name })).not.toBeChecked(),
+      );
+    }
+  });
 });

@@ -164,8 +164,11 @@ void buildStatus(JsonDocument& doc) {
   // actually being driven, and how long the pump has left.
   JsonObject test = root["test"].to<JsonObject>();
   test["enabled"] = rt.test_enabled;
-  test["active"] = rt.test_active;
   test["pump"] = rt.test_pump;
+  // The PAD, not the intent.  "Is D19 high?" is the bench question, and the
+  // switch alone cannot answer it: a commissioning gate once turned the code's
+  // `true` into a LOW pin, and the page had no way to show that (2026-11-16).
+  test["pump_pin"] = digitalRead(pins::PUMP_GATE) == HIGH;
   JsonObject tled = test["leds"].to<JsonObject>();
   tled["organic"] = rt.test_led_organic;
   tled["plastic"] = rt.test_led_plastic;
@@ -478,19 +481,18 @@ void handleCommand() {
       }
     }
   } else if (type == "TEST_MODE") {
-    // The master switch above the five outputs.  Off releases everything it was
-    // holding, so the normal drivers take the pins back on the next pass.
+    // The master switch above the five outputs.  On forces every output OFF and
+    // takes them from the normal drivers; off releases everything and hands
+    // them back (the trailing applyPump below restores the controller's wish).
     const bool on = doc["parameters"]["on"] | false;
     rt.test_enabled = on;
-    if (!on) {
-      rt.test_active = false;
-      rt.test_pump = false;
-      rt.test_led_organic = false;
-      rt.test_led_plastic = false;
-      rt.test_led_paper = false;
-      rt.test_streetlights = false;
-      applyTestLeds(false, false, false, false);
-    }
+    rt.test_pump = false;
+    rt.test_led_organic = false;
+    rt.test_led_plastic = false;
+    rt.test_led_paper = false;
+    rt.test_streetlights = false;
+    applyPumpDirect(false);
+    applyTestLeds(false, false, false, false);
     result = CommandResult::Accepted;
     reason = on ? &reasons::kTestModeOn : &reasons::kTestModeOff;
   } else if (type == "TEST_OUTPUT") {
@@ -504,7 +506,6 @@ void handleCommand() {
       const String output = doc["parameters"]["output"] | "";
       const bool on = doc["parameters"]["on"] | false;
       bool known = true;
-      rt.test_active = true;
       if (output == "pump") {
         rt.test_pump = on;
       } else if (output == "led_organic") {
@@ -524,7 +525,7 @@ void handleCommand() {
       } else {
         result = CommandResult::Accepted;
         reason = on ? &reasons::kTestStarted : &reasons::kTestStopped;
-        applyPump(rt.test_pump);
+        applyPumpDirect(rt.test_pump);
         applyTestLeds(rt.test_led_organic, rt.test_led_plastic, rt.test_led_paper,
                       rt.test_streetlights);
       }
@@ -534,7 +535,7 @@ void handleCommand() {
   rt.events.add(now, reason->code, reason->text);
   rt.commands.remember(hash, result, reason->code, reason->text, now);
   saveCommandsToNvs(rt.commands);
-  if (!rt.test_active) applyPump(rt.irrigation.pumpOn());
+  if (!rt.test_enabled) applyPump(rt.irrigation.pumpOn());
 
   server.send(200, "application/json", ackJson(id, type, result, *reason, now));
 }

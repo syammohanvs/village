@@ -135,7 +135,7 @@ inline constexpr Reason kDuplicate{
 // --- test mode -------------------------------------------------------------
 inline constexpr Reason kTestModeOn{
     "TEST_MODE_ON",
-    "Test mode is on. The five switches on this page now drive the pins."};
+    "Test mode is on. Every output is off; the five switches on this page now drive the pins."};
 inline constexpr Reason kTestModeOff{
     "TEST_MODE_OFF",
     "Test mode is off. Every output went back to normal control."};

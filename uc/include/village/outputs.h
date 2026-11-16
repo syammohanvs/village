@@ -11,6 +11,12 @@ void setupOutputs();
 // These apply the final hardware gate.  The pump can only be HIGH when the
 // compile-time commissioning flag and the runtime config both agree.
 void applyPump(bool on);
+
+// The test page's pump switch.  Writes the gate with none of applyPump()'s
+// checks -- the commissioning gate included -- because the page's master switch
+// is the gate there and the operator takes the protection on themselves.  Every
+// other caller must keep using applyPump().
+void applyPumpDirect(bool on);
 void applyStreetlights(bool on);
 void applyWasteCategory(WasteCategory category);
 void allOutputsOff();
