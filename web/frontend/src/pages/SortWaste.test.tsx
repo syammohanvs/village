@@ -1824,3 +1824,56 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(screen.queryByTestId('waste-offline')).not.toBeInTheDocument();
   });
 });
+
+/** A camera that answers every call, including the device list the panel asks
+ *  for on mount (a leftover stub can leave that promise undefined). */
+function stubCamera() {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: {
+      getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [] }),
+      enumerateDevices: vi.fn().mockResolvedValue([]),
+    },
+  });
+}
+
+describe('Sort Waste — the three bin lamps, in simulation', () => {
+  it('lights the bin the controller was told to indicate, and nothing else', async () => {
+    // A classification sends INDICATE_WASTE and the demo device holds that
+    // category for a few seconds.  The panel reads the frame's own
+    // waste_indicator, so these are the lamps the board would be showing.
+    window.localStorage.setItem('village.demoMode', 'demo');
+    window.history.pushState({}, '', '/waste');
+    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: 'plastic' }));
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    stubCamera();
+    render(<App />);
+
+    const leds = await screen.findByTestId('bin-leds');
+    // The first village frame lands a tick after the panel mounts.
+    await waitFor(
+      () => expect(within(leds).getByTestId('bin-led-plastic')).toHaveClass('is-on'),
+      { timeout: 4000 },
+    );
+    expect(within(leds).getByTestId('bin-led-organic')).not.toHaveClass('is-on');
+    expect(within(leds).getByTestId('bin-led-paper')).not.toHaveClass('is-on');
+    expect(leds).toHaveAttribute('data-active', 'plastic');
+  });
+
+  it('leaves all three off before anything has been put in a bin', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    window.history.pushState({}, '', '/waste');
+    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: null }));
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    stubCamera();
+    render(<App />);
+
+    const leds = await screen.findByTestId('bin-leds');
+    for (const bin of ['organic', 'plastic', 'paper']) {
+      expect(within(leds).getByTestId(`bin-led-${bin}`)).not.toHaveClass('is-on');
+    }
+    expect(leds).toHaveTextContent(/no bin led is lit/i);
+  });
+});

@@ -2037,3 +2037,80 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .waste-dialog-head { padding: 10px 12px; }
   .waste-dialog-title { display: none; }
 }
+
+/* The light lab and the bin lamps: simulation-only drawings of the board's own
+   outputs, kept to the same white/coloured dots so a demo looks like the bench. */
+.lamp-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+}
+.lamp-strip { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.lamp {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2a2321;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.lamp.is-on {
+  background: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 22px rgba(255, 255, 255, 0.45);
+}
+
+.light-slider { display: flex; flex-direction: column; gap: 4px; }
+.light-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.light-slider-word { color: var(--cream); letter-spacing: 0; text-transform: none; font-size: 12px; }
+.light-slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.light-slider .hint { margin: 0; font-size: 11px; }
+
+.bin-leds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+.bin-leds-title {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.bin-leds-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.bin-led { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.bin-led-state { font-size: 11px; color: var(--muted-2); text-transform: uppercase; letter-spacing: 0.08em; }
+.bin-led-label { display: flex; flex-direction: column; line-height: 1.15; }
+.bin-led-pin { font-size: 10px; color: var(--muted-2); }
+.bin-led-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+.bin-led-dot--organic { color: #6cc596; }
+.bin-led-dot--plastic { color: #e05b67; }
+.bin-led-dot--paper { color: #e3b04b; }
+.bin-led-dot.is-on { background: currentColor; box-shadow: 0 0 10px currentColor; }
+.bin-led:has(.is-on) .bin-led-state { color: var(--cream); }

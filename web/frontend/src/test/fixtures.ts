@@ -28,6 +28,8 @@ export interface StateOptions {
   sourceLabel?: string;
   testEnabled?: boolean;
   testPump?: boolean;
+  wasteCategory?: 'organic' | 'plastic' | 'paper' | null;
+  lightMetric?: number;
 }
 
 export function makeState(options: StateOptions = {}): StateEnvelope {
@@ -57,6 +59,8 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     sourceLabel = 'ESP32 over Wi-Fi',
     testEnabled = false,
     testPump = false,
+    wasteCategory = null,
+    lightMetric = 1820,
   } = options;
 
   return {
@@ -111,7 +115,10 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
         light: {
           installed: lightInstalled,
           valid: lightInstalled && lightBrightness !== 'unknown',
-          raw: lightInstalled ? 1980 : null,
+          // The metric the exhibit's slider speaks; the page derives the same
+          // number from `raw` when a real board omits it.
+          raw: lightInstalled ? Math.max(0, 4095 - lightMetric) : null,
+          metric: lightMetric,
           brightness: lightBrightness,
           output_type: 'analog',
           age_ms: 240,
@@ -159,9 +166,9 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
           feedback: 'none',
         },
         waste_indicator: {
-          category: null,
-          active: false,
-          remaining_ms: 0,
+          category: wasteCategory,
+          active: wasteCategory !== null,
+          remaining_ms: wasteCategory ? 8000 : 0,
         },
       },
       irrigation: {

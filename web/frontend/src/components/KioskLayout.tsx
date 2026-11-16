@@ -95,7 +95,10 @@ export function KioskLayout() {
 
         <div className="kiosk-modes">
           <ModeSwitch value={mode} onChange={choose} testUnavailable={testUnavailable} />
-          {testUnavailable && (
+          {/* Said out loud only where it is something to fix.  In Simulation
+              the answer is on the knob itself ("switch to Live"), so a
+              permanent sentence under it would be furniture. */}
+          {testUnavailable && mode !== 'simulation' && (
             <p className="kiosk-note" data-testid="mode-note">
               {testUnavailable}
             </p>

@@ -11,6 +11,7 @@ import {
   type StabilizerSnapshot,
   type StableEvent,
 } from '../lib/wasteStabilizer';
+import { BinLeds } from '../components/BinLeds';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
 import {
@@ -222,7 +223,7 @@ export function SortWaste() {
   // Classifying ends at a bin LED, so the page is offered only while the board
   // can light one -- Simulation mode is the way to show the model without it
   // (decided 2026-11-16).
-  const { connected } = useVillage();
+  const { connected, status } = useVillage();
   const { demo } = useDemo();
   const boardOffline = !connected && !demo;
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
@@ -1421,6 +1422,18 @@ export function SortWaste() {
         </div>
 
         <div className="result-column">
+          {/* Simulation only: a classification sends INDICATE_WASTE, and the
+              demo device holds that category for a few seconds — so these are
+              the real lamps, drawn where the board's own are. */}
+          {demo && (
+            <BinLeds
+              active={
+                status?.actuators?.waste_indicator?.active
+                  ? status.actuators.waste_indicator.category
+                  : null
+              }
+            />
+          )}
           <Card
             className="result-card"
             kicker={

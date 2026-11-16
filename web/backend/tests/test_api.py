@@ -90,6 +90,46 @@ async def test_demo_scenario_does_not_change_live_state(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_the_demo_light_slider_drives_auto_mode(tmp_path):
+    """The exhibit's dark/light slider is the room's own calibration.
+
+    Metric = 4095 - raw, dark below 2100 and bright above 2500, with the band
+    between them holding the last decision — the same two thresholds the
+    firmware uses, so the slider exercises Auto rather than pretending to.
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, gateway, app):
+
+        async def set_metric(value: int) -> dict:
+            response = await client.post(
+                "/api/v1/demo/scenario", json={"light_metric": value}
+            )
+            assert response.status_code == 200
+            return (await client.get("/api/v1/state?mode=demo")).json()["status"]
+
+        dark = await set_metric(1500)
+        assert dark["sensors"]["light"]["brightness"] == "dark"
+        assert dark["sensors"]["light"]["raw"] == 2595
+        assert dark["actuators"]["streetlights"]["commanded"] is True
+
+        bright = await set_metric(3000)
+        assert bright["sensors"]["light"]["brightness"] == "bright"
+        assert bright["actuators"]["streetlights"]["commanded"] is False
+
+        # Inside the band nothing changes, so a hand on the slider cannot make
+        # the lamps flap.
+        band = await set_metric(2300)
+        assert band["sensors"]["light"]["brightness"] == "bright"
+
+        # An explicit reading still wins, and moves the slider's own value.
+        response = await client.post("/api/v1/demo/scenario", json={"light": "dark"})
+        assert response.status_code == 200
+        after = (await client.get("/api/v1/state?mode=demo")).json()["status"]
+        assert after["sensors"]["light"]["metric"] == 1820
+        assert after["actuators"]["streetlights"]["commanded"] is True
+
+
+@pytest.mark.asyncio
 async def test_unacknowledged_command_is_not_reported_as_success(tmp_path):
     settings = make_settings(tmp_path)
     real = RecordingDevice()

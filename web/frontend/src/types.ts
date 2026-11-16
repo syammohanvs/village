@@ -39,6 +39,12 @@ export interface LightReading {
   installed?: boolean;
   valid: boolean;
   raw: number | null;
+  /**
+   * The firmware's brightness metric, `4095 - raw`.  The simulator reports it
+   * directly so the exhibit's dark/light slider can show its own setting; a
+   * real board's frame has only `raw`, and the page derives the same number.
+   */
+  metric?: number;
   brightness: Brightness;
   output_type?: string;
   age_ms: number | null;

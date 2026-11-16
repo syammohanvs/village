@@ -13,8 +13,9 @@ import {
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { TalkToLia } from '../components/TalkToLia';
+import { LightLevelSlider, StreetLampStrip } from '../components/StreetLamps';
 import { Chip } from '../components/ui';
-import { api } from '../lib/api';
+import { api, errorMessage } from '../lib/api';
 import { useCommands } from '../lib/commands';
 import { reservoirLabel, soilLabel } from '../lib/explain';
 import { cx, formatPercent } from '../lib/format';
@@ -63,6 +64,7 @@ export function OurVillage() {
   // "Known" is a fact about the frame we hold, never about the hardware.
   const hasStatus = Boolean(status);
   const watering = irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
+  const pumpOn = irrigation?.state === 'pumping';
   const physicalDisabled = !connected && !demo;
 
   const pumpCommissioned =
@@ -75,6 +77,14 @@ export function OurVillage() {
       : typeof lights?.commanded === 'boolean'
         ? lights.commanded ? 'on' : 'off'
         : null;
+  // The lab's own reading of the slider: the firmware's metric, or raw turned
+  // into one.  A frame that carries neither leaves the slider where it was.
+  const lightMetric =
+    typeof light?.metric === 'number'
+      ? light.metric
+      : typeof light?.raw === 'number'
+        ? Math.max(0, 4095 - light.raw)
+        : 1820;
   const lightWord = light?.installed === false
     ? 'No sensor'
     : light?.brightness === 'dark' ? 'Dark' : light?.brightness === 'bright' ? 'Bright' : 'Unknown';
@@ -111,6 +121,17 @@ export function OurVillage() {
         ? levelChip('Camera ready', 'live')
         : levelChip('Model missing', 'warn');
 
+  /** The simulated room's light level, for exercising Auto mode without a torch. */
+  const setAmbient = async (value: number) => {
+    try {
+      await api.demoScenario({ light_metric: value });
+    } catch (cause) {
+      setNotice({ card: 'lights', text: errorMessage(cause) });
+    } finally {
+      reload();
+    }
+  };
+
   const run = async (key: string, card: CardKey, type: string) => {
     setBusy(key);
     setNotice(null);
@@ -124,6 +145,10 @@ export function OurVillage() {
       }
     } finally {
       setBusy(null);
+      // Read the frame back rather than waiting up to two seconds for the poll:
+      // the pump and the lamps changed because of this press, and the card
+      // should say so at once.
+      reload();
     }
   };
 
@@ -259,6 +284,14 @@ export function OurVillage() {
                   : 'No usable probe reading',
             reservoir?.state === 'available' ? 'good' : reservoir?.state === 'low' ? 'warn' : 'neutral',
           )}
+          {/* What the controller is commanding the pump to do -- the same gate a
+              spoken "water the plants" opens, so the card answers the question
+              the Water button raises without opening another page. */}
+          {hasStatus && (
+            <p className="vcard-state" data-testid="pump-state" data-on={pumpOn ? 'true' : 'false'}>
+              Pump <strong>{pumpOn ? 'on' : 'off'}</strong>
+            </p>
+          )}
         </article>
 
         <article className="vcard vcard--min" data-testid="card-lights">
@@ -284,6 +317,16 @@ export function OurVillage() {
               </button>
             ))}
           </div>
+          {demo && (
+            <div className="lamp-lab" data-testid="lamp-lab">
+              <StreetLampStrip on={Boolean(lights?.commanded)} count={lights?.led_count ?? 5} />
+              <LightLevelSlider
+                metric={lightMetric}
+                onChange={(value) => void setAmbient(value)}
+                disabled={busy !== null}
+              />
+            </div>
+          )}
           {notice?.card === 'lights' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 

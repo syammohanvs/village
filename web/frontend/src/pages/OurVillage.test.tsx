@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -19,6 +19,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       voiceIntents: vi.fn(),
       settings: vi.fn(),
       session: vi.fn(),
+      demoScenario: vi.fn(),
     },
   };
 });
@@ -416,5 +417,77 @@ describe('Talk to Sara on the village page', () => {
 
     await user.click(sara);
     expect(await screen.findByTestId('lia-guide')).toBeInTheDocument();
+  });
+});
+
+describe('the simulation lab: lamps, the light slider and the pump', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+  });
+
+  it('draws five white lamps and lights them when the streetlights are commanded on', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightsMode: 'manual_on', lightsCommanded: true }),
+    );
+    await renderReady();
+
+    const strip = screen.getByTestId('lamp-strip');
+    expect(strip).toHaveAttribute('data-on', 'true');
+    expect(within(strip).getAllByTestId(/^lamp-\d+$/)).toHaveLength(5);
+    // One pin, five lamps: all of them, every time.
+    for (const lamp of within(strip).getAllByTestId(/^lamp-\d+$/)) {
+      expect(lamp).toHaveAttribute('data-on', 'true');
+    }
+  });
+
+  it('leaves the lamps off when the reading is bright, and hides the lab in live mode', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightsMode: 'auto', lightsCommanded: false }),
+    );
+    await renderReady();
+
+    expect(screen.getByTestId('lamp-strip')).toHaveAttribute('data-on', 'false');
+
+    // Not a live control: the board's own LEDs are what matter there.
+    cleanup();
+    window.localStorage.setItem('village.demoMode', 'live');
+    await renderReady();
+    expect(screen.queryByTestId('lamp-lab')).not.toBeInTheDocument();
+  });
+
+  it('posts the slider position as the firmware metric, once per gesture', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightMetric: 1820 }));
+    vi.mocked(api.demoScenario).mockResolvedValue({ status: {}, physical: false });
+    await renderReady();
+
+    const slider = within(screen.getByTestId('light-slider')).getByRole('slider');
+    // Dark at the room's own "light off" reading.
+    expect(screen.getByTestId('light-slider-word')).toHaveTextContent('Dark');
+
+    fireEvent.change(slider, { target: { value: '3000' } });
+    expect(screen.getByTestId('light-slider-word')).toHaveTextContent('Bright');
+
+    // Debounced: the drag is one instruction.
+    await waitFor(() =>
+      expect(api.demoScenario).toHaveBeenCalledWith({ light_metric: 3000 }),
+    );
+    expect(vi.mocked(api.demoScenario).mock.calls.filter(
+      (call) => (call[0] as { light_metric?: number }).light_metric === 3000,
+    )).toHaveLength(1);
+  });
+
+  it('says whether the pump is on, so a spoken "water the plants" is visible on the page', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
+    await renderReady();
+
+    const pump = screen.getByTestId('pump-state');
+    expect(pump).toHaveAttribute('data-on', 'true');
+    expect(pump).toHaveTextContent('Pump on');
+
+    cleanup();
+    vi.mocked(api.state).mockResolvedValue(makeState({ watering: false }));
+    await renderReady();
+    expect(screen.getByTestId('pump-state')).toHaveAttribute('data-on', 'false');
+    expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump off');
   });
 });

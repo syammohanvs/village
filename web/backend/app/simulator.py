@@ -118,6 +118,15 @@ def default_config() -> dict[str, Any]:
     }
 
 
+# The exhibit room's own light calibration (2026-11-15): metric = 4095 - raw,
+# dark below 2100, bright above 2500, and the band between them holds whatever
+# the lamps last decided.
+DARK_THRESHOLD = 2100
+BRIGHT_THRESHOLD = 2500
+DARK_METRIC = 1820
+BRIGHT_METRIC = 2820
+
+
 class SimulatorError(Exception):
     def __init__(self, status: int, payload: dict[str, Any]):
         super().__init__(payload.get("error", {}).get("message", "simulator error"))
@@ -146,6 +155,9 @@ class SimulatedDevice:
         self.soil_pct = 28.0
         self.reservoir = "available"
         self.light = "dark"
+        # The metric this demo starts at: 1820 is the room's own "light off"
+        # reading, 2820 its "light on" one (measured 2026-11-15).
+        self.light_metric = DARK_METRIC
         self.sensor_fault: str | None = None
         self.pump_enabled = True
         self.auto_enabled = True
@@ -345,7 +357,10 @@ class SimulatedDevice:
             }
         return {
             "valid": True,
-            "raw": 3200 if self.light == "dark" else 900,
+            # The board reports raw and the app derives the metric; this is the
+            # other direction of the same arithmetic.
+            "raw": max(0, 4095 - self.light_metric),
+            "metric": self.light_metric,
             "brightness": self.light,
             "output_type": "analog",
             "age_ms": 200,
@@ -717,6 +732,16 @@ class SimulatedDevice:
                     self._stop("IRRIGATION_STOPPED_LOW_WATER", 30000)
             if values.get("light") is not None:
                 self.light = values["light"]
+                self.light_metric = BRIGHT_METRIC if self.light == "bright" else DARK_METRIC
+            if values.get("light_metric") is not None:
+                # The same two thresholds the firmware uses, with the gap between
+                # them keeping the last decision: a slider dragged through the
+                # band must not flap the lamps.
+                self.light_metric = int(values["light_metric"])
+                if self.light_metric < DARK_THRESHOLD:
+                    self.light = "dark"
+                elif self.light_metric > BRIGHT_THRESHOLD:
+                    self.light = "bright"
             if "sensor_fault" in values:
                 self.sensor_fault = values["sensor_fault"] or None
             if values.get("pump_enabled") is not None:
@@ -735,6 +760,7 @@ class SimulatedDevice:
             self.soil_pct = 28.0
             self.reservoir = "available"
             self.light = "dark"
+            self.light_metric = DARK_METRIC
             self.sensor_fault = None
             self.pump_enabled = True
             self.auto_enabled = True

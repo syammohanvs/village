@@ -122,6 +122,11 @@ class ScenarioRequest(BaseModel):
     soil_pct: float | None = Field(default=None, ge=0, le=100)
     reservoir: Literal["available", "low"] | None = None
     light: Literal["bright", "dark"] | None = None
+    # The ambient-light reading the demo should report, on the firmware's own
+    # metric scale (brightness = 4095 - raw).  2100/2500 are the thresholds the
+    # exhibit's room was calibrated to, so a slider on this scale really does
+    # exercise Auto mode rather than pretending to.
+    light_metric: int | None = Field(default=None, ge=0, le=4095)
     sensor_fault: str | None = Field(default=None, max_length=40)
     pump_enabled: bool | None = None
     auto_enabled: bool | None = None
