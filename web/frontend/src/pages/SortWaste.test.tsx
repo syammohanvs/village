@@ -71,13 +71,15 @@ const { predictionState } = vi.hoisted(() => {
 // What the page asked Sara to say, in order.  The delay this pins was measured
 // in the app: the sentence used to wait for the recording round trip.
 const spoken: string[] = [];
+const spokenLanguages: string[] = [];
 
 vi.mock('../lib/speech', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/speech')>();
   return {
     ...actual,
-    speakText: (text: string) => {
+    speakText: (text: string, language = 'en') => {
       spoken.push(text);
+      spokenLanguages.push(language);
       return Promise.resolve();
     },
   };
@@ -113,6 +115,8 @@ beforeEach(() => {
   Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { configurable: true, get: () => 640 });
   Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { configurable: true, get: () => 480 });
   spoken.length = 0;
+  spokenLanguages.length = 0;
+  window.localStorage.removeItem('village.voiceLanguage');
   Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
     configurable: true,
     value: (_type?: string, quality?: unknown) => {
@@ -1615,5 +1619,44 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(await screen.findByText(/A bin needs 70%/)).toBeInTheDocument();
     // Nothing was recorded, which is the point: a bin must not be guessed.
     expect(api.postRecognition).not.toHaveBeenCalled();
+  });
+  it('speaks the sentence in the language chosen in Setup', async () => {
+    // Malayalam is set in Setup, so the answer must be Malayalam -- the page used
+    // to hardcode English here whatever the setting said (reported 2026-11-16).
+    window.localStorage.setItem('village.voiceLanguage', 'ml');
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 11, category: 'plastic', confidence: 0.95 },
+    });
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    predictionState.current = predictionsFor('Plastic', 0.95);
+
+    render(<App />);
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
+    fireEvent.click(await screen.findByTestId('auto-watch'));
+
+    await waitFor(() => expect(spoken.length).toBeGreaterThan(0), { timeout: 8000 });
+    expect(spokenLanguages).toContain('ml');
+    // The sentence itself is Malayalam, not English text read by a Malayalam voice.
+    expect(spoken.some((line) => /പ്ലാസ്റ്റിക്/.test(line))).toBe(true);
   });
 });

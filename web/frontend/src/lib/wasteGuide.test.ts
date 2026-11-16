@@ -154,3 +154,24 @@ describe('a bin is held to a higher bar than a referral', () => {
     }
   });
 });
+
+describe('spokenFor speaks the chosen language', () => {
+  const plastic = guideFor('plastic');
+
+  it('answers in English by default', () => {
+    expect(spokenFor(plastic)).toMatch(/plastic bin/i);
+  });
+
+  it('answers in Malayalam when Malayalam is chosen', () => {
+    expect(spokenFor(plastic, 'ml')).toMatch(/പ്ലാസ്റ്റിക്/);
+    expect(spokenFor(guideFor('medical'), 'ml')).toMatch(/ഗ്രാം സഹായക/);
+  });
+
+  it('answers in Hindi when Hindi is chosen', () => {
+    expect(spokenFor(plastic, 'hi')).toMatch(/प्लास्टिक/);
+  });
+
+  it('falls back to English rather than saying nothing', () => {
+    expect(spokenFor(plastic, 'ta')).toMatch(/plastic bin/i);
+  });
+});

@@ -246,10 +246,44 @@ export function guideFor(
 }
 
 /** The sentence Lia says, kept in step with the card. */
-export function spokenFor(disposal: Disposal): string {
-  if (disposal.destination === 'organic') return 'Organic food waste. Put it in the organic bin.';
-  if (disposal.destination === 'plastic') return 'Empty and clean plastic. Put it in the plastic bin.';
-  if (disposal.destination === 'paper') return 'Clean paper. Put it in the paper and cardboard bin.';
-  if (disposal.support) return 'Keep this item separate. Contact Gram Sahayak.';
-  return 'Keep this item separate for collection.';
+/**
+ * Sara's spoken sentence, in the language chosen in Setup.
+ *
+ * These are the only sentences this page says out loud, so they are translated
+ * here rather than in the page: the spoken and written answers come from the
+ * same place, and a new language is one entry per line.  The English is the
+ * fallback for a language with no translation yet, so a visitor never hears
+ * nothing.
+ */
+const SPOKEN: Record<string, Record<'organic' | 'plastic' | 'paper' | 'support' | 'separate', string>> = {
+  en: {
+    organic: 'Organic food waste. Put it in the organic bin.',
+    plastic: 'Empty and clean plastic. Put it in the plastic bin.',
+    paper: 'Clean paper. Put it in the paper and cardboard bin.',
+    support: 'Keep this item separate. Contact Gram Sahayak.',
+    separate: 'Keep this item separate for collection.',
+  },
+  ml: {
+    organic: 'ആർഗാനിക് ഭക്ഷ്യമാലിന്യം. ഓർഗാനിക് ബിന്നിൽ ഇടുക.',
+    plastic: 'ശുദ്ധമായ പ്ലാസ്റ്റിക്. പ്ലാസ്റ്റിക് ബിന്നിൽ ഇടുക.',
+    paper: 'വൃത്തിയുള്ള പേപ്പർ. പേപ്പർ, കാർഡ്ബോർഡ് ബിന്നിൽ ഇടുക.',
+    support: 'ഇത് വേർതിരിച്ച് സൂക്ഷിക്കുക. ഗ്രാം സഹായകിനെ ബന്ധപ്പെടുക.',
+    separate: 'ഇത് ശേഖരണത്തിനായി വേർതിരിച്ച് സൂക്ഷിക്കുക.',
+  },
+  hi: {
+    organic: 'जैविक खाद्य कचरा। इसे जैविक बिन में डालें।',
+    plastic: 'साफ़ प्लास्टिक। इसे प्लास्टिक बिन में डालें।',
+    paper: 'साफ़ कागज़। इसे कागज़ और कार्डबोर्ड बिन में डालें।',
+    support: 'इसे अलग रखें। ग्राम सहायक से संपर्क करें।',
+    separate: 'इसे संग्रह के लिए अलग रखें।',
+  },
+};
+
+export function spokenFor(disposal: Disposal, language = 'en'): string {
+  const lines = SPOKEN[language] ?? SPOKEN.en;
+  if (disposal.destination === 'organic') return lines.organic;
+  if (disposal.destination === 'plastic') return lines.plastic;
+  if (disposal.destination === 'paper') return lines.paper;
+  if (disposal.support) return lines.support;
+  return lines.separate;
 }
