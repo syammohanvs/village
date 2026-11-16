@@ -16,7 +16,6 @@ import {
 } from './Icons';
 import { LiaAvatar } from './LiaAvatar';
 import { LiaGuide } from './LiaGuide';
-import { StatusStrip } from './StatusStrip';
 
 const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
   '/': IconDashboard,
@@ -57,7 +56,7 @@ function ConnectionPill() {
       className={cx('conn-pill', `conn-pill--${tone}`)}
       title={
         demo
-          ? 'Simulation mode: these readings are invented on the laptop. Press "Back to live" to talk to the board again.'
+          ? 'Simulation mode: these readings are invented on the laptop. Press to go back to live readings.'
           : connected
             ? `Last frame from the controller: ${
                 Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
@@ -208,8 +207,6 @@ export function Layout() {
             )}
           </div>
         </header>
-
-        <StatusStrip />
 
         <main id="main-content" className="content">
           <Outlet />

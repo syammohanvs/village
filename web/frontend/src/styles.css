@@ -571,18 +571,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   cursor: pointer;
 }
 .conn-pill--demo:hover { background: rgba(217,180,91,.12); }
-.banner-action {
-  margin-left: auto;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  padding: 3px 10px;
-  cursor: pointer;
-}
-.banner-action:hover { background: rgba(255,255,255,.06); }
 .conn-pill--stale { color: var(--warn); border-color: rgba(227, 176, 75, .4); }
 .conn-pill--offline { color: var(--danger); border-color: rgba(224, 91, 103, .4); }
 .conn-age { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -611,25 +599,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .demo-switch-label { font-size: 12px; font-weight: 600; }
 
 /* ------------------------------------------------------------------ banners */
-.banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  border-radius: 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.03);
-  color: var(--muted);
-  font-size: 13px;
-}
-.banner--demo { border-color: var(--gold-dim); background: rgba(217,180,91,.09); color: var(--gold-2); }
-.banner--sim { border-color: rgba(139,184,216,.4); background: rgba(139,184,216,.07); color: #cfe6f4; }
-.banner--stale { border-color: rgba(227,176,75,.45); background: rgba(227,176,75,.08); color: var(--warn); }
-.banner--offline { border-color: rgba(224,91,103,.45); background: rgba(224,91,103,.08); color: #ffc9cd; }
-.banner-detail { color: var(--muted); margin-left: 0.35rem; }
-.status-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 26px 0; }
-.status-strip:empty { display: none; }
 
 /* ------------------------------------------------------------------ bins */
 .bin-card { padding: 16px; }
@@ -1760,7 +1729,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 860px) {
   .appbar-lia { display: inline-flex; }
   .setup-jump { top: 56px; }
-  .status-strip { padding: 8px 16px 0; }
   .voice-invite { grid-template-columns: 1fr; }
   .voice-panel { right: 12px; left: 12px; bottom: 12px; width: auto; max-height: 88vh; }
   .lia-quick { grid-template-columns: 1fr; }

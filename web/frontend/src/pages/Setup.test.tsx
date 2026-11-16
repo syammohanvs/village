@@ -189,7 +189,8 @@ describe('simulation toggle', () => {
     // The class the CSS selector needs lives on the track; on the button alone
     // the knob stayed left while the text said On.
     expect(screen.getByTestId('simulation-track').className).toContain('is-on');
-    expect(await screen.findByTestId('demo-banner')).toBeInTheDocument();
+    // No banner: the pill in the top bar carries the state.
+    expect(screen.queryByTestId('demo-banner')).not.toBeInTheDocument();
   });
 });
 

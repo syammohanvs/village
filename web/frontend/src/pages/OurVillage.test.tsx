@@ -133,11 +133,11 @@ describe('Our Village', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByTestId('demo-banner')).toHaveTextContent(
-      /the physical board will not respond/i,
-    );
-    // The pill must not claim the board is live while every number is invented.
-    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Simulation');
+    // The pill is the only place the shell announces simulation; there is no
+    // banner any more (asked for 2026-11-16).
+    const pill = await screen.findByTestId('connection-pill');
+    expect(pill).toHaveTextContent('Simulation');
+    expect(pill.getAttribute('title')).toMatch(/invented on the laptop/i);
     expect(screen.getByTestId('connection-pill')).not.toHaveTextContent('Live');
 
     const start = await screen.findByTestId('water-plants');
@@ -150,16 +150,19 @@ describe('Our Village', () => {
     );
   });
 
-  it('leaves simulation in one press from the banner', async () => {
+  it('leaves simulation in one press on the pill', async () => {
+    // The banner that used to carry this button is gone; the pill itself is the
+    // control, and it says so on hover.
     window.localStorage.setItem('village.demoMode', 'demo');
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByTestId('back-to-live'));
+    const pill = await screen.findByTestId('connection-pill');
+    expect(pill).toHaveAttribute('role', 'button');
+    await user.click(pill);
 
     await waitFor(() => expect(window.localStorage.getItem('village.demoMode')).toBe('live'));
-    await waitFor(() => expect(screen.queryByTestId('demo-banner')).not.toBeInTheDocument());
-    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live');
+    await waitFor(() => expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live'));
   });
 
   it('keeps Stop reachable and reports an unconfirmed result', async () => {
