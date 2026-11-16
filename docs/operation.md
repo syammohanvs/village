@@ -144,7 +144,16 @@ interrupted session.
 
 ## Honest data
 
-The village does not measure tank percentage, litres, household consumption,
-pump pressure, flow, battery charge, solar/wind generation or energy savings.
-Those figures never appear. The solar panels, windmill and model buildings are
-static display models.
+The village does **not** measure tank percentage, litres, household consumption,
+pump pressure, flow, battery charge or energy savings, and those figures never
+appear anywhere.
+
+What **is** measured, and may be quoted: soil moisture, the tank's one minimum
+level, the light level, the **solar** panel (volts, milliamps and milliwatts,
+through a real panel and a red LED as the load) and the **wind** generator's
+volts once a turbine is wired to GPIO 33 — the wind card reads "Not fitted"
+until then, and it deliberately reports no current or power, because one
+analogue input cannot measure both.
+
+The model **buildings** are static display models. The bins have indicator LEDs
+only: nothing measures how full a bin is.

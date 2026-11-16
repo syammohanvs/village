@@ -4,7 +4,15 @@ import { api } from '../lib/api';
 import { openLia } from '../lib/liaUi';
 import { useApi } from '../lib/useApi';
 import type { Profile } from '../types';
-import { IconArrowRight, IconDroplet, IconLamp, IconMic, IconWaste, IconWifi } from '../components/Icons';
+import {
+  IconArrowRight,
+  IconDroplet,
+  IconLamp,
+  IconMic,
+  IconSun,
+  IconWaste,
+  IconWifi,
+} from '../components/Icons';
 
 const SAMPLES: Profile[] = [
   {
@@ -71,7 +79,7 @@ export function AboutHelp() {
       </section>
 
       <div className="about-grid">
-        <Card kicker="What it does" title="Four everyday jobs">
+        <Card kicker="What it does" title="Everyday jobs">
           <ul className="about-list">
             <li>
               <IconDroplet size={18} />
@@ -104,6 +112,15 @@ export function AboutHelp() {
                 suggestion, not proof of disposal.
               </div>
             </li>
+            <li>
+              <IconSun size={18} />
+              <div>
+                <strong>Energy.</strong> A real solar panel is measured — volts, milliamps and
+                milliwatts — and the wind generator has its own card. It says “Not fitted” until
+                the turbine is wired to GPIO 33, and then it reports volts only: one analogue input
+                cannot also measure current, so the card never invents a power figure.
+              </div>
+            </li>
           </ul>
         </Card>
 
@@ -126,8 +143,11 @@ export function AboutHelp() {
               sent to a cloud service.
             </li>
             <li>
-              <strong>Image recognition</strong> runs inside this browser tab with TensorFlow.js.
-              Camera frames are not uploaded.
+              <strong>Image recognition</strong> runs on this laptop, in the backend: the camera
+              sends the one square the model will judge, and a trained model answers. Nothing goes
+              to the internet — but the picture does leave the browser tab, which this page used to
+              say it did not. That changed when the model moved off in-browser TensorFlow.js onto
+              the backend.
             </li>
           </ol>
         </Card>
@@ -165,7 +185,8 @@ export function AboutHelp() {
 
       <Card kicker="For visitors" title="Try it in five steps">
         <ol className="steps-list">
-          <li>Look at the four cards on <Link to="/">Our Village</Link> and read what each one says.</li>
+          <li>Look at the cards on <Link to="/">Our Village</Link> — watering, tank, lights, waste,
+            solar and wind — and read what each one says.</li>
           <li>
             On <Link to="/">Our Village</Link>, choose <em>Automatic</em> for the streetlights, then
             cover the light sensor with your hand. Watch the streetlight LEDs.
@@ -174,8 +195,11 @@ export function AboutHelp() {
             Our model knows <strong>three everyday bins</strong>: <strong>organic / food
             waste</strong>, <strong>plastic</strong> and <strong>paper &amp; cardboard</strong>.
             Show one item to the camera on <Link to="/waste">Sort Waste</Link>, hold it inside the
-            square and press <em>Check the item</em>. It reads three frames, because one frame is
-            what used to change its mind, and a flip becomes “not sure” instead of a guess. The
+            square and press <em>Check the item</em>. It reads a few frames in a row — two by
+            default — because one frame is what used to change its mind, and a flip becomes “not
+            sure” instead of a guess. A bin needs <strong>70%</strong> for those frames (handing
+            something to the agent needs 50%), so a bottle that reads 60% plastic is not decided:
+            the page says which bar it missed rather than guessing. The
             card then says what the AI thinks it is, where it should go, and one reason — with
             <em>Scan another item</em> and <em>Contact Gram Sahayak</em> underneath.
             <br />
@@ -195,7 +219,8 @@ export function AboutHelp() {
               waste apart — plastic and paper are both dry waste.
             </span>
           </li>
-          <li>Press <em>Start Speaking</em> on Our Village and say “turn on the lights”.</li>
+          <li>Press the microphone at the top of <Link to="/">Our Village</Link> and say “turn on the
+            lights”. The language buttons sit directly under it.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>
         </ol>
         {rows.length === 0 && (
@@ -232,7 +257,9 @@ export function AboutHelp() {
         <div className="lia-about">
           <p>
             Sara explains the village, reads the current state aloud and shows you where to press.
-            She can open the right page for you, and she never makes up an action.
+            She can open the right page for you, and she never makes up an action. She speaks the
+            language chosen in Setup — English, Malayalam or Hindi — on every screen, including the
+            answer she gives after a waste item.
           </p>
           <div className="about-actions">
             <button type="button" className="btn btn--gold" onClick={() => openLia('help')}>

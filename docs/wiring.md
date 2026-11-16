@@ -39,7 +39,7 @@ logical order.
 5. Measure the 3.3 V rail under the LED load, and check every analogue input is
    at or below 3.3 V before connecting it.
 
-## 2. GPIO allocation (11 assigned signals)
+## 2. GPIO allocation (12 assigned signals)
 
 | Function | GPIO | Header label | Direction | Why this pin |
 | --- | ---: | --- | --- | --- |
@@ -54,7 +54,7 @@ logical order.
 | Waste LED — organic | **21** | D21 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
-| *Left over* | 33 | D33 | ADC/digital | The named spare; can also drive an output |
+| Wind generator volts | **33** | D33 | ADC input | ADC1_CH5 — the last free analogue pin (§11) |
 | *Left over* | 4, 16, 17, 18, 26 | D4, D16, D17, D18, D26 | Digital I/O | Freed when the bin rangefinders were removed |
 
 ### Why not other pins
@@ -67,7 +67,7 @@ logical order.
 | 6–11 | Connected to the SPI flash; not exposed. |
 | 34, 35, 36, 39 | Input-only. They carry the soil, reservoir, solar-current and solar-voltage inputs. |
 
-All analogue measurements use **ADC1** (GPIO 32, 34, 35, 36, 39). ADC2 shares
+All analogue measurements use **ADC1** (GPIO 32, 33, 34, 35, 36, 39). ADC2 shares
 hardware with the Wi-Fi radio and is not reliable while Wi-Fi is active.
 GPIO 25 is ADC2-capable but is used only as a digital output here, which is
 safe.
@@ -627,3 +627,69 @@ leakage adds a few counts at low light; a low-leakage part (e.g. BAV199) is
 better than a BAT54 here. The simpler answer for an exhibit is a **panel
 disconnect** when it is packed away, or just keep the board powered whenever the
 panel is in the light.
+
+## 11. Wind generator — GPIO 33 (volts only, 2026-11-16)
+
+**One wire, because one pin is all there is.** Every other analogue input is
+taken, and the remaining "analogue" pins on the pinout diagrams are not usable on
+this board:
+
+| ADC1 pin | carries |
+| --- | --- |
+| 32 | LDR (§5) |
+| 34 | soil moisture (§5) |
+| 35 | reservoir probes (§5) |
+| 36 | solar current tap (§10) |
+| 39 | solar panel tap (§10) |
+| **33** | **wind generator — this section** |
+
+**ADC2 cannot be used here.** It shares hardware with the Wi-Fi radio, and this
+exhibit is online the whole time, so GPIO 25, 26, 4, 2 and 12–15 read zero (or
+error) while the station link is up. `uc/include/village/pins.h` enforces this at
+compile time — `isSafeAnalog()` accepts only ADC1 pins, and the build fails if a
+sensor is assigned anywhere else.
+
+### Wiring
+
+```
+generator +  ──[ 10 kΩ ]──  D33 (GPIO 33)
+generator −  ─────────────  GND
+```
+
+- The **10 kΩ is protection**, exactly as on the solar taps: it carries no
+  current and bounds what the pin's clamp sees if the board is unpowered while
+  the turbine spins.
+- Keep the generator's **open-circuit voltage under 3.3 V**. A small DC motor
+  used as a generator usually stays well below that when spun by a model
+  turbine; if yours does not, add a divider and account for it when reading.
+- No load resistor is used, so the reading is the generator's **open-circuit
+  volts**. That is a real measurement, and it is why the card shows volts only.
+
+### What the app does with it
+
+`wind.installed` (default **false**) and `wind.generate_mv` (default **1000**,
+range 0–3300) are in the saved configuration. The card on Our Village says:
+
+| state | card |
+| --- | --- |
+| `installed` false | **Not fitted**, "No reading" |
+| installed, volts ≥ threshold | **Generating** (green) |
+| installed, volts below it | **Not generating** (neutral) |
+
+The threshold is a setting because the turbine, its gearing and the generator
+decide what "turning" means. A stationary generator idles near 0 V, so there is
+no ambiguity at the bottom of the range.
+
+### If you want current and power as well
+
+The card deliberately reports **no milliamps and no milliwatts**: a voltage alone
+cannot give either honestly, and there is no second tap. Two ways to get one:
+
+1. **An ADS1115 (I2C, 4 channels, 16-bit)** on two of the free digital pins —
+   e.g. GPIO 4 (SDA) and GPIO 26 (SCL). Its second channel takes the
+   `generator → 330 Ω → LED → GND` tap the solar section uses, and its readings
+   are unaffected by the ESP32 ADC's non-linearity. This is the route to take if
+   the wind card is meant to show a power figure.
+2. **Free an ADC1 pin** by moving the reservoir (35) or the LDR (32) to another
+   input. That is a hardware change; nothing in the firmware needs editing beyond
+   the pin constant, but the calibration of the moved sensor starts again.

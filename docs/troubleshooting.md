@@ -14,31 +14,61 @@ calibration, pump gate, Whisper, waste model and optional reply audio.
 
 ## The controller is unreachable
 
-First decide which of the two problems it is: **the board is not on the network
-at all**, or **it is, at a different address**.
+**The board is on the laptop's own hotspot**, so "two different networks" is not
+usually the fault any more. Decide which of these three it is, in this order.
 
-1. Serial monitor the ESP32 at 115200 baud; note the printed IP.
-2. Set `VILLAGE_DEVICE_MODE=real` and `VILLAGE_DEVICE_URL=http://<that IP>`.
-3. Confirm the token in `.env` exactly equals `VILLAGE_DEVICE_TOKEN` in
+### 1. Is there a network for the board at all?
+
+```bash
+./scripts/relay.sh status
+```
+
+That one line prints the board, the relay and the **hotspot state**. If it says
+`windows hotspot -> Off`, that is the whole problem: the board's only credential
+is the hotspot's name, so with the hotspot off it has nothing to join and looks
+exactly like a dead board (no `192.168.137.x` address on Windows, no reply on
+the subnet).
+
+- Switch it back on **in the app's own tooling**: `./scripts/relay.sh hotspot-on`
+  (no administrator needed), or Windows Settings → Network & internet → Mobile
+  hotspot.
+- `hotspot=NoInternetProfile` means the laptop itself has no uplink to share;
+  join a Wi-Fi network first, then switch the hotspot on.
+- Starting the dashboard runs the same check (`relay.sh ensure`), so
+  `./scripts/dev.sh` or `./scripts/launch.sh` repairs a switched-off hotspot by
+  itself.
+
+### 2. Is the board powered?
+
+The hotspot can be on and the board still absent because it has no power — a
+powerbank that has switched itself off, a loose USB cable, a flat cell. The
+board gives no sign over the network in that state. Check the LED on the board.
+
+### 3. It is on the network, but at a different address
+
+Normal, and handled for you. The board's address is DHCP and it moves (it has
+been `.168`, `.197` and `.222` in one session). The relay on the Windows host
+sweeps the hotspot subnet for a host answering the device API and switches to it,
+so there is no address to maintain by hand. `VILLAGE_DEVICE_DIRECT` is only the
+first guess.
+
+**Do not** set `VILLAGE_DEVICE_DISCOVER=true` with the relay: the backend would
+sweep the WSL network (`172.29.x`) instead of the hotspot, find nothing, and
+waste a sweep a minute.
+
+### The ordinary checks, if all three are fine
+
+1. Confirm the token in `.env` exactly equals `VILLAGE_DEVICE_TOKEN` in
    `uc/include/village/secrets.h`.
-4. `curl http://<ip>/api/v1/health` from the laptop. This endpoint is public;
-   `/status` requires the token.
-5. **The board's address is DHCP and it moves.** When the configured address
-   stops answering the backend now sweeps that subnet for a host answering
-   `/api/v1/status` with the device token (`VILLAGE_DEVICE_DISCOVER`, default
-   on, at most once a minute) and re-points itself, logging *Controller found at
-   a new address*. So a board that came back on a new address heals by itself;
-   no `.env` edit and no restart.
-6. **If the sweep finds nothing, the board is not on that network.** That is not
-   an app fault: check that it is powered, that its Wi-Fi is the *same* network
-   as this machine (a guest network with client isolation blocks it too), and
-   that it is not on a phone hotspot while the laptop is on the home router. On
-   two separate networks the page cannot reach it at all — the two must be
-   joined, or the address made reachable through a tunnel or a port forward.
-7. If station mode failed, the board starts `Village-Setup` (password in
-   `secrets.h`). Connect to it only for recovery. The board does not switch
-   back automatically; reboot it after fixing the router.
-8. The dashboard shows **stale** and **disconnected** rather than inventing a
+2. `curl http://<board-ip>/api/v1/health` **from Windows** (this endpoint is
+   public; `/status` needs the token). Windows can always reach the board when
+   WSL cannot — that difference is the relay's whole reason to exist.
+3. Serial monitor at 115200 baud to read the board's own scan and join lines.
+4. If station mode failed at boot the board starts `Village-Setup` (password in
+   `secrets.h`). It retries the real network every 60 seconds while nobody is
+   connected to that setup AP, so it usually recovers on its own — connect to it
+   only for recovery.
+5. The dashboard shows **stale** and **disconnected** rather than inventing a
    zero. That is deliberate.
 
 ## Pump does not start

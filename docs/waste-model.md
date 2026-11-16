@@ -1,12 +1,19 @@
 # Waste recognition model
 
-The classifier runs **entirely in the browser** with TensorFlow.js. No image
-leaves the laptop and no cloud service is used.
+**The classifier runs on the backend, not in the browser.** The camera cuts a
+224×224 square, encodes it as JPEG (quality 0.92) and posts it to
+`POST /api/v1/waste/classify`; `web/backend/app/waste_resnet.py` loads
+`models/waste-resnet50/model.pt` and answers in ~50–85 ms on this CPU with no
+internet connection. So a picture **does** leave the browser tab — to the
+backend on the same laptop, and nowhere else. This page used to open by saying
+the model ran in the browser and that frames were not uploaded; that stopped
+being true on 2026-11-13 and the app's About page repeated it until 2026-11-16.
 
-The installed model was trained on this laptop with the same architecture a
-Teachable Machine image project produces (a frozen truncated MobileNet v1 plus
-a small classifier head). It loads exactly as a Teachable Machine export does,
-so the dashboard cannot tell the two apart.
+The sections below on the browser-era pipeline are kept because the training
+scripts and the older measurements still refer to it. For what the dashboard
+actually serves, read **"Where the model runs"** first, then the ResNet50 notes
+(`scripts/waste/train_resnet50.py`, `export_resnet50.py`,
+`evaluate_waste_model.mjs`).
 
 ## 1. Train it automatically on this laptop (what this project uses)
 
