@@ -286,13 +286,23 @@ export function LiaGuide() {
 
   useEffect(() => {
     if (!speechSupported()) return;
+    // The voice list arrives late on Chrome, so the promise can resolve after
+    // the panel has closed — and in a test, after the environment is gone.  A
+    // state update then is the "caught after test environment was torn down"
+    // error, so the callback is dropped when this effect has been torn down.
+    let live = true;
     const handler = () => setVoiceTick((value) => value + 1);
     const synth = window.speechSynthesis;
     synth.addEventListener?.('voiceschanged', handler);
     // Chrome fills the list after mount; without this the first check sees an
     // empty list and calls every language "available".
-    void primeVoices().then(() => setVoiceTick((value) => value + 1));
-    return () => synth.removeEventListener?.('voiceschanged', handler);
+    void primeVoices().then(() => {
+      if (live) setVoiceTick((value) => value + 1);
+    });
+    return () => {
+      live = false;
+      synth.removeEventListener?.('voiceschanged', handler);
+    };
   }, []);
 
   const viewKey = view.kind === 'topic' ? `topic:${view.id}:${view.step}` : view.kind;
