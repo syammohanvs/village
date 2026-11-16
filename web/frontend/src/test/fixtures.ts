@@ -21,7 +21,7 @@ export interface StateOptions {
   solarCurrentMa?: number;
   solarPowerMw?: number;
   solarValid?: boolean;
-  lightsMode?: 'auto' | 'manual' | 'unknown';
+  lightsMode?: 'auto' | 'manual_on' | 'manual_off';
   lightsCommanded?: boolean;
   lastError?: string | null;
   sourceKind?: string;

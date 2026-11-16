@@ -93,7 +93,12 @@ export interface PumpState {
 }
 
 export interface StreetlightState {
-  mode: 'auto' | 'manual' | 'unknown' | string;
+  /**
+   * The firmware's own mode. `manual_on` / `manual_off` are the two states a
+   * LIGHTS_ON / LIGHTS_OFF command puts the lamps in; `auto` follows the LDR.
+   * (This said 'manual' for both, which made "is it already on?" unanswerable.)
+   */
+  mode: 'auto' | 'manual_on' | 'manual_off' | string;
   commanded: boolean;
   led_count: number;
   installed: boolean;

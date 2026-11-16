@@ -376,7 +376,9 @@ describe('typed requests use the same parser', () => {
   });
 
   it('says a command already holds instead of sending it again', async () => {
-    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: false }));
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightsCommanded: false, lightsMode: 'manual_off' }),
+    );
     vi.mocked(api.voiceInterpret).mockResolvedValue({
       status: 'ok',
       kind: 'command',
@@ -393,6 +395,57 @@ describe('typed requests use the same parser', () => {
     await user.click(screen.getByTestId('voice-send'));
 
     expect(await screen.findByText('The lights are already off.')).toBeInTheDocument();
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('still sends "lights on" while Auto happens to have them on', async () => {
+    // Auto + dark: the lamps ARE on, but by the light sensor's decision.  Saying
+    // "lights on" asks for them to be held on, so it must reach the controller
+    // -- otherwise the LDR switches them off again the moment it gets bright,
+    // and the visitor's command was silently dropped.
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightsCommanded: true, lightsMode: 'auto' }),
+    );
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_ON',
+      command: 'LIGHTS_ON',
+      actuation: true,
+      transcript: 'turn the lights on',
+      already_text: 'The lights are already on.',
+      pending_text: 'Switching the lights on.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'turn the lights on');
+    await user.click(screen.getByTestId('voice-send'));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({ type: 'LIGHTS_ON' });
+    expect(screen.queryByText('The lights are already on.')).not.toBeInTheDocument();
+  });
+
+  it('does not re-send "lights on" when the lamps are already held on', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightsCommanded: true, lightsMode: 'manual_on' }),
+    );
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_ON',
+      command: 'LIGHTS_ON',
+      actuation: true,
+      transcript: 'turn the lights on',
+      already_text: 'The lights are already on.',
+      pending_text: 'Switching the lights on.',
+    });
+
+    const { user } = await openPanel();
+    await user.type(screen.getByTestId('voice-text'), 'turn the lights on');
+    await user.click(screen.getByTestId('voice-send'));
+
+    expect(await screen.findByText('The lights are already on.')).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 

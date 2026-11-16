@@ -48,10 +48,14 @@ function alreadyInState(command: string, status: DeviceStatus | null): boolean {
   const lights = status?.actuators?.streetlights;
   const irrigation = status?.irrigation;
   switch (command) {
+    // "Already off" has to mean the lamps are HELD off, not merely off because
+    // it is bright and Auto is in charge: in Auto a "lights off" that is
+    // swallowed leaves the LDR free to switch them on at dusk, which is not
+    // what the visitor asked for.  Same the other way round at night.
     case 'LIGHTS_OFF':
-      return lights?.commanded === false;
+      return lights?.mode === 'manual_off';
     case 'LIGHTS_ON':
-      return lights?.commanded === true;
+      return lights?.mode === 'manual_on';
     case 'LIGHTS_AUTO':
       return lights?.mode === 'auto';
     case 'IRRIGATION_REQUEST':
