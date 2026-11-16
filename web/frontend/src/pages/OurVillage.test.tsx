@@ -403,63 +403,18 @@ describe('Waste card — the camera follows the board', () => {
   });
 });
 
-describe('Our Village — the top bar', () => {
-  it('names the page, with the connection state on the other side', async () => {
-    // The home page used to hide its own title ("the menu names it"), which left
-    // the connection pill alone at the left of the bar with nothing saying which
-    // page you were on (reported 2026-11-16).
-    await renderReady();
-    const title = await waitFor(() => {
-      const found = document.querySelector('.appbar-title');
-      expect(found).not.toBeNull();
-      return found as HTMLElement;
-    });
-    expect(title.textContent).toBe('Our Village');
-
-    const bar = document.querySelector('.appbar') as HTMLElement;
-    expect(bar).toContainElement(title);
-    // The pill lives in the actions block, and the title comes first in document
-    // order -- which is what puts it on the left of a space-between row.
-    const actions = bar.querySelector('.appbar-actions') as HTMLElement;
-    expect(actions.textContent).toMatch(/Live|Offline|Simulator/);
-    expect(
-      title.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-});
-
-describe('The side menu can give its width back', () => {
-  it('collapses to a rail and remembers it', async () => {
+describe('Talk to Sara on the village page', () => {
+  it('sits under the microphone, with the guide behind it', async () => {
     const user = userEvent.setup();
     await renderReady();
 
-    const toggle = await screen.findByTestId('sidebar-toggle');
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(document.querySelector('.sidebar')).not.toHaveClass('is-rail');
+    const sara = screen.getByTestId('talk-to-lia');
+    expect(sara).toHaveTextContent('Talk to Sara');
+    // Beside the microphone, in the page's own header block -- the one action
+    // the page offers a visitor who wants to ask a question.
+    expect(sara.closest('.village-simple-top')).not.toBeNull();
 
-    await user.click(toggle);
-
-    expect(document.querySelector('.sidebar')).toHaveClass('is-rail');
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    // Tooltips name the page while the words are hidden, so the icons remain
-    // readable rather than mysterious.
-    expect(screen.getByRole('link', { name: 'What Happened' })).toHaveAttribute(
-      'title',
-      'What Happened',
-    );
-    expect(window.localStorage.getItem('village.sidebar')).toBe('rail');
-  });
-
-  it('opens a rail that was left collapsed on this device', async () => {
-    window.localStorage.setItem('village.sidebar', 'rail');
-    await renderReady();
-    expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
-    expect(document.querySelector('.sidebar')).toHaveClass('is-rail');
-  });
-
-  it('is expanded by default, so a first visit never lands in a rail', async () => {
-    await renderReady();
-    expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true');
-    expect(window.localStorage.getItem('village.sidebar')).toBeNull();
+    await user.click(sara);
+    expect(await screen.findByTestId('lia-guide')).toBeInTheDocument();
   });
 });

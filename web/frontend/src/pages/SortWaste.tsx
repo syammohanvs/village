@@ -1243,7 +1243,7 @@ export function SortWaste() {
             {boardOffline && (
               <p className="hint" data-testid="waste-offline">
                 The controller is offline, so the camera is not offered: a recognised item
-                could not light its bin LED. Turn on <strong>Simulation</strong> in Setup to
+                could not light its bin LED. Turn on <strong>Simulation</strong> above to
                 show the classifier without the board.
               </p>
             )}
@@ -1261,7 +1261,7 @@ export function SortWaste() {
                 }
                 title={
                   boardOffline
-                    ? 'The controller is offline, so no bin LED could light. Use Simulation in Setup to show the classifier without the board.'
+                    ? 'The controller is offline, so no bin LED could light. Choose Simulation above to show the classifier without the board.'
                     : !cameraSupported
                     ? 'This browser cannot open a camera in this tab.'
                     : installed && modelState !== 'ready'

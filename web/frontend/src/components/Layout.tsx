@@ -1,11 +1,10 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { cx, formatAge } from '../lib/format';
-import { openLia } from '../lib/liaUi';
+import { cx } from '../lib/format';
+import { ConnectionPill } from './ConnectionPill';
 import { useSession } from '../lib/session';
 import { PAGES, SETUP_PAGE, pageMeta } from '../lib/pages';
 import { useVillage } from '../lib/village';
-import { useDemo } from '../lib/demo';
 import { Emblem } from './Emblem';
 import {
   IconActivity,
@@ -17,7 +16,7 @@ import {
   IconSettings,
   IconWaste,
 } from './Icons';
-import { LiaAvatar } from './LiaAvatar';
+import { TalkToLia } from './TalkToLia';
 import { LiaGuide } from './LiaGuide';
 
 const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
@@ -28,84 +27,10 @@ const NAV_ICONS: Record<string, (props: { size?: number }) => ReactElement> = {
   '/setup': IconSettings,
 };
 
-function clockOf(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return null;
-  return at.toLocaleTimeString(undefined, { hour12: false });
-}
-
 const SIDEBAR_KEY = 'village.sidebar';
 
-function ConnectionPill() {
-  const { connected, stale, connection, ageMs } = useVillage();
-  const { demo, setMode } = useDemo();
-  // A clock that advances once a second is the cheapest honest proof that the
-  // page is still being fed.  A relative "N ms ago" flickers between 0 and
-  // 1000 because the backend polls every second, which reads as a frozen
-  // counter rather than a live one.
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const label = demo ? 'Simulation' : !connected ? 'Offline' : stale ? 'Stale' : 'Live';
-  const tone = demo ? 'demo' : !connected ? 'offline' : stale ? 'stale' : 'live';
-  const lastSuccess = connection?.last_success_at ?? null;
-  const clock = clockOf(lastSuccess);
-  const sinceLast = lastSuccess ? Math.max(0, now - Date.parse(lastSuccess)) : null;
-  return (
-    <span
-      className={cx('conn-pill', `conn-pill--${tone}`)}
-      title={
-        demo
-          ? 'Simulation mode: these readings are invented on the laptop. Press to go back to live readings.'
-          : connected
-            ? `Last frame from the controller: ${
-                Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
-              }${lastSuccess ? ` (${lastSuccess})` : ''}`
-            : connection?.last_error ?? 'No live frame from the controller.'
-      }
-      data-testid="connection-pill"
-      onClick={demo ? () => setMode('live') : undefined}
-      role={demo ? 'button' : undefined}
-      tabIndex={demo ? 0 : undefined}
-      onKeyDown={
-        demo
-          ? (event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                setMode('live');
-              }
-            }
-          : undefined
-      }
-    >
-      <span className="dot" aria-hidden="true" />
-      {label}
-      {!demo && connected && !stale && clock && <span className="conn-age">{clock}</span>}
-      {!demo && connected && stale && <span className="conn-age">{formatAge(ageMs)}</span>}
-    </span>
-  );
-}
 
 
-function TalkToLia({ compact = false }: { compact?: boolean }) {
-  return (
-    <button
-      type="button"
-      className={cx('talk-lia', compact && 'talk-lia--compact')}
-      onClick={() => openLia('help')}
-      data-testid="talk-to-lia"
-      aria-label="Talk to Sara"
-    >
-      <LiaAvatar size={compact ? 30 : 40} decorative />
-      {!compact && <span className="talk-lia-label">Talk to Sara</span>}
-    </button>
-  );
-}
 
 export function Layout() {
   const location = useLocation();

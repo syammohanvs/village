@@ -12,6 +12,7 @@ import {
   IconWind,
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
+import { TalkToLia } from '../components/TalkToLia';
 import { Chip } from '../components/ui';
 import { api } from '../lib/api';
 import { useCommands } from '../lib/commands';
@@ -168,6 +169,9 @@ export function OurVillage() {
         >
           <IconMic size={28} />
         </button>
+        {/* Sara sits under the microphone rather than in a menu: on a page with
+            no menu this is the only way to ask the village a question. */}
+        <TalkToLia className="talk-lia--page" />
         <LanguagePicker
           className="village-simple-langs"
           options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
@@ -306,7 +310,7 @@ export function OurVillage() {
               disabled={physicalDisabled}
               title={
                 physicalDisabled
-                  ? 'The controller is offline. Use Simulation in Setup to show the classifier without the board.'
+                  ? 'The controller is offline. Choose Simulation above to show the classifier without the board.'
                   : 'Open the waste camera.'
               }
             >

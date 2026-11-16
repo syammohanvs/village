@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { KioskLayout } from './components/KioskLayout';
 import { Layout } from './components/Layout';
+import { WasteDialog } from './components/WasteDialog';
 import { Gate } from './components/Gate';
 import { VoicePanel } from './components/VoicePanel';
 import { CommandsProvider } from './lib/commands';
@@ -13,6 +15,36 @@ import { Setup } from './pages/Setup';
 import { SortWaste } from './pages/SortWaste';
 import { WhatHappened } from './pages/WhatHappened';
 
+/**
+ * Which shell the build draws.
+ *
+ * `kiosk` (the default) is the exhibit: one page, a centred mark, the
+ * three-stop mode knob and no side menu.  `sidebar` is the operator console the
+ * exhibit grew out of — kept in the tree so going back is a build flag rather
+ * than a revert, and tagged `exhibit-sidebar-2026-11-17` as well.
+ *
+ *   VITE_LAYOUT=sidebar npm run build
+ */
+const LAYOUT = ((import.meta.env as Record<string, string | undefined>).VITE_LAYOUT ?? 'kiosk')
+  .trim()
+  .toLowerCase();
+const KIOSK = LAYOUT !== 'sidebar';
+
+/**
+ * The waste sorter, over the village page in the kiosk and as its own screen on
+ * the console.  One address either way, so old links keep working.
+ */
+function WasteScreen() {
+  return KIOSK ? (
+    <>
+      <OurVillage />
+      <WasteDialog />
+    </>
+  ) : (
+    <SortWaste />
+  );
+}
+
 export default function App() {
   return (
     <SessionProvider>
@@ -23,9 +55,9 @@ export default function App() {
           <VoiceUiProvider>
             <BrowserRouter>
               <Routes>
-                <Route element={<Layout />}>
+                <Route element={KIOSK ? <KioskLayout /> : <Layout />}>
                   <Route index element={<OurVillage />} />
-                  <Route path="waste" element={<SortWaste />} />
+                  <Route path="waste" element={<WasteScreen />} />
                   <Route path="activity" element={<WhatHappened />} />
                   <Route path="about" element={<AboutHelp />} />
                   <Route path="setup" element={<Setup />} />

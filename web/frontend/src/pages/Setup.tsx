@@ -9,6 +9,7 @@ import { useVillage } from '../lib/village';
 import { buildLabel } from '../build';
 import { validateSettings } from '../lib/validation';
 import { CommandResult } from '../components/CommandResult';
+import { Toggle } from '../components/Toggle';
 import { Sensors } from './Sensors';
 import { Card, Chip, EmptyState, ErrorBlock, KeyValue, Notice } from '../components/ui';
 import { LanguagePicker } from '../components/LanguagePicker';
@@ -30,37 +31,6 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function Toggle({
-  id,
-  checked,
-  disabled,
-  onChange,
-  label,
-}: {
-  id: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      id={id}
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      className={cx('toggle', checked && 'is-on')}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-    >
-      <span className={cx('toggle-track', checked && 'is-on')} aria-hidden="true" data-testid={`${id}-track`}>
-        <span className="toggle-knob" />
-      </span>
-      <span className="toggle-text">{checked ? 'On' : 'Off'}</span>
-    </button>
-  );
-}
 
 function checklistItems(document: SetupChecklist | null) {
   return document?.items ?? document?.checks ?? [];
