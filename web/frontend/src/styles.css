@@ -127,6 +127,48 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 .brand-copy { display: flex; flex-direction: column; line-height: 1.1; }
+
+.rail-toggle {
+  margin-left: auto;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.rail-toggle:hover { border-color: var(--gold-dim); color: var(--gold-2); }
+.rail-toggle:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 2px; }
+
+/* The rail: icons only, and the page gets the rest of the width.  Desktop only --
+   below 860px the menu is a drawer, and a drawer with no words is not a menu. */
+@media (min-width: 861px) {
+  .sidebar.is-rail {
+    width: 76px;
+    flex: 0 0 76px;
+    padding: 18px 10px 16px;
+    gap: 14px;
+  }
+  .sidebar.is-rail .brand {
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px 0 14px;
+  }
+  .sidebar.is-rail .brand-copy,
+  .sidebar.is-rail .nav-link span,
+  .sidebar.is-rail .setup-link span,
+  .sidebar.is-rail .source-line { display: none; }
+  .sidebar.is-rail .rail-toggle { margin-left: 0; }
+  .sidebar.is-rail .nav-link {
+    justify-content: center;
+    padding: 11px 0;
+  }
+  .sidebar.is-rail .setup-link { justify-content: center; }
+}
 .brand-eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.18em;

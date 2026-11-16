@@ -11,6 +11,7 @@ import {
   IconDashboard,
   IconInfo,
   IconMenu,
+  IconSidebar,
   IconSettings,
   IconWaste,
 } from './Icons';
@@ -31,6 +32,8 @@ function clockOf(iso: string | null | undefined): string | null {
   if (Number.isNaN(at.getTime())) return null;
   return at.toLocaleTimeString(undefined, { hour12: false });
 }
+
+const SIDEBAR_KEY = 'village.sidebar';
 
 function ConnectionPill() {
   const { connected, stale, connection, ageMs } = useVillage();
@@ -108,6 +111,26 @@ export function Layout() {
   const isHome = location.pathname === '/';
   const { simulator } = useVillage();
   const [navOpen, setNavOpen] = useState(false);
+  // Collapsed menu, remembered per device.  Expanded is the default: a rail is a
+  // preference, never a state a first visit lands in.
+  const [rail, setRail] = useState(() => {
+    try {
+      return window.localStorage.getItem(SIDEBAR_KEY) === 'rail';
+    } catch {
+      return false;
+    }
+  });
+  const toggleRail = () => {
+    setRail((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(SIDEBAR_KEY, next ? 'rail' : 'full');
+      } catch {
+        /* storage can be unavailable in private modes */
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     setNavOpen(false);
@@ -127,13 +150,32 @@ export function Layout() {
         Skip to content
       </a>
 
-      <aside className={cx('sidebar', navOpen && 'is-open')} aria-label="Village navigation">
+      <aside
+        className={cx('sidebar', rail && 'is-rail', navOpen && 'is-open')}
+        aria-label="Village navigation"
+      >
         <div className="brand">
-          <Emblem size={62} />
-          <div className="brand-copy">
-            <span className="brand-eyebrow">Smart Green</span>
-            <span className="brand-name">Village</span>
-          </div>
+          <Emblem size={rail ? 38 : 62} />
+          {!rail && (
+            <div className="brand-copy">
+              <span className="brand-eyebrow">Smart Green</span>
+              <span className="brand-name">Village</span>
+            </div>
+          )}
+          {/* The menu can give the page its width back.  Remembered on this
+              device, because it is a preference about the screen, not about the
+              village. */}
+          <button
+            type="button"
+            className="rail-toggle"
+            data-testid="sidebar-toggle"
+            aria-label={rail ? 'Expand the menu' : 'Collapse the menu'}
+            aria-expanded={!rail}
+            title={rail ? 'Expand the menu' : 'Collapse the menu'}
+            onClick={toggleRail}
+          >
+            <IconSidebar size={17} />
+          </button>
         </div>
 
         <nav className="side-nav">
@@ -145,7 +187,8 @@ export function Layout() {
                 to={page.path}
                 end={page.path === '/'}
                 className={({ isActive }) => cx('nav-link', isActive && 'is-active')}
-                title={page.kicker}
+                title={rail ? page.navLabel : page.kicker}
+                aria-label={page.navLabel}
               >
                 <Icon size={19} />
                 <span>{page.navLabel}</span>
@@ -155,8 +198,14 @@ export function Layout() {
         </nav>
 
         <div className="side-foot">
-          <TalkToLia />
-          <NavLink to={SETUP_PAGE.path} className="setup-link" data-testid="nav-setup">
+          <TalkToLia compact={rail} />
+          <NavLink
+            to={SETUP_PAGE.path}
+            className="setup-link"
+            data-testid="nav-setup"
+            title={rail ? 'Setup' : undefined}
+            aria-label="Setup"
+          >
             <IconSettings size={16} />
             <span>Setup</span>
           </NavLink>

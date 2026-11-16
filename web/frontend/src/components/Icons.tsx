@@ -184,6 +184,15 @@ export const IconRefresh = (p: IconProps) => (
   </Svg>
 );
 
+/** A panel with a chevron: collapse or expand the side menu. */
+export const IconSidebar = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+    <path d="M9 4.5v15" />
+    <path d="M14.5 9.5 12.5 12l2 2.5" />
+  </Svg>
+);
+
 export const IconMenu = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 6.5h16M4 12h16M4 17.5h16" />

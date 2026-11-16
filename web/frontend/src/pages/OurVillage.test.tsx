@@ -392,3 +392,39 @@ describe('Our Village — the top bar', () => {
     ).toBeTruthy();
   });
 });
+
+describe('The side menu can give its width back', () => {
+  it('collapses to a rail and remembers it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const toggle = await screen.findByTestId('sidebar-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(document.querySelector('.sidebar')).not.toHaveClass('is-rail');
+
+    await user.click(toggle);
+
+    expect(document.querySelector('.sidebar')).toHaveClass('is-rail');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Tooltips name the page while the words are hidden, so the icons remain
+    // readable rather than mysterious.
+    expect(screen.getByRole('link', { name: 'What Happened' })).toHaveAttribute(
+      'title',
+      'What Happened',
+    );
+    expect(window.localStorage.getItem('village.sidebar')).toBe('rail');
+  });
+
+  it('opens a rail that was left collapsed on this device', async () => {
+    window.localStorage.setItem('village.sidebar', 'rail');
+    render(<App />);
+    expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.sidebar')).toHaveClass('is-rail');
+  });
+
+  it('is expanded by default, so a first visit never lands in a rail', async () => {
+    render(<App />);
+    expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(window.localStorage.getItem('village.sidebar')).toBeNull();
+  });
+});
