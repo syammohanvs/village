@@ -26,9 +26,39 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **438 firmware checks**, **32 backend tests** and
-**83 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+The current tree passes **484 firmware checks**, **80 backend tests** and
+**268 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
+
+## Signing in (the dashboard gate, 2026-11-17)
+
+One account in front of every screen, so a laptop left open in a room of
+visitors cannot be used to press **Water** or change calibration.
+
+- `admin` / `village` by default, set in `.env` as `VILLAGE_ADMIN_USER`,
+  `VILLAGE_ADMIN_PASSWORD` (or `VILLAGE_ADMIN_PASSWORD_HASH`, a `pbkdf2$…`
+  value — it is used as given, never re-hashed), and `VILLAGE_SESSION_HOURS`
+  (12).  `VILLAGE_AUTH_ENABLED=false` switches the gate off for a bench
+  session; the start-up log warns that every screen is open, and it also warns
+  while the built-in default password is still in use.
+- Backend: `web/backend/app/auth.py` — PBKDF2-HMAC-SHA256 with a salt, and a
+  session cookie `username|expiry|HMAC` signed with a key derived from the
+  stored hash, so changing the password invalidates every cookie and a restart
+  does not.  `HttpOnly`, `SameSite=Lax`.  The middleware in `main.py` gates
+  `/api/v1` except `/auth/login`, `/auth/session` and `/system/health`; the SPA
+  shell must stay public or the form could never be shown.  Five wrong tries
+  from one address pause the form for a minute.
+- Frontend: `lib/session.tsx` (asks once, and again on any 401 — `api.ts`
+  raises `village:unauthorised`), `components/Gate.tsx` (checking → form /
+  dashboard / "did not answer, try again"; **nothing of the village is mounted
+  behind the form**), `pages/Login.tsx`, and Sign out at the foot of the side
+  menu under the source line.
+- **Tests that render `<App />` must wait past the gate.** It adds one round
+  trip, so `render()` no longer returns a populated page: `OurVillage.test.tsx`
+  uses `renderReady()` (waits until neither "Checking the session" nor
+  "Waiting for the first frame" is on screen).  An assertion made before that
+  passes or fails by timing — which is exactly how the first version of this
+  work went red.
 
 ## ESP32 firmware
 
