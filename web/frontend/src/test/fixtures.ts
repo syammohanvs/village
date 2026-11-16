@@ -15,6 +15,9 @@ export interface StateOptions {
   lightInstalled?: boolean;
   /** Panel volts on VN. Omit for "no solar reading yet". */
   solarMillivolts?: number | null;
+  /** Wind generator volts; null means no reading at all (the default). */
+  windMillivolts?: number | null;
+  windInstalled?: boolean;
   solarCurrentMa?: number;
   solarPowerMw?: number;
   solarValid?: boolean;
@@ -41,6 +44,8 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     reservoirState = 'available',
     lightBrightness = 'dark',
     lightInstalled = true,
+    windMillivolts = null,
+    windInstalled = false,
     solarMillivolts = 142,
     solarCurrentMa = 0,
     solarPowerMw = 0,
@@ -126,6 +131,18 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
                 current_ma: solarCurrentMa,
                 power_mw: solarPowerMw,
                 valid: solarValid,
+              },
+        wind:
+          windMillivolts === null
+            ? undefined
+            : {
+                installed: windInstalled,
+                raw: 0,
+                millivolts: windMillivolts,
+                volts: windMillivolts / 1000,
+                generate_millivolts: 1000,
+                generating: windInstalled && windMillivolts >= 1000,
+                valid: windInstalled,
               },
       },
       actuators: {

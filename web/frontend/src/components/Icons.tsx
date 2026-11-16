@@ -109,6 +109,14 @@ export const IconSun = (p: IconProps) => (
   </Svg>
 );
 
+/** A turbine: hub, three blades and the mast. */
+export const IconWind = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="8.4" r="1.6" />
+    <path d="M12 6.8V3.4M13.4 9.2l3 1.8M10.6 9.2l-3 1.8M12 10v10.6M9 20.6h6" />
+  </Svg>
+);
+
 export const IconMoon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M20 14.6A8.2 8.2 0 0 1 9.4 4a8.4 8.4 0 1 0 10.6 10.6Z" />

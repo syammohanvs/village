@@ -138,6 +138,17 @@ void buildStatus(JsonDocument& doc) {
   solar["power_mw"] = power.power_mw;
   solar["valid"] = power.valid;
 
+  JsonObject wind = sensors["wind"].to<JsonObject>();
+  wind["installed"] = rt.config.wind.installed;
+  wind["raw"] = rt.wind_raw;
+  wind["millivolts"] = rt.wind_mv;
+  wind["volts"] = static_cast<float>(rt.wind_mv) / 1000.0f;
+  wind["generate_millivolts"] = rt.config.wind.generate_mv;
+  // One tap, so there is no current and no power to report -- saying so is
+  // better than inventing a number from a voltage.
+  wind["generating"] = rt.config.wind.installed && rt.wind_mv >= rt.config.wind.generate_mv;
+  wind["valid"] = rt.config.wind.installed;
+
   const IrrigationStatus irr = rt.irrigation.status(now);
   JsonObject actuators = root["actuators"].to<JsonObject>();
   JsonObject pump = actuators["pump"].to<JsonObject>();

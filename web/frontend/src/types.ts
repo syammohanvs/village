@@ -60,8 +60,27 @@ export interface SolarReading {
 }
 
 
+/**
+ * Wind generator, voltage only.
+ *
+ * The board has one free analogue pin (GPIO 33, ADC1_CH5) and the rest of ADC1
+ * carries the soil, reservoir, LDR and solar sensors; ADC2 cannot be used while
+ * Wi-Fi runs. So there is no second tap, and therefore no current or power to
+ * report -- a voltage is a real measurement, a power figure would be invented.
+ */
+export interface WindReading {
+  installed?: boolean;
+  raw?: number | null;
+  millivolts?: number | null;
+  volts?: number | null;
+  generate_millivolts?: number | null;
+  generating?: boolean | null;
+  valid?: boolean | null;
+}
+
 export interface Sensors {
   solar?: SolarReading;
+  wind?: WindReading;
   soil?: SoilReading;
   reservoir?: ReservoirReading;
   light?: LightReading;

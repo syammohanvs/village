@@ -74,6 +74,8 @@ struct Runtime {
   EventLog events;
 
   // Solar panel (instantaneous voltage on VN / GPIO 39, ADC1).
+  uint16_t wind_raw = 0;
+  uint16_t wind_mv = 0;
   uint16_t solar_raw = 0;
   uint16_t solar_mv = 0;
   // Junction between the series resistor and the LED (GPIO 36, ADC1).

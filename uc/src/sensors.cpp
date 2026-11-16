@@ -82,6 +82,10 @@ void sampleSensors(uint32_t now) {
     rt.solar_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_PANEL_ADC));
     rt.solar_junction_raw = static_cast<uint16_t>(analogRead(pins::SOLAR_CURRENT_ADC));
     rt.solar_junction_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_CURRENT_ADC));
+    // Wind shares the solar sampling period: one more ADC read on the last free
+    // ADC1 pin, and it is the same kind of slow signal.
+    rt.wind_raw = static_cast<uint16_t>(analogRead(pins::WIND_ADC));
+    rt.wind_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::WIND_ADC));
     markSample(now);
   }
 

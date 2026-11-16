@@ -194,7 +194,11 @@ inline constexpr int WASTE_LED_PAPER = 23;
 //
 // GPIO 2/5/15 are strapping pins that stay unused, and GPIO 1/3 remain the USB
 // serial console.  D33 is the named spare.
+// The last free ADC1 pin, and the only one left: every other ADC1 pin carries a
+// sensor, and ADC2 cannot be used while Wi-Fi runs.  A second analogue input for
+// wind (the current tap) needs an external ADC -- see docs/wiring.md.
 inline constexpr int SPARE_INPUT = 33;
+inline constexpr int WIND_ADC = SPARE_INPUT;  // ADC1_CH5, input-only
 
 // Pins deliberately left free for future work.  Kept as a list so a build that
 // starts using one fails the uniqueness check rather than colliding silently.
@@ -213,6 +217,8 @@ static_assert(isSafeAnalog(SOLAR_PANEL_ADC),
               "solar panel voltage must be on an exposed ADC1 pin");
 static_assert(isSafeAnalog(SOLAR_CURRENT_ADC),
               "solar current sense must be on an exposed ADC1 pin");
+static_assert(isSafeAnalog(WIND_ADC),
+              "wind generator voltage must be on an exposed ADC1 pin");
 static_assert(isSafeOutput(RESERVOIR_EXCITE),
               "reservoir excitation must be a safe output");
 static_assert(isSafeOutput(PUMP_GATE), "pump gate must be a safe output");

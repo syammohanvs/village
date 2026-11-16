@@ -73,6 +73,17 @@ struct WasteConfig {
 // junction between that resistor and the LED.  The voltage across the resistor
 // gives the current (I = V/R) and the panel voltage times that current is the
 // power it is delivering.
+// Wind generator: voltage only for now.  The board has exactly one free ADC1
+// pin (GPIO 33), so there is no second tap to measure current the way the solar
+// block does with its LED junction; a second input means an external ADC.
+struct WindConfig {
+  bool installed = false;
+  // Above this the generator is doing something.  A small DC motor used as a
+  // generator idles near 0 V, so this is a real threshold, not a guess -- but it
+  // is a setting because the turbine and gearing decide the number.
+  uint16_t generate_mv = 1000;
+};
+
 struct SolarConfig {
   bool installed = false;
   // The resistor the LED current actually flows through (the 330 ohm in
@@ -89,6 +100,7 @@ struct DeviceConfig {
   IrrigationConfig irrigation;
   WasteConfig waste;
   SolarConfig solar;
+  WindConfig wind;
 };
 
 struct ConfigError {
@@ -234,6 +246,12 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
   // an absurd value would silently report nonsense.
   if (!inRange(c.solar.sense_ohms, 1, 10000)) {
     return fail("solar.sense_ohms", "Solar sense resistor must be 1..10000 ohms.");
+  }
+
+  // A wind threshold above the pin's own range would make "generating" true
+  // only on an impossible reading, so it is refused rather than stored.
+  if (!inRange(static_cast<int>(c.wind.generate_mv), 0, 3300)) {
+    return fail("wind.generate_mv", "Wind generating threshold must be 0..3300 mV.");
   }
 
   err = ConfigError{};

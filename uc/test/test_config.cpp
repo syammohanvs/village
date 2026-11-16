@@ -115,3 +115,26 @@ TEST(config_rejects_inverted_reservoir_and_light_thresholds) {
   CHECK(!validateConfig(c, err));
 }
 
+
+// Wind: the board has one free ADC1 pin (GPIO 33), so the block is a voltage
+// tap plus the level that counts as generating.  A threshold the pin's own range
+// cannot reach would make "generating" permanently false, so it is refused.
+TEST(config_wind_threshold_stays_inside_the_adc_range) {
+  DeviceConfig c = defaults();
+  ConfigError err;
+  CHECK(validateConfig(c, err));
+  CHECK(c.wind.installed == false);
+  CHECK(c.wind.generate_mv == 1000);
+
+  c.wind.generate_mv = 3300;
+  CHECK(validateConfig(c, err));
+
+  c.wind.generate_mv = 3301;
+  CHECK(!validateConfig(c, err));
+  CHECK(err.field != nullptr);
+
+  c = defaults();
+  c.wind.installed = true;
+  c.wind.generate_mv = 0;
+  CHECK(validateConfig(c, err));
+}

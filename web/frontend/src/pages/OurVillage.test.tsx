@@ -257,3 +257,34 @@ describe('Our Village — the microphone stands alone', () => {
     }
   });
 });
+
+describe('wind card', () => {
+  it('says the turbine is not fitted before anything is wired to GPIO 33', async () => {
+    render(<App />);
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.getByText('Not fitted')).toHaveClass('chip', 'chip--neutral');
+    expect(card.getByText('No reading')).toBeInTheDocument();
+    // No invented power figure: one tap cannot measure current.
+    expect(card.queryByText(/mW/)).not.toBeInTheDocument();
+  });
+
+  it('goes green once the generator is turning above its threshold', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ windMillivolts: 2400, windInstalled: true }),
+    );
+    render(<App />);
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.getByText('Generating')).toHaveClass('chip', 'chip--live');
+    expect(card.getByText('2.40 V')).toBeInTheDocument();
+  });
+
+  it('stays neutral when a fitted turbine is not turning', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ windMillivolts: 120, windInstalled: true }),
+    );
+    render(<App />);
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.getByText('Not generating')).toHaveClass('chip', 'chip--neutral');
+    expect(card.getByText('0.12 V')).toBeInTheDocument();
+  });
+});

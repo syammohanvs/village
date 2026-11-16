@@ -55,6 +55,10 @@ void writeConfigJson(JsonObject out, const DeviceConfig& c) {
   JsonObject solar = out["solar"].to<JsonObject>();
   solar["installed"] = c.solar.installed;
   solar["sense_ohms"] = c.solar.sense_ohms;
+
+  JsonObject wind = out["wind"].to<JsonObject>();
+  wind["installed"] = c.wind.installed;
+  wind["generate_mv"] = c.wind.generate_mv;
 }
 
 bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
@@ -129,6 +133,12 @@ bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
 
   // `solar` is optional: a configuration saved before this existed must still
   // load, and the defaults (not declared, 330 ohm) are the safe ones.
+  JsonObjectConst wind = c["wind"].as<JsonObjectConst>();
+  if (!wind.isNull()) {
+    out.wind.installed = wind["installed"] | out.wind.installed;
+    out.wind.generate_mv = wind["generate_mv"] | out.wind.generate_mv;
+  }
+
   JsonObjectConst solar = c["solar"].as<JsonObjectConst>();
   if (!solar.isNull()) {
     out.solar.installed = solar["installed"] | out.solar.installed;

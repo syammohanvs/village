@@ -9,6 +9,7 @@ import {
   IconPump,
   IconStop,
   IconSun,
+  IconWind,
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { Chip } from '../components/ui';
@@ -53,6 +54,7 @@ export function OurVillage() {
   const reservoir = sensors?.reservoir;
   const light = sensors?.light;
   const solar = sensors?.solar;
+  const wind = sensors?.wind;
   const irrigation = status?.irrigation;
   const lights = status?.actuators?.streetlights;
   const waste = status?.actuators?.waste_indicator;
@@ -94,6 +96,10 @@ export function OurVillage() {
   const solarCurrent = hasStatus && solar?.current_ma != null ? solar.current_ma.toFixed(2) : null;
   const solarPower = hasStatus && solar?.power_mw != null ? solar.power_mw.toFixed(1) : null;
   const solarGenerating = Boolean(solarVolts) && (solar?.power_mw ?? 0) >= SOLAR_GENERATING_MW;
+
+  const windVolts = hasStatus && wind?.millivolts != null ? (wind.millivolts / 1000).toFixed(2) : null;
+  const windFitted = wind?.installed ?? false;
+  const windGenerating = Boolean(wind?.generating);
 
   const modelInstalled = model.data?.installed ?? model.data?.available ?? model.data?.present;
   const modelChip = model.error
@@ -307,6 +313,30 @@ export function OurVillage() {
             : 'No reading',
           'neutral',
         )}
+      </article>
+
+      <article className="vcard vcard--min vcard--solar" data-testid="card-wind">
+        <header className="vcard-head">
+          <span className="vcard-icon" aria-hidden="true"><IconWind size={19} /></span>
+          <h2>Wind</h2>
+          {levelChip(
+            !hasStatus
+              ? 'Status unknown'
+              : !windFitted
+                ? 'Not fitted'
+                : windGenerating
+                  ? 'Generating'
+                  : 'Not generating',
+            windGenerating ? 'live' : 'neutral',
+          )}
+        </header>
+        {stateLine(windVolts ? `${windVolts} V` : 'No reading', 'neutral')}
+        {windFitted ? (
+          <p className="vcard-note">
+            A generator's voltage alone; current needs a second input this board does not have
+            free.
+          </p>
+        ) : null}
       </article>
     </div>
   );
