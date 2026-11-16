@@ -13,6 +13,8 @@ vi.mock('../lib/api', async (importOriginal) => {
       ...actual.api,
       state: vi.fn(),
       settings: vi.fn(),
+      demoReset: vi.fn(),
+      demoScenario: vi.fn(),
       putSettings: vi.fn(),
       systemHealth: vi.fn(),
       setupChecklist: vi.fn(),
@@ -328,5 +330,38 @@ describe('Setup — test outputs', () => {
         expect(await screen.findByRole('switch', { name })).not.toBeChecked(),
       );
     }
+  });
+});
+
+describe('Setup — the simulation can be put back to a demo state', () => {
+  const openSimulation = async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    render(<App />);
+    // The card lives on the Setup page; the scenarios only exist while the
+    // simulation is on.
+    return screen.findByTestId('demo-reset');
+  };
+
+  it('resets the simulated world to dry soil, available water and a dark room', async () => {
+    vi.mocked(api.demoReset).mockResolvedValue({});
+    const reset = await openSimulation();
+    await userEvent.click(reset);
+    await waitFor(() => expect(api.demoReset).toHaveBeenCalledTimes(1));
+  });
+
+  it('offers the individual scenarios the guide describes', async () => {
+    vi.mocked(api.demoScenario).mockResolvedValue({});
+    await openSimulation();
+    await userEvent.click(screen.getByTestId('demo-low-water'));
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ reservoir: 'low' }));
+    await userEvent.click(screen.getByTestId('demo-dry-soil'));
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ soil_pct: 20 }));
+  });
+
+  it('says so when the simulation cannot be changed', async () => {
+    vi.mocked(api.demoReset).mockRejectedValue(new Error('backend said no'));
+    const reset = await openSimulation();
+    await userEvent.click(reset);
+    expect(await screen.findByTestId('demo-scenario-error')).toHaveTextContent(/backend said no/);
   });
 });

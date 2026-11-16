@@ -73,8 +73,28 @@ function itemOk(item: { ok?: boolean; status?: string }): boolean {
 function Connections() {
   const health = useApi<HealthResponse>(['system-health'], () => api.systemHealth(), { intervalMs: 15000 });
   const { demo, toggle } = useDemo();
+  const { reload: reloadVillage } = useVillage();
   const [testState, setTestState] = useState<TestState>('idle');
   const [testMessage, setTestMessage] = useState('');
+  const [demoBusy, setDemoBusy] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState('');
+
+  // Changing the simulated world, then pulling a fresh frame so the cards agree
+  // immediately.  "Reset" is the one that matters: the simulator starts dry and
+  // gets wet once you water it, and there was no way back (reported 2026-11-16).
+  const demoScenario = async (label: string, values: Record<string, unknown>) => {
+    setDemoBusy(label);
+    setDemoError('');
+    try {
+      if (label === 'reset') await api.demoReset();
+      else await api.demoScenario(values);
+      reloadVillage();
+    } catch (cause) {
+      setDemoError(errorMessage(cause));
+    } finally {
+      setDemoBusy(null);
+    }
+  };
 
   const testDevice = async () => {
     setTestState('testing');
@@ -166,10 +186,69 @@ function Connections() {
           <Toggle id="simulation" label="Simulation mode" checked={demo} onChange={toggle} />
         </div>
         {demo && (
-          <Notice tone="warn">
-            <strong>Simulation — the physical board will not respond.</strong> Commands are still
-            sent to the same endpoints, marked <code>mode: demo</code>.
-          </Notice>
+          <>
+            <Notice tone="warn">
+              <strong>Simulation — the physical board will not respond.</strong> Commands are still
+              sent to the same endpoints, marked <code>mode: demo</code>.
+            </Notice>
+            {/* The simulator starts dry and gets wet once you water it.  Without
+                a way back it stops being a demonstration: the Watering card
+                correctly refuses a start on wet soil and stays that way for
+                twenty minutes (reported 2026-11-16). */}
+            <div className="setting-row">
+              <div>
+                <p className="setting-name">Put the simulation back to a demo state</p>
+                <p className="hint">
+                  Resetting returns the soil to dry, the tank to available and the room to dark.
+                  Then Water on Our Village is offered again.
+                </p>
+              </div>
+            </div>
+            <div className="segmented segmented--wide" role="group" aria-label="Simulation scenarios">
+              <button
+                type="button"
+                className="segment"
+                data-testid="demo-reset"
+                disabled={demoBusy !== null}
+                onClick={() => void demoScenario('reset', {})}
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="segment"
+                data-testid="demo-dry-soil"
+                disabled={demoBusy !== null}
+                onClick={() => void demoScenario('dry soil', { soil_pct: 20 })}
+              >
+                Dry soil
+              </button>
+              <button
+                type="button"
+                className="segment"
+                data-testid="demo-low-water"
+                disabled={demoBusy !== null}
+                onClick={() => void demoScenario('low water', { reservoir: 'low' })}
+              >
+                Low water
+              </button>
+              <button
+                type="button"
+                className="segment"
+                data-testid="demo-night"
+                disabled={demoBusy !== null}
+                onClick={() => void demoScenario('night', { light: 'dark' })}
+              >
+                Night
+              </button>
+            </div>
+            {demoBusy && <p className="hint">Changing the simulation…</p>}
+            {demoError && (
+              <p className="error-text" data-testid="demo-scenario-error">
+                {demoError}
+              </p>
+            )}
+          </>
         )}
         <p className="hint">
           Simulation is only ever switched by hand. A connection failure never turns it on silently.

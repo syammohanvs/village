@@ -774,3 +774,25 @@ async def test_a_bin_answer_survives_a_board_that_cannot_be_reached(tmp_path):
     # The answer itself is intact and recorded, marked as not physically shown.
     assert body["recognition"]["category"] == "plastic"
     assert body["recognition"]["indication_confirmed"] in (False, 0)
+
+
+@pytest.mark.asyncio
+async def test_demo_mode_shows_a_wind_reading_like_the_solar_panel(tmp_path):
+    """Simulation has to demonstrate the card, not leave it "Not fitted".
+
+    The wind input is one analogue pin that nothing is wired to yet; in
+    Simulation the point is to show what the card will look like once it is
+    (asked for 2026-11-16).
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, _gateway, _app):
+        response = await client.get("/api/v1/state?mode=demo")
+
+    assert response.status_code == 200
+    sensors = (response.json().get("status") or {}).get("sensors") or {}
+    wind = sensors.get("wind") or {}
+    assert wind.get("installed") is True
+    assert wind.get("millivolts", 0) > 0
+    assert wind.get("generating") is True
+    # The solar card in Simulation is the model this follows.
+    assert (sensors.get("solar") or {}).get("installed") is True

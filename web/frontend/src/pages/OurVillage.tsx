@@ -145,16 +145,15 @@ export function OurVillage() {
                 : '';
 
   const startDisabled = busy !== null || watering || Boolean(waterBlocked);
-  // Stop is a KILL, not a mode: the firmware writes the pump gate low on every
-  // IRRIGATION_STOP, even when the controller thinks nothing is running (it
-  // answers "already stopped" and still drops the gate).  So it stays offered
-  // whenever the board can be reached -- including while the card says the soil
-  // probe is uncalibrated, because that only blocks STARTING.
+  // Stop belongs to a run.  The user's rule (2026-11-16, twice): Stop is offered
+  // only while the pump is actually on, so a card that says "watering is not
+  // needed" does not also offer a button that looks like it would act.
   //
-  // What was wrong is the other half: with the controller unreachable it was
-  // still offered, and a press could only fail.  That is what made it look
-  // inconsistent next to a disabled Water button (reported 2026-11-16).
-  const stopDisabled = busy !== null || physicalDisabled;
+  // The trade-off is deliberate and worth knowing: the firmware writes the pump
+  // gate low on every IRRIGATION_STOP even when idle, so this gives up a
+  // convenient hard-kill for the case where the board's own state is wrong.  The
+  // bench page (Setup → Test outputs) is where an output is forced by hand.
+  const stopDisabled = busy !== null || !watering;
 
   return (
     <div className="page village-page village-page--minimal">
@@ -231,7 +230,12 @@ export function OurVillage() {
               <IconStop size={16} /> Stop
             </button>
           </div>
-          {waterBlocked && <p className="vcard-note">{waterBlocked}</p>}
+          {waterBlocked && (
+            <p className="vcard-note" data-testid="water-blocked">
+              {waterBlocked}
+              {demo && ' Use Reset in Setup → Simulation to put the demo back to dry soil.'}
+            </p>
+          )}
           {notice?.card === 'plants' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 

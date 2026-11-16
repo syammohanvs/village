@@ -96,6 +96,10 @@ def default_config() -> dict[str, Any]:
             "stable_ms": 2000,
             "max_age_ms": 5000,
         },
+        "wind": {
+            "installed": True,
+            "generate_mv": 1000,
+        },
         "irrigation": {
             "auto_enabled": True,
             "pump_enabled": True,
@@ -446,6 +450,7 @@ class SimulatedDevice:
                     "reservoir": self._reservoir(),
                     "light": self._light(),
                     "solar": self._solar(),
+                    "wind": self._wind(),
                 },
                 "actuators": {
                     "pump": {
@@ -467,6 +472,25 @@ class SimulatedDevice:
                 "faults": self._faults(),
                 "recent_events": list(self.events),
             }
+
+    def _wind(self) -> dict[str, Any]:
+        """A generator turning slowly: ~1.9 V, well above the 1.0 V threshold.
+
+        Simulation has to show a reading here for the same reason it shows one
+        for the solar panel: a card that says "Not fitted" teaches nothing about
+        what the panel will look like once the turbine is wired (asked for
+        2026-11-16).
+        """
+        millivolts = 1900
+        return {
+            "installed": True,
+            "raw": millivolts,
+            "millivolts": millivolts,
+            "volts": millivolts / 1000.0,
+            "generate_millivolts": self.config.get("wind", {}).get("generate_mv", 1000),
+            "generating": millivolts >= self.config.get("wind", {}).get("generate_mv", 1000),
+            "valid": True,
+        }
 
     def _solar(self) -> dict[str, Any]:
         """A panel in a light-ish room: about 2.4 V across a red LED pair."""

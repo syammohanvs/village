@@ -236,20 +236,17 @@ describe('unknown readings', () => {
 });
 
 describe('Watering — starting and stopping are different permissions', () => {
-  it('offers Stop while the probe is uncalibrated, and says what it does', async () => {
-    // The soil probe only blocks STARTING.  Stop is a kill: the firmware writes
-    // the pump gate low on every IRRIGATION_STOP, even when it thinks nothing is
-    // running, so hiding it would remove the one control that always works.
+  it('offers neither button while nothing can run or is running', async () => {
+    // The user's rule (2026-11-16): Stop appears only while the pump is on, so a
+    // card that says watering is not needed does not also offer a button that
+    // looks like it would do something.
     vi.mocked(api.state).mockResolvedValue(makeState({ soilCalibrated: false }));
     render(<App />);
 
     const card = within(await screen.findByTestId('card-plants'));
     expect(card.getByText(/Not calibrated/i)).toBeInTheDocument();
     expect(card.getByTestId('water-plants')).toBeDisabled();
-
-    const stop = card.getByTestId('stop-watering');
-    expect(stop).toBeEnabled();
-    expect(stop).toHaveAttribute('title', expect.stringContaining('Nothing is running'));
+    expect(card.getByTestId('stop-watering')).toBeDisabled();
   });
 
   it('disables Stop when the controller cannot be reached', async () => {
@@ -327,6 +324,18 @@ describe('wind card', () => {
     expect(card.getByText('0.12 V')).toBeInTheDocument();
   });
 });
+
+it('points at Reset when the simulation itself is what blocks watering', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'wet', soilPercent: 62 }),
+    );
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByTestId('water-plants')).toBeDisabled();
+    expect(card.getByTestId('water-blocked')).toHaveTextContent(/Reset in Setup/i);
+  });
 
 describe('Waste card — the camera follows the board', () => {
   it('does not offer the camera while the controller is offline', async () => {
