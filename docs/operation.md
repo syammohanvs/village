@@ -10,7 +10,8 @@
    ```bash
    ./scripts/launch.sh
    ```
-5. Open the printed URL, usually <http://127.0.0.1:8010/>.
+5. Open the printed URL, usually <http://127.0.0.1:8010/>, and sign in
+   (see **Signing in** below).
 6. Check the **Setup** checklist before the audience arrives.
 
 During the exhibition, do not change Wi-Fi modes or power-cycle the router.
@@ -29,6 +30,44 @@ backend; Windows can also resolve `village.local`.
 
 Firmware can be updated over Wi-Fi once the board is on the network — see
 `docs/installation.md` (“Updating firmware without the USB cable”).
+
+## Signing in
+
+The dashboard is behind one password. It is there for the case the exhibit
+actually has: a screen left open in a room of visitors, where somebody can
+otherwise press **Water** or walk into **Setup** and change the calibration.
+
+- **Default account** — username `admin`, password `village`. Both are set in
+  `.env`:
+
+  ```bash
+  VILLAGE_ADMIN_USER=admin
+  VILLAGE_ADMIN_PASSWORD=choose-something-you-can-type-on-the-day
+  VILLAGE_SESSION_HOURS=12
+  ```
+
+  Change the password before the exhibit is public. The start-up log says so
+  out loud while the default is still in use:
+  `the sign-in password for 'admin' is the built-in default …`.
+- **Press Enter, not a remember-me box.** A session lasts `VILLAGE_SESSION_HOURS`
+  (12 by default), so a fresh laptop opens on the form once a day and a running
+  exhibit does not.
+- **It locks the screen, not the village.** The board keeps running, the camera
+  keeps classifying and the pump stays under its own rules while nobody is
+  signed in — which is what makes the gate safe to leave on: `./scripts/launch.sh`
+  can start the app before anyone is at the keyboard.
+- **Signing out** is the last row in the side menu, under the source line
+  (**ESP32 over Wi-Fi** or **Simulator**). It ends the session on the laptop, so
+  the next person has to sign in again.
+- **Switching the gate off** is one line in `.env`,
+  `VILLAGE_AUTH_ENABLED=false`, and a restart — for a bench session where the
+  form is only in the way. The start-up log then warns that every screen is
+  open.
+- **A forgotten password** is not recoverable from the app (nothing is shown
+  and nothing is emailed). Set `VILLAGE_ADMIN_PASSWORD` — or
+  `VILLAGE_ADMIN_PASSWORD_HASH`, a `pbkdf2$…` value — in `.env` and restart.
+  Any signed-in browser is asked to sign in again, because the cookie is signed
+  with the password.
 
 ## Sara, the village guide
 

@@ -185,6 +185,14 @@ export const IconRefresh = (p: IconProps) => (
 );
 
 /** A panel with a chevron: collapse or expand the side menu. */
+/** A door with an arrow leaving it: sign out. */
+export const IconSignOut = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H14" />
+    <path d="M17.5 8.5 21 12l-3.5 3.5M21 12h-8" />
+  </Svg>
+);
+
 export const IconSidebar = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4.5" width="18" height="15" rx="2.5" />

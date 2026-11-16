@@ -12,6 +12,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       ...actual.api,
       state: vi.fn(),
       settings: vi.fn(),
+      session: vi.fn(),
       wasteModelStatus: vi.fn(),
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
@@ -21,6 +22,12 @@ vi.mock('../lib/api', async (importOriginal) => {
 });
 
 beforeEach(() => {
+  vi.mocked(api.session).mockResolvedValue({
+    authenticated: true,
+    username: null,
+    auth_enabled: false,
+  });
+
   window.history.pushState({}, '', '/activity');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.settings).mockResolvedValue(makeSettings());

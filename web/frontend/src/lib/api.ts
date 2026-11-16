@@ -134,6 +134,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   const parsed = await readBody(response);
+  if (response.status === 401 && !path.startsWith('/auth/login')) {
+    window.dispatchEvent(new Event('village:unauthorised'));
+  }
   if (!response.ok) {
     const { message, code } = describeError(response.status, parsed, response.statusText);
     const record = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
@@ -385,6 +388,23 @@ export const api = {
 
   demoReset(): Promise<unknown> {
     return request('/demo/reset', { method: 'POST', body: {} });
+  },
+
+  /** Who am I, and is the gate even on? */
+  session(): Promise<{ authenticated: boolean; username: string | null; auth_enabled: boolean }> {
+    return request('/auth/session', { mode: undefined });
+  },
+
+  login(username: string, password: string): Promise<{ authenticated: boolean; username: string }> {
+    return request('/auth/login', {
+      method: 'POST',
+      body: { username, password },
+      mode: undefined,
+    });
+  },
+
+  logout(): Promise<unknown> {
+    return request('/auth/logout', { method: 'POST', body: {}, mode: undefined });
   },
 };
 

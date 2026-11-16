@@ -13,6 +13,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       ...actual.api,
       state: vi.fn(),
       settings: vi.fn(),
+      session: vi.fn(),
       wasteCorrect: vi.fn(),
       wasteModelStatus: vi.fn(),
       wasteResnetStatus: vi.fn(),
@@ -92,6 +93,12 @@ vi.mock('../lib/speech', async (importOriginal) => {
 const toDataUrlCalls: unknown[] = [];
 
 beforeEach(() => {
+  vi.mocked(api.session).mockResolvedValue({
+    authenticated: true,
+    username: null,
+    auth_enabled: false,
+  });
+
   window.history.pushState({}, '', '/waste');
   // The classifier adapter draws the crop into a canvas and sends it to the
   // backend.  jsdom has no canvas implementation, so these two calls are stubbed
@@ -401,7 +408,9 @@ describe('Sort Waste', () => {
     });
 
     render(<App />);
-    fireEvent.click(screen.getByTestId('hazardous-button'));
+    // The sign-in gate adds one round trip before the page mounts, so the
+    // button is not on screen at the moment render() returns.
+    fireEvent.click(await screen.findByTestId('hazardous-button'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 4000 });
     expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({

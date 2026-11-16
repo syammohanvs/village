@@ -6,6 +6,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .auth import hash_password
+
+DEFAULT_ADMIN_USER = "admin"
+DEFAULT_ADMIN_PASSWORD = "village"
+
 
 def _capture_dir(name: str, default: Path) -> Path | None:
     """A directory for saved crops, or None when the setting is switched off.
@@ -25,6 +30,18 @@ def _path(name: str, default: Path) -> Path:
     """A directory that must stay useful: unset or blank means the default."""
     raw = (os.getenv(name) or "").strip()
     return Path(raw) if raw else default
+
+
+def _admin_password_hash() -> str:
+    """An explicit hash wins, then an explicit password, then the default.
+
+    Hashing a supplied hash again would be a silent footgun, so
+    `VILLAGE_ADMIN_PASSWORD_HASH` is taken as already-hashed (`pbkdf2$...`).
+    """
+    stored = (os.getenv("VILLAGE_ADMIN_PASSWORD_HASH") or "").strip()
+    if stored:
+        return stored
+    return hash_password(os.getenv("VILLAGE_ADMIN_PASSWORD") or DEFAULT_ADMIN_PASSWORD)
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -83,6 +100,16 @@ class Settings:
     # `train_handheld_head.py --extra-train` reads, so a venue mistake becomes a
     # training photo with one press.
     waste_samples_dir: Path
+    # One account for the exhibit.  The default is a convenience for a fresh
+    # install; docs/operation.md says to change it, and the startup log warns
+    # while it is still in place.
+    auth_enabled: bool
+    admin_user: str
+    admin_password_hash: str
+    # True while the built-in "village" password is in use, so start-up can say
+    # so out loud instead of leaving a default to be discovered.
+    admin_password_default: bool
+    session_hours: int
     db_path: Path
     dist_dir: Path
     frontend_dir: Path
@@ -145,6 +172,15 @@ class Settings:
             waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 20000),
             waste_samples_dir=_path("VILLAGE_WASTE_SAMPLES_DIR",
                                     root / "data" / "waste-samples"),
+            auth_enabled=_bool("VILLAGE_AUTH_ENABLED", True),
+            admin_user=(os.getenv("VILLAGE_ADMIN_USER") or DEFAULT_ADMIN_USER).strip(),
+            # The password is read once and hashed here, so the plaintext never
+            # lives in settings (or in a repr, or in a log line).
+            admin_password_hash=_admin_password_hash(),
+            admin_password_default=not (
+                os.getenv("VILLAGE_ADMIN_PASSWORD") or os.getenv("VILLAGE_ADMIN_PASSWORD_HASH")
+            ),
+            session_hours=_int("VILLAGE_SESSION_HOURS", 12),
             db_path=Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")),
             dist_dir=dist,
             frontend_dir=frontend,

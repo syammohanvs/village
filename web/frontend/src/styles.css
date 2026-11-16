@@ -1482,6 +1482,18 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .setup-link:hover { color: var(--cream); background: rgba(255,255,255,.04); }
 .setup-link.is-active { color: var(--gold-2); }
 
+/* Sign out is a button (it ends a session, it does not navigate), so it needs
+   the anchor's look said again -- a UA button is a grey box. */
+.sign-out {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sign-out:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 2px; }
+
 /* Our Village ------------------------------------------------------- */
 
 /* Minimal home: one round microphone, the language pills, and bare status.
@@ -1781,3 +1793,41 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .vcard-actions .btn { width: 100%; justify-content: center; }
   .camera-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* The sign-in screen: the same charcoal, burgundy and gold, no sidebar. */
+.login-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(124, 32, 44, 0.35), transparent 60%),
+    var(--bg);
+}
+.login-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px;
+  border-radius: 18px;
+  border: 1px solid var(--line-red);
+  background: linear-gradient(180deg, #1a1212, #120d0d);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+.login-brand { display: flex; align-items: center; gap: 14px; }
+.login-title {
+  font-family: var(--serif);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--gold-2);
+  margin: 0;
+}
+.login-show {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.login-foot { margin-top: 2px; }

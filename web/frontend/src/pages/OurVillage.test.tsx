@@ -18,11 +18,43 @@ vi.mock('../lib/api', async (importOriginal) => {
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
       settings: vi.fn(),
+      session: vi.fn(),
     },
   };
 });
 
+
+/**
+ * Render the app and wait for the first village frame.
+ *
+ * Two things happen after `render(<App />)` that a test must not read through:
+ * the sign-in gate asks `/auth/session` (one round trip), and then the first
+ * `state` poll lands a tick after that.  Waiting for the pill to leave
+ * "Waiting for the first frame" is waiting for the page to be *populated*, which
+ * is what every assertion below is about.
+ */
+async function renderReady() {
+  render(<App />);
+  // The page prints this only while it has no frame *and* is still asking, so
+  // its absence means the first answer landed — whether that answer was a
+  // reading or an error.  (The pill is not enough: in Simulation it never says
+  // "waiting" at all, so it would settle before the frame arrived.)
+  await waitFor(() => {
+    const page = document.body.textContent ?? '';
+    // Both sentences are on screen from the first paint (the gate's card, then
+    // the page's own note), so waiting for both to go cannot pass early.
+    expect(page).not.toMatch(/Checking the session/i);
+    expect(page).not.toMatch(/Waiting for the first frame/i);
+  });
+}
+
 beforeEach(() => {
+  vi.mocked(api.session).mockResolvedValue({
+    authenticated: true,
+    username: null,
+    auth_enabled: false,
+  });
+
   window.history.pushState({}, '', '/');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.events).mockResolvedValue({ events: [] });
@@ -43,7 +75,7 @@ afterEach(() => {
 
 describe('Our Village', () => {
   it('shows the six everyday cards with honest values', async () => {
-    render(<App />);
+    await renderReady();
 
     expect(await screen.findByText('Watering')).toBeInTheDocument();
     expect(screen.getByText('Tank')).toBeInTheDocument();
@@ -71,7 +103,7 @@ describe('Our Village', () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ lightInstalled: false, lightBrightness: 'unknown' }),
     );
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-lights'));
     expect(card.getByText('No sensor')).toBeInTheDocument();
@@ -81,7 +113,7 @@ describe('Our Village', () => {
 
   it('explains why watering is disabled when the tank is low', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
-    render(<App />);
+    await renderReady();
 
     expect(await screen.findByText(/Refill the reservoir before watering/i)).toBeInTheDocument();
     expect(screen.getByTestId('water-plants')).toBeDisabled();
@@ -91,7 +123,7 @@ describe('Our Village', () => {
     // The pill is the one place connection state is reported; a banner saying
     // the same thing only pushed the cards down (asked for 2026-11-16).
     vi.mocked(api.state).mockResolvedValue(makeState({ stale: true, ageMs: 7200 }));
-    render(<App />);
+    await renderReady();
 
     const pill = await screen.findByTestId('connection-pill');
     expect(pill).toHaveTextContent('Stale');
@@ -99,9 +131,12 @@ describe('Our Village', () => {
   });
 
   it('shows the last frame time while live instead of a flickering millisecond count', async () => {
-    render(<App />);
+    await renderReady();
 
     const pill = await screen.findByTestId('connection-pill');
+    // Wait for the frame that carries the last success time, so a slower machine
+    // cannot read the pill a tick before its clock is written.
+    await waitFor(() => expect(pill.textContent ?? '').toMatch(/\d{1,2}:\d{2}:\d{2}/));
     expect(pill).toHaveTextContent('Live');
     // The backend polls once a second, so a relative "N ms ago" swung between
     // 0 and 1000 and read as a frozen counter.  A clock of the last frame is
@@ -115,7 +150,7 @@ describe('Our Village', () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ connected: false, stale: false, ageMs: 15000, lastError: 'Timed out contacting the controller.' }),
     );
-    render(<App />);
+    await renderReady();
 
     const pill = await screen.findByTestId('connection-pill');
     expect(pill).toHaveTextContent('Offline');
@@ -131,7 +166,7 @@ describe('Our Village', () => {
   it('labels simulation and sends demo commands for Water Plants', async () => {
     window.localStorage.setItem('village.demoMode', 'demo');
     const user = userEvent.setup();
-    render(<App />);
+    await renderReady();
 
     // The pill is the only place the shell announces simulation; there is no
     // banner any more (asked for 2026-11-16).
@@ -155,7 +190,7 @@ describe('Our Village', () => {
     // control, and it says so on hover.
     window.localStorage.setItem('village.demoMode', 'demo');
     const user = userEvent.setup();
-    render(<App />);
+    await renderReady();
 
     const pill = await screen.findByTestId('connection-pill');
     expect(pill).toHaveAttribute('role', 'button');
@@ -174,7 +209,7 @@ describe('Our Village', () => {
       }),
     );
     const user = userEvent.setup();
-    render(<App />);
+    await renderReady();
 
     const stop = await screen.findByTestId('stop-watering');
     expect(stop).toHaveTextContent('Stop');
@@ -196,7 +231,7 @@ describe('solar pill', () => {
   it('stays neutral while the panel reads volts but no current flows', async () => {
     // A dark panel: 142 mV, no current.  That is a true reading, not a fault, and
     // a green "live" pill here would claim the panel is producing power.
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-solar'));
     const chip = card.getByText('Not generating');
     expect(chip).toHaveClass('chip', 'chip--neutral');
@@ -209,7 +244,7 @@ describe('solar pill', () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ solarMillivolts: 3200, solarCurrentMa: 4.55, solarPowerMw: 14.6 }),
     );
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-solar'));
     const chip = card.getByText('Generating');
     expect(chip).toHaveClass('chip--live');
@@ -218,7 +253,7 @@ describe('solar pill', () => {
 
   it('says where the two taps go when there is no reading at all', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ solarMillivolts: null }));
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-solar'));
     expect(card.getAllByText('No reading').length).toBeGreaterThan(0);
     expect(card.queryByText(/GPIO/i)).not.toBeInTheDocument();
@@ -228,7 +263,7 @@ describe('solar pill', () => {
 describe('unknown readings', () => {
   it('never claims Idle, Off or "not commissioned" without a frame', async () => {
     vi.mocked(api.state).mockRejectedValue(new Error('backend down'));
-    render(<App />);
+    await renderReady();
 
     expect(await screen.findByText(/village service is not answering/i)).toBeInTheDocument();
     expect(screen.getAllByText('Status unknown').length).toBeGreaterThan(0);
@@ -248,7 +283,7 @@ describe('Watering — starting and stopping are different permissions', () => {
     // card that says watering is not needed does not also offer a button that
     // looks like it would do something.
     vi.mocked(api.state).mockResolvedValue(makeState({ soilCalibrated: false }));
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-plants'));
     expect(card.getByText(/Not calibrated/i)).toBeInTheDocument();
@@ -260,7 +295,7 @@ describe('Watering — starting and stopping are different permissions', () => {
     // Offered while unreachable, a press can only fail -- that was the
     // inconsistency: a live Stop beside a disabled Water.
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-plants'));
     expect(card.getByTestId('stop-watering')).toBeDisabled();
@@ -268,7 +303,7 @@ describe('Watering — starting and stopping are different permissions', () => {
 
   it('keeps Stop offered while the pump is running', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-plants'));
     const stop = card.getByTestId('stop-watering');
@@ -279,7 +314,7 @@ describe('Watering — starting and stopping are different permissions', () => {
 
 describe('Our Village — the microphone stands alone', () => {
   it('centres the microphone with the language choices under it', async () => {
-    render(<App />);
+    await renderReady();
     const mic = await screen.findByTestId('start-voice');
     const languages = await screen.findByRole('group', { name: 'Language' });
 
@@ -293,7 +328,7 @@ describe('Our Village — the microphone stands alone', () => {
   });
 
   it('still offers all three spoken languages under the microphone', async () => {
-    render(<App />);
+    await renderReady();
     const languages = await screen.findByRole('group', { name: 'Language' });
     for (const code of ['en', 'ml', 'hi']) {
       expect(within(languages).getByTestId(`invite-lang-${code}`)).toBeInTheDocument();
@@ -303,7 +338,7 @@ describe('Our Village — the microphone stands alone', () => {
 
 describe('wind card', () => {
   it('says the turbine is not fitted before anything is wired to GPIO 33', async () => {
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Not fitted')).toHaveClass('chip', 'chip--neutral');
     expect(card.getByText('No reading')).toBeInTheDocument();
@@ -315,7 +350,7 @@ describe('wind card', () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ windMillivolts: 2400, windInstalled: true }),
     );
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Generating')).toHaveClass('chip', 'chip--live');
     expect(card.getByText('2.40 V')).toBeInTheDocument();
@@ -325,7 +360,7 @@ describe('wind card', () => {
     vi.mocked(api.state).mockResolvedValue(
       makeState({ windMillivolts: 120, windInstalled: true }),
     );
-    render(<App />);
+    await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Not generating')).toHaveClass('chip', 'chip--neutral');
     expect(card.getByText('0.12 V')).toBeInTheDocument();
@@ -337,7 +372,7 @@ it('points at Reset when the simulation itself is what blocks watering', async (
     vi.mocked(api.state).mockResolvedValue(
       makeState({ soilState: 'wet', soilPercent: 62 }),
     );
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-plants'));
     expect(card.getByTestId('water-plants')).toBeDisabled();
@@ -350,7 +385,7 @@ describe('Waste card — the camera follows the board', () => {
     // offered only while the board can light one -- Simulation mode is the way
     // to show the model without it.
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-waste'));
     expect(card.getByTestId('open-sort-waste')).toBeDisabled();
@@ -360,7 +395,7 @@ describe('Waste card — the camera follows the board', () => {
   it('offers it again in Simulation mode, which does not use the board', async () => {
     window.localStorage.setItem('village.demoMode', 'demo');
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
-    render(<App />);
+    await renderReady();
 
     const card = within(await screen.findByTestId('card-waste'));
     expect(card.getByTestId('open-sort-waste')).toBeEnabled();
@@ -373,7 +408,7 @@ describe('Our Village — the top bar', () => {
     // The home page used to hide its own title ("the menu names it"), which left
     // the connection pill alone at the left of the bar with nothing saying which
     // page you were on (reported 2026-11-16).
-    render(<App />);
+    await renderReady();
     const title = await waitFor(() => {
       const found = document.querySelector('.appbar-title');
       expect(found).not.toBeNull();
@@ -396,7 +431,7 @@ describe('Our Village — the top bar', () => {
 describe('The side menu can give its width back', () => {
   it('collapses to a rail and remembers it', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderReady();
 
     const toggle = await screen.findByTestId('sidebar-toggle');
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -417,13 +452,13 @@ describe('The side menu can give its width back', () => {
 
   it('opens a rail that was left collapsed on this device', async () => {
     window.localStorage.setItem('village.sidebar', 'rail');
-    render(<App />);
+    await renderReady();
     expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'false');
     expect(document.querySelector('.sidebar')).toHaveClass('is-rail');
   });
 
   it('is expanded by default, so a first visit never lands in a rail', async () => {
-    render(<App />);
+    await renderReady();
     expect(await screen.findByTestId('sidebar-toggle')).toHaveAttribute('aria-expanded', 'true');
     expect(window.localStorage.getItem('village.sidebar')).toBeNull();
   });

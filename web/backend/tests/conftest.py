@@ -86,6 +86,9 @@ def make_settings(tmp_path: Path) -> Settings:
         poll_enabled=False,
         sample_loop_enabled=False,
         device_mode="simulator",
+        # The existing suite drives the API directly; the login is exercised in
+        # tests/test_auth.py, which turns it back on for itself.
+        auth_enabled=False,
         stale_after_ms=0,
         disconnect_after_ms=0,
         # Keep the waste-model check hermetic: the repository's models/waste may

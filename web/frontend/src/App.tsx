@@ -1,8 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { Gate } from './components/Gate';
 import { VoicePanel } from './components/VoicePanel';
 import { CommandsProvider } from './lib/commands';
 import { DemoProvider } from './lib/demo';
+import { SessionProvider } from './lib/session';
 import { VillageProvider } from './lib/village';
 import { VoiceUiProvider } from './lib/voiceUi';
 import { AboutHelp } from './pages/AboutHelp';
@@ -13,6 +15,8 @@ import { WhatHappened } from './pages/WhatHappened';
 
 export default function App() {
   return (
+    <SessionProvider>
+      <Gate>
     <DemoProvider>
       <VillageProvider>
         <CommandsProvider>
@@ -41,5 +45,7 @@ export default function App() {
         </CommandsProvider>
       </VillageProvider>
     </DemoProvider>
+      </Gate>
+    </SessionProvider>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { cx, formatAge } from '../lib/format';
 import { openLia } from '../lib/liaUi';
+import { useSession } from '../lib/session';
 import { PAGES, SETUP_PAGE, pageMeta } from '../lib/pages';
 import { useVillage } from '../lib/village';
 import { useDemo } from '../lib/demo';
@@ -12,6 +13,7 @@ import {
   IconInfo,
   IconMenu,
   IconSidebar,
+  IconSignOut,
   IconSettings,
   IconWaste,
 } from './Icons';
@@ -113,6 +115,7 @@ export function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   // Collapsed menu, remembered per device.  Expanded is the default: a rail is a
   // preference, never a state a first visit lands in.
+  const { username: signedInAs, signOut } = useSession();
   const [rail, setRail] = useState(() => {
     try {
       return window.localStorage.getItem(SIDEBAR_KEY) === 'rail';
@@ -213,6 +216,18 @@ export function Layout() {
             <span className={cx('dot', simulator ? 'dot--gold' : 'dot--green')} aria-hidden="true" />
             {simulator ? 'Simulator' : 'ESP32 over Wi-Fi'}
           </p>
+          {signedInAs && (
+            <button
+              type="button"
+              className="setup-link sign-out"
+              onClick={() => void signOut()}
+              title={`Signed in as ${signedInAs} — sign out`}
+              data-testid="sign-out"
+            >
+              <IconSignOut size={16} />
+              <span>Sign out</span>
+            </button>
+          )}
         </div>
       </aside>
 

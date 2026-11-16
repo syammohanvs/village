@@ -13,6 +13,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       ...actual.api,
       state: vi.fn(),
       settings: vi.fn(),
+      session: vi.fn(),
       demoReset: vi.fn(),
       demoScenario: vi.fn(),
       putSettings: vi.fn(),
@@ -31,6 +32,12 @@ vi.mock('../lib/api', async (importOriginal) => {
 });
 
 beforeEach(() => {
+  vi.mocked(api.session).mockResolvedValue({
+    authenticated: true,
+    username: null,
+    auth_enabled: false,
+  });
+
   window.history.pushState({}, '', '/setup');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.events).mockResolvedValue({ events: [] });
@@ -199,9 +206,10 @@ describe('connection health wording', () => {
     render(<App />);
     expect(await screen.findByText(/not checked — press Test connection/i)).toBeInTheDocument();
     // The backend names the clock `time`; reading only `server_time` printed a dash.
+    // The value arrives with the first frame, after the gate's round trip.
     const row = screen.getByText('Server time').closest('.kv-row');
+    await waitFor(() => expect(row?.textContent ?? '').toMatch(/2026/));
     expect(row?.textContent ?? '').not.toBe('Server time—');
-    expect(row?.textContent ?? '').toMatch(/2026/);
   });
 });
 

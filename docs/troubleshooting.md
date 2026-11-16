@@ -12,6 +12,20 @@ calibration, pump gate, Whisper, waste model and optional reply audio.
 - Verify the backend directly:
   `curl http://127.0.0.1:8010/api/v1/system/health`.
 
+## The sign-in form will not let me in
+
+- The default is `admin` / `village`. If that is refused, check `.env`:
+  `VILLAGE_ADMIN_USER`, and either `VILLAGE_ADMIN_PASSWORD` or
+  `VILLAGE_ADMIN_PASSWORD_HASH`. The backend reads `.env` once at start, so a
+  change needs a restart (`./scripts/stop.sh && ./scripts/launch.sh`).
+- Five wrong attempts from the same address pause the form for a minute
+  ("too many attempts; wait a minute and try again"). That is a pause, not a
+  lockout — wait and try the right password.
+- `The village service did not answer` on the card is **not** a password
+  problem: the backend is not running. Check `data/logs/backend.log`.
+- Nothing about the password is emailed or shown anywhere, so a forgotten one
+  is reset in `.env` (see **Signing in** in `docs/operation.md`).
+
 ## The controller is unreachable
 
 **The board is on the laptop's own hotspot**, so "two different networks" is not

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -13,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from .auth import COOKIE_NAME, Sessions, verify_password
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
 from . import waste_resnet
@@ -39,6 +41,7 @@ from .protocol import (
     SpeakRequest,
     SoilCalibrationRequest,
     VoiceInterpretRequest,
+    LoginRequest,
     WasteClassifyRequest,
     WasteCorrectionRequest,
 )
@@ -136,6 +139,21 @@ async def lifespan(app: FastAPI):
     settings: Settings = app.state.settings
     db: Database = app.state.db
     gateway: DeviceGateway = app.state.gateway
+    if not settings.auth_enabled:
+        log.warning(
+            "sign-in is switched off (VILLAGE_AUTH_ENABLED=false): every screen is open"
+        )
+    elif settings.admin_password_default:
+        # Said out loud at every start, because a default password is exactly
+        # the thing everybody means to change and nobody comes back to.
+        log.warning(
+            "the sign-in password for %r is the built-in default — "
+            "set VILLAGE_ADMIN_PASSWORD in .env before the exhibit is public",
+            settings.admin_user,
+        )
+    else:
+        log.info("sign-in is on for %r", settings.admin_user)
+
     waste_resnet.configure(settings)
     await db.init()
     await gateway.start()
@@ -207,6 +225,12 @@ def create_app(
     app.state.voice = voice
     app.state.tts = tts or PiperTts(settings)
     app.state.matcher = matcher
+    sessions = Sessions(
+        settings.admin_user,
+        settings.admin_password_hash,
+        hours=settings.session_hours,
+    )
+    app.state.sessions = sessions
 
     app.add_middleware(
         CORSMiddleware,
@@ -215,6 +239,37 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # A handful of failures per address, then a minute's pause.  Not an
+    # authentication system's lockout -- just enough that guessing by hand is
+    # slower than reading the password off the laptop.
+    login_failures: dict[str, tuple[int, float]] = {}
+    LOGIN_FREE_TRIES = 5
+    LOGIN_PAUSE_S = 60.0
+
+    PUBLIC_PATHS = {
+        "/api/v1/auth/login",
+        "/api/v1/auth/session",
+        "/api/v1/system/health",
+    }
+
+    @app.middleware("http")
+    async def require_session(request: Request, call_next):
+        """One account guards the API; the SPA shell itself stays public.
+
+        The dashboard needs to load in order to *show* the login form, so the
+        static files and the SPA fallback are open.  Everything under /api/v1
+        needs the cookie, except the three routes above (the form has to be able
+        to ask "am I signed in?" and to post the password) and the health probe.
+        """
+        if not settings.auth_enabled:
+            return await call_next(request)
+        path = request.url.path
+        if not path.startswith("/api/") or path in PUBLIC_PATHS:
+            return await call_next(request)
+        if sessions.read(request.cookies.get(COOKIE_NAME)) is None:
+            return JSONResponse({"detail": "sign in to continue"}, status_code=401)
+        return await call_next(request)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -239,6 +294,55 @@ def create_app(
         elif response.headers.get("content-type", "").startswith("text/html"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    # ------------------------------------------------------------------
+    @app.post("/api/v1/auth/login")
+    async def auth_login(request: Request, body: LoginRequest):
+        address = request.client.host if request.client else "?"
+        failures, paused_until = login_failures.get(address, (0, 0.0))
+        now = time.monotonic()
+        if failures >= LOGIN_FREE_TRIES and now < paused_until:
+            raise HTTPException(
+                status_code=429,
+                detail="too many attempts; wait a minute and try again",
+            )
+        user = body.username.strip()
+        if user != settings.admin_user or not verify_password(
+            body.password, settings.admin_password_hash
+        ):
+            failures = failures + 1 if now < paused_until or failures else failures + 1
+            login_failures[address] = (failures, now + LOGIN_PAUSE_S if failures >= LOGIN_FREE_TRIES else paused_until)
+            # One sentence for both halves: which of the two was wrong is not a
+            # stranger's to learn.
+            raise HTTPException(status_code=401, detail="that username and password do not match")
+
+        login_failures.pop(address, None)
+        token = sessions.issue()
+        response = JSONResponse({"authenticated": True, "username": settings.admin_user})
+        response.set_cookie(
+            COOKIE_NAME,
+            token,
+            max_age=sessions.ttl,
+            httponly=True,
+            samesite="lax",
+            path="/",
+        )
+        return response
+
+    @app.post("/api/v1/auth/logout")
+    async def auth_logout() -> dict[str, Any]:
+        response = JSONResponse({"authenticated": False})
+        response.delete_cookie(COOKIE_NAME, path="/")
+        return response
+
+    @app.get("/api/v1/auth/session")
+    async def auth_session(request: Request) -> dict[str, Any]:
+        user = sessions.read(request.cookies.get(COOKIE_NAME))
+        return {
+            "authenticated": user is not None,
+            "username": user,
+            "auth_enabled": settings.auth_enabled,
+        }
 
     # ------------------------------------------------------------------
     @app.get("/api/v1/system/health")

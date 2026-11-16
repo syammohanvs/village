@@ -17,6 +17,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       wasteModelStatus: vi.fn(),
       voiceIntents: vi.fn(),
       settings: vi.fn(),
+      session: vi.fn(),
       voiceTranscribe: vi.fn(),
       voiceInterpret: vi.fn(),
       events: vi.fn(),
@@ -56,6 +57,12 @@ async function openPanel() {
 }
 
 beforeEach(() => {
+  vi.mocked(api.session).mockResolvedValue({
+    authenticated: true,
+    username: null,
+    auth_enabled: false,
+  });
+
   window.history.pushState({}, '', '/');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: false }));

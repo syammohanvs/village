@@ -147,6 +147,15 @@ class VoiceInterpretRequest(BaseModel):
     source: Literal["typed", "voice"] = "typed"
 
 
+class LoginRequest(BaseModel):
+    """The one account's credentials."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: str = Field(min_length=1, max_length=60)
+    password: str = Field(min_length=1, max_length=200)
+
+
 class WasteCorrectionRequest(BaseModel):
     """What the operator says an item really was, for one judged crop.
 
