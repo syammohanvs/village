@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe('Our Village', () => {
-  it('shows the four everyday cards with honest values', async () => {
+  it('shows the six everyday cards with honest values', async () => {
     render(<App />);
 
     expect(await screen.findByText('Watering')).toBeInTheDocument();
@@ -50,6 +50,7 @@ describe('Our Village', () => {
     expect(screen.getByText('Lights')).toBeInTheDocument();
     expect(screen.getByText('Waste')).toBeInTheDocument();
     expect(screen.getByText('Solar')).toBeInTheDocument();
+    expect(screen.getByText('Wind')).toBeInTheDocument();
 
     expect(screen.getByText(/28%/)).toBeInTheDocument();
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
@@ -231,6 +232,44 @@ describe('unknown readings', () => {
     for (const mode of ['auto', 'on', 'off'] as const) {
       expect(screen.getByTestId(`lights-${mode}`)).toHaveAttribute('aria-pressed', 'false');
     }
+  });
+});
+
+describe('Watering — starting and stopping are different permissions', () => {
+  it('offers Stop while the probe is uncalibrated, and says what it does', async () => {
+    // The soil probe only blocks STARTING.  Stop is a kill: the firmware writes
+    // the pump gate low on every IRRIGATION_STOP, even when it thinks nothing is
+    // running, so hiding it would remove the one control that always works.
+    vi.mocked(api.state).mockResolvedValue(makeState({ soilCalibrated: false }));
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByText(/Not calibrated/i)).toBeInTheDocument();
+    expect(card.getByTestId('water-plants')).toBeDisabled();
+
+    const stop = card.getByTestId('stop-watering');
+    expect(stop).toBeEnabled();
+    expect(stop).toHaveAttribute('title', expect.stringContaining('Nothing is running'));
+  });
+
+  it('disables Stop when the controller cannot be reached', async () => {
+    // Offered while unreachable, a press can only fail -- that was the
+    // inconsistency: a live Stop beside a disabled Water.
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByTestId('stop-watering')).toBeDisabled();
+  });
+
+  it('keeps Stop offered while the pump is running', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-plants'));
+    const stop = card.getByTestId('stop-watering');
+    expect(stop).toBeEnabled();
+    expect(stop).toHaveAttribute('title', 'Stop the pump now.');
   });
 });
 

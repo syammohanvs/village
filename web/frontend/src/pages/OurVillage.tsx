@@ -145,7 +145,16 @@ export function OurVillage() {
                 : '';
 
   const startDisabled = busy !== null || watering || Boolean(waterBlocked);
-  const stopDisabled = busy !== null;
+  // Stop is a KILL, not a mode: the firmware writes the pump gate low on every
+  // IRRIGATION_STOP, even when the controller thinks nothing is running (it
+  // answers "already stopped" and still drops the gate).  So it stays offered
+  // whenever the board can be reached -- including while the card says the soil
+  // probe is uncalibrated, because that only blocks STARTING.
+  //
+  // What was wrong is the other half: with the controller unreachable it was
+  // still offered, and a press could only fail.  That is what made it look
+  // inconsistent next to a disabled Water button (reported 2026-11-16).
+  const stopDisabled = busy !== null || physicalDisabled;
 
   return (
     <div className="page village-page village-page--minimal">
@@ -212,6 +221,11 @@ export function OurVillage() {
               className="btn btn--danger"
               data-testid="stop-watering"
               disabled={stopDisabled}
+              title={
+                watering
+                  ? 'Stop the pump now.'
+                  : 'Forces the pump off. Nothing is running at the moment.'
+              }
               onClick={() => void run('stop', 'plants', 'IRRIGATION_STOP')}
             >
               <IconStop size={16} /> Stop
