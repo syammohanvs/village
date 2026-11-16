@@ -773,7 +773,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    a check, not the picture to look at: if a visitor's own hair is in here, the
    crop took the person and the answer will be about the person. */
 .crop-preview { position: absolute; left: 10px; bottom: 10px; margin: 0; display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
-.crop-preview canvas { width: 84px; height: 84px; border-radius: 8px; border: 1px solid rgba(255,255,255,.55); background: #fff; image-rendering: pixelated; }
+/* Neutral, not white: this canvas shows the crop, and a white background turned
+   "nothing drawn yet" into something that looked like a white plate -- which is
+   a real answer to the model, not an empty box (reported 2026-11-16). */
+.crop-preview canvas { width: 84px; height: 84px; border-radius: 8px; border: 1px solid rgba(255,255,255,.55); background: rgba(0,0,0,.45); image-rendering: pixelated; }
 .crop-preview figcaption { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 .camera-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; padding: 20px; }
 .prediction-list { display: flex; flex-direction: column; gap: 6px; }

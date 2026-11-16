@@ -1562,4 +1562,58 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
       HTMLCanvasElement.prototype.getContext = originalGetContext;
     }
   }, 25000);
+  it('does not call a 60% bin answer strong, and says which bar it missed', async () => {
+    // A plastic bottle split Plastic 0.60 / Glass 0.25: below the 70% a bin
+    // needs, so nothing may be recorded -- but the row used to be highlighted
+    // and the page said nothing about why (reported from the venue 2026-11-16).
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    predictionState.current = [
+      { className: 'Organic', probability: 0.01 },
+      { className: 'Plastic', probability: 0.6 },
+      { className: 'Paper', probability: 0.02 },
+      { className: 'Glass', probability: 0.25 },
+      { className: 'Metal', probability: 0.02 },
+      { className: 'Textile', probability: 0.02 },
+      { className: 'Leather', probability: 0.02 },
+      { className: 'Footwear', probability: 0.02 },
+      { className: 'Thermocol', probability: 0.02 },
+      { className: 'Ewaste', probability: 0.01 },
+      { className: 'Background', probability: 0.01 },
+    ];
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
+    fireEvent.click(await screen.findByTestId('auto-watch'));
+
+    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
+
+    // 60% of a bin is not a decision, so the per-class readout stays hidden --
+    // naming a material the page has not chosen is what read as "it knows it is
+    // plastic but says nothing".
+    await waitFor(() => expect(document.querySelector('.prediction-list')).toBeNull());
+    expect(document.querySelector('.is-strong')).toBeNull();
+
+    // What is shown instead is the bar that was missed.
+    expect(await screen.findByText(/A bin needs 70%/)).toBeInTheDocument();
+    // Nothing was recorded, which is the point: a bin must not be guessed.
+    expect(api.postRecognition).not.toHaveBeenCalled();
+  });
 });

@@ -397,18 +397,49 @@ export function SortWaste() {
     stabilizerRef.current.reset();
   }, []);
 
+  // One place paints "What it is reading", so no path can return without
+  // saying what the model is about to be handed.  The box used to be drawn on
+  // only one of the ways out of focusInput, and its canvas has a white
+  // background, so a path that returned early left a blank white square
+  // captioned "What it is reading" (reported from the venue 2026-11-16).
+  const drawPreview = useCallback(
+    (source: CanvasImageSource, box: { x: number; y: number; width: number; height: number }) => {
+      const preview = previewCanvasRef.current;
+      const context = preview?.getContext('2d');
+      if (!preview || !context) return;
+      context.clearRect(0, 0, preview.width, preview.height);
+      context.drawImage(source, box.x, box.y, box.width, box.height, 0, 0, preview.width, preview.height);
+    },
+    [],
+  );
+
   const focusInput = useCallback(
     (video: HTMLVideoElement): FocusOutcome | null => {
-      if (!focusOn) return { kind: 'whole', input: video };
+      const wholeFrame = () => ({
+        x: 0,
+        y: 0,
+        width: video.videoWidth || ANALYSIS_WIDTH,
+        height: video.videoHeight || ANALYSIS_HEIGHT,
+      });
+      if (!focusOn) {
+        // Focus off: the model is handed the whole frame, so that is what the
+        // box shows.
+        drawPreview(video, wholeFrame());
+        return { kind: 'whole', input: video };
+      }
 
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const context = analysis.getContext('2d');
-      if (!context) return { kind: 'whole', input: video };
+      if (!context) {
+        drawPreview(video, wholeFrame());
+        return { kind: 'whole', input: video };
+      }
       let frame: ImageData;
       try {
         context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       } catch {
+        drawPreview(video, wholeFrame());
         return { kind: 'whole', input: video };
       }
 
@@ -514,6 +545,11 @@ export function SortWaste() {
           noteScene(sceneRef.current, 'empty', Date.now());
           learnScene(sceneRef.current, frame.data);
         }
+        // Show the square unmasked: nothing is being classified, so the honest
+        // thing in the box is what the camera can see.
+        drawPreview(video, scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT,
+                                    video.videoWidth || ANALYSIS_WIDTH,
+                                    video.videoHeight || ANALYSIS_HEIGHT));
         return { kind: 'empty' };
       }
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
@@ -590,15 +626,10 @@ export function SortWaste() {
       // every non-skin blob in those frames touches the frame edge), so the cure
       // is to let the operator SEE the box and either move, or set the
       // background with themselves in the shot so only the item changes.
-      const preview = previewCanvasRef.current;
-      const previewContext = preview?.getContext('2d');
-      if (preview && previewContext) {
-        previewContext.clearRect(0, 0, preview.width, preview.height);
-        previewContext.drawImage(crop, 0, 0, preview.width, preview.height);
-      }
+      drawPreview(crop, { x: 0, y: 0, width: CROP_SIZE, height: CROP_SIZE });
       return { kind: 'object', input: crop, region };
     },
-    [focusOn],
+    [focusOn, drawPreview],
   );
 
   // Syringes, cotton, napkins, diapers, urine bags and catheters are hazardous
@@ -1043,6 +1074,27 @@ export function SortWaste() {
     };
   }, [cameraOn, modelState, autoWatch, accept, focusOn, captureBackground, focusInput]);
 
+  // The box is captioned "What it is reading" and sits on screen the whole time
+  // the camera is on, but it was only painted while a read was in flight -- so
+  // between reads it was an empty square, and with the canvas' white background
+  // that looked like the model had been handed a white plate.  A cheap refresh
+  // keeps it showing the camera; a read still overwrites it with the exact crop
+  // (mask included) that was judged.
+  useEffect(() => {
+    if (!cameraOn) return;
+    const timer = setInterval(() => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+      drawPreview(video, {
+        x: 0,
+        y: 0,
+        width: video.videoWidth || ANALYSIS_WIDTH,
+        height: video.videoHeight || ANALYSIS_HEIGHT,
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [cameraOn, drawPreview]);
+
   const recognitionId = recognition?.recognition?.id ?? recognition?.recognition_id ?? null;
   const targetCategory =
     recognition?.category ?? recognition?.recognition?.category ?? recognition?.indicator?.category ?? null;
@@ -1062,8 +1114,14 @@ export function SortWaste() {
   const top = groupedTop
     ? { label: groupedTop.material ?? groupedTop.label, confidence: groupedTop.confidence }
     : predictions[0];
+  // "Strong" means the bar that would actually ACCEPT this answer, not the
+  // generic referral bar.  At 60% a plastic bottle was called strong (the
+  // referral bar is 50%) and its row was highlighted while a bin needs 70%, so
+  // the page looked like it had decided and was refusing to say so (reported
+  // from the venue 2026-11-16).
   const strong = Boolean(
-    groupedTop ? groupedTop.confidence >= confidence : top && top.confidence >= confidence,
+    top && !(top.label.trim().toLowerCase() === 'background') &&
+      top.confidence >= confidenceBar(confidence, guideFor(top.label)),
   );
   const topIsBackground = Boolean(
     groupedTop
@@ -1463,7 +1521,7 @@ export function SortWaste() {
                     ? 'Nothing to sort — this does not look like waste. Show one item, held in your hand is fine.'
                     : strong
                       ? `Looking at ${displayLabel(top.label)}… hold still.`
-                      : `Not sure what this is — hold one item on its own, filling the square, and keep still.`
+                      : `Not sure what this is — hold one item on its own, filling the square, and keep still. A bin needs ${Math.round(confidenceBar(confidence, guideFor(top.label)) * 100)}% on ${stabilityFrames} frames in a row.`
                   : 'Waiting for the camera to see something.'}
               </p>
             ) : cameraOn && previewOnly ? (
@@ -1562,7 +1620,11 @@ export function SortWaste() {
                     <li
                       key={row.label}
                       className={cx(
-                        (row.confidence >= confidence ||
+                        // The bar that would ACCEPT this row.  It used to be the
+                        // generic referral bar, so a Plastic row at 60% was
+                        // highlighted while a bin needs 70% -- which reads as "it
+                        // knows it is plastic but says nothing" (2026-11-16).
+                        (row.confidence >= confidenceBar(confidence, guideFor(row.label)) ||
                           (strong && groupedTop?.material === row.label)) &&
                           'is-strong',
                       )}

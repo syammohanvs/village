@@ -849,6 +849,32 @@ item-only crop upscaled from ~100 px is mush. What works is a clean photo of the
 item filling the guide square with nobody behind it, and (offered, not built) a
 guard that declines when the changed region covers most of the frame.
 
+**The "What it is reading" box was blank, and a 60% bottle was called strong
+(2026-11-16).** Two separate faults, both reported together as "the box is white
+and it says plastic 60% but never decides":
+
+- The box was painted **only on some of the ways out of `focusInput`** (not when
+  the item was outside the guide square, not when focus was off), and its canvas
+  had `background: #fff` — so a path that returned early left a white square
+  captioned "What it is reading", which looks exactly like the model being handed
+  a white plate. `drawPreview()` is now the one place it is painted, every path
+  calls it, the background is neutral, and a 500 ms refresh keeps it showing the
+  camera between reads.
+- It **hid the reference to which bar was missed**, and 60% *was* shown because
+  `strong` (which is what reveals the per-class list) used the generic 50%
+  referral bar, while a bin needs `BIN_CONFIDENCE` 70%. `strong` and the row
+  highlight now use `confidenceBar(confidence, guideFor(...))` — the bar that
+  would actually accept that class — and the unsure line says *"A bin needs 70%
+  on 2 frames in a row"*. **Do not re-name the material in that line**: naming it
+  at 59% is what the venue read as "still thermocol".
+
+The real bottle that prompted it: four saved captures read Plastic 0.7058 /
+0.5152 / 0.3133 with Glass 0.13–0.28 behind them — a white/clear bottle splits
+Plastic/Glass, and 0.70 twice in a row never happened. That is the model's honest
+uncertainty, not a threshold bug: a bin must not be guessed. `waste_confidence`
+cannot lower a bin's bar (it is a floor of 0.70 by design), so the fix for a
+bottle is framing and light, not settings.
+
 **Follow-up the same day: the not-sure line no longer names a material.** The
 venue reported "still thermocol" three times while the press had chosen **no**
 bin (Thermocol 0.59/0.59/0.40, mean 0.53 — under the 0.70 bar); what was being
