@@ -81,17 +81,6 @@ struct SolarConfig {
   uint16_t sense_ohms = 330;
 };
 
-// Test mode: drive the pump and the four light outputs by hand, for a bench
-// check of the wiring.  Deliberately a configuration flag rather than a build
-// flag, because the venue wants the switches in the app -- but it is OFF by
-// default, every command is refused while it is off, and the pump always stops
-// itself after `pump_max_ms` so a forgotten switch cannot run a dry pump.
-struct TestConfig {
-  bool enabled = false;
-  // uint32 like the irrigation timers: the 300 s ceiling does not fit in 16 bits.
-  uint32_t pump_max_ms = 30000;
-};
-
 struct DeviceConfig {
   uint32_t revision = 1;
   SoilConfig soil;
@@ -100,7 +89,6 @@ struct DeviceConfig {
   IrrigationConfig irrigation;
   WasteConfig waste;
   SolarConfig solar;
-  TestConfig test;
 };
 
 struct ConfigError {
@@ -246,11 +234,6 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
   // an absurd value would silently report nonsense.
   if (!inRange(c.solar.sense_ohms, 1, 10000)) {
     return fail("solar.sense_ohms", "Solar sense resistor must be 1..10000 ohms.");
-  }
-  // A test-mode pump that never stops is the one setting here that can damage
-  // hardware, so its ceiling is bounded and enforced by the firmware as well.
-  if (!inRange(static_cast<int>(c.test.pump_max_ms), 5000, 300000)) {
-    return fail("test.pump_max_ms", "Test-mode pump limit must be 5..300 seconds.");
   }
 
   err = ConfigError{};

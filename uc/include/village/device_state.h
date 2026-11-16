@@ -89,12 +89,13 @@ struct Runtime {
   uint32_t first_sample_at_ms = 0;
   bool first_sample_seen = false;
 
-  // --- test mode (Setup → Test outputs) -----------------------------------
-  // These override the normal drivers while `config.test.enabled` is true and
-  // are cleared the moment it stops being true.  The pump carries a deadline:
-  // the firmware stops it by itself at `config.test.pump_max_ms`.
+  // --- test page (Setup → Test outputs) ------------------------------------
+  // One switch per output, straight to the pin.  `test_active` latches on the
+  // first TEST_OUTPUT and hands the outputs to that page for the rest of the
+  // session: the controller asked for no gating and no timers, so none are
+  // applied -- nothing here overrides what the operator set.
+  bool test_active = false;
   bool test_pump = false;
-  uint32_t test_pump_until_ms = 0;
   bool test_led_organic = false;
   bool test_led_plastic = false;
   bool test_led_paper = false;

@@ -122,12 +122,10 @@ export interface DeviceStatus {
     waste_indicator?: WasteIndicatorState;
   };
   irrigation: IrrigationState;
-  /** What test mode is driving right now, straight from the controller. */
+  /** What the test page is driving right now, straight from the controller. */
   test?: {
-    enabled: boolean;
+    active: boolean;
     pump: boolean;
-    pump_max_ms: number;
-    pump_remaining_ms: number;
     leds: { organic: boolean; plastic: boolean; paper: boolean; streetlights: boolean };
   };
   faults?: (string | { code?: string; text?: string })[];
@@ -199,25 +197,12 @@ export interface WasteConfig {
   indicate_ms: number;
 }
 
-/**
- * Test mode: drive the pump and the four light outputs by hand from Setup.
- * OFF by default, refused while off, and the pump stops itself after
- * `pump_max_ms` — the firmware enforces all three, not the page.
- */
-export interface TestConfig {
-  enabled: boolean;
-  pump_max_ms: number;
-}
-
 export interface DeviceConfig {
   soil: SoilConfig;
   reservoir: ReservoirConfig;
   light: LightConfig;
   irrigation: IrrigationConfig;
   waste: WasteConfig;
-  // Optional: a configuration saved before test mode existed has no block,
-  // and absent must mean "off", never "on".
-  test?: TestConfig;
 }
 
 export interface DeviceConfigDocument {

@@ -55,10 +55,6 @@ void writeConfigJson(JsonObject out, const DeviceConfig& c) {
   JsonObject solar = out["solar"].to<JsonObject>();
   solar["installed"] = c.solar.installed;
   solar["sense_ohms"] = c.solar.sense_ohms;
-
-  JsonObject test = out["test"].to<JsonObject>();
-  test["enabled"] = c.test.enabled;
-  test["pump_max_ms"] = c.test.pump_max_ms;
 }
 
 bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
@@ -137,14 +133,6 @@ bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
   if (!solar.isNull()) {
     out.solar.installed = solar["installed"] | out.solar.installed;
     out.solar.sense_ohms = solar["sense_ohms"] | out.solar.sense_ohms;
-  }
-
-  // `test` is optional too, and absent means DISABLED: a configuration written
-  // by an older build must not come back with the bench switches live.
-  JsonObjectConst test = c["test"].as<JsonObjectConst>();
-  if (!test.isNull()) {
-    out.test.enabled = test["enabled"] | out.test.enabled;
-    out.test.pump_max_ms = test["pump_max_ms"] | out.test.pump_max_ms;
   }
   return true;
 }

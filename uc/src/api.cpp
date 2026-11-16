@@ -163,11 +163,8 @@ void buildStatus(JsonDocument& doc) {
   // Test mode (Setup → Test outputs).  Reported so the panel can show what is
   // actually being driven, and how long the pump has left.
   JsonObject test = root["test"].to<JsonObject>();
-  test["enabled"] = rt.config.test.enabled;
+  test["active"] = rt.test_active;
   test["pump"] = rt.test_pump;
-  test["pump_max_ms"] = rt.config.test.pump_max_ms;
-  test["pump_remaining_ms"] =
-      rt.test_pump ? static_cast<int32_t>(rt.test_pump_until_ms - now) : 0;
   JsonObject tled = test["leds"].to<JsonObject>();
   tled["organic"] = rt.test_led_organic;
   tled["plastic"] = rt.test_led_plastic;
@@ -480,19 +477,16 @@ void handleCommand() {
       }
     }
   } else if (type == "TEST_OUTPUT") {
-    // Bench control from Setup → Test outputs.  Refused outright unless the
-    // operator has switched test mode on, and the pump is capped by
-    // config.test.pump_max_ms (the loop stops it; see applyTestOutputs).
-    if (!rt.config.test.enabled) {
-      result = CommandResult::Rejected;
-      reason = &reasons::kTestDisabled;
-    } else {
+    // Bench control from Setup → Test outputs: one switch per output, straight
+    // to the pin.  No gates and no timers by request -- the operator said they
+    // would look after protection themselves (2026-11-16).
+    {
       const String output = doc["parameters"]["output"] | "";
       const bool on = doc["parameters"]["on"] | false;
       bool known = true;
+      rt.test_active = true;
       if (output == "pump") {
         rt.test_pump = on;
-        rt.test_pump_until_ms = on ? now + rt.config.test.pump_max_ms : 0;
       } else if (output == "led_organic") {
         rt.test_led_organic = on;
       } else if (output == "led_plastic") {
@@ -520,9 +514,7 @@ void handleCommand() {
   rt.events.add(now, reason->code, reason->text);
   rt.commands.remember(hash, result, reason->code, reason->text, now);
   saveCommandsToNvs(rt.commands);
-  if (!(rt.config.test.enabled && rt.test_pump)) {
-    applyPump(rt.irrigation.pumpOn());
-  }
+  if (!rt.test_active) applyPump(rt.irrigation.pumpOn());
 
   server.send(200, "application/json", ackJson(id, type, result, *reason, now));
 }

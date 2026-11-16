@@ -74,27 +74,14 @@ void setup() {
   }
 }
 
-// Test mode (Setup → Test outputs).  Runs AFTER the normal drivers so the
-// hand switches win, and stops the pump itself when its limit runs out -- a
-// switch somebody forgot must not run a dry pump indefinitely.
-static void applyTestOutputs(uint32_t now) {
-  if (!rt.config.test.enabled) {
-    if (rt.test_pump || rt.test_led_organic || rt.test_led_plastic ||
-        rt.test_led_paper || rt.test_streetlights) {
-      // Leaving test mode releases everything it was holding.
-      rt.test_pump = false;
-      rt.test_led_organic = rt.test_led_plastic = rt.test_led_paper = false;
-      rt.test_streetlights = false;
-    }
-    return;
-  }
-  if (rt.test_pump && static_cast<int32_t>(now - rt.test_pump_until_ms) >= 0) {
-    rt.test_pump = false;
-    rt.events.add(now, reasons::kTestPumpTimedOut.code, reasons::kTestPumpTimedOut.text);
-  }
-  if (rt.test_pump) applyPump(true);
-  // In test mode the light outputs belong to the panel alone, so this runs
-  // every pass rather than only when a switch is on.
+// Test page (Setup → Test outputs): one switch per output, straight to the pin.
+// Once the page has driven anything it owns the outputs for the rest of the
+// session, so the normal drivers cannot pull a pin back down between writes.
+// Deliberately no gates and no timers -- the operator asked for that and takes
+// the protection on themselves.
+static void applyTestOutputs(uint32_t) {
+  if (!rt.test_active) return;
+  applyPump(rt.test_pump);
   applyTestLeds(rt.test_led_organic, rt.test_led_plastic, rt.test_led_paper,
                 rt.test_streetlights);
 }
@@ -120,9 +107,9 @@ void loop() {
   // never turned -- "pin high indefinitely" needs this call to be the only one.
   applyPump(true);
 #else
-  // Test mode owns the gate while its switch is on; writing pumpOn() here as
-  // well would drop the pin LOW for a moment every pass (relay chatter).
-  if (!(rt.config.test.enabled && rt.test_pump)) applyPump(rt.irrigation.pumpOn());
+  // The test page owns the gate once it has driven anything; writing pumpOn()
+  // here as well would drop the pin LOW for a moment every pass (relay chatter).
+  if (!rt.test_active) applyPump(rt.irrigation.pumpOn());
 #endif
 
 #if VILLAGE_PUMP_BENCH_DRIVE == 1
@@ -139,15 +126,14 @@ void loop() {
   }
 #endif
 
-  // In test mode the four light outputs belong to the panel, so the normal
-  // drivers stand down -- otherwise the two would write the same pins with
-  // different values every pass.
+  // Same for the four light outputs: once the test page has driven one, the
+  // normal drivers stand down so the two cannot write the same pins every pass.
   const LightOutput lights = rt.lights.output(rt.config, now);
-  if (!rt.config.test.enabled) applyStreetlights(lights.on);
+  if (!rt.test_active) applyStreetlights(lights.on);
 
   rt.waste.tick(now);
   const WasteLedState waste = rt.waste.read(now);
-  if (!rt.config.test.enabled) {
+  if (!rt.test_active) {
     applyWasteCategory(waste.active ? waste.category : WasteCategory::Unknown);
   }
 
