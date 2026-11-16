@@ -269,11 +269,30 @@ export const api = {
   wasteClassify(image: string): Promise<{
     model: string;
     predictions: { className: string; probability: number }[];
+    /** The crop the backend kept, so a correction can point at this exact frame. */
+    file?: string | null;
   }> {
-    return request<{ model: string; predictions: { className: string; probability: number }[] }>(
-      '/waste/classify',
-      { method: 'POST', body: { image }, mode: undefined },
-    );
+    return request<{
+      model: string;
+      predictions: { className: string; probability: number }[];
+      file?: string | null;
+    }>('/waste/classify', { method: 'POST', body: { image }, mode: undefined });
+  },
+
+  /**
+   * Tell the backend what the item really was.  The crop is copied into the
+   * training tree, so a mistake at the venue becomes a training photo.
+   */
+  wasteCorrect(file: string, actual: 'organic' | 'plastic' | 'paper' | 'separate'): Promise<{
+    file: string;
+    actual: string;
+    saved_as: string;
+  }> {
+    return request<{ file: string; actual: string; saved_as: string }>('/waste/correction', {
+      method: 'POST',
+      body: { file, actual },
+      mode: undefined,
+    });
   },
 
   postRecognition(input: {

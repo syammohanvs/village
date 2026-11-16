@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
@@ -13,6 +13,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       ...actual.api,
       state: vi.fn(),
       settings: vi.fn(),
+      wasteCorrect: vi.fn(),
       wasteModelStatus: vi.fn(),
       wasteResnetStatus: vi.fn(),
       wasteClassify: vi.fn(),
@@ -130,6 +131,11 @@ beforeEach(() => {
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
   vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: false, model: 'resnet50', classes: [] });
+  vi.mocked(api.wasteCorrect).mockResolvedValue({
+    file: 'capture.jpg',
+    actual: 'Plastic',
+    saved_as: '/tmp/samples/Plastic/venue-capture.jpg',
+  });
   vi.mocked(api.wasteClassify).mockImplementation(async () => ({
     model: 'resnet50',
     predictions: predictionState.current,
@@ -1658,5 +1664,65 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(spokenLanguages).toContain('ml');
     // The sentence itself is Malayalam, not English text read by a Malayalam voice.
     expect(spoken.some((line) => /പ്ലാസ്റ്റിക്/.test(line))).toBe(true);
+  });
+  it('files a misread as a training photo when the operator corrects it', async () => {
+    // The venue's whole learning loop: one press, and the frame the model got
+    // wrong joins data/waste-samples/<Class>/ for the next training run.
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(
+      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
+    );
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'metal',
+      recognition: { id: 21, category: 'metal', confidence: 0.65 },
+    });
+    predictionState.current = [
+      { className: 'Organic', probability: 0.02 },
+      { className: 'Plastic', probability: 0.15 },
+      { className: 'Paper', probability: 0.02 },
+      { className: 'Glass', probability: 0.05 },
+      { className: 'Metal', probability: 0.65 },
+      { className: 'Textile', probability: 0.03 },
+      { className: 'Leather', probability: 0.02 },
+      { className: 'Footwear', probability: 0.02 },
+      { className: 'Thermocol', probability: 0.01 },
+      { className: 'Ewaste', probability: 0.02 },
+      { className: 'Background', probability: 0.01 },
+    ];
+    vi.mocked(api.wasteClassify).mockImplementation(async () => ({
+      model: 'resnet50',
+      predictions: predictionState.current,
+      file: 'capture.jpg',
+    }));
+
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+
+    render(<App />);
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
+    fireEvent.click(await screen.findByTestId('auto-watch'));
+
+    const correction = await screen.findByTestId('waste-correction', {}, { timeout: 8000 });
+    expect(within(correction).getByText(/Wrong\? It was/)).toBeInTheDocument();
+    fireEvent.click(within(correction).getByTestId('correct-plastic'));
+
+    await waitFor(() => expect(api.wasteCorrect).toHaveBeenCalled());
+    // The frame the model judged, not "the most recent crop".
+    expect(vi.mocked(api.wasteCorrect).mock.calls[0]).toEqual(['capture.jpg', 'plastic']);
+    expect(await screen.findByText(/now in the training set for Plastic/)).toBeInTheDocument();
   });
 });

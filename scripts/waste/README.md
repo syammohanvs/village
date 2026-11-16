@@ -227,3 +227,44 @@ than pretending the model is finished.
 - A 224×224 image of a crumpled wrapper is genuinely ambiguous. The page
   requires the same class for several consecutive frames and a confidence
   threshold; it does not guess when the answer is weak.
+
+## At the venue: correct the miss, keep the photo
+
+Every crop the Sort Waste page sends is kept, with the full 11-class
+distribution, in `data/waste-captures/` (an `index.jsonl` line plus the JPEG).
+
+**When the model is wrong, press _Wrong? It was…_ under the result.** That one
+press posts `POST /api/v1/waste/correction` with the crop's own file name (the
+one the classify response returned) and the class you say it really is.  The
+backend copies that frame into `data/waste-samples/<Class>/venue-<stamp>.jpg`
+and appends a line to `data/waste-corrections.jsonl`.
+
+Those copies are exactly what the trainer reads:
+
+```bash
+python3 scripts/waste/train_handheld_head.py --extra-train data/waste-samples
+python3 scripts/waste/export_resnet50.py
+# then re-measure before trusting it
+python3 scripts/waste/hand_eval.py
+```
+
+`separate` ("keep it separate") is **not** a training class — it is glass,
+metal, textile, leather, footwear, thermocol or e-waste, and guessing which
+would put a wrong label in the tree.  Those frames go to
+`data/waste-samples/Separate/` for a human to file.
+
+## What did the camera see? (`venue_report.py`)
+
+```bash
+python3 scripts/waste/venue_report.py              # the whole log
+python3 scripts/waste/venue_report.py --days 1     # today
+python3 scripts/waste/venue_report.py --undecided 15
+```
+
+It reports reads per day, what the page would have said (bin / referral /
+nothing / undecided) using the app's own 0.70 and 0.50 bars, the top-class
+distribution, and the correction confusion list (*model said → really is*).
+`--undecided N` lists the most recent crops that reached no decision, which are
+the ones worth looking at first.  On the 23,961 reads recorded at home and in
+the office it answers: 19.4% bin, 32.3% referral, 15.3% background and **33.0%
+undecided** — the baseline to compare a venue session against.

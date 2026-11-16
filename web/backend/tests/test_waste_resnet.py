@@ -90,3 +90,85 @@ async def test_resnet_status_names_the_classes(tmp_path: Path) -> None:
     body = response.json()
     assert body["model"] == "resnet50"
     assert len(body["classes"]) == 11
+
+
+@pytest.mark.asyncio
+async def test_a_correction_files_the_judged_crop_under_the_right_class(
+    tmp_path: Path,
+) -> None:
+    """The venue's learning loop: one press, and that frame joins the training tree.
+
+    The name comes from the classify response, so a correction can never land on
+    "the most recent crop" -- which is a different picture once the camera has
+    looked at anything else.
+    """
+    settings = make_settings(tmp_path)
+    captures = settings.waste_capture_dir
+    assert captures is not None
+    captures.mkdir(parents=True, exist_ok=True)
+    (captures / "20261116T101500-metal-0.65.jpg").write_bytes(b"\xff\xd8notreallyajpeg")
+
+    async with client_for(settings) as (client, _gateway, _app):
+        response = await client.post(
+            "/api/v1/waste/correction",
+            json={"file": "20261116T101500-metal-0.65.jpg", "actual": "plastic"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["actual"] == "Plastic"
+    filed = Path(body["saved_as"])
+    assert filed.parent.name == "Plastic"
+    assert filed.is_file()
+    assert filed.name.startswith("venue-")
+    # The log beside the tree records what the model had said and what it is.
+    log = (settings.waste_samples_dir.parent / "waste-corrections.jsonl").read_text()
+    assert "20261116T101500-metal-0.65.jpg" in log and "Plastic" in log
+
+
+@pytest.mark.asyncio
+async def test_a_correction_refuses_an_unusable_target_or_name(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path)
+    captures = settings.waste_capture_dir
+    assert captures is not None
+    captures.mkdir(parents=True, exist_ok=True)
+
+    async with client_for(settings) as (client, _gateway, _app):
+        unknown = await client.post(
+            "/api/v1/waste/correction",
+            json={"file": "x.jpg", "actual": "glass"},
+        )
+        traversal = await client.post(
+            "/api/v1/waste/correction",
+            json={"file": "../secrets.jpg", "actual": "paper"},
+        )
+        missing = await client.post(
+            "/api/v1/waste/correction",
+            json={"file": "not-there.jpg", "actual": "paper"},
+        )
+
+    assert unknown.status_code == 422
+    assert traversal.status_code == 422
+    assert missing.status_code == 404
+    # Nothing was written for a refused correction.
+    assert not (settings.waste_samples_dir / "Paper").exists()
+
+
+@pytest.mark.asyncio
+async def test_classify_names_the_crop_it_kept(tmp_path: Path) -> None:
+    """The page needs that name to point a correction at the right picture."""
+    settings = make_settings(tmp_path)
+    original = waste_resnet.classify
+    waste_resnet.classify = lambda image: [{"className": "Metal", "probability": 0.6}]  # type: ignore[assignment]
+    waste_resnet._last_capture = "20261116T101500-metal-0.60.jpg"  # type: ignore[attr-defined]
+    try:
+        async with client_for(settings) as (client, _gateway, _app):
+            response = await client.post(
+                "/api/v1/waste/classify",
+                json={"image": "data:image/jpeg;base64,/9j/4AAQSkZJRg=="},
+            )
+    finally:
+        waste_resnet.classify = original  # type: ignore[assignment]
+
+    assert response.status_code == 200
+    assert response.json()["file"] == "20261116T101500-metal-0.60.jpg"

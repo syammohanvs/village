@@ -779,6 +779,19 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .crop-preview canvas { width: 84px; height: 84px; border-radius: 8px; border: 1px solid rgba(255,255,255,.55); background: rgba(0,0,0,.45); image-rendering: pixelated; }
 .crop-preview figcaption { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 .camera-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted); text-align: center; padding: 20px; }
+/* "Wrong? It was …" -- the venue's one-press correction.  It sits under the
+   result, quiet, because it is only used when the model was wrong. */
+.correction-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line-soft);
+}
+.correction-prompt { color: var(--muted); font-size: 12px; }
+.correction-chip { cursor: pointer; }
+
 .prediction-list { display: flex; flex-direction: column; gap: 6px; }
 .prediction-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
 .prediction-bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.07); overflow: hidden; }

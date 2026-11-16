@@ -21,6 +21,12 @@ def _capture_dir(name: str, default: Path) -> Path | None:
     return Path(raw) if raw else None
 
 
+def _path(name: str, default: Path) -> Path:
+    """A directory that must stay useful: unset or blank means the default."""
+    raw = (os.getenv(name) or "").strip()
+    return Path(raw) if raw else default
+
+
 def _bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None or raw.strip() == "":
@@ -73,6 +79,10 @@ class Settings:
     # afterwards.  Empty disables it.
     waste_capture_dir: Path | None
     waste_capture_keep: int
+    # Where a corrected crop is filed, one folder per class.  This is the tree
+    # `train_handheld_head.py --extra-train` reads, so a venue mistake becomes a
+    # training photo with one press.
+    waste_samples_dir: Path
     db_path: Path
     dist_dir: Path
     frontend_dir: Path
@@ -133,6 +143,8 @@ class Settings:
             waste_capture_dir=_capture_dir("VILLAGE_WASTE_CAPTURE_DIR",
                                           root / "data" / "waste-captures"),
             waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 20000),
+            waste_samples_dir=_path("VILLAGE_WASTE_SAMPLES_DIR",
+                                    root / "data" / "waste-samples"),
             db_path=Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")),
             dist_dir=dist,
             frontend_dir=frontend,

@@ -248,6 +248,10 @@ export function SortWaste() {
   // did not match what the Gram Sahayak could see.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
   const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
+  // The crop behind the current answer, and what the operator said it really
+  // was.  One press per mistake is the venue's whole learning loop.
+  const captureFileRef = useRef<string | null>(null);
+  const [correction, setCorrection] = useState<string>('');
   // A reader's own statement about the item (mixed bag, sanitary waste, a sharp)
   // is not a model class, so it is kept apart from `recognition`.
   const [manualGuide, setManualGuide] = useState<Disposal | null>(null);
@@ -688,6 +692,9 @@ export function SortWaste() {
           // a few kilobytes either way.
           const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
           const result = await api.wasteClassify(dataUrl);
+          // Remember which crop this was: a correction must point at the frame
+          // the model judged, not at whatever the camera looks at next.
+          if (result.file) captureFileRef.current = result.file;
           return result.predictions;
         },
       };
@@ -851,6 +858,8 @@ export function SortWaste() {
     setRecognition(null);
     setReferralLabel(null);
     setHazardousLabel(null);
+    setCorrection('');
+    captureFileRef.current = null;
     try {
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const analysisContext = analysis.getContext('2d');
@@ -1426,6 +1435,8 @@ export function SortWaste() {
                     setManualGuide(null);
                     setRecognition(null);
                     setPredictions([]);
+                    setCorrection('');
+                    captureFileRef.current = null;
                     stabilizerRef.current.reset();
                   }}
                   support={SUPPORT}
@@ -1463,11 +1474,55 @@ export function SortWaste() {
                   onScanAnother={() => {
                     setRecognition(null);
                     setPredictions([]);
+                    setCorrection('');
+                    captureFileRef.current = null;
                     stabilizerRef.current.reset();
                   }}
                   support={SUPPORT}
                 />
                 <p className="hint">{WORDS.notProof}</p>
+                {captureFileRef.current && (
+                  <div className="correction-row" data-testid="waste-correction">
+                    {correction ? (
+                      <p className="hint">{correction}</p>
+                    ) : (
+                      <>
+                        <span className="correction-prompt">Wrong? It was…</span>
+                        {(
+                          [
+                            ['organic', 'Organic'],
+                            ['plastic', 'Plastic'],
+                            ['paper', 'Paper'],
+                            ['separate', 'Keep it separate'],
+                          ] as const
+                        ).map(([actual, label]) => (
+                          <button
+                            key={actual}
+                            type="button"
+                            className="chip chip--neutral correction-chip"
+                            data-testid={`correct-${actual}`}
+                            onClick={() => {
+                              const file = captureFileRef.current;
+                              if (!file) return;
+                              void api
+                                .wasteCorrect(file, actual)
+                                .then(() => {
+                                  setCorrection(
+                                    `Thank you — that photo is now in the training set for ${label}.`,
+                                  );
+                                })
+                                .catch((cause: unknown) => {
+                                  setCorrection(errorMessage(cause));
+                                });
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
                 {stability?.phase === 'waiting-removal' && (
                   <p className="hint" data-testid="waste-rearm">
                     Remove the item; the camera arms itself for the next one.

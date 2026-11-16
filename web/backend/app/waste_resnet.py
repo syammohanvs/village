@@ -17,6 +17,7 @@ import base64
 import io
 import json
 import os
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -40,6 +41,10 @@ class WasteModelError(Exception):
 
 
 _lock = threading.Lock()
+# The crop this process kept for the last classification.  One camera, one page,
+# one at a time -- and the page needs the name so a correction can point at the
+# exact picture the model judged.
+_last_capture: str | None = None
 _model: Any = None
 _classes: list[str] = CLASSES
 _transforms: Any = None
@@ -143,6 +148,10 @@ def status() -> dict[str, Any]:
 # what it was actually shown, so it is on by default while the app is being
 # developed.  Bounded by `keep` so a long session cannot fill the disk.
 _capture_lock = threading.Lock()
+# The crop this process kept for the last classification.  One camera, one page,
+# one at a time -- and the page needs the name so a correction can point at the
+# exact picture the model judged.
+_last_capture: str | None = None
 
 
 def _capture(raw: bytes, predictions: list[dict[str, Any]]) -> Path | None:
@@ -171,6 +180,8 @@ def _capture(raw: bytes, predictions: list[dict[str, Any]]) -> Path | None:
                 path = folder / f"{name}-{suffix}.jpg"
                 suffix += 1
             path.write_bytes(raw)
+            global _last_capture
+            _last_capture = path.name
             line = {
                 "file": path.name,
                 "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -210,6 +221,78 @@ def configure(settings: Any) -> None:
 
 def _settings() -> Any:
     return _settings_ref
+
+
+def last_capture() -> str | None:
+    """The file name of the crop kept for the most recent classification."""
+    return _last_capture
+
+
+# A correction names what the item really was, in the operator's words.  A
+# referral is deliberately NOT a training class: "keep it separate" is glass,
+# metal, textile, leather, footwear, thermocol or e-waste, and guessing which
+# one would put a wrong label in the tree.  Those frames are kept aside for a
+# human to file.
+CORRECTION_TARGETS = {
+    "organic": "Organic",
+    "plastic": "Plastic",
+    "paper": "Paper",
+    "separate": "Separate",
+}
+
+
+def label_capture(file_name: str, actual: str) -> dict[str, Any]:
+    """File a judged crop under the class the operator says it really is.
+
+    This is the venue's whole learning loop: every mistake costs one press, and
+    the picture is copied into the folder the trainer reads, so the next model
+    has seen the venue's own light, background and hands.
+    """
+    from .config import Settings as _Settings  # noqa: F401  (kept importable alone)
+
+    target = CORRECTION_TARGETS.get((actual or "").strip().lower())
+    if target is None:
+        raise WasteModelError(
+            422,
+            "BAD_CORRECTION",
+            "actual must be organic, plastic, paper or separate",
+        )
+    name = (file_name or "").strip()
+    # A file name, nothing else: no separators, no "..", no absolute path.
+    if not name or Path(name).name != name:
+        raise WasteModelError(422, "BAD_FILE", "the capture name must be a plain file name")
+
+    settings = _settings()
+    captures_dir = settings.waste_capture_dir if settings else None
+    if captures_dir is None:
+        raise WasteModelError(409, "CAPTURES_OFF", "crop capture is disabled on this deployment")
+    source = Path(captures_dir) / name
+    if not source.is_file():
+        raise WasteModelError(404, "NO_CAPTURE", f"{name} is not a saved crop")
+
+    samples_dir = Path(settings.waste_samples_dir) / target
+    samples_dir.mkdir(parents=True, exist_ok=True)
+    destination = samples_dir / f"venue-{source.stem}.jpg"
+    suffix = 1
+    while destination.exists():
+        destination = samples_dir / f"venue-{source.stem}-{suffix}.jpg"
+        suffix += 1
+    shutil.copyfile(source, destination)
+
+    line = {
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "file": name,
+        "actual": target,
+        "saved_as": str(destination),
+    }
+    try:
+        with open(Path(settings.waste_samples_dir).parent / "waste-corrections.jsonl",
+                  "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(line) + "\n")
+    except OSError:
+        # The copy is what matters; a missing log must not undo the press.
+        pass
+    return {"file": name, "actual": target, "saved_as": str(destination)}
 
 
 def captures() -> dict[str, Any]:

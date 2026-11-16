@@ -794,6 +794,24 @@ photographed** — ten real photos of a person holding an item are still the
 measurement that counts, and `scripts/waste/hand_eval.py` scores whatever model
 the backend is serving.
 
+**A venue mistake is now one press away from being training data (2026-11-16).**
+Every crop the model judges was already kept (`data/waste-captures/`, ~24k reads
+by 2026-11-16) but **unlabelled**, so a venue session could not teach anything.
+The result card now offers **Wrong? It was…** (Organic / Plastic / Paper / Keep
+it separate); pressing one posts `POST /api/v1/waste/correction` with the crop's
+own file name — taken from the `file` field the classify response now returns, so
+a correction can never land on "the most recent crop" — and the backend copies it
+to `data/waste-samples/<Class>/venue-<stamp>.jpg`, appending
+`data/waste-corrections.jsonl`. That tree is what
+`train_handheld_head.py --extra-train` reads. `separate` is deliberately **not** a
+training class: it is seven different materials, so those frames go to
+`Separate/` for a human. `scripts/waste/venue_report.py` reads both logs and
+reports reads/day, bin/referral/nothing/undecided shares at the app's own 0.70
+and 0.50 bars, the top-class distribution and the said→really-is list; on the
+home/office log it is **19.4% bin, 32.3% referral, 15.3% background, 33.0%
+undecided**. That is the number a venue session is measured against — the photos
+so far are all from home and the office, which is the known generalisation risk.
+
 **A confident wrong answer is fixed with photographs, not with a rule**
 (2026-11-13, the user's choice). A handkerchief read as Plastic 0.75 lit the
 plastic bin, so a higher bar for bins was measured and **rejected**: 0.80 for the

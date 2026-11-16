@@ -40,6 +40,7 @@ from .protocol import (
     SoilCalibrationRequest,
     VoiceInterpretRequest,
     WasteClassifyRequest,
+    WasteCorrectionRequest,
 )
 from .simulator import SimulatorError
 from .tts import PiperTts, TtsError
@@ -468,7 +469,25 @@ def create_app(
                 status_code=exc.status,
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
-        return {"model": "resnet50", "predictions": predictions}
+        # `file` is the crop that was just kept, so the page can point a
+        # correction at it instead of guessing which frame it meant.
+        return {"model": "resnet50", "predictions": predictions, "file": waste_resnet.last_capture()}
+
+    @app.post("/api/v1/waste/correction")
+    async def waste_correction(body: WasteCorrectionRequest):
+        """File a judged crop under the class the operator says it really is.
+
+        One press per mistake, and the venue's own photo joins the training tree
+        (`data/waste-samples/<Class>/`), which is what
+        `train_handheld_head.py --extra-train` reads.
+        """
+        try:
+            return await asyncio.to_thread(waste_resnet.label_capture, body.file, body.actual)
+        except waste_resnet.WasteModelError as exc:
+            raise HTTPException(
+                status_code=exc.status,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
 
     @app.post("/api/v1/waste/recognition")
     async def waste_recognition(

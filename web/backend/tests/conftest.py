@@ -91,6 +91,10 @@ def make_settings(tmp_path: Path) -> Settings:
         # Keep the waste-model check hermetic: the repository's models/waste may
         # hold a real trained model on a presenter's machine.
         waste_model_dir=tmp_path / "models" / "waste",
+        # A venue correction writes into this tree, so keep it inside tmp_path
+        # rather than next to the repository's real samples.
+        waste_capture_dir=tmp_path / "captures",
+        waste_samples_dir=tmp_path / "samples",
     )
 
 

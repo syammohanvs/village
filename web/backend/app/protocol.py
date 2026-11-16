@@ -147,6 +147,19 @@ class VoiceInterpretRequest(BaseModel):
     source: Literal["typed", "voice"] = "typed"
 
 
+class WasteCorrectionRequest(BaseModel):
+    """What the operator says an item really was, for one judged crop.
+
+    `file` is the name the classify response returned, so the correction points
+    at the exact picture the model was shown -- never at "the most recent one".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    file: str = Field(min_length=1, max_length=200)
+    actual: str = Field(min_length=1, max_length=20)
+
+
 class WasteClassifyRequest(BaseModel):
     """A 224x224 frame (data URL or bare base64) to classify with ResNet50."""
 
