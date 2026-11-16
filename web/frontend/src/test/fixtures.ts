@@ -79,6 +79,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
       // Test mode (Setup → Test outputs): absent in an older payload, so the
       // page must treat "no block" as off.
       test: {
+        enabled: testEnabled,
         active: testEnabled,
         pump: testPump,
         leds: { organic: false, plastic: false, paper: false, streetlights: false },

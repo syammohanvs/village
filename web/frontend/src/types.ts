@@ -124,6 +124,8 @@ export interface DeviceStatus {
   irrigation: IrrigationState;
   /** What the test page is driving right now, straight from the controller. */
   test?: {
+    /** The page's master switch: no output can be driven while this is false. */
+    enabled: boolean;
     active: boolean;
     pump: boolean;
     leds: { organic: boolean; plastic: boolean; paper: boolean; streetlights: boolean };

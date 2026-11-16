@@ -667,8 +667,8 @@ def test_classify_saves_the_crop_it_judged(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_test_output_is_normalised_and_refused_when_unknown(tmp_path):
-    """Setup → Test outputs: the wire shape is checked here, the gates live in
-    the controller (test mode off, pump time limit)."""
+    """Setup → Test outputs: the wire shape is checked here, the gate lives in
+    the controller (test mode off refuses every output)."""
     settings = make_settings(tmp_path)
     real = RecordingDevice()
     async with client_for(settings, device=real) as (client, gateway, app):
@@ -700,3 +700,42 @@ async def test_test_output_is_normalised_and_refused_when_unknown(tmp_path):
         )
         assert bad.status_code == 422
         assert "led_organic" in bad.json()["detail"]
+
+@pytest.mark.asyncio
+async def test_test_mode_is_the_master_switch_above_the_outputs(tmp_path):
+    """TEST_MODE turns the five output switches on and off.
+
+    The refusal itself is in the firmware -- an output with test mode off is
+    answered REJECTED there -- so all this route owes is an honest wire shape
+    and a real boolean, which is what a UI switch sends.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        on = await client.post(
+            "/api/v1/commands",
+            json={
+                "mode": "live",
+                "type": "TEST_MODE",
+                "parameters": {"on": "yes"},
+                "request_id": "test-mode-0001",
+                "source": "browser",
+            },
+        )
+        assert on.status_code == 200
+        forwarded = real.calls[-1]
+        assert forwarded["type"] == "TEST_MODE"
+        assert forwarded["parameters"]["on"] is True
+
+        off = await client.post(
+            "/api/v1/commands",
+            json={
+                "mode": "live",
+                "type": "TEST_MODE",
+                "parameters": {"on": 0},
+                "request_id": "test-mode-0002",
+                "source": "browser",
+            },
+        )
+        assert off.status_code == 200
+        assert real.calls[-1]["parameters"]["on"] is False

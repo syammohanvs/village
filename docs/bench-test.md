@@ -21,21 +21,29 @@ until step 8.
 
 ## Test outputs page (Setup → Test outputs)
 
-Five switches and nothing else: **Pump / motor (D19)**, **Organic LED (D21)**,
-**Plastic LED (D22)**, **Paper LED (D23)** and **Streetlights (D13)**. Turn one
-on and that output is driven; turn it off and it is released. No gating, no
-timers, no interlocks.
+**One master switch, then five output switches:**
 
-**The protection is the operator's.** That is a deliberate choice (2026-11-16),
-so know what it means before using it:
+1. **Test mode** — the master. Nothing below can move a pin until this is on,
+   so a stray press cannot start the pump. Turning it off releases whatever the
+   five switches were holding and hands every output back to the controller on
+   the next pass.
+2. **Pump / motor (D19)**, **Organic LED (D21)**, **Plastic LED (D22)**,
+   **Paper LED (D23)**, **Streetlights (D13)**. Turn one on and that output is
+   driven; turn it off and it is released.
+
+Both levels are **session-only**: a reboot puts the outputs back under normal
+control, so a forgotten switch cannot survive a power cycle.
+
+**Once test mode is on, the protection is the operator's** — that is a
+deliberate choice (2026-11-16), so know what it means before using it:
 
 - The pump **runs while the switch is on**, regardless of the soil probe, the
   tank probe, the pump commissioning gate, the cooldown or the kill switch. It
-  does not stop by itself — turn it off, or remove power.
-- Once the page has driven any output, the firmware lets it own all five for the
-  rest of the session: the normal light and waste drivers stand down so the two
-  cannot fight over the same pins. A reboot gives the outputs back to the normal
-  drivers.
+  does not stop by itself — turn it off, switch test mode off, or remove power.
+- Once an output has actually been driven, the firmware lets the page own all
+  five for the rest of the session: the normal light and waste drivers stand
+  down so the two cannot fight over the same pins. Turning test mode off (or
+  rebooting) gives them back.
 - Never leave the pump switch on with the pump out of water, and do not leave it
   on unattended.
 

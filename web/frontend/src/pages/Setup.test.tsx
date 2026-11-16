@@ -223,22 +223,57 @@ describe('spoken language setting', () => {
 
 
 describe('Setup — test outputs', () => {
-  it('offers one switch per output and nothing else', async () => {
+  const OUTPUTS = [
+    'Pump / motor (D19)',
+    'Organic LED (D21)',
+    'Plastic LED (D22)',
+    'Paper LED (D23)',
+    'Streetlights (D13)',
+  ];
+
+  it('offers a master switch and one switch per output', async () => {
     render(<App />);
-    for (const name of [
-      'Pump / motor (D19)',
-      'Organic LED (D21)',
-      'Plastic LED (D22)',
-      'Paper LED (D23)',
-      'Streetlights (D13)',
-    ]) {
+    expect(await screen.findByRole('switch', { name: 'Test mode' })).toBeInTheDocument();
+    for (const name of OUTPUTS) {
       expect(await screen.findByRole('switch', { name })).toBeInTheDocument();
     }
-    // Nothing that gates the switches: no master test-mode switch, no limits.
-    expect(screen.queryByRole('switch', { name: 'Test mode' })).not.toBeInTheDocument();
   });
 
-  it('drives one LED at a time', async () => {
+  it('refuses to offer the outputs until test mode is on', async () => {
+    // The controller reports the master switch, so a page that thinks it is on
+    // while the firmware says otherwise would be a switch that only looks usable.
+    render(<App />);
+    expect(await screen.findByRole('switch', { name: 'Test mode' })).not.toBeChecked();
+    for (const name of OUTPUTS) {
+      expect(await screen.findByRole('switch', { name })).toBeDisabled();
+    }
+  });
+
+  it('sends TEST_MODE when the master switch is turned on', async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Test mode' }));
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({
+      type: 'TEST_MODE',
+      parameters: { on: true },
+    });
+  });
+
+  it('sends TEST_MODE off to release the outputs', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
+    render(<App />);
+    const mode = await screen.findByRole('switch', { name: 'Test mode' });
+    await waitFor(() => expect(mode).toBeChecked());
+    await userEvent.click(mode);
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({
+      type: 'TEST_MODE',
+      parameters: { on: false },
+    });
+  });
+
+  it('drives one LED at a time, once test mode is on', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
     render(<App />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Paper LED (D23)' }));
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
@@ -249,6 +284,7 @@ describe('Setup — test outputs', () => {
   });
 
   it('turns the pump on', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ testEnabled: true }));
     render(<App />);
     await userEvent.click(await screen.findByRole('switch', { name: 'Pump / motor (D19)' }));
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());

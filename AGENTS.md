@@ -171,11 +171,13 @@ stay under automatic control** across a power cut — after the reboot
 
 ### Driving the outputs by hand: the Test outputs page (2026-11-16)
 
-**Start here, not with a bench build.** Setup → **Test outputs** in the app is
-one on/off switch per output — **Pump / motor D19, Organic LED D21, Plastic LED
-D22, Paper LED D23, Streetlights D13** — and each one goes straight to the pin:
+**Start here, not with a bench build.** Setup → **Test outputs** has a master
+switch and then one on/off switch per output — **Pump / motor D19, Organic LED
+D21, Plastic LED D22, Paper LED D23, Streetlights D13**. Nothing moves a pin
+until the master is on; past that the five switches go straight to the pins:
 
 ```
+POST /api/v1/commands  {"type":"TEST_MODE","parameters":{"on":true}}   # the gate
 POST /api/v1/commands  {"type":"TEST_OUTPUT","parameters":{"output":"pump","on":true}}
 # output: pump | led_organic | led_plastic | led_paper | streetlights
 ```
@@ -186,10 +188,15 @@ Verified on the board 2026-11-16 over the app's own route: all four LEDs read
 
 Four things worth knowing before using it:
 
-- **It is deliberately unprotected, at the user's request** ("I will take care
-  of any protection manually"): no gates, no timers, no oversight of the soil
-  probe, the tank probe, the commissioning gate, the cooldown or the kill
-  switch. The pump runs while its switch is on and does not stop by itself.
+- **The master switch is the only gate** (added 2026-11-16 at the user's ask,
+  after the five switches could be pressed with nothing in front of them).
+  `TEST_OUTPUT` is answered `REJECTED` / `TEST_MODE_DISABLED` while
+  `rt.test_enabled` is false. Past that there is deliberately no oversight of
+  the soil probe, the tank probe, the commissioning gate, the cooldown or the
+  kill switch: the pump runs while its switch is on and does not stop by itself
+  ("I will take care of any protection manually").
+- **Both levels are session-only** — a reboot clears `test_enabled` as well as
+  `test_active`, so a forgotten master switch cannot survive a power cycle.
 - **The first `TEST_OUTPUT` latches `rt.test_active`**, after which the normal
   pump / streetlight / waste drivers stand down for the rest of the session —
   otherwise the two would write the same pins every pass and the relay would

@@ -163,6 +163,7 @@ void buildStatus(JsonDocument& doc) {
   // Test mode (Setup → Test outputs).  Reported so the panel can show what is
   // actually being driven, and how long the pump has left.
   JsonObject test = root["test"].to<JsonObject>();
+  test["enabled"] = rt.test_enabled;
   test["active"] = rt.test_active;
   test["pump"] = rt.test_pump;
   JsonObject tled = test["leds"].to<JsonObject>();
@@ -476,11 +477,30 @@ void handleCommand() {
         applyWasteCategory(category);
       }
     }
+  } else if (type == "TEST_MODE") {
+    // The master switch above the five outputs.  Off releases everything it was
+    // holding, so the normal drivers take the pins back on the next pass.
+    const bool on = doc["parameters"]["on"] | false;
+    rt.test_enabled = on;
+    if (!on) {
+      rt.test_active = false;
+      rt.test_pump = false;
+      rt.test_led_organic = false;
+      rt.test_led_plastic = false;
+      rt.test_led_paper = false;
+      rt.test_streetlights = false;
+      applyTestLeds(false, false, false, false);
+    }
+    result = CommandResult::Accepted;
+    reason = on ? &reasons::kTestModeOn : &reasons::kTestModeOff;
   } else if (type == "TEST_OUTPUT") {
-    // Bench control from Setup → Test outputs: one switch per output, straight
-    // to the pin.  No gates and no timers by request -- the operator said they
-    // would look after protection themselves (2026-11-16).
-    {
+    // One switch per output, straight to the pin -- but only while the page's
+    // master switch is on.  Past that there are no gates and no timers: the
+    // operator asked to take the protection on themselves (2026-11-16).
+    if (!rt.test_enabled) {
+      result = CommandResult::Rejected;
+      reason = &reasons::kTestDisabled;
+    } else {
       const String output = doc["parameters"]["output"] | "";
       const bool on = doc["parameters"]["on"] | false;
       bool known = true;

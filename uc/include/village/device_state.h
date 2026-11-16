@@ -90,10 +90,16 @@ struct Runtime {
   bool first_sample_seen = false;
 
   // --- test page (Setup → Test outputs) ------------------------------------
-  // One switch per output, straight to the pin.  `test_active` latches on the
-  // first TEST_OUTPUT and hands the outputs to that page for the rest of the
-  // session: the controller asked for no gating and no timers, so none are
-  // applied -- nothing here overrides what the operator set.
+  // Two levels, both session-only (a reboot puts the outputs back under normal
+  // control, so a forgotten switch cannot survive a power cycle):
+  //   * `test_enabled` is the page's own master switch.  Nothing can be driven
+  //     until it is on, so the five switches cannot be pressed by accident;
+  //   * `test_active` latches when the first output is actually driven, after
+  //     which the normal drivers stand down for the rest of the session so the
+  //     two cannot write the same pins every pass.
+  // Once enabled there are no further gates and no timers: the operator asked
+  // to take the protection on themselves (2026-11-16).
+  bool test_enabled = false;
   bool test_active = false;
   bool test_pump = false;
   bool test_led_organic = false;

@@ -13,9 +13,10 @@ ALLOWED_COMMANDS = {
     "IRRIGATION_REQUEST",
     "IRRIGATION_STOP",
     "INDICATE_WASTE",
-    # Bench control from Setup → Test outputs: one switch per output, straight
-    # to the pin.  Deliberately ungated -- the operator takes the protection on
-    # themselves (2026-11-16) -- so this route only keeps the wire shape honest.
+    # Bench control from Setup → Test outputs: TEST_MODE is the page's master
+    # switch and TEST_OUTPUT drives one pin.  The firmware refuses an output
+    # while the master switch is off, so this route only keeps the wire honest.
+    "TEST_MODE",
     "TEST_OUTPUT",
 }
 

@@ -287,6 +287,8 @@ def create_app(
     ):
         if body.type not in ALLOWED_COMMANDS:
             raise HTTPException(status_code=422, detail=f"unsupported command type: {body.type}")
+        if body.type == "TEST_MODE":
+            body.parameters["on"] = bool(body.parameters.get("on"))
         if body.type == "TEST_OUTPUT":
             output = str(body.parameters.get("output", "")).lower()
             if output not in TEST_OUTPUTS:

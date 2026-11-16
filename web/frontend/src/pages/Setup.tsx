@@ -495,15 +495,20 @@ function TestOutputs() {
 
   const test = status?.test;
   const physicalDisabled = !connected && !demo;
+  // The master switch comes from the controller, not from this page: the five
+  // outputs are only offered while the firmware says test mode is on.  Without
+  // it the switches would look usable while every press was refused.
+  const enabled = Boolean(test?.enabled);
 
-  // One switch per output, and that is the whole panel.  Turning it on drives
-  // the pin, turning it off releases it.  No gates and no timers: protection is
-  // the operator's job here, by request (2026-11-16).
-  const drive = async (output: string, on: boolean) => {
-    setBusy(output);
+  const command = async (
+    key: string,
+    type: 'TEST_MODE' | 'TEST_OUTPUT',
+    parameters: Record<string, unknown>,
+  ) => {
+    setBusy(key);
     setError('');
     try {
-      await send('TEST_OUTPUT', { output, on });
+      await send(type, parameters);
       reloadVillage();
     } catch (cause) {
       setError(errorMessage(cause));
@@ -522,6 +527,24 @@ function TestOutputs() {
 
   return (
     <Card kicker="Bench test" title="Test outputs" actions={<IconPlug size={18} />}>
+      {/* The gate.  Nothing below can move a pin until this is on, so a stray
+          press cannot start the pump.  Turning it off releases whatever the five
+          switches were holding and hands the outputs back to the controller. */}
+      <div className="setting-row">
+        <div>
+          <p className="setting-name">Test mode</p>
+          <p className="hint">
+            Turns the five switches below on. Nothing on this page can move a pin while it is off.
+          </p>
+        </div>
+        <Toggle
+          id="test-mode"
+          label="Test mode"
+          checked={enabled}
+          disabled={busy !== null || physicalDisabled}
+          onChange={(next) => void command('mode', 'TEST_MODE', { on: next })}
+        />
+      </div>
       {rows.map((row) => (
         <div className="setting-row" key={row.output}>
           <div>
@@ -531,8 +554,8 @@ function TestOutputs() {
             id={`test-${row.output}`}
             label={row.label}
             checked={row.on}
-            disabled={busy !== null || physicalDisabled}
-            onChange={(next) => void drive(row.output, next)}
+            disabled={busy !== null || physicalDisabled || !enabled}
+            onChange={(next) => void command(row.output, 'TEST_OUTPUT', { output: row.output, on: next })}
           />
         </div>
       ))}

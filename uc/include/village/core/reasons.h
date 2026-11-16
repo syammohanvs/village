@@ -133,6 +133,15 @@ inline constexpr Reason kDuplicate{
     "DUPLICATE_COMMAND", "This command was already processed. No second action was taken."};
 
 // --- test mode -------------------------------------------------------------
+inline constexpr Reason kTestModeOn{
+    "TEST_MODE_ON",
+    "Test mode is on. The five switches on this page now drive the pins."};
+inline constexpr Reason kTestModeOff{
+    "TEST_MODE_OFF",
+    "Test mode is off. Every output went back to normal control."};
+inline constexpr Reason kTestDisabled{
+    "TEST_MODE_DISABLED",
+    "Test mode is off. Turn it on before driving an output by hand."};
 inline constexpr Reason kTestStarted{
     "TEST_OUTPUT_ON", "Test mode drove that output on."};
 inline constexpr Reason kTestStopped{
