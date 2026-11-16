@@ -86,10 +86,12 @@ def looks_like_board(host: str, port: int = 80, timeout: float = 0.6) -> bool:
 class Locator:
     """Where the board is, kept current without being told."""
 
-    def __init__(self, subnet: str, port: int, hint: str | None, log_handle):
+    def __init__(self, subnet: str, port: int, hint: str | None, log_handle, cooldown: float = 10.0):
         self.subnet = subnet
         self.port = port
         self.address: str | None = hint
+        self.cooldown = cooldown
+        self._last_scan = 0.0
         self._failed = 0
         self._lock = threading.Lock()
         self._log = log_handle
@@ -100,6 +102,16 @@ class Locator:
     def discover(self) -> str | None:
         with self._lock:
             # Another thread may have found it while this one waited.
+            if self.address:
+                return self.address
+            # The backend polls once a second.  Sweeping 254 hosts on every
+            # poll while the board is off would hammer the hotspot for no
+            # reason, so a sweep is rate-limited; the poll simply gets "no
+            # board" in between.
+            now = time.time()
+            if now - self._last_scan < self.cooldown:
+                return None
+            self._last_scan = now
             _log(f"looking for the board on {self.subnet}.0/24 ...", self._log)
             with concurrent.futures.ThreadPoolExecutor(max_workers=64) as pool:
                 for host, found in zip(
