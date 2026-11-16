@@ -153,7 +153,13 @@ export function VoicePanel() {
     () => api.voiceIntents(language),
     { enabled: open },
   );
-  const readiness = useApi(['voice-readiness'], () => api.voiceReadiness(), { enabled: open });
+  // Polled while the panel is open: the local speech server is a separate
+  // process, and starting it later must bring the microphone back without a
+  // reload -- otherwise "it is not listening" survives a perfectly good fix.
+  const readiness = useApi(['voice-readiness'], () => api.voiceReadiness(), {
+    enabled: open,
+    intervalMs: 15000,
+  });
   const settings = useApi(['settings'], () => api.settings(), { enabled: open });
 
   const clearTimer = () => {
@@ -488,15 +494,23 @@ export function VoicePanel() {
 
   const blocker = !micSupported
     ? 'This browser cannot record audio, so spoken commands are unavailable here. Use the buttons on the cards instead.'
-    : !connected
-      ? 'The board is disconnected, so a spoken command cannot be carried out. Reconnect the board and try again.'
-      : speechState === 'off'
-        ? `The speech service is not available on this laptop: ${readiness.data?.whisper?.message ?? 'the local model is missing.'}`
-        : speechState === 'unknown'
-          ? 'The speech service could not be checked, so recording is paused. The cards still work.'
-          : '';
+    : speechState === 'off'
+      ? `The speech service is not available on this laptop: ${readiness.data?.whisper?.message ?? 'the local model is missing.'}`
+      : speechState === 'unknown'
+        ? 'The speech service could not be checked, so recording is paused. The cards still work.'
+        : '';
 
-  const supported = micSupported && connected && speechState !== 'off' && speechState !== 'unknown';
+  // A board that is not answering is not a reason to refuse to listen: the
+  // sentence and the answer are still the useful part, and the panel already
+  // refuses to act on a command it cannot deliver ("I can't reach the village
+  // controller").  A dead button that says nothing looked like a broken
+  // microphone (reported 2026-11-17, with the board powered off).
+  const offlineNote =
+    !demo && !connected
+      ? 'The board is not answering. You can still speak and see what the village understood, but nothing will move until it reconnects.'
+      : '';
+
+  const supported = micSupported && speechState !== 'off' && speechState !== 'unknown';
   const disabled = speaking || state === 'processing' || !supported;
   const helpIntents = orderedIntents(intents.data);
   const unavailable = new Set(readiness.data?.unavailable_languages ?? []);
@@ -508,6 +522,10 @@ export function VoicePanel() {
   // folded list rather than a scrollbar inside a panel.
   const visibleIntents = helpIntents.slice(0, 4);
   const moreIntents = helpIntents.slice(4);
+  // Exactly what the panel will send: the typed box while it has something in
+  // it (it clears once the answer arrives), else the sentence Whisper heard.
+  const typedNow = typed.trim();
+  const staged = typedNow || transcript;
 
   if (!open) return null;
 
@@ -572,6 +590,11 @@ export function VoicePanel() {
                       : 'Speech ready'}
         </span>
         {blocker && <p className="voice-blocker">{blocker}</p>}
+        {!blocker && offlineNote && (
+          <p className="voice-blocker voice-blocker--warn" data-testid="voice-offline-note">
+            {offlineNote}
+          </p>
+        )}
         {!blocker && villageLoading && (
           <p className="voice-blocker">Waiting for the first reading from the board…</p>
         )}
@@ -600,6 +623,7 @@ export function VoicePanel() {
           }}
           disabled={disabled && state !== 'listening'}
           aria-label={state === 'listening' ? 'Stop Recording' : 'Start Speaking'}
+          title={disabled && blocker ? blocker : undefined}
           data-testid="voice-start"
         >
           <span className="ptt-icon" aria-hidden="true">
@@ -622,7 +646,11 @@ export function VoicePanel() {
             <span className="ptt-hint">
               {state === 'listening'
                 ? `${elapsed.toFixed(1)}s of ${MAX_SECONDS}s — press to finish`
-                : `Up to ${MAX_SECONDS} seconds, then it stops by itself.`}
+                : blocker
+                  ? // Named here, at the control that is off, not only in the
+                    // status chip above it.
+                    'The microphone is off — see the reason above.'
+                  : `Up to ${MAX_SECONDS} seconds, then it stops by itself.`}
             </span>
           </span>
         </button>
@@ -640,6 +668,35 @@ export function VoicePanel() {
           {micError && <p className="error-text">{micError}</p>}
           {ttsNote && <p className="hint">{ttsNote}</p>}
         </div>
+      </div>
+
+      {/*
+        Asked for 2026-11-17: the panel must say, in words, what it is about to
+        send.  It used to show the sentence only after the round trip and below
+        the type box, which read as a leftover rather than as the payload.
+      */}
+      <div className="voice-staged" data-testid="voice-staged">
+        <p className="eyebrow">What will be sent</p>
+        {state === 'listening' ? (
+          <p className="voice-heard" data-testid="voice-staged-text">
+            Listening — the sentence appears here the moment you stop.
+          </p>
+        ) : staged ? (
+          <>
+            <p className="voice-heard" data-testid="voice-staged-text">
+              “{staged}”
+            </p>
+            <p className="hint">
+              {typedNow
+                ? 'This is exactly what Send gives the village.'
+                : 'This is the sentence the village was given — Whisper only changes how the words arrive.'}
+            </p>
+          </>
+        ) : (
+          <p className="voice-heard" data-testid="voice-staged-text">
+            Nothing yet — speak, or type below, and the sentence appears here.
+          </p>
+        )}
       </div>
 
       <form className="voice-type" onSubmit={(event) => void submitTyped(event)}>
@@ -672,13 +729,6 @@ export function VoicePanel() {
           request never sends anything.
         </p>
       </form>
-
-      {transcript && (
-        <div className="voice-transcript">
-          <p className="eyebrow">You said</p>
-          <p className="voice-heard">“{transcript}”</p>
-        </div>
-      )}
 
       {result && (
         <div className="voice-result">

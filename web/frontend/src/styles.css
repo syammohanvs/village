@@ -848,6 +848,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .voice-title { font-family: var(--serif); font-size: 22px; color: var(--gold-2); margin: 0; line-height: 1.2; }
 .voice-subtitle { margin: 4px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 .voice-readiness { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.voice-blocker--warn { color: var(--warn); }
 .voice-blocker { margin: 0; color: var(--warn); font-size: 12.5px; line-height: 1.5; }
 
 /* One language selector for Lia, the voice panel and the home invitation. */
@@ -939,6 +940,19 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .voice-type .hint { margin: 0; }
 
 .voice-transcript { color: var(--cream); font-size: 15px; }
+/* The sentence that is about to be sent: the one thing a visitor should be able
+   to read back before it acts. */
+.voice-staged {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.025);
+}
+.voice-staged .voice-heard { color: var(--cream); font-size: 15px; line-height: 1.35; }
+.voice-staged .hint { margin: 0; font-size: 11px; }
 .voice-heard { color: var(--muted); font-size: 12px; margin: 0; }
 .voice-result { border-top: 1px solid var(--line-soft); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .voice-result-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 13px; }

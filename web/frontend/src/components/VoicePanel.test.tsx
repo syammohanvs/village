@@ -159,7 +159,11 @@ describe('Voice panel language and readiness', () => {
     expect(list?.textContent).not.toMatch(/Lights on/);
   });
 
-  it('names a disconnected board separately from a missing speech service', async () => {
+  it('still listens while the board is away, and says that nothing will move', async () => {
+    // Changed 2026-11-17 (reported with the board powered off): a dead
+    // microphone with no explanation reads as "it is not listening".  The
+    // sentence and the answer are still useful, and the panel already refuses
+    // to act on a command it cannot deliver.
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false, stale: false }));
     const user = userEvent.setup();
     render(<App />);
@@ -167,8 +171,10 @@ describe('Voice panel language and readiness', () => {
 
     const readiness = await screen.findByTestId('voice-readiness');
     expect(readiness).toHaveTextContent('Board offline');
-    expect(readiness).toHaveTextContent(/The board is disconnected/);
-    expect(screen.getByTestId('voice-start')).toBeDisabled();
+    expect(await screen.findByTestId('voice-offline-note')).toHaveTextContent(
+      /nothing will move until it reconnects/i,
+    );
+    expect(screen.getByTestId('voice-start')).toBeEnabled();
   });
 
   it('disables recording when the speech service is down and says why', async () => {
@@ -586,5 +592,50 @@ describe('typed requests use the same parser', () => {
       expect(await screen.findByText(message)).toBeInTheDocument();
     }
     expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+});
+
+describe('when the speech server is not running', () => {
+  it('turns the microphone off and says why, at the control that is off', async () => {
+    // The local whisper server is a separate process.  Without it nothing can
+    // be transcribed, so the button must not look usable -- and it must name
+    // the reason where the reader is looking (found 2026-11-17: the panel said
+    // nothing at the button and pressing Start did nothing).
+    vi.mocked(api.voiceReadiness).mockResolvedValue({
+      ready: false,
+      whisper: { ready: false, model: 'ggml-base.bin', message: 'Whisper server is not reachable.' },
+      unavailable_languages: [],
+    });
+
+    await openPanel();
+
+    const start = await screen.findByTestId('voice-start');
+    await waitFor(() => expect(start).toBeDisabled());
+    expect(start).toHaveAttribute('title', expect.stringContaining('speech service is not available'));
+    expect(screen.getByTestId('voice-start')).toHaveTextContent(/microphone is off/i);
+    // The reason is on screen as a sentence too, not only in a tooltip.
+    expect(screen.getByText(/Whisper server is not reachable/i)).toBeInTheDocument();
+  });
+
+  it('asks again when the panel is reopened, so a started server brings the microphone back', async () => {
+    // The panel and the guide both ask, so the answer is driven by a flag
+    // rather than by call order.
+    let serverUp = false;
+    vi.mocked(api.voiceReadiness).mockImplementation(async () => ({
+      ready: serverUp,
+      whisper: serverUp
+        ? { ready: true, model: 'ggml-base.bin' }
+        : { ready: false, model: 'ggml-base.bin', message: 'Whisper server is not reachable.' },
+      unavailable_languages: [],
+    }));
+
+    const { user } = await openPanel();
+    await waitFor(() => expect(screen.getByTestId('voice-start')).toBeDisabled());
+
+    serverUp = true;
+    await user.click(screen.getByRole('button', { name: 'Close voice panel' }));
+    await user.click(await screen.findByTestId('start-voice'));
+
+    await waitFor(() => expect(screen.getByTestId('voice-start')).toBeEnabled());
   });
 });

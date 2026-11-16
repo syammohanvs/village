@@ -14,7 +14,11 @@ local waste classifier. Keep the app running at <http://127.0.0.1:8010/>.
 
 ```bash
 ./scripts/launch.sh        # build web/dist, start whisper + backend on :8010
-./scripts/stop.sh          # stop only what launch.sh started
+./scripts/dev.sh           # the same, with Vite and uvicorn --reload (it starts
+                           # whisper too — it used not to, so voice had no speech
+                           # server at all; fixed 2026-11-17)
+./scripts/whisper.sh       # start|status|stop the local whisper.cpp server
+./scripts/stop.sh          # stop only what the start scripts started
 ./scripts/test_all.sh      # firmware host tests + backend + frontend
 ```
 

@@ -56,54 +56,13 @@ if ss -ltn 2>/dev/null | awk '{print $4}' | grep -q "[:.]${PORT}$"; then
 fi
 
 info "Starting whisper.cpp (if the binary and model are present)"
-WHISPER_READY=0
-WHISPER_ALREADY=0
-WHISPER_PIDFILE="$ROOT/data/run/whisper.pid"
-# A server started by a previous run is reused only when it is loaded with the
-# model this configuration names.  Otherwise switching VILLAGE_WHISPER_MODEL
-# would silently keep the old model, which is exactly how a "base" server
-# survives a switch to a larger one.
-if [ -f "$WHISPER_PIDFILE" ]; then
-  OLD_WPID="$(cat "$WHISPER_PIDFILE" || true)"
-  if [ -n "${OLD_WPID:-}" ] && kill -0 "$OLD_WPID" 2>/dev/null; then
-    RUNNING_CMDLINE="$(tr '\0' ' ' < "/proc/$OLD_WPID/cmdline" 2>/dev/null || true)"
-    if printf '%s' "$RUNNING_CMDLINE" | grep -Fq -- "$WHISPER_MODEL"; then
-      WHISPER_ALREADY=1
-      WHISPER_READY=1
-      printf 'Whisper already running at %s with %s\n' "$WHISPER_URL" "$(basename "$WHISPER_MODEL")"
-    else
-      printf 'Whisper is running a different model; restarting it with %s\n' "$(basename "$WHISPER_MODEL")"
-      kill "$OLD_WPID" 2>/dev/null || true
-      for _ in $(seq 1 25); do kill -0 "$OLD_WPID" 2>/dev/null || break; sleep 0.2; done
-      kill -9 "$OLD_WPID" 2>/dev/null || true
-    fi
-  fi
-  rm -f "$WHISPER_PIDFILE"
-fi
-
-if [ "$WHISPER_ALREADY" != 1 ] && [ -x "$WHISPER_BIN" ] && [ -f "$WHISPER_MODEL" ]; then
-  WP="${WHISPER_URL##*:}"
-  WP="${WP%%/*}"
-  HOSTPART="${WHISPER_URL#*://}"
-  HOSTPART="${HOSTPART%%:*}"
-  setsid "$WHISPER_BIN" -m "$WHISPER_MODEL" -t "$WHISPER_THREADS" --host "$HOSTPART" --port "$WP" \
-    > data/logs/whisper.log 2>&1 < /dev/null &
-  echo $! > "$WHISPER_PIDFILE"
-  for _ in $(seq 1 120); do
-    if curl -fsS -m 2 "${WHISPER_URL}/health" >/dev/null 2>&1; then WHISPER_READY=1; break; fi
-    sleep 0.5
-  done
-  if [ "$WHISPER_READY" = 1 ]; then printf 'Whisper started; model loaded.\n'; else printf 'Whisper did not become ready; see data/logs/whisper.log\n'; fi
-fi
-
-if [ "$WHISPER_READY" != 1 ] && curl -fsS -m 2 "${WHISPER_URL}/health" >/dev/null 2>&1; then
+# One implementation, shared with dev.sh: the whisper block used to live here
+# only, and a dev session therefore had no speech server at all.
+if ./scripts/whisper.sh start; then
   WHISPER_READY=1
-  printf 'Whisper is answering at %s but was not started by this script; its model was not checked.\n' "$WHISPER_URL"
-fi
-
-if [ "$WHISPER_READY" != 1 ] && { [ ! -x "$WHISPER_BIN" ] || [ ! -f "$WHISPER_MODEL" ]; }; then
-  printf 'Whisper binary or model not found (%s). Voice will report "not ready" until supplied.\n' "$WHISPER_MODEL"
-  printf 'See docs/installation.md for the whisper.cpp build and model download.\n'
+else
+  WHISPER_READY=0
+  printf 'Voice will report "not ready" until the whisper server and model are supplied.\n'
 fi
 
 info "Starting the village backend"

@@ -23,6 +23,12 @@ PORT="${VILLAGE_PORT:-8000}"
 
 [ -x "$VENV/bin/uvicorn" ] || { echo "Run ./scripts/setup.sh first."; exit 1; }
 
+# Speech needs the local model server, and a dev session used to start without
+# it: the voice panel then showed a disabled microphone beside "Whisper server
+# is not reachable" and pressing Start did nothing (found 2026-11-17).  Best
+# effort, like the relay: no model must not stop the app.
+./scripts/whisper.sh start || true
+
 cleanup() {
   trap - INT TERM EXIT
   [ -n "${VITE_PID:-}" ] && kill "$VITE_PID" 2>/dev/null || true
