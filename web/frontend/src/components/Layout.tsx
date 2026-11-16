@@ -189,14 +189,15 @@ export function Layout() {
             <IconMenu size={20} />
           </button>
 
-          {/* The home page names itself on the menu and starts with its own
-              round microphone, so the big title and the second talk button are
-              noise there.  Every other page keeps them. */}
-          {!isHome && (
-            <div className="appbar-heading">
-              <h1 className="appbar-title">{meta.title}</h1>
-            </div>
-          )}
+          {/* Every page names itself in the bar, including the home page.  It
+              used to be hidden there ("the menu names it") and the consequence
+              was the connection pill sitting alone on the left of the bar, with
+              nothing to say which page you were on (reported 2026-11-16).  The
+              home page still keeps its own big microphone instead of a second
+              Talk button. */}
+          <div className="appbar-heading">
+            <h1 className="appbar-title">{meta.title}</h1>
+          </div>
 
           <div className="appbar-actions">
             <ConnectionPill />

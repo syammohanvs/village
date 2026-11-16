@@ -351,3 +351,28 @@ describe('Waste card — the camera follows the board', () => {
     expect(card.queryByTestId('waste-offline-note')).not.toBeInTheDocument();
   });
 });
+
+describe('Our Village — the top bar', () => {
+  it('names the page, with the connection state on the other side', async () => {
+    // The home page used to hide its own title ("the menu names it"), which left
+    // the connection pill alone at the left of the bar with nothing saying which
+    // page you were on (reported 2026-11-16).
+    render(<App />);
+    const title = await waitFor(() => {
+      const found = document.querySelector('.appbar-title');
+      expect(found).not.toBeNull();
+      return found as HTMLElement;
+    });
+    expect(title.textContent).toBe('Our Village');
+
+    const bar = document.querySelector('.appbar') as HTMLElement;
+    expect(bar).toContainElement(title);
+    // The pill lives in the actions block, and the title comes first in document
+    // order -- which is what puts it on the left of a space-between row.
+    const actions = bar.querySelector('.appbar-actions') as HTMLElement;
+    expect(actions.textContent).toMatch(/Live|Offline|Simulator/);
+    expect(
+      title.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
