@@ -106,6 +106,12 @@ phrases the catalogue already had (“light off”, “light band karo”, “pu
 cheyyuka”). Whichever language is selected in the panel is the one Whisper is
 asked for and the one the reply is spoken in.
 
+**That one setting is the whole app's**, including the answer after a waste item:
+the Sort Waste page speaks its result in the chosen language (the sentences are
+held in English, Malayalam and Hindi, so the words and the voice agree). It used
+to hardcode English there, so a visitor who chose Malayalam in Setup still heard
+an English answer — reported and fixed 2026-11-16.
+
 Questions are recognised by their words, not by a full stop: Hindi **“क्या” is a
 question word** at the start, while Malayalam can also mark a question on the verb
 (“…ഉണ്ടോ”, “…ആണോ”). Negation is read the same way in meaning — Hindi “मत” and
