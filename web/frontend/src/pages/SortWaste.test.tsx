@@ -1768,4 +1768,50 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     // The routing is still shown -- that is the point.
     expect(screen.getByTestId('waste-destination')).toHaveTextContent(/plastic bin/i);
   });
+  it('does not offer the camera while the controller is offline', async () => {
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    // The model is installed, so the ONLY reason left for the button being off
+    // is the board being unreachable.
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByTestId('start-camera')).toBeDisabled());
+    expect(screen.getByTestId('waste-offline')).toHaveTextContent(/Simulation/);
+  });
+
+  it('offers the camera in Simulation mode even with no board', async () => {
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled());
+    expect(screen.queryByTestId('waste-offline')).not.toBeInTheDocument();
+  });
 });

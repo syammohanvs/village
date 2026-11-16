@@ -299,11 +299,22 @@ export function OurVillage() {
               className="btn btn--primary"
               onClick={() => navigate('/waste')}
               data-testid="open-sort-waste"
-              title="The camera and the model run on this laptop; only the bin LED needs the board."
+              disabled={physicalDisabled}
+              title={
+                physicalDisabled
+                  ? 'The controller is offline. Use Simulation in Setup to show the classifier without the board.'
+                  : 'Open the waste camera.'
+              }
             >
               <IconCamera size={16} /> Open camera
             </button>
           </div>
+          {physicalDisabled && (
+            <p className="vcard-note" data-testid="waste-offline-note">
+              The controller is offline. Use <strong>Simulation</strong> in Setup to show the
+              classifier without the board.
+            </p>
+          )}
         </article>
       </div>
 

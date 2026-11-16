@@ -327,3 +327,27 @@ describe('wind card', () => {
     expect(card.getByText('0.12 V')).toBeInTheDocument();
   });
 });
+
+describe('Waste card — the camera follows the board', () => {
+  it('does not offer the camera while the controller is offline', async () => {
+    // Decided 2026-11-16: a recognised item ends at a bin LED, so the camera is
+    // offered only while the board can light one -- Simulation mode is the way
+    // to show the model without it.
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-waste'));
+    expect(card.getByTestId('open-sort-waste')).toBeDisabled();
+    expect(card.getByTestId('waste-offline-note')).toHaveTextContent(/Simulation/);
+  });
+
+  it('offers it again in Simulation mode, which does not use the board', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    render(<App />);
+
+    const card = within(await screen.findByTestId('card-waste'));
+    expect(card.getByTestId('open-sort-waste')).toBeEnabled();
+    expect(card.queryByTestId('waste-offline-note')).not.toBeInTheDocument();
+  });
+});

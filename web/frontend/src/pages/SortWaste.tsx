@@ -44,6 +44,8 @@ import {
 } from '../lib/wasteGuide';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
+import { useDemo } from '../lib/demo';
+import { useVillage } from '../lib/village';
 import {
   clearBackgrounds as clearStoredBackgrounds,
   loadBackgrounds,
@@ -217,6 +219,12 @@ export function SortWaste() {
   // recorded event said `top: []`.  A ref is the frame's guesses as of now.
   const predictionsRef = useRef<Prediction[]>([]);
   const { language: voiceLanguage } = useVoiceUi();
+  // Classifying ends at a bin LED, so the page is offered only while the board
+  // can light one -- Simulation mode is the way to show the model without it
+  // (decided 2026-11-16).
+  const { connected } = useVillage();
+  const { demo } = useDemo();
+  const boardOffline = !connected && !demo;
   const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
   const [referralLabel, setReferralLabel] = useState<string | null>(null);
@@ -1232,6 +1240,13 @@ export function SortWaste() {
           </div>
 
           <div className="camera-actions">
+            {boardOffline && (
+              <p className="hint" data-testid="waste-offline">
+                The controller is offline, so the camera is not offered: a recognised item
+                could not light its bin LED. Turn on <strong>Simulation</strong> in Setup to
+                show the classifier without the board.
+              </p>
+            )}
             {cameraOn ? (
               <button type="button" className="btn btn--danger btn--large" onClick={stopCamera}>
                 <IconStop size={18} /> Stop Camera
@@ -1241,9 +1256,13 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void startCamera()}
-                disabled={!cameraSupported || (installed && modelState !== 'ready')}
+                disabled={
+                  boardOffline || !cameraSupported || (installed && modelState !== 'ready')
+                }
                 title={
-                  !cameraSupported
+                  boardOffline
+                    ? 'The controller is offline, so no bin LED could light. Use Simulation in Setup to show the classifier without the board.'
+                    : !cameraSupported
                     ? 'This browser cannot open a camera in this tab.'
                     : installed && modelState !== 'ready'
                       ? 'The classifier is still loading. The camera opens once it is ready.'
