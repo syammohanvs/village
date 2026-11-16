@@ -8,6 +8,13 @@ cd "$ROOT"
 # container cannot route to, and the relay/address can have changed since the
 # last start.  Best effort -- a missing board must not stop the app.
 ./scripts/relay.sh ensure || true
+# Windows switches its Mobile Hotspot off by itself (twice on 2026-11-16, once
+# mid-demo), which reads as "the board is dead".  Keep a watcher on it for the
+# life of this run; stop.sh kills it with the rest.
+if ! pgrep -f "relay[.]sh wat[c]h" >/dev/null 2>&1; then
+  setsid ./scripts/relay.sh watch > data/logs/relay-watch.log 2>&1 < /dev/null &
+  echo $! > data/run/relay-watch.pid
+fi
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 VENV="${VILLAGE_VENV:-$ROOT/.venv}"

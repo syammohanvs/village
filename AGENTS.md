@@ -131,6 +131,26 @@ it to `%USERPROFILE%\village-flash\tcp-relay.py` and starts it hidden.
   permanent fix (it routes from WSL natively). It needs that network's password
   compiled in, and Windows withholds the stored key without elevation.
 
+**Windows keeps this hotspot on by itself, mostly.** Measured 2026-11-16: switch
+it off from the WinRT API and it comes **back on within ~14 s** while the laptop
+has an internet connection to share. So a hotspot found `Off` is not a toggle
+someone flipped — it is almost always the laptop having **no uplink** (Wi-Fi
+dropped, or the machine was asleep), and the hotspot resumes as soon as it
+returns. That is why the real test is `relay.sh status` (hotspot state + board),
+not the toggle.
+
+**A watcher keeps the link repaired for the life of a run**
+(`./scripts/relay.sh watch`, started by `dev.sh` and `launch.sh`, killed by
+`stop.sh` via `data/run/relay-watch.pid`). Every 30 s it probes the board and,
+when the probe fails, re-runs `ensure` — which re-points the URL, restarts a dead
+relay and asks for the hotspot. It logs to `data/logs/relay-watch.log`. Measured:
+hotspot switched off by hand → board back through the relay **within 30 s** with
+`link down: repairing … board reachable again` in that log.
+
+**`ensure` now acts on any hotspot state that is not `On`**, not only on `Off`:
+a WinRT read that fails while the hotspot is down used to fall through with no
+repair at all, and switching it on is a no-op when it is already up.
+
 **Gotchas, and each one is already handled:**
 
 - The relay is a **Windows** process, so it dies when the laptop reboots. Nothing

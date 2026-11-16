@@ -6,6 +6,7 @@
 #   ./scripts/relay.sh start     # run the relay on the Windows host
 #   ./scripts/relay.sh hotspot     # is the hotspot on? (the board's only network)
 #   ./scripts/relay.sh hotspot-on  # switch it back on if Windows turned it off
+#   ./scripts/relay.sh watch     # keep repairing the chain (loop, for a session)
 #   ./scripts/relay.sh stop
 #
 # Why: Windows Mobile Hotspot is ICS.  It gives the board 192.168.137.x and
@@ -179,14 +180,21 @@ ensure() {
   # all.  This is the single failure that looks identical to a dead board.
   local state
   state="$(hotspot_state)"
-  if [[ "$state" == "Off" ]]; then
-    echo "  the Windows Mobile Hotspot is OFF -- switching it back on"
+  if [[ "$state" == "NoInternetProfile" ]]; then
+    : # handled below, before the generic attempt
+  elif [[ "$state" != "On" ]]; then
+    # Not "Off" specifically: an empty or failed read must still lead to the
+    # attempt, because the switch-on is a no-op when the hotspot is already up,
+    # and a WinRT read that fails while the hotspot is off is exactly the case
+    # that used to fall through with no repair at all (2026-11-16).
+    echo "  the Windows Mobile Hotspot reads '${state:-unknown}' -- asking for it to be on"
     hotspot on | sed 's/^/    /'
     if wait_for_board "${VILLAGE_RELAY_HOTSPOT_WAIT:-25}"; then
       echo "  board reachable at $DEVICE_URL (after switching the hotspot on)"
       return 0
     fi
-  elif [[ "$state" == "NoInternetProfile" ]]; then
+  fi
+  if [[ "$state" == "NoInternetProfile" ]]; then
     echo "  the laptop has no internet connection to share, so the hotspot cannot run." >&2
     echo "  Join a Wi-Fi network, then: ./scripts/relay.sh hotspot-on" >&2
     return 0
@@ -227,6 +235,24 @@ case "${1:-ensure}" in
     fi
     for pid in $pids; do ps "Stop-Process -Id $pid -Force"; done
     echo "relay stopped (was pid $pids)"
+    ;;
+  watch)
+    # Windows drops the Mobile Hotspot on its own -- measured twice on
+    # 2026-11-16, once mid-demo, and the symptom is a board that answers
+    # nothing while the laptop looks fine.  This loop re-runs `ensure`, which
+    # switches the hotspot back on, restarts a dead relay and waits for the
+    # board; the app reconnects by itself.
+    interval="${VILLAGE_RELAY_WATCH_SECS:-30}"
+    need_interop || exit 0
+    echo "watching the board link every ${interval}s (Ctrl-C to stop)"
+    while true; do
+      if [[ "$(probe)" != "200" ]]; then
+        printf '%s  link down: repairing\n' "$(date +%H:%M:%S)"
+        ensure 2>&1 | sed 's/^/    /'
+        [[ "$(probe)" == "200" ]] && echo "    board reachable again"
+      fi
+      sleep "$interval"
+    done
     ;;
   hotspot)      need_interop; hotspot state ;;
   hotspot-on)   need_interop; hotspot on; if wait_for_board "${VILLAGE_RELAY_HOTSPOT_WAIT:-25}"; then echo "  board reachable at $DEVICE_URL"; else echo "  hotspot on, no board yet (it rejoins by itself)" >&2; fi ;;

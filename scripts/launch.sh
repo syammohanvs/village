@@ -13,6 +13,12 @@ if [ ! -f .env ]; then cp .env.example .env; fi
 # container cannot route to, and the relay/address can have changed since the
 # last start.  Best effort -- a missing board must not stop the exhibition.
 ./scripts/relay.sh ensure || true
+# The hotspot can be switched off by Windows at any moment; the watcher puts it
+# back so an unattended exhibit recovers instead of going dark.
+if ! pgrep -f "relay[.]sh wat[c]h" >/dev/null 2>&1; then
+  setsid ./scripts/relay.sh watch > data/logs/relay-watch.log 2>&1 < /dev/null &
+  echo $! > data/run/relay-watch.pid
+fi
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
 
