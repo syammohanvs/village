@@ -44,17 +44,9 @@ export default function Login() {
     <div className="login-page">
       <form className="login-card" onSubmit={(event) => void submit(event)} data-testid="login-form">
         <div className="login-brand">
-          <Emblem size={64} />
-          <div>
-            <p className="brand-eyebrow">Smart Green</p>
-            <h1 className="login-title">Village</h1>
-          </div>
+          <Emblem size={72} />
+          <h1 className="login-title">Smart Green Village</h1>
         </div>
-
-        <p className="hint">
-          Sign in to control the village. This account is for the person running the exhibit;
-          the username and password are set on the laptop.
-        </p>
 
         <label className="field">
           <span>Username</span>
@@ -107,11 +99,6 @@ export default function Login() {
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
-
-        <p className="hint login-foot">
-          Nothing about the village is shown until you sign in. The board and the camera keep
-          running either way — this only locks the screen.
-        </p>
       </form>
     </div>
   );
