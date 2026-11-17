@@ -2455,13 +2455,31 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    Each animated thing is a **group**, so the opacity inside it still comes from
    the reading — a dim panel shimmers more faintly than a bright one, and an
    unlit LED has no halo to breathe. */
-.solar-rays { animation: sim-breathe 5s ease-in-out infinite; }
+.solar-rays { animation: sim-breathe 4.5s ease-in-out infinite; }
+.solar-sun {
+  animation: sim-pulse 3.2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
 .solar-led-glow { animation: sim-breathe 2.6s ease-in-out infinite; }
-.lamp-glow { animation: sim-breathe 3.6s ease-in-out infinite; }
-.bin-glow { animation: sim-breathe 2.4s ease-in-out infinite; }
+.lamp-glow { animation: sim-pulse 2.8s ease-in-out infinite; }
+.bin-glow { animation: sim-pulse 2.2s ease-in-out infinite; }
+/* The sight line walks, so the waste card is alive before anything is
+   recognised — and it claims nothing: it is the field of view, not a bin. */
+.sight-line { animation: sight-walk 1.4s linear infinite; }
 @keyframes sim-breathe {
-  0%, 100% { opacity: 0.55; }
+  0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
+}
+/* A glow grows and shrinks as well as brightening.  `fill-box` is what makes
+   `transform-origin: center` mean the drawing rather than the whole canvas. */
+@keyframes sim-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.5; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+.lamp-glow, .bin-glow { transform-box: fill-box; transform-origin: center; }
+@keyframes sight-walk {
+  to { stroke-dashoffset: -16; }
 }
 
 /* Gentle, and still for anyone who asked their system for less motion. */
@@ -2470,9 +2488,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .watering-drops circle,
   .tank-drops line,
   .solar-rays,
+  .solar-sun,
   .solar-led-glow,
   .lamp-glow,
-  .bin-glow { animation: none !important; }
+  .bin-glow,
+  .sight-line { animation: none !important; }
   /* Without motion the drops would sit in mid-air, which reads as a fault, so
      they are simply not drawn. */
   .watering-drops, .tank-drops { display: none; }

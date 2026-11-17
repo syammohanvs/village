@@ -32,7 +32,11 @@ export function SolarPanel({ light, label }: { light: number; label: string }) {
       aria-label={label}
       data-light={level.toFixed(2)}
     >
-      {/* the lamp above it */}
+      {/* the lamp above it, with a halo that pulses — the one thing on this card
+          that moves in every state, because the light is always there */}
+      <g className="solar-sun">
+        <circle cx="60" cy="9" r="12" fill="var(--gold-2)" opacity={0.2 + 0.45 * level} />
+      </g>
       <circle cx="60" cy="9" r="6" fill="var(--gold-2)" opacity={0.25 + 0.75 * level} />
       {/* The rays breathe.  The group carries the animation, so each ray keeps
           its own opacity from the light level and the two multiply: a dim panel
@@ -72,7 +76,7 @@ export function SolarPanel({ light, label }: { light: number; label: string }) {
       <line x1="60" y1="68" x2="60" y2="72" stroke="var(--muted)" strokeWidth="1.2" />
       {/* A lit LED has a soft halo that pulses; a dark one has none, because a
           glow around an unlit LED would be a picture claiming current. */}
-      {glow > 0.02 && <circle className="solar-led-glow" cx="60" cy="74" r="6.4" fill="#ff5a4d" opacity="0.22" />}
+      {glow > 0.02 && <circle className="solar-led-glow" cx="60" cy="74" r="7.5" fill="#ff5a4d" opacity="0.34" />}
       <circle
         cx="60"
         cy="74"
@@ -325,7 +329,8 @@ export function StreetLamp({ on, label }: { on: boolean; label: string }) {
       <ellipse cx="54" cy="20" rx="7" ry="3.4" fill={lit ? 'var(--gold-2)' : '#4a4034'} />
       {lit && (
         <g className="lamp-glow">
-          <circle cx="54" cy="20" r="12" fill="var(--gold-2)" opacity="0.18" />
+          <circle cx="54" cy="20" r="19" fill="var(--gold-2)" opacity="0.12" />
+          <circle cx="54" cy="20" r="11" fill="var(--gold-2)" opacity="0.3" />
         </g>
       )}
     </svg>
@@ -364,14 +369,24 @@ export function WasteBins({ active, label }: { active: string | null; label: str
       </g>
       {/* the line of sight: dashed, because it is a field of view and not a beam */}
       <polygon points="38,30 50,21 50,46" fill="var(--gold-2)" opacity="0.08" />
-      <line x1="38" y1="33.5" x2="50" y2="33.5" stroke="var(--gold-dim)" strokeWidth="1" strokeDasharray="3 3" opacity="0.7" />
+      <line
+        className="sight-line"
+        x1="38"
+        y1="33.5"
+        x2="50"
+        y2="33.5"
+        stroke="var(--gold-2)"
+        strokeWidth="1.6"
+        strokeDasharray="4 4"
+        opacity="0.85"
+      />
       {bins.map((bin) => {
         const on = lit === bin.id;
         return (
           <g key={bin.id} opacity={on ? 1 : lit ? 0.5 : 0.75}>
             {on && (
               <g className="bin-glow">
-                <circle cx={bin.x + 8} cy="34" r="15" fill={bin.colour} opacity="0.16" />
+                <circle cx={bin.x + 8} cy="34" r="19" fill={bin.colour} opacity="0.3" />
               </g>
             )}
             {/* lid and its handle, so three rectangles read as three bins */}

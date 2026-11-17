@@ -82,12 +82,26 @@ describe('the tank shows one of its two levels, or nothing', () => {
 });
 
 describe('the motion is gentle and can be turned off', () => {
-  it('breathes the animated parts through one keyframe', () => {
-    for (const selector of ['.solar-rays', '.solar-led-glow', '.lamp-glow', '.bin-glow']) {
+  it('breathes the light and swells the glows', () => {
+    // Opacity alone was too faint to see at 18 px (reported 2026-11-18), so the
+    // sun, the lamp and a named bin change size as well as brightness.
+    const rules: [string, RegExp][] = [
+      ['.solar-rays', /animation:\s*sim-breathe/],
+      ['.solar-led-glow', /animation:\s*sim-breathe/],
+      ['.solar-sun', /animation:\s*sim-pulse/],
+      ['.lamp-glow', /animation:\s*sim-pulse/],
+      ['.bin-glow', /animation:\s*sim-pulse/],
+      ['.sight-line', /animation:\s*sight-walk/],
+    ];
+    for (const [selector, wanted] of rules) {
       const rule = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`).exec(styles)?.[1] ?? '';
-      expect(rule, selector).toMatch(/animation:\s*sim-breathe/);
+      expect(rule, selector).toMatch(wanted);
     }
-    expect(styles).toMatch(/@keyframes sim-breathe\s*\{/);
+    for (const frames of ['sim-breathe', 'sim-pulse', 'sight-walk']) {
+      expect(styles, frames).toMatch(new RegExp(`@keyframes ${frames}\\s*\\{`));
+    }
+    // A pulsing glow has to scale about itself, not about the whole canvas.
+    expect(styles).toMatch(/\.lamp-glow, \.bin-glow \{[^}]*transform-box:\s*fill-box/);
   });
 
   it('stops every drawing for a reader who asked for less motion', () => {
@@ -97,7 +111,14 @@ describe('the motion is gentle and can be turned off', () => {
       .map((match) => match[1]);
     const drawings = blocks.find((block) => block.includes('.windmill-blades')) ?? '';
     expect(drawings, 'a reduced-motion block covering the drawings').not.toBe('');
-    for (const selector of ['.solar-rays', '.solar-led-glow', '.lamp-glow', '.bin-glow']) {
+    for (const selector of [
+      '.solar-rays',
+      '.solar-sun',
+      '.solar-led-glow',
+      '.lamp-glow',
+      '.bin-glow',
+      '.sight-line',
+    ]) {
       expect(drawings, selector).toContain(selector);
     }
     expect(drawings).toMatch(/animation:\s*none !important/);
