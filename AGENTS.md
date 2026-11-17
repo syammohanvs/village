@@ -1,10 +1,16 @@
 # AGENTS.md — working notes for this repository
 
-> **LOCAL ONLY — do not `git push`.** The user explicitly prefers local
-> commits (2026-11-12) because a push to `origin/main` triggers a Cloudflare
-> Pages build. Commit on the local `main` and leave it ahead of `origin`. Only
-> push if the user asks for it in that turn. (`origin` is
-> `git@github.com:syammohanvs/village.git`.)
+> **This repository is the master copy — commit and push normally.** The user
+> changed this on 2026-11-17: *"commit everything including secrets.h in github.
+> If laptop has a problem I should simply be able to use another laptop and run
+> the app as is."* So the code, the models, the settings and the secrets are all
+> committed and pushed to `origin/main` (`git@github.com:syammohanvs/village.git`,
+> **private**). Do not publish it, and do not paste its credentials anywhere
+> public. **Pushing still triggers a Cloudflare Pages build** of the dashboard —
+> that is a deploy of `web/dist` only and contains no token (verified: the built
+> bundle carries no `VILLAGE_*` value), so it is a side effect to be aware of,
+> not a reason to hold commits back. Earlier history: the user preferred local
+> commits (2026-11-12) for exactly that reason.
 
 Smart Green Village: ESP32 firmware (`uc/`), FastAPI backend
 (`web/backend/`), React/Vite dashboard (`web/frontend/`), Whisper voice and a
