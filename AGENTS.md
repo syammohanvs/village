@@ -103,7 +103,11 @@ visitors cannot be used to press **Water** or change calibration.
   `nowrap` title — a fixed 300 px squeezed "Rain Water Tank" onto two lines as
   soon as its chip read "Status unknown".  The tank card is titled **Rain Water
   Tank**, not "Tank", and `docs/operation.md` + the About page + Sara's topics
-  say the same.
+  say the same.  The Watering row answers two questions and now says so: the
+  chip is the *session* (`Watering` / `Idle`) and the line beside it is the
+  soil's own reading, prefixed with **Soil:** — unprefixed, "Idle · Not
+  calibrated" read as one confused state.  `soilPercent` already carries its
+  `%`, so appending another printed `Dry · 28%%` on any calibrated probe.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider

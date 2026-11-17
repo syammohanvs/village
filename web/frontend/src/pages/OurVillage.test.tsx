@@ -124,6 +124,28 @@ describe('Our Village', () => {
     expect(screen.queryByTestId('stop-watering')).not.toBeInTheDocument();
   });
 
+  it('names the soil reading, so the pump state and the probe cannot be confused', async () => {
+    // Asked 2026-11-17: "watering u have idle pill and then there is not
+    // calibrated y?"  Two facts were sitting side by side and only one said
+    // what it was about: the chip is the session ("Idle"), the line is the
+    // soil's own reading.
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'uncalibrated', soilCalibrated: false }),
+    );
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByText('Idle')).toBeInTheDocument();
+    expect(card.getByText(/^Soil: not calibrated$/)).toBeInTheDocument();
+  });
+
+  it('keeps the moisture on the soil line when the probe is calibrated', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ soilState: 'dry', soilPercent: 21 }));
+    await renderReady();
+
+    expect(await screen.findByText('Soil: dry · 21%')).toBeInTheDocument();
+  });
+
   it('says a frame is stale once, in the top bar', async () => {
     // The pill is the one place connection state is reported; a banner saying
     // the same thing only pushed the cards down (asked for 2026-11-16).

@@ -218,9 +218,18 @@ export function OurVillage() {
               watering ? 'live' : 'neutral',
             )}
           </header>
+          {/* The chip beside the name says whether a watering session is
+              running; this line is the SOIL's own reading.  It used to read
+              just "Not calibrated", which sat next to the "Idle" chip looking
+              like a second answer to the same question (asked 2026-11-17). */}
           {stateLine(
             hasStatus
-              ? soilPercent ? `${soilWord} · ${soilPercent}%` : soilWord
+              ? soilPercent
+                ? // soilPercent is already formatted WITH its "%" — the first
+                  // version appended another one, so a calibrated probe read
+                  // "Dry · 28%%" and no test had ever seen it (2026-11-17).
+                  `Soil: ${soilWord.toLowerCase()} · ${soilPercent}`
+                : `Soil: ${soilWord.toLowerCase()}`
               : 'No soil reading yet',
             soil?.state === 'dry' ? 'warn' : 'neutral',
           )}
