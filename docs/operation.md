@@ -132,7 +132,9 @@ water physically flowed. The dashboard keeps the two statements separate.
    **On** to hold the pump running and **Off** to stop it, then give it back to
    **Auto**. The controller may refuse with a reason — that is a feature, not a
    failure — and the reason is written under the switch.
-4. **Sort Waste.** Hold a plastic item in front of the camera. The stable
+4. **Sort Waste.** Check **Camera device** under the Start/Stop button — a
+   laptop with a USB camera has two, and the list remembers the one chosen. Hold
+   a plastic item in front of the camera. The stable
    prediction lights the plastic LED. Move it away; show that repeated frames
    do not count as new items. Point out that recognition is not proof of
    disposal.

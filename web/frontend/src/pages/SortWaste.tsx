@@ -33,7 +33,13 @@ import {
 } from '../lib/sceneMemory';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
-import { cameraErrorMessage, openCameraStream, waitForFrames } from '../lib/camera';
+import {
+  CAMERA_STORAGE_KEY,
+  cameraErrorMessage,
+  openCameraStream,
+  readStoredCamera,
+  waitForFrames,
+} from '../lib/camera';
 import {
   SUPPORT,
   SUPPORT_ROLE,
@@ -197,7 +203,11 @@ export function SortWaste() {
   const modelStatus = useApi(['waste-resnet'], () => api.wasteResnetStatus(), {});
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [deviceId, setDeviceId] = useState('');
+  // The camera the operator chose is remembered: an exhibit laptop usually has
+  // a built-in camera AND an external one on a USB lead, and the browser's
+  // default is the built-in one — so without this the exhibit came back on the
+  // wrong camera after every reload (2026-11-17).
+  const [deviceId, setDeviceId] = useState<string>(() => readStoredCamera());
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [modelState, setModelState] = useState<ModelState>('idle');
@@ -300,15 +310,6 @@ export function SortWaste() {
       cooldownMs: effectiveCooldown,
     });
   }, [confidence, stabilityFrames, effectiveCooldown]);
-
-  useEffect(() => {
-    const media = navigator.mediaDevices;
-    if (!media || typeof media.enumerateDevices !== 'function') return;
-    void media
-      .enumerateDevices()
-      .then((list) => setDevices(list.filter((device) => device.kind === 'videoinput')))
-      .catch(() => undefined);
-  }, []);
 
   useEffect(() => {
     let storage: Storage | null = null;
@@ -733,8 +734,29 @@ export function SortWaste() {
     setDevices(list.filter((device) => device.kind === 'videoinput'));
   }, []);
 
+  /** Choose a camera, and remember it for the next visit. */
+  const chooseDevice = useCallback((next: string) => {
+    setDeviceId(next);
+    try {
+      if (next) window.localStorage.setItem(CAMERA_STORAGE_KEY, next);
+      else window.localStorage.removeItem(CAMERA_STORAGE_KEY);
+    } catch {
+      /* private modes can refuse storage; the choice still holds this visit */
+    }
+  }, []);
+
   useEffect(() => {
     void refreshDevices();
+  }, [refreshDevices]);
+
+  // A camera plugged in while the page is open must appear without a reload —
+  // that is exactly how an external camera arrives at a venue.
+  useEffect(() => {
+    const media = navigator.mediaDevices;
+    if (!media || typeof media.addEventListener !== 'function') return undefined;
+    const onChange = () => void refreshDevices();
+    media.addEventListener('devicechange', onChange);
+    return () => media.removeEventListener('devicechange', onChange);
   }, [refreshDevices]);
 
   const startCamera = async () => {
@@ -749,7 +771,7 @@ export function SortWaste() {
       const opened = await openCameraStream(navigator.mediaDevices, deviceId);
       const stream = opened.stream;
       // A device that no longer answers must not be asked for again.
-      if (deviceId && !opened.usedDeviceId) setDeviceId('');
+      if (deviceId && !opened.usedDeviceId) chooseDevice('');
       streamRef.current = stream;
       const element = videoRef.current;
       // `getVideoTracks` is the standard accessor but a stand-in stream (and
@@ -1345,6 +1367,37 @@ export function SortWaste() {
             >
               Hazardous / medical
             </button>
+            <div className="camera-picker" data-testid="camera-picker">
+              <label className="field">
+                <span>Camera device</span>
+                <select
+                  className="select"
+                  value={deviceId}
+                  onChange={(event) => chooseDevice(event.target.value)}
+                  disabled={cameraOn}
+                  data-testid="camera-device"
+                  title={
+                    cameraOn
+                      ? 'Stop the camera to choose another device.'
+                      : 'Pick the camera to use — a laptop usually has a built-in one and may have an external USB camera as well.'
+                  }
+                >
+                  <option value="">Default camera</option>
+                  {devices.map((device, index) => (
+                    <option key={device.deviceId || index} value={device.deviceId}>
+                      {device.label || `Camera ${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {devices.some((device) => !device.label) && (
+                <p className="hint" data-testid="camera-labels-hint">
+                  Camera names appear after this page is allowed to use a camera once: press{' '}
+                  <strong>Start camera</strong>, allow it, then stop and pick the external camera by
+                  name.
+                </p>
+              )}
+            </div>
             {focusNote && (
               <p className="hint" data-testid="focus-note">
                 {focusNote}
@@ -1728,22 +1781,6 @@ export function SortWaste() {
                 </ul>
               ) : null}
               <div className="camera-controls">
-                <label className="field">
-                  <span>Camera device</span>
-                  <select
-                    className="select"
-                    value={deviceId}
-                    onChange={(event) => setDeviceId(event.target.value)}
-                    disabled={cameraOn}
-                  >
-                    <option value="">Default camera</option>
-                    {devices.map((device, index) => (
-                      <option key={device.deviceId || index} value={device.deviceId}>
-                        {device.label || `Camera ${index + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 {installed && modelState !== 'ready' && (
                   <button
                     type="button"

@@ -1877,3 +1877,105 @@ describe('Sort Waste — the three bin lamps, in simulation', () => {
     expect(leds).toHaveTextContent(/no bin led is lit/i);
   });
 });
+
+/**
+ * Choosing the camera.  An exhibit laptop usually has a built-in camera and an
+ * external one on a USB lead; the browser's default is the built-in one, so the
+ * page has to offer the choice, keep it, and notice a camera plugged in after it
+ * was opened (asked 2026-11-17: "I connected an external webcam via USB, how can
+ * I select that cam in the app?").
+ */
+describe('Sort Waste — choosing the camera', () => {
+  const KEY = 'village.cameraDevice';
+
+  function stubCameras(initial: { deviceId: string; label: string }[]) {
+    let current = initial;
+    const listeners = new Set<() => void>();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn(async () =>
+          current.map((device) => ({ ...device, kind: 'videoinput' })) as unknown as MediaDeviceInfo[],
+        ),
+        addEventListener: (event: string, listener: () => void) => {
+          if (event === 'devicechange') listeners.add(listener);
+        },
+        removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+      },
+    });
+    return {
+      plugIn: (next: { deviceId: string; label: string }[]) => {
+        current = next;
+        listeners.forEach((listener) => listener());
+      },
+    };
+  }
+
+  beforeEach(() => {
+    window.localStorage.removeItem(KEY);
+    window.history.pushState({}, '', '/waste');
+    vi.mocked(api.state).mockResolvedValue(makeState());
+    vi.mocked(api.events).mockResolvedValue({ events: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+  });
+
+  it('lists every camera and remembers the one chosen', async () => {
+    stubCameras([
+      { deviceId: 'built-in', label: 'Integrated Webcam' },
+      { deviceId: 'usb-cam', label: 'USB Camera' },
+    ]);
+    render(<App />);
+
+    const select = await screen.findByTestId('camera-device');
+    await waitFor(() => expect(within(select).getByText('USB Camera')).toBeInTheDocument());
+    // The default option stays first: "whatever the browser picks".
+    expect(within(select).getByText('Default camera')).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: 'usb-cam' } });
+    expect(select).toHaveValue('usb-cam');
+    expect(window.localStorage.getItem(KEY)).toBe('usb-cam');
+  });
+
+  it('opens on the camera chosen last time', async () => {
+    window.localStorage.setItem(KEY, 'usb-cam');
+    stubCameras([
+      { deviceId: 'built-in', label: 'Integrated Webcam' },
+      { deviceId: 'usb-cam', label: 'USB Camera' },
+    ]);
+    render(<App />);
+
+    const select = await screen.findByTestId('camera-device');
+    await waitFor(() => expect(select).toHaveValue('usb-cam'));
+  });
+
+  it('offers a camera plugged in while the page is open, without a reload', async () => {
+    const media = stubCameras([{ deviceId: 'built-in', label: 'Integrated Webcam' }]);
+    render(<App />);
+
+    const select = await screen.findByTestId('camera-device');
+    await waitFor(() => expect(within(select).getByText('Integrated Webcam')).toBeInTheDocument());
+    expect(within(select).queryByText('USB Camera')).not.toBeInTheDocument();
+
+    act(() => {
+      media.plugIn([
+        { deviceId: 'built-in', label: 'Integrated Webcam' },
+        { deviceId: 'usb-cam', label: 'USB Camera' },
+      ]);
+    });
+
+    await waitFor(() => expect(within(select).getByText('USB Camera')).toBeInTheDocument());
+  });
+
+  it('says how the names appear before the page may use a camera', async () => {
+    stubCameras([{ deviceId: 'opaque-id', label: '' }]);
+    render(<App />);
+
+    const select = await screen.findByTestId('camera-device');
+    await waitFor(() => expect(within(select).getByText('Camera 1')).toBeInTheDocument());
+    expect(await screen.findByTestId('camera-labels-hint')).toHaveTextContent(
+      /allowed to use a camera once/i,
+    );
+  });
+});

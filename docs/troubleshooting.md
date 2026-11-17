@@ -244,6 +244,25 @@ Sara refuses to guess. See [calibration.md](calibration.md).
 - The app will not record while it is speaking a reply. If the microphone
   button is disabled, wait for the reply to finish.
 
+## The camera opens the wrong one (a laptop with a USB camera)
+
+A laptop usually has a built-in camera, and the browser's default is the
+built-in one. **Camera device** on the Sort Waste page, just under the
+Start/Stop button, lists every camera the browser can see; pick the external one
+and the app remembers it for next time (per device, not per account).
+
+- **Names are blank until the page may use a camera once.** Press **Start
+  camera**, allow it, stop, and the list fills in with real names (the page says
+  this too).
+- **A camera plugged in while the page is open appears by itself** — no reload.
+- **Stop the camera before changing device**: the list is disabled while the
+  camera runs, so the choice is never half-applied.
+- If the remembered camera is unplugged, the app falls back and clears the
+  choice rather than failing the whole call.
+- On Windows, make sure the camera is recognised first (Settings → Bluetooth &
+  devices → Cameras), and check the site is allowed a camera (the padlock in the
+  address bar → Site settings → Camera).
+
 ## The camera says “Recognition model not installed”
 
 Copy `model.json`, `metadata.json` and `weights.bin` into `models/waste/`, then

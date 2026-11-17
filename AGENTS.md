@@ -134,6 +134,18 @@ visitors cannot be used to press **Water** or change calibration.
 - **Sara's reply and the request stay on screen while a new recording starts**,
   and closing the panel mid-recording cancels the recorder. A reply is only
   replaced by a newer request.
+- **Choosing a camera is a first-class control (2026-11-17).** An exhibit
+  laptop usually has a built-in camera *and* an external USB one, and the
+  browser defaults to the built-in. `Camera device` sits on Sort Waste **under
+  the Start/Stop button** (it used to be buried inside the collapsed
+  "Confidence and model details" panel, where nobody found it) and lists
+  `enumerateDevices()`; the choice is stored in `localStorage`
+  (`village.cameraDevice`, helpers in `lib/camera.ts`), a `devicechange` listener
+  refreshes the list so a camera plugged in later appears without a reload, and
+  a remembered device that no longer answers is cleared rather than retried.
+  Names only appear after the page has been allowed a camera once — the page
+  says so. Listed before anything else when someone asks "how do I select my
+  webcam".
 - **The language pills are styled in `styles.css` and guarded (2026-11-17).**
   `.lang-picker` / `.lang-pill` (plus `.is-on`, `-label`, `-note`) are shared by
   the page, the panel and Lia.  Rewriting a large CSS block wholesale deleted

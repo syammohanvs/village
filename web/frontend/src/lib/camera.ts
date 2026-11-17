@@ -18,6 +18,19 @@
  * told which rung it landed on so the device list can follow along.
  */
 
+/** Where the operator's camera choice is remembered (per browser). */
+export const CAMERA_STORAGE_KEY = 'village.cameraDevice';
+
+/** The camera chosen last time, or '' for the browser's default. */
+export function readStoredCamera(storage: Pick<Storage, 'getItem'> | null = null): string {
+  try {
+    const store = storage ?? window.localStorage;
+    return store.getItem(CAMERA_STORAGE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export interface CameraMedia {
   getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
 }

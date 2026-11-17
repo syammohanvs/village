@@ -2279,3 +2279,18 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .voice-message { font-size: 16px; }
   .ptt-label { font-size: 17px; }
 }
+
+/* The camera picker sits under the Start/Stop button, on its own line: an
+   operator with a USB camera plugged in looks here first, not inside a
+   collapsed "model details" panel (2026-11-17). */
+.camera-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  /* Its own line in the action row: the buttons come first, then "which
+     camera", which is a setup question rather than an action. */
+  flex: 1 1 100%;
+}
+.camera-picker .field { flex: 0 1 320px; margin: 0; }
+.camera-picker .hint { flex: 1 1 260px; margin: 0; }
