@@ -105,8 +105,12 @@ const EN: VoiceCopy = {
     LIGHTS_ON: 'Turns the streetlights on.',
     LIGHTS_OFF: 'Turns the streetlights off.',
     LIGHTS_AUTO: 'Lets the light sensor decide.',
+    PUMP_AUTO: 'Hands the pump back to the readings.',
     IRRIGATION_REQUEST: 'Starts a short watering pulse.',
     IRRIGATION_STOP: 'Stops the pump.',
+    // Ids, not only commands: HELP has no command, and "answers with the
+    // current reading" was the wrong sentence for it.
+    HELP: 'Lists everything you can say.',
     answer: 'Answers with the current reading.',
   },
 };
@@ -152,8 +156,10 @@ const ML: VoiceCopy = {
     LIGHTS_ON: 'തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു.',
     LIGHTS_OFF: 'തെരുവുവിളക്കുകൾ അണയ്ക്കുന്നു.',
     LIGHTS_AUTO: 'വെളിച്ച സെൻസറിന് വിടുന്നു.',
+    PUMP_AUTO: 'പമ്പിനെ വീണ്ടും വായനകൾക്ക് വിടുന്നു.',
     IRRIGATION_REQUEST: 'ചെറിയ നനയ്ക്കൽ തുടങ്ങുന്നു.',
     IRRIGATION_STOP: 'പമ്പ് നിർത്തുന്നു.',
+    HELP: 'നിങ്ങൾക്ക് പറയാവുന്നതെല്ലാം കാണിക്കുന്നു.',
     answer: 'ഇപ്പോഴത്തെ അളവ് പറയുന്നു.',
   },
 };
@@ -199,8 +205,10 @@ const HI: VoiceCopy = {
     LIGHTS_ON: 'सड़क की बत्तियाँ चालू करता है।',
     LIGHTS_OFF: 'सड़क की बत्तियाँ बंद करता है।',
     LIGHTS_AUTO: 'रोशनी सेंसर पर छोड़ देता है।',
+    PUMP_AUTO: 'पंप को फिर से रीडिंग पर छोड़ देता है।',
     IRRIGATION_REQUEST: 'छोटी सिंचाई शुरू करता है।',
     IRRIGATION_STOP: 'पंप बंद करता है।',
+    HELP: 'आप जो कह सकते हैं, वह सब बताता है।',
     answer: 'इस समय की रीडिंग बताता है।',
   },
 };

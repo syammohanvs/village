@@ -285,7 +285,13 @@ class IntentMatcher:
             # whole village; "help" asks for the catalogue.
             if self._has(tokens, ["help", "commands", "what can you do"]):
                 return self._intent_result("HELP", language, device=None, action=None)
-            if status_hits and not state_hits:
+            # …but only when every word is one it knows.  A bare status word is
+            # a whole-village question; "bin status" is not, because "bin" is a
+            # thing this build has no reading for — answering it with the
+            # village's own status would be answering a different question
+            # (the bin command itself was removed on 2026-11-18: the three bins
+            # are LEDs lit by the classifier and nothing measures them).
+            if status_hits and not state_hits and not self._unaccounted(tokens, language):
                 return self._intent_result("VILLAGE_STATUS", language, device="village", action="status")
             fallback = self._phrase_fallback(tokens, language, allow=not (is_question or negators))
             if fallback:
@@ -490,6 +496,11 @@ class IntentMatcher:
         if not allow:
             return None
         token_set = set(tokens)
+        # A catalogue phrase is the *whole* sentence, so it must also cover the
+        # words no rule knows.  Without this, the one-word phrase "status" made
+        # "bin status" a village-status question (2026-11-18) — the extra noun
+        # was simply ignored, and the visitor was answered about something else.
+        unaccounted = set(self._unaccounted(tokens, language))
         scored: list[tuple[float, str, str]] = []
         for intent in self.data["intents"]:
             for phrase in intent["phrases"].get(language, []):
@@ -499,6 +510,8 @@ class IntentMatcher:
                 if any(token not in token_set for token in phrase_tokens):
                     continue
                 phrase_set = set(phrase_tokens)
+                if any(token not in phrase_set for token in unaccounted):
+                    continue
                 unmatched = sum(1 for token in tokens if token not in phrase_set)
                 score = 1.0 + min(len(phrase_tokens), 8) * 0.001 - 0.03 * unmatched
                 scored.append((score, intent["id"], phrase))

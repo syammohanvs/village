@@ -1691,6 +1691,8 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .mic-button:hover .mic-button-icon { transform: translateY(-1px) scale(1.03); }
 .mic-button:active .mic-button-icon { transform: scale(0.97); }
 .mic-button:focus-visible { outline: 2px solid var(--cream); outline-offset: 5px; border-radius: 16px; }
+/* The three pills say what they are (English · हिन्दी · മലയാളം), so no word
+   "Language" sits above them (asked 2026-11-18). */
 .village-simple-langs { margin: 0; justify-content: center; }
 .village-simple-note {
   margin: 0;
@@ -2397,12 +2399,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    The controls a visitor may change, and the sentence that says why the village
    did what it did.  Everything here exists only in Simulation; Live shows the
    cards without any of it (asked for 2026-11-17). */
-
-.village-simple-lang-label {
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--muted);
-}
 
 /* The microphone is a button you can see is a button: the icon beside its name,
    in a pill, over the whole control (asked for 2026-11-17). */

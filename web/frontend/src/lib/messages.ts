@@ -92,11 +92,6 @@ export const MESSAGES = {
   // ------------------------------------------------------------------- page ---
   'page.talkToSara': ['Talk to Sara', 'सारा से बात करें', 'സാറയോട് സംസാരിക്കുക'],
   'page.language': ['Language', 'भाषा', 'ഭാഷ'],
-  'page.languageHint': [
-    'Changes the page and Sara’s language',
-    'पेज और सारा की भाषा बदलता है',
-    'പേജിന്റെയും സാറയുടെയും ഭാഷ മാറ്റുന്നു',
-  ],
   'page.simIntroTitle': [
     'Try changing the light, soil and water conditions. See how the village responds.',
     'रोशनी, मिट्टी और पानी की स्थिति बदलकर देखें। गाँव कैसे बदलता है, देखें।',

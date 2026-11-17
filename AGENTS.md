@@ -967,6 +967,11 @@ or ultrasonic rangefinder, no distance, no fill percentage, no "bin full"
 alert.  A bin is something a person can see into; three LEDs (organic D21,
 plastic D22, paper D23) say which category the camera last recognised.
 
+- **The voice command went too (2026-11-18).** `BIN_STATUS` was the last thing
+  claiming a bin reading could be asked for; it is gone from
+  `shared/intents.json` (intent, `device_commands` and the `bins` aliases), from
+  the help list and from the panel's catalogue.  “bin status” is now an ordinary
+  unsupported request.
 - Firmware 0.2.0 removed `bins.h`/`tof.h`, `BinState`, `BinConfig`/`BinModel`
   and the VL53L0X dependency.  `/api/v1/status` has no `sensors.bins`, no
   `BIN_*` events and no bin faults; `/api/v1/config` has no `bins` section.
@@ -1111,8 +1116,19 @@ inflected form is refused rather than guessed.
 
 - unrecognised: “Please ask me to control a supported device or check its status.
   For other help, contact Gram Sahayak.”
-- bin fullness: “Our model does not measure bin fullness. The three bins have
-  indicator LEDs only.” — never a number, because nothing measures it.
+- ~~bin fullness~~ — **the command is gone (2026-11-18).**  `BIN_STATUS` used to
+  answer “Our model does not measure bin fullness…”, but a catalogue entry is a
+  promise that asking does something and this one could only say it cannot.  The
+  intent, its `device_commands` row and the `bins` device aliases are removed,
+  so “are the bins full” is an ordinary unsupported request.  The bins are what
+  they always were: three LEDs lit by the classifier.
+- **A whole-phrase match must also cover the words no rule knows (2026-11-18).**
+  Removing the bin device exposed it: `_phrase_fallback` accepted the one-word
+  phrase “status” inside “bin status”, so the sentence was answered as a
+  village-status question while the extra noun was ignored.  A candidate phrase
+  now has to contain every token `_unaccounted` reported, and the bare-status
+  branch (`status` / `what is happening`) requires the same, so a sentence about
+  a thing this build has no reading for is refused rather than re-pointed.
 - ambiguous between on and off: “Would you like the lights on or off?”
 - statement / hypothetical / negation / disconnected / unconfirmed: in
   `shared/intents.json` under `messages`, translated for all three languages.

@@ -804,10 +804,12 @@ export function VoicePanel() {
                     data-testid={`voice-more-${intent.id.toLowerCase()}`}
                     onClick={() => void runPhrase(phrase)}
                     disabled={busy || speaking}
-                    title={actionWords(copy, intent.command)}
+                    title={copy.actions[intent.id] ?? actionWords(copy, intent.command)}
                   >
                     <span className="help-phrase">“{phrase}”</span>
-                    <span className="help-note">{actionWords(copy, intent.command)}</span>
+                    <span className="help-note">
+                      {copy.actions[intent.id] ?? actionWords(copy, intent.command)}
+                    </span>
                   </button>
                 </li>
               );

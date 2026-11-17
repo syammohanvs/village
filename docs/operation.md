@@ -193,12 +193,17 @@ Supported in English, Malayalam and Hindi:
 - lights on
 - lights off
 - automatic lights
+- automatic pump
 - soil moisture
 - start irrigation
 - stop irrigation
 - water availability
-- bin status
 - help
+
+There is deliberately **no "bin status"**: the three bins are LEDs lit by the
+classifier, and nothing measures them. (There used to be a reply that only said
+so; it was removed on 2026-11-18 because a catalogue entry is a promise that
+asking does something.)
 
 Push-to-talk is deliberate: the app does not listen continuously. It rejects
 unsupported, ambiguous and negated phrases with the exact support sentence.

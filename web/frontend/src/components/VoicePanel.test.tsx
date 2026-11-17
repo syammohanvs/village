@@ -560,28 +560,6 @@ describe('typed requests use the same parser', () => {
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
   });
 
-  it('says the model does not measure bin fullness', async () => {
-    vi.mocked(api.voiceInterpret).mockResolvedValue({
-      status: 'ok',
-      kind: 'status',
-      intent: 'BIN_STATUS',
-      command: null,
-      actuation: false,
-      transcript: 'are the bins full',
-      response_text:
-        'Our model does not measure bin fullness. The three bins have indicator LEDs only.',
-    });
-
-    const { user } = await openPanel();
-    await user.type(screen.getByTestId('voice-text'), 'are the bins full');
-    await user.click(screen.getByTestId('voice-send'));
-
-    expect(
-      await screen.findByText(/does not measure bin fullness/i),
-    ).toBeInTheDocument();
-    expect(api.sendCommand).not.toHaveBeenCalled();
-  });
-
   it('does not act on a statement or a hypothetical question', async () => {
     const { user } = await openPanel();
     for (const [text, message] of [

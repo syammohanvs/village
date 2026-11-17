@@ -330,9 +330,6 @@ export function OurVillage() {
           </span>
           <span className="mic-button-label">{t('page.talkToSara')}</span>
         </button>
-        <p className="village-simple-lang-label" title={t('page.languageHint')}>
-          {t('page.language')}
-        </p>
         <LanguagePicker
           className="village-simple-langs"
           options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}

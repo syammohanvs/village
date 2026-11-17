@@ -334,6 +334,12 @@ describe('Our Village — the microphone stands alone', () => {
     expect(header).toContainElement(languages);
     expect(mic.compareDocumentPosition(languages) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(languages).toHaveClass('village-simple-langs');
+
+    // The three pills say what they are ("English · हिन्दी · മലയാളം"), so the
+    // word "Language" above them was furniture (asked 2026-11-18).  The group
+    // still carries that name for a screen reader.
+    expect(screen.queryByText('Language')).toBeNull();
+    expect(languages).toHaveAccessibleName('Language');
   });
 
   it('still offers all three spoken languages under the microphone', async () => {

@@ -27,7 +27,6 @@ def test_existing_exact_commands(matcher: IntentMatcher) -> None:
     assert matcher.match("village status", "en")["intent"] == "VILLAGE_STATUS"
     assert matcher.match("is the soil dry", "en")["intent"] == "SOIL_STATUS"
     assert matcher.match("water availability", "en")["intent"] == "WATER_STATUS"
-    assert matcher.match("bin status", "en")["intent"] == "BIN_STATUS"
     assert matcher.match("help", "en")["intent"] == "HELP"
 
 
@@ -110,7 +109,6 @@ def test_status_questions_do_not_act(matcher: IntentMatcher) -> None:
         ("is watering on?", "PUMP_STATUS"),
         ("what is the soil moisture?", "SOIL_STATUS"),
         ("how much water is in the tank?", "WATER_STATUS"),
-        ("are the bins full?", "BIN_STATUS"),
     ):
         result = matcher.match(text, "en")
         assert result["kind"] == "status", text
@@ -236,10 +234,15 @@ def test_result_shape_is_structured(matcher: IntentMatcher) -> None:
 def test_help_lists_every_supported_command(matcher: IntentMatcher) -> None:
     for language in ("en", "ml", "hi"):
         help_list = matcher.help_list(language)
+        # BIN_STATUS was removed on 2026-11-18 — the three bins are LEDs lit by
+        # the classifier and nothing measures them — and PUMP_AUTO was added,
+        # so the count is unchanged.
         assert len(help_list) == 12
         assert all(item["label"] for item in help_list)
         assert any(item["id"] == "IRRIGATION_START" for item in help_list)
         assert any(item["id"] == "LIGHTS_STATUS" for item in help_list)
+        assert any(item["id"] == "PUMP_AUTO" for item in help_list)
+        assert all(item["id"] != "BIN_STATUS" for item in help_list)
 
 
 # ---------------------------------------------------------------------------
@@ -276,19 +279,29 @@ async def test_typed_request_uses_the_same_parser(tmp_path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Review points: bin fullness, polite requests vs advice, and the exact
-# Malayalam/Hindi sentences that fail when only sentence endings are inspected.
+# Review points: bins are not a device, polite requests vs advice, and the
+# exact Malayalam/Hindi sentences that fail when only sentence endings are
+# inspected.
 # ---------------------------------------------------------------------------
-def test_bin_fullness_is_not_measured(matcher: IntentMatcher) -> None:
-    result = matcher.match("are the bins full", "en")
-    assert result["kind"] == "status"
-    assert result["intent"] == "BIN_STATUS"
-    assert result["command"] is None
-    assert "does not measure bin fullness" in result["response_text"]
-    # and the same answer in the other languages
-    for language, needle in (("ml", "അളക്കുന്നില്ല"), ("hi", "नहीं मापता")):
-        text = "ബിൻ സ്റ്റാറ്റസ്" if language == "ml" else "बिन स्टेटस"
-        assert needle in matcher.match(text, language)["response_text"]
+def test_bins_are_not_a_status_this_app_can_report(matcher: IntentMatcher) -> None:
+    """The three bins are LEDs lit by the classifier — nothing measures them.
+
+    There used to be a BIN_STATUS command that only ever said "our model does
+    not measure bin fullness".  It was removed on 2026-11-18: a catalogue entry
+    is a promise that asking about it does something, and this one could only
+    answer that it cannot answer.
+    """
+    assert all(item["id"] != "BIN_STATUS" for item in matcher.help_list("en"))
+    # It is no longer recognised as a device, so the sentence is answered like
+    # any other unsupported request — not with a status it does not have.
+    for text in ("bin status", "are the bins full", "is the bin full"):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "unsupported", text
+        assert result["intent"] == "UNKNOWN", text
+        assert result["command"] is None, text
+    # The help sentence must not list it either.
+    for language in ("en", "ml", "hi"):
+        assert "bin" not in matcher.match("help", language)["response_text"].lower()
 
 
 def test_polite_requests_are_commands_but_advice_is_not(matcher: IntentMatcher) -> None:

@@ -58,13 +58,13 @@
     "LIGHTS_ON",
     "LIGHTS_OFF",
     "LIGHTS_AUTO",
+    "PUMP_AUTO",
     "LIGHTS_STATUS",
     "SOIL_STATUS",
     "IRRIGATION_START",
     "IRRIGATION_STOP",
     "PUMP_STATUS",
     "WATER_STATUS",
-    "BIN_STATUS",
     "HELP"
   ],
   "intents": [
@@ -500,47 +500,6 @@
       }
     },
     {
-      "id": "BIN_STATUS",
-      "command": null,
-      "actuation": false,
-      "label": {
-        "en": "Bin status",
-        "ml": "ബിന്നിന്റെ അവസ്ഥ",
-        "hi": "बिन की स्थिति"
-      },
-      "phrases": {
-        "en": [
-          "bin status",
-          "are the bins full",
-          "is the bin full",
-          "how full are the bins",
-          "bin fill",
-          "bins full"
-        ],
-        "ml": [
-          "ബിന്നിന്റെ അവസ്ഥ",
-          "ചപ്പുചവറിന്റെ അവസ്ഥ",
-          "ബിൻ നിറഞ്ഞോ",
-          "binte avastha",
-          "chappuchavarinte avastha",
-          "bin niranjo"
-        ],
-        "hi": [
-          "कूड़ेदान की स्थिति",
-          "कचरे के डिब्बे की स्थिति",
-          "बिन भर गया क्या",
-          "koodedan ki sthiti",
-          "kachre ke dibbe ki sthiti",
-          "bin bhar gaya kya"
-        ]
-      },
-      "response": {
-        "en": "Our model does not measure bin fullness. The three bins have indicator LEDs only.",
-        "ml": "ഞങ്ങളുടെ മോഡൽ ബിൻ എത്ര നിറഞ്ഞിരിക്കുന്നു എന്ന് അളക്കുന്നില്ല. മൂന്ന് ബിന്നുകൾക്കും ഇൻഡിക്കേറ്റർ എൽഇഡികൾ മാത്രമാണ്.",
-        "hi": "हमारा मॉडल यह नहीं मापता कि बिन कितना भरा है। तीनों बिन में केवल इंडिकेटर एलईडी हैं।"
-      }
-    },
-    {
       "id": "HELP",
       "command": null,
       "actuation": false,
@@ -576,9 +535,9 @@
         ]
       },
       "response": {
-        "en": "You can say: village status, lights on, lights off, automatic lights, soil moisture, start irrigation, stop irrigation, water availability, bin status, or help.",
-        "ml": "ഇവ പറയാം: ഗ്രാമത്തിന്റെ അവസ്ഥ, വിളക്കുകൾ കത്തിക്കുക, വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ ഓട്ടോ, മണ്ണിലെ ഈർപ്പം, നനയ്ക്കാൻ തുടങ്ങുക, നനയ്ക്കുന്നത് നിർത്തുക, വെള്ളം ഉണ്ടോ, ബിന്നിന്റെ അവസ്ഥ, സഹായം.",
-        "hi": "आप कह सकते हैं: गाँव की स्थिति, लाइट चालू करो, लाइट बंद करो, लाइट ऑटो, मिट्टी की नमी, सिंचाई शुरू करो, सिंचाई बंद करो, पानी है क्या, बिन की स्थिति, मदद।"
+        "en": "You can say: village status, lights on, lights off, automatic lights, automatic pump, soil moisture, start irrigation, stop irrigation, water availability, or help.",
+        "ml": "ഇവ പറയാം: ഗ്രാമത്തിന്റെ അവസ്ഥ, വിളക്കുകൾ കത്തിക്കുക, വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ ഓട്ടോ, പമ്പ് ഓട്ടോ, മണ്ണിലെ ഈർപ്പം, നനയ്ക്കാൻ തുടങ്ങുക, നനയ്ക്കുന്നത് നിർത്തുക, വെള്ളം ഉണ്ടോ, സഹായം.",
+        "hi": "आप कह सकते हैं: गाँव की स्थिति, लाइट चालू करो, लाइट बंद करो, लाइट ऑटो, पंप ऑटो, मिट्टी की नमी, सिंचाई शुरू करो, सिंचाई बंद करो, पानी है क्या, मदद।"
       }
     },
     {
@@ -804,29 +763,6 @@
         "tank"
       ]
     },
-    "bins": {
-      "en": [
-        "bin",
-        "bins",
-        "waste bin",
-        "dustbin",
-        "dust bin",
-        "garbage bin"
-      ],
-      "ml": [
-        "ബിൻ",
-        "ബിന്നുകൾ",
-        "bin",
-        "bins"
-      ],
-      "hi": [
-        "बिन",
-        "डिब्बा",
-        "कूड़ेदान",
-        "bin",
-        "bins"
-      ]
-    },
     "village": {
       "en": [
         "village",
@@ -957,9 +893,6 @@
     },
     "water": {
       "status": "WATER_STATUS"
-    },
-    "bins": {
-      "status": "BIN_STATUS"
     },
     "village": {
       "status": "VILLAGE_STATUS"
