@@ -360,7 +360,7 @@ export function OurVillage() {
         </article>
       </div>
 
-      <article className="vcard vcard--min vcard--solar" data-testid="card-solar">
+      <article className="vcard vcard--min vcard--solar vcard--row" data-testid="card-solar">
         <header className="vcard-head">
           <span className="vcard-icon" aria-hidden="true"><IconSun size={19} /></span>
           <h2>Solar</h2>
@@ -383,7 +383,7 @@ export function OurVillage() {
         )}
       </article>
 
-      <article className="vcard vcard--min vcard--solar" data-testid="card-wind">
+      <article className="vcard vcard--min vcard--solar vcard--row" data-testid="card-wind">
         <header className="vcard-head">
           <span className="vcard-icon" aria-hidden="true"><IconWind size={19} /></span>
           <h2>Wind</h2>
