@@ -5,9 +5,7 @@ import {
   IconDroplet,
   IconLamp,
   IconMic,
-  IconPlay,
   IconPump,
-  IconStop,
   IconSun,
   IconWind,
 } from '../components/Icons';
@@ -156,32 +154,22 @@ export function OurVillage() {
     }
   };
 
-  // The firmware refuses these too; disabling here explains why instead of
-  // letting a visitor press a button that can only be refused.
-  const waterBlocked = !hasStatus && !demo
+  // What the controller will refuse, said before it happens.  The tank is the
+  // one condition that stops the pump even on the manual switch, so it belongs
+  // on the card; wet soil only means Auto has nothing to do.
+  const pumpNote = !hasStatus && !demo
     ? 'Connect the board to check watering readiness.'
     : reservoir?.state === 'low'
-      ? 'The tank water is low. Refill the reservoir before watering.'
+      ? `The tank water is low. Refill the reservoir — the pump will not run, on Auto or by hand.${
+          demo ? ' Use Reset in Setup → Simulation to refill the demo tank.' : ''
+        }`
       : reservoir?.state !== 'available'
-        ? 'The tank reading is unavailable, so watering is disabled.'
-        : soil?.state === 'wet' || soil?.state === 'adequate'
-          ? 'The soil is already moist, so watering is not needed.'
-          : soil?.calibrated === false
-            ? 'The soil probe is not calibrated, so the controller will refuse to water.'
-            : physicalDisabled
-              ? 'The controller is offline. Actions are disabled.'
-              : '';
+        ? 'The tank reading is unavailable, so the pump will not run.'
+        : physicalDisabled
+          ? 'The controller is offline. Actions are disabled.'
+          : '';
 
-  const startDisabled = busy !== null || watering || Boolean(waterBlocked);
-  // Stop belongs to a run.  The user's rule (2026-11-16, twice): Stop is offered
-  // only while the pump is actually on, so a card that says "watering is not
-  // needed" does not also offer a button that looks like it would act.
-  //
-  // The trade-off is deliberate and worth knowing: the firmware writes the pump
-  // gate low on every IRRIGATION_STOP even when idle, so this gives up a
-  // convenient hard-kill for the case where the board's own state is wrong.  The
-  // bench page (Setup → Test outputs) is where an output is forced by hand.
-  const stopDisabled = busy !== null || !watering;
+
 
   return (
     <div className="page village-page village-page--minimal">
@@ -233,31 +221,6 @@ export function OurVillage() {
               : 'No soil reading yet',
             soil?.state === 'dry' ? 'warn' : 'neutral',
           )}
-          <div className="vcard-actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              data-testid="water-plants"
-              disabled={startDisabled}
-              onClick={() => void run('water', 'plants', 'IRRIGATION_REQUEST')}
-            >
-              <IconPlay size={16} /> Water
-            </button>
-            <button
-              type="button"
-              className="btn btn--danger"
-              data-testid="stop-watering"
-              disabled={stopDisabled}
-              title={
-                watering
-                  ? 'Stop the pump now.'
-                  : 'Forces the pump off. Nothing is running at the moment.'
-              }
-              onClick={() => void run('stop', 'plants', 'IRRIGATION_STOP')}
-            >
-              <IconStop size={16} /> Stop
-            </button>
-          </div>
           <div className="pump-manual" data-testid="pump-manual">
               <p className="pump-manual-label">Pump</p>
               <div className="segmented segmented--wide" role="group" aria-label="Pump mode">
@@ -282,14 +245,13 @@ export function OurVillage() {
                 ))}
               </div>
               <p className="hint">
-                On holds the pump running whatever the soil says; Off holds it stopped. Auto gives
-                it back to the rules. Whichever is chosen, an empty tank still stops it.
+                Auto lets the rules water; On holds the pump running and Off holds it stopped,
+                whatever the soil says. Even then an empty tank stops it.
               </p>
             </div>
-          {waterBlocked && pumpMode !== 'on' && (
-            <p className="vcard-note" data-testid="water-blocked">
-              {waterBlocked}
-              {demo && ' Use Reset in Setup → Simulation to put the demo back to dry soil.'}
+          {pumpNote && (
+            <p className="vcard-note" data-testid="pump-note">
+              {pumpNote}
             </p>
           )}
           {notice?.card === 'plants' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}

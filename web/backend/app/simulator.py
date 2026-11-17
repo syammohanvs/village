@@ -683,10 +683,20 @@ class SimulatedDevice:
                 self._apply_pump_manual(mode)
                 result = "ACCEPTED"
                 code, text = self._pump_manual_reason()
+            elif command_type == "IRRIGATION_REQUEST" and self.pump_manual != "auto":
+                result = "REJECTED"
+                code, text = reason("PUMP_MANUAL_ACTIVE")
             elif command_type == "IRRIGATION_REQUEST":
                 result, code, text = self._request_irrigation("manual")
             elif command_type == "IRRIGATION_STOP":
-                if self.state == "idle":
+                if self.pump_manual != "auto":
+                    # "Stop the pump" stops it even when the switch is holding
+                    # it on; leaving the switch on while answering "stopped"
+                    # would be the worst answer this can give.
+                    self._apply_pump_manual("off")
+                    code, text = reason("PUMP_MANUAL_OFF")
+                    result = "ACCEPTED"
+                elif self.state == "idle":
                     code, text = reason("IDLE_ALREADY_STOPPED")
                 else:
                     self._stop("IRRIGATION_STOPPED_USER", 1000)

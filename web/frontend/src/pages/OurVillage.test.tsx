@@ -112,12 +112,16 @@ describe('Our Village', () => {
     expect(card.queryByText('Bright')).not.toBeInTheDocument();
   });
 
-  it('explains why watering is disabled when the tank is low', async () => {
+  it('says the pump will not run on an empty tank, on Auto or by hand', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
     await renderReady();
 
-    expect(await screen.findByText(/Refill the reservoir before watering/i)).toBeInTheDocument();
-    expect(screen.getByTestId('water-plants')).toBeDisabled();
+    expect(await screen.findByTestId('pump-note')).toHaveTextContent(
+      /Refill the reservoir — the pump will not run, on Auto or by hand/i,
+    );
+    // The card no longer carries Water/Stop: the switch is the control.
+    expect(screen.queryByTestId('water-plants')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stop-watering')).not.toBeInTheDocument();
   });
 
   it('says a frame is stale once, in the top bar', async () => {
@@ -160,11 +164,11 @@ describe('Our Village', () => {
     expect(pill.getAttribute('title')).toMatch(/Timed out contacting the controller/);
     expect(screen.queryByTestId('offline-banner')).not.toBeInTheDocument();
     expect(screen.getByText('Watering')).toBeInTheDocument();
-    expect(screen.getByTestId('water-plants')).toBeDisabled();
+    expect(screen.getByTestId('pump-on')).toBeDisabled();
     expect(screen.getByTestId('lights-auto')).toBeDisabled();
   });
 
-  it('labels simulation and sends demo commands for Water Plants', async () => {
+  it('labels simulation and sends its pump command to the demo village', async () => {
     window.localStorage.setItem('village.demoMode', 'demo');
     const user = userEvent.setup();
     await renderReady();
@@ -176,13 +180,13 @@ describe('Our Village', () => {
     expect(pill.getAttribute('title')).toMatch(/invented on the laptop/i);
     expect(screen.getByTestId('connection-pill')).not.toHaveTextContent('Live');
 
-    const start = await screen.findByTestId('water-plants');
+    const start = await screen.findByTestId('pump-on');
     expect(start).toBeEnabled();
     await user.click(start);
 
     await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
     expect(api.sendCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'IRRIGATION_REQUEST', mode: 'demo' }),
+      expect.objectContaining({ type: 'PUMP_ON', mode: 'demo' }),
     );
   });
 
@@ -201,7 +205,7 @@ describe('Our Village', () => {
     await waitFor(() => expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live'));
   });
 
-  it('keeps Stop reachable and reports an unconfirmed result', async () => {
+  it('reports an unconfirmed pump command instead of claiming success', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
     vi.mocked(api.sendCommand).mockRejectedValue(
       new ApiError(503, 'The controller did not acknowledge the command.', {
@@ -212,13 +216,13 @@ describe('Our Village', () => {
     const user = userEvent.setup();
     await renderReady();
 
-    const stop = await screen.findByTestId('stop-watering');
-    expect(stop).toHaveTextContent('Stop');
-    await user.click(stop);
+    const off = await screen.findByTestId('pump-off');
+    expect(off).toHaveTextContent('Off');
+    await user.click(off);
 
     await waitFor(() =>
       expect(api.sendCommand).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'IRRIGATION_STOP' }),
+        expect.objectContaining({ type: 'PUMP_OFF' }),
       ),
     );
     // The card says the controller did not confirm, rather than claiming success.
@@ -278,41 +282,6 @@ describe('unknown readings', () => {
   });
 });
 
-describe('Watering — starting and stopping are different permissions', () => {
-  it('offers neither button while nothing can run or is running', async () => {
-    // The user's rule (2026-11-16): Stop appears only while the pump is on, so a
-    // card that says watering is not needed does not also offer a button that
-    // looks like it would do something.
-    vi.mocked(api.state).mockResolvedValue(makeState({ soilCalibrated: false }));
-    await renderReady();
-
-    const card = within(await screen.findByTestId('card-plants'));
-    expect(card.getByText(/Not calibrated/i)).toBeInTheDocument();
-    expect(card.getByTestId('water-plants')).toBeDisabled();
-    expect(card.getByTestId('stop-watering')).toBeDisabled();
-  });
-
-  it('disables Stop when the controller cannot be reached', async () => {
-    // Offered while unreachable, a press can only fail -- that was the
-    // inconsistency: a live Stop beside a disabled Water.
-    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
-    await renderReady();
-
-    const card = within(await screen.findByTestId('card-plants'));
-    expect(card.getByTestId('stop-watering')).toBeDisabled();
-  });
-
-  it('keeps Stop offered while the pump is running', async () => {
-    vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
-    await renderReady();
-
-    const card = within(await screen.findByTestId('card-plants'));
-    const stop = card.getByTestId('stop-watering');
-    expect(stop).toBeEnabled();
-    expect(stop).toHaveAttribute('title', 'Stop the pump now.');
-  });
-});
-
 describe('Our Village — the microphone stands alone', () => {
   it('centres the microphone with the language choices under it', async () => {
     await renderReady();
@@ -368,16 +337,12 @@ describe('wind card', () => {
   });
 });
 
-it('points at Reset when the simulation itself is what blocks watering', async () => {
+it('points at Reset when the simulated tank is empty', async () => {
     window.localStorage.setItem('village.demoMode', 'demo');
-    vi.mocked(api.state).mockResolvedValue(
-      makeState({ soilState: 'wet', soilPercent: 62 }),
-    );
+    vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
     await renderReady();
 
-    const card = within(await screen.findByTestId('card-plants'));
-    expect(card.getByTestId('water-plants')).toBeDisabled();
-    expect(card.getByTestId('water-blocked')).toHaveTextContent(/Reset in Setup/i);
+    expect(await screen.findByTestId('pump-note')).toHaveTextContent(/Reset in Setup/i);
   });
 
 describe('Waste card — the camera follows the board', () => {

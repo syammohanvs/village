@@ -35,7 +35,7 @@ Firmware can be updated over Wi-Fi once the board is on the network — see
 
 The dashboard is behind one password. It is there for the case the exhibit
 actually has: a screen left open in a room of visitors, where somebody can
-otherwise press **Water** or walk into **Setup** and change the calibration.
+otherwise press the pump's **On** switch or walk into **Setup** and change the calibration.
 
 - **Default account** — username `admin`, password `village`. Both are set in
   `.env`:
@@ -135,7 +135,7 @@ water physically flowed. The dashboard keeps the two statements separate.
 7. **Demo mode (optional).** Turn it on in **Setup → Simulation** for a fast
    scenario demonstration. The same card carries the scenario buttons —
    **Reset**, **Dry soil**, **Low water**, **Night** — because the simulator
-   starts dry but gets wet once you water it, and without a reset the Water
+   starts dry but gets wet once you water it, and without a reset the pump
    button stays correctly disabled for the next twenty minutes. There is no
    banner: the connection pill reads **Simulation** instead of Live — a simulated
    page never claims the board is answering — and **pressing the pill** returns to
@@ -243,9 +243,11 @@ both on the Our Village page:
   Auto can be seen switching the five lamps.
 - **Watering → Pump: Auto / On / Off**, which holds the pump running or stopped
   regardless of the soil or the tank. **Live has no equivalent** — there the
-  Water button is a *request* the controller answers under its own rules (tank
-  level, soil, cooldown, commissioning), and the manual control is the bench
-  panel behind **Test**, which takes all five outputs and is session-only.
+  switch is the same **Auto / On / Off** row as the simulation's: Auto is every
+  rule, and On/Off are the operator's, watched only by the tank.  (The card used
+  to carry Water and Stop buttons beside it; they said the same thing twice, so
+  they are gone.  A spoken "water the plants" still starts a session under the
+  rules, and "stop the pump" also releases the manual switch.)
 
 Both are the simulator's own state, so they end with the simulation: switching
 back to Live, or restarting the app, returns the pump and the lamps to the

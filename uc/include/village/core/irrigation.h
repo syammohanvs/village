@@ -145,6 +145,15 @@ class IrrigationController {
   // An explicit stop is idempotent: pressing Stop when idle is a success, not
   // an error.  It interrupts a pulse immediately and records the session.
   IrrigationDecision stopUser(uint32_t now) {
+    if (mode_ != PumpMode::Auto) {
+      // "Stop the pump" must stop it even when the manual switch is holding it
+      // on.  Leaving the switch on while answering "stopped" is the one answer
+      // this must never give (2026-11-17).
+      mode_ = PumpMode::Off;
+      manual_on_ = false;
+      reason_ = &reasons::kPumpManualOff;
+      return {CommandResult::Accepted, reason_};
+    }
     if (!active()) {
       pump_on_ = false;
       reason_ = &reasons::kIdleAlreadyStopped;

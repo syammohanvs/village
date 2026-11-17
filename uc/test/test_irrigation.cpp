@@ -440,6 +440,24 @@ TEST(irrigation_survives_a_contact_stamp_from_the_same_tick) {
   CHECK(!s.last.present);
 }
 
+TEST(stop_the_pump_releases_a_manual_switch_too) {
+  IrrigationController c;
+  c.begin(0, autoCfg());
+  c.setMode(PumpMode::On);
+  IrrigationInputs wet = dryInputs();
+  wet.soil_percent = 60.0f;
+  c.tick(6000, wet);
+  CHECK(c.pumpOn());
+
+  // A spoken "stop the pump" is an IRRIGATION_STOP, and it must not answer
+  // "already stopped" while the switch holds the pump on.
+  const IrrigationDecision d = c.stopUser(6100);
+  CHECK(d.result == CommandResult::Accepted);
+  CHECK(c.mode() == PumpMode::Off);
+  c.tick(6200, wet);
+  CHECK(!c.pumpOn());
+}
+
 TEST(a_manual_pump_says_why_it_cannot_run_when_the_tank_is_unreadable) {
   IrrigationController c;
   c.begin(0, autoCfg());

@@ -86,6 +86,10 @@ visitors cannot be used to press **Water** or change calibration.
   codes are `*_PUMP_DISABLED`. The pump has the same **Auto / On / Off** switch
   as the lights: Auto is every rule, and On/Off are the operator's, watched only
   by the tank (`PUMP_ON` / `PUMP_OFF` / `PUMP_AUTO`, status `actuators.pump.mode`).
+  The card carries that switch and nothing else: Water/Stop were removed
+  (2026-11-17) because On/Off say the same thing.  A spoken "stop the pump"
+  (IRRIGATION_STOP) also releases a manual **On** — answering "stopped" while
+  the switch holds the pump running is the one answer it must never give.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider
