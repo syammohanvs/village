@@ -153,7 +153,9 @@ void buildStatus(JsonDocument& doc) {
   JsonObject actuators = root["actuators"].to<JsonObject>();
   JsonObject pump = actuators["pump"].to<JsonObject>();
   pump["commanded"] = irr.pump_on;
-  pump["commissioned"] = VILLAGE_PUMP_COMMISSIONED == 1;
+  // No commissioning gate any more: the hardware is finished, and whether the
+  // pump may run is the switch (auto / on / off) plus the tank.
+  pump["mode"] = toString(irr.mode);
   pump["enabled"] = rt.config.irrigation.pump_enabled;
   pump["feedback"] = "none";
 
@@ -189,7 +191,6 @@ void buildStatus(JsonDocument& doc) {
   JsonObject ir = root["irrigation"].to<JsonObject>();
   ir["auto_enabled"] = irr.auto_enabled;
   ir["pump_enabled"] = irr.pump_enabled;
-  ir["commissioned"] = irr.commissioned;
   ir["failure_lockout"] = irr.failure_lockout;
   ir["state"] = toString(irr.state);
   ir["session"] = toString(irr.session);
@@ -263,7 +264,6 @@ void buildHealth(JsonDocument& doc) {
   wifi["rssi"] = networkRssi();
   wifi["connected"] = networkConnected();
 
-  root["pump_commissioned"] = VILLAGE_PUMP_COMMISSIONED == 1;
   root["free_heap"] = ESP.getFreeHeap();
 
   JsonObject ota = root["ota"].to<JsonObject>();
@@ -375,12 +375,6 @@ void handleConfigPut() {
     sendError(400, "CONFIG_INVALID", parseError);
     return;
   }
-  if (incoming.irrigation.pump_enabled && VILLAGE_PUMP_COMMISSIONED != 1) {
-    sendError(400, "PUMP_NOT_COMMISSIONED",
-              "the pump is disabled in this firmware build; complete the bench test and set VILLAGE_PUMP_COMMISSIONED 1",
-              "irrigation.pump_enabled");
-    return;
-  }
   ConfigError ce;
   if (!validateConfig(incoming, ce)) {
     sendError(400, "CONFIG_INVALID", ce.message, ce.field);
@@ -461,6 +455,18 @@ void handleCommand() {
       reason = out.reason;
       applyStreetlights(out.on);
     }
+  } else if (type == "PUMP_ON" || type == "PUMP_OFF" || type == "PUMP_AUTO") {
+    if (type == "PUMP_ON") rt.irrigation.setMode(PumpMode::On);
+    if (type == "PUMP_OFF") rt.irrigation.setMode(PumpMode::Off);
+    if (type == "PUMP_AUTO") rt.irrigation.setMode(PumpMode::Auto);
+    // The switch decides now, so answer from the controller's own view of the
+    // tank rather than from the command.
+    const IrrigationInputs inputs = buildIrrigationInputs(now);
+    rt.irrigation.tick(now, inputs);
+    const IrrigationStatus pumpStatus = rt.irrigation.status(now);
+    result = CommandResult::Accepted;
+    reason = pumpStatus.reason;
+    applyPump(rt.irrigation.pumpOn());
   } else if (type == "IRRIGATION_REQUEST") {
     const IrrigationDecision d =
         rt.irrigation.requestManual(now, buildIrrigationInputs(now));

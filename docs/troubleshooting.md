@@ -89,9 +89,11 @@ waste a sweep a minute.
 
 The controller refuses with a reason. Check, in order:
 
-- `Irrigation blocked: the pump has not been commissioned.` — the build flag
-  `VILLAGE_PUMP_COMMISSIONED` is still 0, or the runtime switch is off, or both.
-  Complete `docs/bench-test.md` before opening either gate.
+- `Irrigation blocked: the pump is switched off in the configuration.` —
+  **Automatic watering allowed** is off in Setup. The manual **On** switch on
+  the village page still runs the pump, because only the tank can stop it.
+  (The old "not commissioned" line came from a build flag that no longer
+  exists: the hardware is finished, 2026-11-17.)
 - `reservoir water is low` / `state is unknown` — calibrate the probes and make
   sure probe B is grounded and probe A is on the 47 kΩ/ADC node.
 - `soil moisture is not calibrated` — capture dry and wet endpoints.

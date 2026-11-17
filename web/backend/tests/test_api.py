@@ -840,11 +840,12 @@ async def test_demo_mode_shows_a_wind_reading_like_the_solar_panel(tmp_path):
 
 @pytest.mark.asyncio
 async def test_the_demo_pump_has_a_manual_switch_like_the_lamps(tmp_path):
-    """Simulation only: the pump can be held on (or off) regardless of soil.
+    """The pump can be held on (or off) regardless of the soil.
 
-    Live has no manual pump mode — the firmware's Water request is subject to
-    the tank, the soil and the commissioning gate — so this is the demo's lab
-    switch, and it hands the pump back to the rules when set to auto.
+    The board has the same switch now (`PUMP_ON` / `PUMP_OFF` / `PUMP_AUTO`), so
+    this exercises the simulator through the demo scenario field it shares; the
+    manual mode watches the tank and nothing else, and hands the pump back to
+    the rules when set to auto.
     """
     settings = make_settings(tmp_path)
     async with client_for(settings) as (client, gateway, app):
@@ -857,13 +858,13 @@ async def test_the_demo_pump_has_a_manual_switch_like_the_lamps(tmp_path):
         # Wet soil: the rules keep the pump off.
         wet = await scenario({"soil_pct": 60.0, "pump_manual": "auto"})
         assert wet["actuators"]["pump"]["commanded"] is False
-        assert wet["actuators"]["pump"]["manual"] == "auto"
+        assert wet["actuators"]["pump"]["mode"] == "auto"
 
         # Held on by hand, soil or no soil.
         on = await scenario({"pump_manual": "on"})
         assert on["actuators"]["pump"]["commanded"] is True
         assert on["irrigation"]["state"] == "pumping"
-        assert on["actuators"]["pump"]["manual"] == "on"
+        assert on["actuators"]["pump"]["mode"] == "on"
 
         off = await scenario({"pump_manual": "off"})
         assert off["actuators"]["pump"]["commanded"] is False
@@ -873,4 +874,49 @@ async def test_the_demo_pump_has_a_manual_switch_like_the_lamps(tmp_path):
         assert auto["actuators"]["pump"]["commanded"] is True
         back = await scenario({"pump_manual": "auto"})
         assert back["actuators"]["pump"]["commanded"] is False
-        assert back["actuators"]["pump"]["manual"] == "auto"
+        assert back["actuators"]["pump"]["mode"] == "auto"
+
+
+@pytest.mark.asyncio
+async def test_the_pump_switch_is_a_command_the_board_understands(tmp_path):
+    """PUMP_ON / PUMP_OFF / PUMP_AUTO are ordinary commands.
+
+    That matters because the page sends them in Live as well as Simulation: the
+    firmware's switch and the simulator's have to answer the same three words.
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, gateway, app):
+
+        async def command(kind: str, index: int) -> dict:
+            response = await client.post(
+                "/api/v1/commands",
+                json={
+                    "type": kind,
+                    "parameters": {},
+                    "mode": "demo",
+                    "request_id": f"pump-switch-{index:04d}",
+                },
+            )
+            body = response.json()
+            assert response.status_code == 200, body
+            return body
+
+        wet = await client.post(
+            "/api/v1/demo/scenario", json={"soil_pct": 60.0, "pump_manual": "auto"}
+        )
+        assert wet.status_code == 200
+
+        on = await command("PUMP_ON", 1)
+        assert on["ack"]["result"] == "ACCEPTED"
+        assert on["ack"]["irrigation"]["pump_on"] is True
+
+        off = await command("PUMP_OFF", 2)
+        assert off["ack"]["result"] == "ACCEPTED"
+        assert off["ack"]["irrigation"]["pump_on"] is False
+
+        auto = await command("PUMP_AUTO", 3)
+        assert auto["ack"]["result"] == "ACCEPTED"
+        status = (await client.get("/api/v1/state?mode=demo")).json()["status"]
+        assert status["actuators"]["pump"]["mode"] == "auto"
+        # Wet soil, so the rules keep it off.
+        assert status["actuators"]["pump"]["commanded"] is False

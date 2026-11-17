@@ -46,8 +46,7 @@ void setup() {
   }
   setupOutputs();
   setupSensors();
-  rt.irrigation.begin(millis(), rt.config.irrigation,
-                      VILLAGE_PUMP_COMMISSIONED == 1);
+  rt.irrigation.begin(millis(), rt.config.irrigation);
   applyRuntimeConfig(millis());
 
   startNetwork();
@@ -58,13 +57,13 @@ void setup() {
                 loaded ? "Controller started from saved configuration. Pump is off."
                        : "Controller started with default configuration. Pump is off.");
   Serial.printf("[boot] %s, boot %s, pump gate %s\n", g_device_id, g_boot_id,
-                VILLAGE_PUMP_BENCH_DRIVE == 1
-                    ? "BENCH DRIVE"
-                    : (VILLAGE_PUMP_COMMISSIONED == 1 ? "commissioned"
-                                                      : "DISABLED"));
+                VILLAGE_PUMP_BENCH_DRIVE == 1 ? "BENCH DRIVE"
+                                              : (rt.config.irrigation.pump_enabled
+                                                     ? "enabled in the saved configuration"
+                                                     : "disabled in the saved configuration"));
   if (VILLAGE_PUMP_BENCH_DRIVE == 1) {
-    Serial.println("[boot] BENCH DRIVE is on: the pump gate is HIGH with no "
-                   "commissioning. The pump must be disconnected.");
+    Serial.println("[boot] BENCH DRIVE is on: the pump gate is HIGH regardless of "
+                   "the configuration. The pump must be disconnected.");
   } else if (VILLAGE_PUMP_DRIVE_INVERTED == 1) {
     Serial.println("[boot] pump drive INVERTED for the NPN demo driver: "
                    "GPIO HIGH = pump off, GPIO LOW = pump on.");
@@ -109,7 +108,14 @@ void loop() {
 #else
   // The test page owns the gate once it has driven anything; writing pumpOn()
   // here as well would drop the pin LOW for a moment every pass (relay chatter).
-  if (!rt.test_enabled) applyPump(rt.irrigation.pumpOn());
+  if (!rt.test_enabled) {
+    // The manual switch owns the pad; Auto goes through the configured gate.
+    if (rt.irrigation.mode() == PumpMode::Auto) {
+      applyPump(rt.irrigation.pumpOn());
+    } else {
+      applyPumpDirect(rt.irrigation.pumpOn());
+    }
+  }
 #endif
 
 #if VILLAGE_PUMP_BENCH_DRIVE == 1

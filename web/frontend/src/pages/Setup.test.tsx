@@ -123,11 +123,11 @@ describe('Setup', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
-  it('keeps the pump commissioning controls usable for the presenter', async () => {
+  it('offers the automatic-watering switch, which is not a commissioning gate', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const gate = await screen.findByRole('switch', { name: 'Pump commissioning gate' });
+    const gate = await screen.findByRole('switch', { name: 'Automatic watering allowed' });
     await user.click(gate);
 
     await waitFor(() => expect(api.putDeviceConfig).toHaveBeenCalled());

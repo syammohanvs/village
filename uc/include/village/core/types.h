@@ -8,6 +8,7 @@ enum class SoilState : uint8_t { Unavailable, Uncalibrated, Dry, Adequate, Wet }
 enum class ReservoirState : uint8_t { Unavailable, Uncalibrated, Low, Available };
 enum class Brightness : uint8_t { Unknown, Bright, Dark };
 enum class LightMode : uint8_t { Auto, ManualOn, ManualOff };
+enum class PumpMode : uint8_t { Auto, On, Off };
 enum class IrrigationState : uint8_t { Idle, Pumping, Soaking };
 enum class SessionKind : uint8_t { None, Auto, Manual };
 enum class CommandResult : uint8_t { Accepted, Rejected, Duplicate };
@@ -41,6 +42,15 @@ inline const char* toString(Brightness b) {
     case Brightness::Unknown: return "unknown";
   }
   return "unknown";
+}
+
+inline const char* toString(PumpMode m) {
+  switch (m) {
+    case PumpMode::Auto: return "auto";
+    case PumpMode::On: return "on";
+    case PumpMode::Off: return "off";
+  }
+  return "auto";
 }
 
 inline const char* toString(LightMode m) {

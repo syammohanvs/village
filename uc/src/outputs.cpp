@@ -58,10 +58,12 @@ void setupOutputs() {
   allOutputsOff();
 }
 
+// No commissioning gate any more (2026-11-17).  In Auto the saved
+// `pump_enabled` still decides, because that is what the rules were configured
+// with; the manual switch answers through applyPumpDirect().
 void applyPump(bool on) {
   const bool allowed =
-      VILLAGE_PUMP_BENCH_DRIVE == 1 ||
-      (on && VILLAGE_PUMP_COMMISSIONED == 1 && rt.config.irrigation.pump_enabled);
+      VILLAGE_PUMP_BENCH_DRIVE == 1 || (on && rt.config.irrigation.pump_enabled);
   digitalWrite(pins::PUMP_GATE, pumpGateLevel(allowed));
 }
 

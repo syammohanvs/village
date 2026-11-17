@@ -33,7 +33,7 @@ struct IrrigationLastSession {
 struct IrrigationStatus {
   bool auto_enabled = true;
   bool pump_enabled = false;   // configuration
-  bool commissioned = false;   // compile-time hardware gate
+  PumpMode mode = PumpMode::Auto;
   bool failure_lockout = false;
   bool pump_on = false;
   IrrigationState state = IrrigationState::Idle;
@@ -66,9 +66,10 @@ class IrrigationController {
   static constexpr uint32_t kUserStopCooldownMs = 1000;
   static constexpr uint32_t kLinkLostCooldownMs = 5000;
 
-  void begin(uint32_t now, const IrrigationConfig& cfg, bool commissioned) {
+  void begin(uint32_t now, const IrrigationConfig& cfg) {
     cfg_ = cfg;
-    commissioned_ = commissioned;
+    mode_ = PumpMode::Auto;
+    manual_on_ = false;
     state_ = IrrigationState::Idle;
     session_ = SessionKind::None;
     pump_on_ = false;
@@ -88,25 +89,41 @@ class IrrigationController {
     reason_ = &reasons::kIdleBoot;
   }
 
-  void setConfig(uint32_t now, const IrrigationConfig& cfg, bool commissioned) {
+  void setConfig(uint32_t now, const IrrigationConfig& cfg) {
     cfg_ = cfg;
-    commissioned_ = commissioned;
     if (active() && !effectivePump()) {
       stopInternal(now, reasons::kStoppedPumpDisabled, 0);
     }
   }
 
+  // The manual switch is the operator's, so it answers directly; everything
+  // else answers from the session state machine.
   bool pumpOn() const {
+    if (mode_ != PumpMode::Auto) return manual_on_;
     return pump_on_ && state_ == IrrigationState::Pumping;
   }
+
+  void setMode(PumpMode mode) {
+    mode_ = mode;
+    if (mode != PumpMode::Auto) {
+      // Leaving the rules ends any session they had running.
+      pump_on_ = false;
+      state_ = IrrigationState::Idle;
+      session_ = SessionKind::None;
+      dry_timer_active_ = false;
+      manual_on_ = false;
+    }
+  }
+  PumpMode mode() const { return mode_; }
 
   bool active() const {
     return state_ == IrrigationState::Pumping || state_ == IrrigationState::Soaking;
   }
 
   IrrigationDecision requestManual(uint32_t now, const IrrigationInputs& in) {
+    if (mode_ != PumpMode::Auto) return reject(reasons::kPumpManualActive);
     if (active()) return reject(reasons::kBlockedAlreadyActive);
-    if (!effectivePump()) return reject(reasons::kBlockedPumpNotCommissioned);
+    if (!effectivePump()) return reject(reasons::kBlockedPumpDisabled);
     if (bootGuardActive(now)) return reject(reasons::kBlockedBootGuard);
     if (failure_lockout_) return reject(reasons::kBlockedLockout);
     if (cooldownActive(now)) return reject(reasons::kBlockedCooldown);
@@ -138,6 +155,11 @@ class IrrigationController {
 
   // Called frequently (the firmware uses ~100 ms).  Safe to call at any time.
   void tick(uint32_t now, const IrrigationInputs& in) {
+    if (mode_ != PumpMode::Auto) {
+      tickManual(in);
+      return;
+    }
+    manual_on_ = false;
     if (active()) {
       if (!effectivePump()) {
         stopInternal(now, reasons::kStoppedPumpDisabled, 0);
@@ -217,6 +239,32 @@ class IrrigationController {
     updateIdle(now, in);
   }
 
+  // Manual: the switch decides, and the tank is the only thing still watched.
+  // A pump must never run dry, so a low or unreadable tank stops it whatever
+  // the switch says.
+  void tickManual(const IrrigationInputs& in) {
+    pump_on_ = false;
+    state_ = IrrigationState::Idle;
+    session_ = SessionKind::None;
+    if (mode_ == PumpMode::Off) {
+      manual_on_ = false;
+      reason_ = &reasons::kPumpManualOff;
+      return;
+    }
+    if (!in.reservoir_valid) {
+      manual_on_ = false;
+      reason_ = &reasons::kPumpManualWaterUnknown;
+      return;
+    }
+    if (!in.reservoir_available) {
+      manual_on_ = false;
+      reason_ = &reasons::kPumpManualWaterLow;
+      return;
+    }
+    manual_on_ = true;
+    reason_ = &reasons::kPumpManualOn;
+  }
+
   void clearFailureLockout(uint32_t now) {
     failure_lockout_ = false;
     cooldown_until_ms_ = now;
@@ -226,7 +274,7 @@ class IrrigationController {
     IrrigationStatus s;
     s.auto_enabled = cfg_.auto_enabled;
     s.pump_enabled = cfg_.pump_enabled;
-    s.commissioned = commissioned_;
+    s.mode = mode_;
     s.failure_lockout = failure_lockout_;
     s.pump_on = pumpOn();
     s.state = state_;
@@ -256,7 +304,7 @@ class IrrigationController {
     return {CommandResult::Rejected, &r};
   }
 
-  bool effectivePump() const { return cfg_.pump_enabled && commissioned_; }
+  bool effectivePump() const { return cfg_.pump_enabled; }
 
   bool bootGuardActive(uint32_t now) const {
     return static_cast<int32_t>(boot_guard_until_ms_ - now) > 0;
@@ -350,7 +398,7 @@ class IrrigationController {
     }
 
     if (!effectivePump()) {
-      reason_ = &reasons::kIdlePumpNotCommissioned;
+      reason_ = &reasons::kIdlePumpDisabled;
       dry_timer_active_ = false;
       return;
     }
@@ -408,7 +456,8 @@ class IrrigationController {
   }
 
   IrrigationConfig cfg_{};
-  bool commissioned_ = false;
+  PumpMode mode_ = PumpMode::Auto;
+  bool manual_on_ = false;
   bool pump_on_ = false;
   bool failure_lockout_ = false;
   IrrigationState state_ = IrrigationState::Idle;

@@ -155,7 +155,7 @@ handle the pump, mains power or dirty waste alone.
 - soil: the calibrated percentage and state, or "not calibrated";
 - tank: water at the low level, low, or "not calibrated";
 - lamps: on or off, or "the light sensor is not fitted";
-- pump: running or off, and "locked for safety" when it is not commissioned;
+- pump: running or off, and whether the manual switch is holding it;
 - the last message or two recorded by the village.
 
 When the link is offline or stale, Sara stops describing sensors: a stale figure

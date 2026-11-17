@@ -42,7 +42,7 @@ control, so a forgotten switch cannot survive a power cycle.
 deliberate choice (2026-11-16), so know what it means before using it:
 
 - The pump **runs while the switch is on**, regardless of the soil probe, the
-  tank probe, the pump commissioning gate, the cooldown or the kill switch. It
+  tank probe, the cooldown or the kill switch. It
   does not stop by itself — turn it off, switch test mode off, or remove power.
 - Once an output has actually been driven, the firmware lets the page own all
   five for the rest of the session: the normal light and waste drivers stand
@@ -189,7 +189,7 @@ on its own, use the build flags in the firmware instead (`VILLAGE_PUMP_BENCH_DRI
 - [ ] Set `VILLAGE_PUMP_COMMISSIONED 1` in
       `uc/include/village/build_config.h`.
 - [ ] Reflash.
-- [ ] Enable the pump in **Setup → Advanced → Pump commissioning**.
+- [ ] Put the pump back on **Auto** (the switch beside it) and confirm the rules decide again.
 - [ ] Run one short pulse in water while watching the current.
 - [ ] Record final timings and thresholds in `docs/calibration.md`.
 

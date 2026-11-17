@@ -2129,5 +2129,4 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   text-transform: uppercase;
   color: var(--muted-2);
 }
-.pump-manual-note { text-transform: none; letter-spacing: 0; color: var(--muted-2); font-size: 11px; }
 .pump-manual .hint { margin: 0; font-size: 11px; }

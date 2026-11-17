@@ -12,6 +12,10 @@ ALLOWED_COMMANDS = {
     "LIGHTS_AUTO",
     "IRRIGATION_REQUEST",
     "IRRIGATION_STOP",
+    # The pump's own switch, like the lights': the rules, held on, held off.
+    "PUMP_ON",
+    "PUMP_OFF",
+    "PUMP_AUTO",
     "INDICATE_WASTE",
     # Bench control from Setup → Test outputs: TEST_MODE is the page's master
     # switch and TEST_OUTPUT drives one pin.  The firmware refuses an output

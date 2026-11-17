@@ -139,4 +139,5 @@ gone and the firmware no longer has the settings, so an old note about
 | Manual link timeout | 30 s | A manual session stops if the laptop disappears |
 
 Change these only after observing the real soil and pump. The pump cannot run
-until both commissioning gates are open.
+until automatic watering is switched on in Setup — and the manual **On** switch on the village
+page overrides the rules, watched only by the tank.

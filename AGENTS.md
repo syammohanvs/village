@@ -81,6 +81,11 @@ visitors cannot be used to press **Water** or change calibration.
   `intents.py` uses that only when the script is not the chosen language's, and
   only for exactly one device + one state with no refusal word — do not widen it
   to fuzzy edit distance, which was measured turning "turn off" into "water".
+- **There is no pump commissioning gate any more (2026-11-17).** The hardware is
+  finished; the `VILLAGE_PUMP_COMMISSIONED` build flag is deleted and the reason
+  codes are `*_PUMP_DISABLED`. The pump has the same **Auto / On / Off** switch
+  as the lights: Auto is every rule, and On/Off are the operator's, watched only
+  by the tank (`PUMP_ON` / `PUMP_OFF` / `PUMP_AUTO`, status `actuators.pump.mode`).
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider

@@ -1,14 +1,13 @@
 #pragma once
 
-// Build-time switches.  These are deliberately separate from the runtime
-// configuration so the pump needs two independent keys before it can run.
+// Build-time switches.
 //
-// The pump is DISABLED unless BOTH are true:
-//   1. VILLAGE_PUMP_COMMISSIONED == 1 (this file, changed after the bench test)
-//   2. config.irrigation.pump_enabled == true (saved in NVS from the UI)
-#ifndef VILLAGE_PUMP_COMMISSIONED
-#define VILLAGE_PUMP_COMMISSIONED 1
-#endif
+// There is no commissioning gate any more (2026-11-17): the hardware is
+// finished and the gate only produced "the pump is not commissioned" on a board
+// whose pump is wired and tested.  Whether the pump may run is a runtime
+// question now -- `config.irrigation.pump_enabled` for the automatic rules, and
+// the manual Auto/On/Off switch beside it, whose only remaining check is the
+// tank.
 
 #define VILLAGE_FIRMWARE_VERSION "0.2.2"
 #define VILLAGE_PROTOCOL_VERSION 1

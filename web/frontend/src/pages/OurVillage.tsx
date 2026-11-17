@@ -66,10 +66,6 @@ export function OurVillage() {
   const pumpOn = irrigation?.state === 'pumping';
   const physicalDisabled = !connected && !demo;
 
-  const pumpCommissioned =
-    typeof status?.actuators?.pump?.commissioned === 'boolean'
-      ? status.actuators.pump.commissioned
-      : null;
   const lightMode: 'auto' | 'on' | 'off' | null =
     lights?.mode === 'auto'
       ? 'auto'
@@ -120,25 +116,14 @@ export function OurVillage() {
         ? levelChip('Camera ready', 'live')
         : levelChip('Model missing', 'warn');
 
-  /** The demo's pump switch: hold it on or off regardless of the soil. */
-  const [pumpManual, setPumpManual] = useState<'auto' | 'on' | 'off' | null>(null);
+  // Auto / On / Off, like the streetlights.  Auto is every rule; On and Off
+  // are the operator's switch, watched only by the tank.
   const pumpMode: 'auto' | 'on' | 'off' =
-    pumpManual ?? (status?.actuators?.pump?.manual === 'on'
+    status?.actuators?.pump?.mode === 'on'
       ? 'on'
-      : status?.actuators?.pump?.manual === 'off'
+      : status?.actuators?.pump?.mode === 'off'
         ? 'off'
-        : 'auto');
-
-  const setPumpMode = async (mode: 'auto' | 'on' | 'off') => {
-    setPumpManual(mode);
-    try {
-      await api.demoScenario({ pump_manual: mode });
-    } catch (cause) {
-      setNotice({ card: 'plants', text: errorMessage(cause) });
-    } finally {
-      reload();
-    }
-  };
+        : 'auto';
 
   /** The simulated room's light level, for exercising Auto mode without a torch. */
   const setAmbient = async (value: number) => {
@@ -175,19 +160,17 @@ export function OurVillage() {
   // letting a visitor press a button that can only be refused.
   const waterBlocked = !hasStatus && !demo
     ? 'Connect the board to check watering readiness.'
-    : pumpCommissioned === false
-      ? 'The pump is not commissioned, so watering is disabled.'
-      : reservoir?.state === 'low'
-        ? 'The tank water is low. Refill the reservoir before watering.'
-        : reservoir?.state !== 'available'
-          ? 'The tank reading is unavailable, so watering is disabled.'
-          : soil?.state === 'wet' || soil?.state === 'adequate'
-            ? 'The soil is already moist, so watering is not needed.'
-            : soil?.calibrated === false
-              ? 'The soil probe is not calibrated, so the controller will refuse to water.'
-              : physicalDisabled
-                ? 'The controller is offline. Actions are disabled.'
-                : '';
+    : reservoir?.state === 'low'
+      ? 'The tank water is low. Refill the reservoir before watering.'
+      : reservoir?.state !== 'available'
+        ? 'The tank reading is unavailable, so watering is disabled.'
+        : soil?.state === 'wet' || soil?.state === 'adequate'
+          ? 'The soil is already moist, so watering is not needed.'
+          : soil?.calibrated === false
+            ? 'The soil probe is not calibrated, so the controller will refuse to water.'
+            : physicalDisabled
+              ? 'The controller is offline. Actions are disabled.'
+              : '';
 
   const startDisabled = busy !== null || watering || Boolean(waterBlocked);
   // Stop belongs to a run.  The user's rule (2026-11-16, twice): Stop is offered
@@ -275,11 +258,8 @@ export function OurVillage() {
               <IconStop size={16} /> Stop
             </button>
           </div>
-          {demo && (
-            <div className="pump-manual" data-testid="pump-manual">
-              <p className="pump-manual-label">
-                Pump <span className="pump-manual-note">manual, simulation only</span>
-              </p>
+          <div className="pump-manual" data-testid="pump-manual">
+              <p className="pump-manual-label">Pump</p>
               <div className="segmented segmented--wide" role="group" aria-label="Pump mode">
                 {(['auto', 'on', 'off'] as const).map((mode) => (
                   <button
@@ -288,7 +268,14 @@ export function OurVillage() {
                     data-testid={`pump-${mode}`}
                     className={cx('segment', pumpMode === mode && 'is-active')}
                     aria-pressed={pumpMode === mode}
-                    onClick={() => void setPumpMode(mode)}
+                    disabled={physicalDisabled || busy !== null}
+                    onClick={() =>
+                      void run(
+                        `pump-${mode}`,
+                        'plants',
+                        mode === 'auto' ? 'PUMP_AUTO' : mode === 'on' ? 'PUMP_ON' : 'PUMP_OFF',
+                      )
+                    }
                   >
                     {mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'}
                   </button>
@@ -296,10 +283,9 @@ export function OurVillage() {
               </div>
               <p className="hint">
                 On holds the pump running whatever the soil says; Off holds it stopped. Auto gives
-                it back to the rules.
+                it back to the rules. Whichever is chosen, an empty tank still stops it.
               </p>
             </div>
-          )}
           {waterBlocked && pumpMode !== 'on' && (
             <p className="vcard-note" data-testid="water-blocked">
               {waterBlocked}

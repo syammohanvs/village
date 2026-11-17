@@ -638,7 +638,6 @@ function Irrigation() {
   const [error, setError] = useState('');
 
   const irrigation = status?.irrigation;
-  const commissioned = status?.actuators?.pump?.commissioned ?? false;
   const physicalDisabled = !connected && !demo;
 
   const apply = async (patch: Partial<IrrigationConfig>, label: string) => {
@@ -655,12 +654,7 @@ function Irrigation() {
       config.reload();
       reloadVillage();
     } catch (cause) {
-      const body = cause instanceof ApiError ? (cause.body as { reason_code?: string } | null) : null;
-      setError(
-        body?.reason_code === 'PUMP_NOT_COMMISSIONED'
-          ? 'The controller refused to open the pump gate: this firmware was not compiled with the pump commissioning key.'
-          : errorMessage(cause),
-      );
+      setError(errorMessage(cause));
     } finally {
       setBusy(null);
     }
@@ -703,12 +697,13 @@ function Irrigation() {
   return (
     <Card
       kicker="Pump & irrigation"
-      title="Commissioning and safe limits"
+      title="Irrigation and its limits"
       actions={<Chip tone={wateringLabel(irrigation?.state)}>{titleCase(irrigation?.state ?? 'unknown')}</Chip>}
     >
       <p className="hint">
-        Two keys are required before the pump can run: the firmware commissioning flag and this
-        gate. The controller still applies soil, water, sensor, cooldown and runtime limits.
+        There is no commissioning gate any more. Automatic watering applies soil, water, sensor,
+        cooldown and runtime limits; the pump's <strong>Auto / On / Off</strong> switch on the
+        village page overrides them by hand, and only an empty tank still stops it.
       </p>
       <div className="setting-row">
         <div>
@@ -725,20 +720,18 @@ function Irrigation() {
       </div>
       <div className="setting-row">
         <div>
-          <p className="setting-name">Pump commissioning gate</p>
+          <p className="setting-name">Automatic watering allowed</p>
           <p className="hint">
-            {commissioned
-              ? 'The controller reports the gate open.'
-              : 'The controller reports the gate closed.'}{' '}
-            Open it only when the pump is in water and the bench test is done.
+            The pump itself is not switched off by this — the village page's manual <strong>On</strong>
+            still runs it, watched only by the tank.
           </p>
         </div>
         <Toggle
           id="pump-gate"
-          label="Pump commissioning gate"
+          label="Automatic watering allowed"
           checked={Boolean(gateEnabled)}
           disabled={!config.data || physicalDisabled || busy !== null}
-          onChange={(next) => void apply({ pump_enabled: next }, 'Pump commissioning gate')}
+          onChange={(next) => void apply({ pump_enabled: next }, 'Automatic watering')}
         />
       </div>
 

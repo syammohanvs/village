@@ -38,9 +38,9 @@ inline constexpr Reason kIdleCooldown{
 inline constexpr Reason kIdleFailureLockout{
     "IDLE_FAILURE_LOCKOUT",
     "Irrigation is locked out after repeated watering with no moisture rise. Check the probe, the water and the soil."};
-inline constexpr Reason kIdlePumpNotCommissioned{
-    "IDLE_PUMP_NOT_COMMISSIONED",
-    "Soil is dry and water is available, but the pump is not commissioned."};
+inline constexpr Reason kIdlePumpDisabled{
+    "IDLE_PUMP_DISABLED",
+    "Soil is dry and water is available, but irrigation is switched off in the configuration."};
 inline constexpr Reason kIdleAlreadyStopped{
     "IDLE_ALREADY_STOPPED", "Irrigation is already stopped. The pump is off."};
 
@@ -58,9 +58,9 @@ inline constexpr Reason kBlockedWaterLow{
 inline constexpr Reason kBlockedWaterUnknown{
     "IRRIGATION_BLOCKED_WATER_UNKNOWN",
     "Irrigation blocked: the reservoir state is uncalibrated or unavailable."};
-inline constexpr Reason kBlockedPumpNotCommissioned{
-    "IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED",
-    "Irrigation blocked: the pump has not been commissioned."};
+inline constexpr Reason kBlockedPumpDisabled{
+    "IRRIGATION_BLOCKED_PUMP_DISABLED",
+    "Irrigation blocked: the pump is switched off in the configuration."};
 inline constexpr Reason kBlockedAlreadyActive{
     "IRRIGATION_BLOCKED_ALREADY_ACTIVE",
     "Irrigation blocked: a watering session is already running."};
@@ -112,6 +112,18 @@ inline constexpr Reason kLightsAutoBright{
 inline constexpr Reason kLightsAutoUnknown{
     "LIGHTS_AUTO_UNKNOWN",
     "The light sensor is not ready, so the streetlights stay off."};
+inline constexpr Reason kPumpManualOn{
+    "PUMP_MANUAL_ON", "Pump switched on by hand. Nothing but the tank is checked."};
+inline constexpr Reason kPumpManualOff{
+    "PUMP_MANUAL_OFF", "Pump switched off by hand."};
+inline constexpr Reason kPumpManualWaterLow{
+    "PUMP_MANUAL_WATER_LOW", "The tank is at or below the minimum, so the pump stays off."};
+inline constexpr Reason kPumpManualActive{
+    "PUMP_MANUAL_ACTIVE",
+    "The pump is on the manual switch. Set it back to Auto to water by the rules."};
+inline constexpr Reason kPumpManualWaterUnknown{
+    "PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading, so the pump stays off."};
+
 inline constexpr Reason kLightsManualOn{
     "LIGHTS_MANUAL_ON", "Streetlights switched on manually."};
 inline constexpr Reason kLightsManualOff{

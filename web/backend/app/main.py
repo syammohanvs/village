@@ -945,8 +945,8 @@ def create_app(
             },
             {
                 "id": "pump",
-                "label": "Pump commissioned",
-                "status": "ok" if actuators.get("pump", {}).get("commissioned") and actuators.get("pump", {}).get("enabled") else "warn",
+                "label": "Pump",
+                "status": "ok" if actuators.get("pump", {}).get("enabled") else "warn",
                 "detail": "Both the build flag and runtime switch are on."
                 if actuators.get("pump", {}).get("commissioned") and actuators.get("pump", {}).get("enabled")
                 else "Complete docs/bench-test.md before enabling the pump.",

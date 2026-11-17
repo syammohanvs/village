@@ -26,7 +26,7 @@ Evidence collected on 2026-11-07:
 never wire by counting header positions, because the physical order is not the
 logical order.
 
-### Still to check on the real board (commissioning)
+### Still to check on the real board
 
 1. Read the metal shield: it must say **ESP32-WROOM-32** (not WROVER). A WROVER
    uses GPIO 16/17 for PSRAM, which would require moving the bin triggers.
@@ -497,7 +497,7 @@ Do this in order, with the pump **disconnected** until step 7:
 8. Connect the pump **in water**, never dry. Measure the running and stall
    current. Confirm the 5 V supply holds up.
 9. Calibrate soil (dry and wet) and the reservoir (dry and wet). The bins need no calibration: they have indicator LEDs only.
-10. Run the acceptance tests in `docs/bench-test.md`, then commission the pump.
+10. Run the acceptance tests in `docs/bench-test.md`. There is no commissioning step any more.
 
 ## 9. Commissioning the pump
 
@@ -511,7 +511,8 @@ The pump is protected by two independent gates:
 After the bench test passes:
 
 1. Set `VILLAGE_PUMP_COMMISSIONED 1` and reflash.
-2. In **Setup → Advanced → Pump commissioning**, read the safety checklist and enable
+2. On the village page, the pump's **Auto / On / Off** switch decides. Nothing needs enabling
+   that was not there before; that older checklist item read
    the pump. The device accepts this only when the compile-time gate is open.
 3. Fill the reservoir, place the probes, and run one short pulse with the
    pump in water while watching the current.

@@ -44,7 +44,7 @@ IrrigationInputs dryInputs() {
 
 TEST(irrigation_boot_leaves_pump_off_and_guards_requests) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   IrrigationStatus s = c.status(0);
   CHECK(!s.pump_on);
   CHECK(s.state == IrrigationState::Idle);
@@ -65,7 +65,7 @@ TEST(irrigation_boot_leaves_pump_off_and_guards_requests) {
 
 TEST(irrigation_manual_start_and_user_stop) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   IrrigationDecision d = c.requestManual(6000, dryInputs());
   CHECK(d.result == CommandResult::Accepted);
   CHECK(d.reason == &reasons::kStarted);
@@ -106,7 +106,7 @@ TEST(irrigation_manual_start_and_user_stop) {
 
 TEST(irrigation_blocks_wet_soil_and_bad_readings) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
 
   IrrigationInputs in = dryInputs();
   in.soil_percent = 40.0f;
@@ -135,23 +135,59 @@ TEST(irrigation_blocks_wet_soil_and_bad_readings) {
   CHECK(!c.pumpOn());
 }
 
-TEST(irrigation_requires_both_commissioning_gates) {
+TEST(irrigation_is_switched_off_by_the_configuration_not_by_a_build_flag) {
+  // The commissioning gate is gone (2026-11-17): the hardware is finished.
+  // What is left is the operator's own `pump_enabled`, and it only governs the
+  // automatic rules -- the manual switch answers to the tank alone.
   IrrigationController c;
   IrrigationConfig cfg = manualCfg();
   cfg.pump_enabled = false;
-  c.begin(0, cfg, true);
-  CHECK(c.requestManual(6000, dryInputs()).reason ==
-        &reasons::kBlockedPumpNotCommissioned);
-
-  c.begin(0, manualCfg(), false);
-  CHECK(c.requestManual(6000, dryInputs()).reason ==
-        &reasons::kBlockedPumpNotCommissioned);
+  c.begin(0, cfg);
+  CHECK(c.requestManual(6000, dryInputs()).reason == &reasons::kBlockedPumpDisabled);
   CHECK(!c.pumpOn());
+
+  // Running it by hand is still allowed with the rules switched off.
+  c.setMode(PumpMode::On);
+  c.tick(6000, dryInputs());
+  CHECK(c.pumpOn());
+}
+
+TEST(a_manual_pump_runs_and_stops_and_is_still_guarded_by_the_tank) {
+  IrrigationController c;
+  c.begin(0, autoCfg());
+
+  // On: runs with wet soil, which the rules would refuse.
+  IrrigationInputs wet = dryInputs();
+  wet.soil_percent = 60.0f;
+  c.setMode(PumpMode::On);
+  c.tick(6000, wet);
+  CHECK(c.pumpOn());
+  CHECK(c.mode() == PumpMode::On);
+
+  // Off: stopped.
+  c.setMode(PumpMode::Off);
+  c.tick(6100, wet);
+  CHECK(!c.pumpOn());
+
+  // On again, and the tank runs dry: the one check that remains.
+  c.setMode(PumpMode::On);
+  c.tick(6200, wet);
+  CHECK(c.pumpOn());
+  wet.reservoir_available = false;
+  c.tick(6300, wet);
+  CHECK(!c.pumpOn());
+
+  // Auto hands it back to the rules: wet soil, so it stays off.
+  wet.reservoir_available = true;
+  c.setMode(PumpMode::Auto);
+  c.tick(7000, wet);
+  CHECK(!c.pumpOn());
+  CHECK(c.mode() == PumpMode::Auto);
 }
 
 TEST(irrigation_stops_on_low_water_mid_pulse) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   c.tick(7000, dryInputs());
   CHECK(c.pumpOn());
@@ -169,7 +205,7 @@ TEST(irrigation_stops_on_low_water_mid_pulse) {
 
 TEST(irrigation_stops_on_invalid_sensor_during_soak) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   c.tick(10000, dryInputs());
   CHECK(c.status(10000).state == IrrigationState::Soaking);
@@ -192,7 +228,7 @@ TEST(irrigation_max_cumulative_accounts_exactly_once) {
   cfg.max_pulses = 4;
 
   IrrigationController c;
-  c.begin(0, cfg, true);
+  c.begin(0, cfg);
   c.requestManual(6000, dryInputs());
   c.tick(10000, dryInputs());
   CHECK(c.status(10000).state == IrrigationState::Soaking);
@@ -224,7 +260,7 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
   cfg.max_pulses = 2;
 
   IrrigationController c;
-  c.begin(0, cfg, true);
+  c.begin(0, cfg);
   c.requestManual(6000, dryInputs());
   c.tick(7000, dryInputs());
   c.tick(8000, dryInputs());
@@ -254,7 +290,7 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
 
 TEST(irrigation_completes_when_soil_reaches_stop_level) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   c.tick(10000, dryInputs());
   CHECK(c.status(10000).state == IrrigationState::Soaking);
@@ -272,7 +308,7 @@ TEST(irrigation_completes_when_soil_reaches_stop_level) {
 
 TEST(irrigation_link_loss_stops_only_a_manual_session) {
   IrrigationController manual;
-  manual.begin(0, manualCfg(), true);
+  manual.begin(0, manualCfg());
   manual.requestManual(6000, dryInputs());
   IrrigationInputs lost = dryInputs();
   lost.link_age_ms = 31000;
@@ -281,7 +317,7 @@ TEST(irrigation_link_loss_stops_only_a_manual_session) {
   CHECK(manual.status(7000).reason == &reasons::kStoppedLinkLost);
 
   IrrigationController automatic;
-  automatic.begin(0, autoCfg(), true);
+  automatic.begin(0, autoCfg());
   automatic.tick(6000, dryInputs());
   automatic.tick(6001, dryInputs());
   CHECK(automatic.pumpOn());
@@ -296,7 +332,7 @@ TEST(irrigation_link_loss_stops_only_a_manual_session) {
 
 TEST(irrigation_auto_needs_dry_soil_and_water) {
   IrrigationController c;
-  c.begin(0, autoCfg(), true);
+  c.begin(0, autoCfg());
 
   IrrigationInputs wet = dryInputs();
   wet.soil_percent = 40.0f;
@@ -321,7 +357,7 @@ TEST(irrigation_auto_confirms_dryness_before_starting) {
   IrrigationConfig cfg = autoCfg();
   cfg.dry_confirm_ms = 1000;
   IrrigationController c;
-  c.begin(0, cfg, true);
+  c.begin(0, cfg);
   c.tick(6000, dryInputs());
   CHECK(!c.pumpOn());
   CHECK(c.status(6000).reason == &reasons::kIdleSoilDryWaiting);
@@ -334,11 +370,11 @@ TEST(irrigation_auto_confirms_dryness_before_starting) {
 
 TEST(irrigation_restart_clears_the_session_and_pump) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   CHECK(c.pumpOn());
 
-  c.begin(7000, manualCfg(), true);
+  c.begin(7000, manualCfg());
   CHECK(!c.pumpOn());
   IrrigationStatus s = c.status(7000);
   CHECK(s.state == IrrigationState::Idle);
@@ -351,20 +387,20 @@ TEST(irrigation_restart_clears_the_session_and_pump) {
 
 TEST(irrigation_config_change_can_disable_the_pump_safely) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   CHECK(c.pumpOn());
 
   IrrigationConfig cfg = manualCfg();
   cfg.pump_enabled = false;
-  c.setConfig(6500, cfg, true);
+  c.setConfig(6500, cfg);
   CHECK(!c.pumpOn());
   CHECK(c.status(6500).reason == &reasons::kStoppedPumpDisabled);
 }
 
 TEST(irrigation_reports_pulse_and_soak_countdowns) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   c.requestManual(6000, dryInputs());
   CHECK(c.status(7000).pulse_remaining_ms == 3000);
   c.tick(10000, dryInputs());
@@ -388,7 +424,7 @@ TEST(age_ms_treats_a_stamp_ahead_of_now_as_zero) {
 
 TEST(irrigation_survives_a_contact_stamp_from_the_same_tick) {
   IrrigationController c;
-  c.begin(0, manualCfg(), true);
+  c.begin(0, manualCfg());
   CHECK(c.requestManual(6000, dryInputs()).result == CommandResult::Accepted);
   CHECK(c.pumpOn());
 

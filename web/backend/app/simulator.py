@@ -25,7 +25,7 @@ REASONS: dict[str, tuple[str, str]] = {
     "IDLE_SOIL_UNCALIBRATED": ("IDLE_SOIL_UNCALIBRATED", "Irrigation blocked: soil moisture is not calibrated."),
     "IDLE_SENSOR_INVALID": ("IDLE_SENSOR_INVALID", "Irrigation blocked: a required sensor reading is invalid."),
     "IDLE_COOLDOWN": ("IDLE_COOLDOWN", "Waiting before the next watering session."),
-    "IDLE_PUMP_NOT_COMMISSIONED": ("IDLE_PUMP_NOT_COMMISSIONED", "Soil is dry and water is available, but the pump is not commissioned."),
+    "IDLE_PUMP_DISABLED": ("IDLE_PUMP_DISABLED", "Soil is dry and water is available, but irrigation is switched off in the configuration."),
     "IDLE_ALREADY_STOPPED": ("IDLE_ALREADY_STOPPED", "Irrigation is already stopped. The pump is off."),
     "IDLE_FAILURE_LOCKOUT": ("IDLE_FAILURE_LOCKOUT", "Irrigation is locked out after repeated watering with no moisture rise. Check the probe, the water and the soil."),
     "IRRIGATION_STARTED": ("IRRIGATION_STARTED", "Soil is dry and water is available. Watering for a short pulse."),
@@ -44,7 +44,12 @@ REASONS: dict[str, tuple[str, str]] = {
     "IRRIGATION_BLOCKED_SENSOR_INVALID": ("IRRIGATION_BLOCKED_SENSOR_INVALID", "Irrigation blocked: a required sensor reading is stale or invalid."),
     "IRRIGATION_BLOCKED_WATER_LOW": ("IRRIGATION_BLOCKED_WATER_LOW", "Irrigation blocked: reservoir water is low."),
     "IRRIGATION_BLOCKED_WATER_UNKNOWN": ("IRRIGATION_BLOCKED_WATER_UNKNOWN", "Irrigation blocked: the reservoir state is uncalibrated or unavailable."),
-    "IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED": ("IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED", "Irrigation blocked: the pump has not been commissioned."),
+    "IRRIGATION_BLOCKED_PUMP_DISABLED": ("IRRIGATION_BLOCKED_PUMP_DISABLED", "Irrigation blocked: the pump is switched off in the configuration."),
+    "PUMP_MANUAL_ON": ("PUMP_MANUAL_ON", "Pump switched on by hand. Nothing but the tank is checked."),
+    "PUMP_MANUAL_OFF": ("PUMP_MANUAL_OFF", "Pump switched off by hand."),
+    "PUMP_MANUAL_WATER_LOW": ("PUMP_MANUAL_WATER_LOW", "The tank is at or below the minimum, so the pump stays off."),
+    "PUMP_MANUAL_WATER_UNKNOWN": ("PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading, so the pump stays off."),
+    "PUMP_MANUAL_ACTIVE": ("PUMP_MANUAL_ACTIVE", "The pump is on the manual switch. Set it back to Auto to water by the rules."),
     "IRRIGATION_BLOCKED_ALREADY_ACTIVE": ("IRRIGATION_BLOCKED_ALREADY_ACTIVE", "Irrigation blocked: a watering session is already running."),
     "IRRIGATION_BLOCKED_COOLDOWN": ("IRRIGATION_BLOCKED_COOLDOWN", "Irrigation blocked: the post-session lockout is still active."),
     "IRRIGATION_BLOCKED_LOCKOUT": ("IRRIGATION_BLOCKED_LOCKOUT", "Irrigation blocked: repeated watering produced no moisture rise, so the controller is locked out."),
@@ -489,10 +494,9 @@ class SimulatedDevice:
                 "actuators": {
                     "pump": {
                         "commanded": self.state == "pumping",
-                        "commissioned": True,
+                        # "auto" (the rules) or the manual switch.
+                        "mode": self.pump_manual,
                         "enabled": self.pump_enabled,
-                        # "auto" (the soil decides) or the lab switch.
-                        "manual": self.pump_manual,
                         "feedback": "none",
                     },
                     "streetlights": {
@@ -674,6 +678,11 @@ class SimulatedDevice:
                 lights = self._lights()
                 result = "ACCEPTED" if lights["installed"] else "REJECTED"
                 code, text = lights["reason_code"], lights["reason"]
+            elif command_type in {"PUMP_ON", "PUMP_OFF", "PUMP_AUTO"}:
+                mode = {"PUMP_ON": "on", "PUMP_OFF": "off", "PUMP_AUTO": "auto"}[command_type]
+                self._apply_pump_manual(mode)
+                result = "ACCEPTED"
+                code, text = self._pump_manual_reason()
             elif command_type == "IRRIGATION_REQUEST":
                 result, code, text = self._request_irrigation("manual")
             elif command_type == "IRRIGATION_STOP":
@@ -755,24 +764,7 @@ class SimulatedDevice:
                 self.light = values["light"]
                 self.light_metric = BRIGHT_METRIC if self.light == "bright" else DARK_METRIC
             if values.get("pump_manual") is not None:
-                mode = str(values["pump_manual"])
-                if mode in {"auto", "on", "off"}:
-                    self.pump_manual = mode
-                    if mode == "off" and self.state == "pumping":
-                        self._stop("IRRIGATION_STOPPED_USER", 0)
-                    if mode == "on" and self.state != "pumping":
-                        self.state = "pumping"
-                        self.session = "manual"
-                        self.pulse_started = self.now_ms
-                        self.pulse_len = 1 << 60
-                        self._add_event(*reason("IRRIGATION_STARTED"))
-                    if mode == "auto":
-                        # Handing the pump back to the rules: end the manual
-                        # session, or a pulse timer held open by hand would
-                        # keep it running under "auto" until the next reboot.
-                        if self.session == "manual":
-                            self._stop("IRRIGATION_STOPPED_USER", 0)
-                        self.dry_since = None
+                self._apply_pump_manual(str(values["pump_manual"]))
             if values.get("light_metric") is not None:
                 # The same two thresholds the firmware uses, with the gap between
                 # them keeping the last decision: a slider dragged through the
@@ -794,6 +786,30 @@ class SimulatedDevice:
                 self.config["irrigation"]["auto_enabled"] = self.auto_enabled
             self._add_event("DEMO_SCENARIO", "Demo scenario changed (simulated data, no physical outputs).")
             return self.status()
+
+    def _apply_pump_manual(self, mode: str) -> None:
+        if mode not in {"auto", "on", "off"}:
+            return
+        self.pump_manual = mode
+        if mode == "off" and self.state == "pumping":
+            self._stop("IRRIGATION_STOPPED_USER", 0)
+        if mode == "on" and self.state != "pumping":
+            self.state = "pumping"
+            self.session = "manual"
+            self.pulse_started = self.now_ms
+            self.pulse_len = 1 << 60
+            self._add_event(*reason("IRRIGATION_STARTED"))
+        if mode == "auto":
+            if self.session == "manual":
+                self._stop("IRRIGATION_STOPPED_USER", 0)
+            self.dry_since = None
+
+    def _pump_manual_reason(self) -> tuple[str, str]:
+        if self.pump_manual == "off":
+            return reason("PUMP_MANUAL_OFF")
+        if self.reservoir == "low":
+            return reason("PUMP_MANUAL_WATER_LOW")
+        return reason("PUMP_MANUAL_ON")
 
     def reset(self) -> dict[str, Any]:
         with self._lock:

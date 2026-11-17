@@ -85,15 +85,21 @@ export function explainIrrigation(status: DeviceStatus): Explanation {
 export function explainPump(status: DeviceStatus): Explanation {
   const pump = status.actuators?.pump;
   const commanded = Boolean(pump?.commanded);
-  const commissioned = Boolean(pump?.commissioned);
+  const mode = pump?.mode ?? 'auto';
+
   return {
     key: 'pump',
     label: 'Pump',
     headline: commanded ? 'Commanded on' : 'Off',
-    detail: commissioned
-      ? 'Pump output is allowed by the firmware commissioning gate.'
-      : 'The commissioning gate is closed, so the firmware refuses to switch the pump on.',
-    tone: commissioned ? (commanded ? 'good' : 'neutral') : 'warn',
+    detail:
+      mode === 'on'
+        ? 'Held on by the manual switch; only the tank can stop it.'
+        : mode === 'off'
+          ? 'Held off by the manual switch.'
+          : commanded
+            ? 'The automatic rules are watering.'
+            : 'Auto: the rules decide, and the soil is not dry enough right now.',
+    tone: commanded ? 'good' : 'neutral',
   };
 }
 

@@ -653,7 +653,6 @@ export function describeVillage(
   const pump = status?.actuators?.pump;
   if (pump) {
     items.push({ icon: 'pump', text: pump.commanded ? copy.pumpOn : copy.pumpOff });
-    if (!pump.commissioned) items.push({ icon: 'help', text: copy.pumpLocked });
   }
 
   return items;

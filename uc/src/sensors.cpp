@@ -158,8 +158,7 @@ void applyRuntimeConfig(uint32_t now) {
                              rt.config.reservoir.confirm_readings);
   rt.lights.configure(rt.config.light);
   rt.waste.configure(rt.config.waste);
-  rt.irrigation.setConfig(now, rt.config.irrigation,
-                          VILLAGE_PUMP_COMMISSIONED == 1);
+  rt.irrigation.setConfig(now, rt.config.irrigation);
 }
 
 }  // namespace village

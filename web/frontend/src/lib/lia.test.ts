@@ -158,7 +158,7 @@ describe('Lia live narration', () => {
     expect(items[0].text).not.toContain('soil');
   });
 
-  it('marks demo mode as pretend and the pump as locked when not commissioned', () => {
+  it('marks demo mode as pretend and never claims a locked pump', () => {
     const items = describeVillage(
       {
         status: status({ pumpCommissioned: false }),
@@ -171,7 +171,9 @@ describe('Lia live narration', () => {
     );
     const text = items.map((item) => item.text).join(' ');
     expect(text).toContain('Demo mode is on');
-    expect(text).toContain('pump is still locked');
+    // There is no commissioning gate any more (2026-11-17), so a "locked for
+    // safety" line would now be a claim about hardware that is finished.
+    expect(text).not.toContain('locked');
   });
 
   it('keeps every language free of volume claims', () => {

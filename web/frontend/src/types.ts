@@ -94,9 +94,10 @@ export interface Sensors {
 
 export interface PumpState {
   commanded: boolean;
-  commissioned: boolean;
-  /** "auto" (the soil decides) or the simulation's lab switch. */
-  manual?: 'auto' | 'on' | 'off';
+  /** "auto" (the rules decide) or the manual switch. */
+  mode?: 'auto' | 'on' | 'off';
+  /** Older firmware reported a build-time commissioning gate; it is gone. */
+  commissioned?: boolean;
   feedback?: string;
 }
 
