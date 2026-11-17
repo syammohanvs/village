@@ -2130,3 +2130,64 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   color: var(--muted-2);
 }
 .pump-manual .hint { margin: 0; font-size: 11px; }
+
+/* The village page's cards, one per row -- the shape Solar and Wind already
+   had.  On a wide screen each card is used as a row: the name and its chip on
+   the left, then the reading, then the control.  Narrower windows wrap back to
+   a column, which is the same card in less width. */
+.village-rows { display: flex; flex-direction: column; gap: 10px; }
+
+.vcard--row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  padding: 12px 16px;
+}
+.vcard--row .vcard-head {
+  flex: 0 0 210px;
+  margin: 0;
+}
+.vcard--row .vcard-state,
+.vcard--row .vcard-actions { margin: 0; }
+.vcard--row > .segmented { flex: 0 0 300px; }
+/* Inside the pump block the switch is a column child, where a flex-basis would
+   be a HEIGHT: it stretched the card to 330 px before this rule (2026-11-17). */
+.vcard--row .pump-manual .segmented { flex: 0 0 auto; }
+
+/* The pump block: the label and the switch side by side, the sentence below. */
+.vcard--row .pump-manual {
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px 12px;
+  padding-top: 0;
+  border-top: 0;
+}
+.vcard--row .pump-manual .pump-manual-label { flex: 0 0 auto; }
+.vcard--row .pump-manual .segmented { flex: 0 0 300px; }
+.vcard--row .pump-manual .hint { flex-basis: 100%; font-size: 11px; }
+
+/* The light lab reads as one strip: lamps, then the slider beside them. */
+.vcard--row .lamp-lab {
+  flex: 1 1 430px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px 20px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.vcard--row .lamp-lab .light-slider { flex: 1 1 260px; }
+.vcard--row .lamp-lab .light-slider .hint { display: none; }
+.vcard--row > .vcard-note,
+.vcard--row > .hint { flex-basis: 100%; margin: 0; }
+
+@media (max-width: 900px) {
+  .vcard--row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .vcard--row .vcard-head { flex: 0 0 auto; }
+  .vcard--row .segmented,
+  .vcard--row .pump-manual,
+  .vcard--row .lamp-lab { flex: 0 0 auto; }
+  .vcard--row .lamp-lab { flex-direction: column; align-items: stretch; }
+}

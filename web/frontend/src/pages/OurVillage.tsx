@@ -208,8 +208,8 @@ export function OurVillage() {
       {!envelope && loading && (
         <p className="village-simple-note" role="status">Waiting for the first frame…</p>
       )}
-      <div className="village-grid village-grid--minimal">
-        <article className="vcard vcard--min" data-testid="card-plants">
+      <div className="village-rows">
+        <article className="vcard vcard--min vcard--row" data-testid="card-plants">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconDroplet size={19} /></span>
             <h2>Watering</h2>
@@ -248,8 +248,7 @@ export function OurVillage() {
                 ))}
               </div>
               <p className="hint">
-                Auto lets the rules water; On holds the pump running and Off holds it stopped,
-                whatever the soil says. Even then an empty tank stops it.
+                On holds the pump; Off stops it. Auto gives it back to the rules.
               </p>
             </div>
           {pumpNote && (
@@ -260,7 +259,7 @@ export function OurVillage() {
           {notice?.card === 'plants' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 
-        <article className="vcard vcard--min" data-testid="card-tank">
+        <article className="vcard vcard--min vcard--row" data-testid="card-tank">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconPump size={19} /></span>
             <h2>Tank</h2>
@@ -286,7 +285,7 @@ export function OurVillage() {
           )}
         </article>
 
-        <article className="vcard vcard--min" data-testid="card-lights">
+        <article className="vcard vcard--min vcard--row" data-testid="card-lights">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconLamp size={19} /></span>
             <h2>Lights</h2>
@@ -322,7 +321,7 @@ export function OurVillage() {
           {notice?.card === 'lights' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 
-        <article className="vcard vcard--min" data-testid="card-waste">
+        <article className="vcard vcard--min vcard--row" data-testid="card-waste">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconCamera size={19} /></span>
             <h2>Waste</h2>
