@@ -135,6 +135,12 @@ class ScenarioRequest(BaseModel):
     # Simulation only: the firmware has no manual pump mode, and its gates
     # (commissioning, tank, soil) are exactly what this bypasses for a demo.
     pump_manual: Literal["auto", "on", "off"] | None = None
+    # The streetlights' own switch, so a preset can say "night time + Auto".
+    lights_mode: Literal["auto", "manual_on", "manual_off"] | None = None
+    # The lab's two light sources, 0..1: the lamp on the solar panel and the
+    # windmill's speed.  Both are simulated inputs, never measurements.
+    solar_light: float | None = Field(default=None, ge=0, le=1)
+    wind_speed: float | None = Field(default=None, ge=0, le=1)
     sensor_fault: str | None = Field(default=None, max_length=40)
     pump_enabled: bool | None = None
     auto_enabled: bool | None = None

@@ -134,6 +134,22 @@ visitors cannot be used to press **Water** or change calibration.
 - **Sara's reply and the request stay on screen while a new recording starts**,
   and closing the panel mid-recording cancels the recorder. A reply is only
   replaced by a newer request.
+- **The simulation lab is one engine with real controls (2026-11-17).** Every
+  slider, preset and sample goes through `SimulatedDevice` (`web/backend/app/
+  simulator.py`) via `POST /demo/scenario` / `/demo/reset` — never a second
+  simulation, and never a hardware command.  Controls: soil moisture
+  (`soil_pct`), tank `available|low`, outside light (`light_metric`),
+  `solar_light`, `wind_speed`, and `lights_mode` for the presets.  Solar is one
+  circuit (mW = V × mA, junction clamped at the LED's forward voltage); wind is
+  **voltage only** — no current or power field exists, deliberately.  A manual
+  **On** is stopped by a *low* tank in the simulator exactly as on the board,
+  and the switch stays where the operator put it.  Demo answers are prefixed
+  "Simulated: " so a spoken reply cannot imply the physical model moved.
+  `Quick demonstrations` (Night-time / Dry soil / Low water / Reset demo) are
+  deterministic and each states what it changed; reset clears timers and
+  restores the documented defaults without touching hardware settings.
+  Waste samples are five presets answered from `lib/wasteGuide.ts` — they are
+  **not** classifier results and light no bin LED.
 - **Choosing a camera is a first-class control (2026-11-17).** An exhibit
   laptop usually has a built-in camera *and* an external USB one, and the
   browser defaults to the built-in. `Camera device` sits on Sort Waste **under
@@ -146,6 +162,13 @@ visitors cannot be used to press **Water** or change calibration.
   Names only appear after the page has been allowed a camera once — the page
   says so. Listed before anything else when someone asks "how do I select my
   webcam".
+- **A filled button keeps its fill on hover (2026-11-17).** `.btn:hover:
+  not(:disabled)` is a class plus two pseudo-classes, so it outranks
+  `.btn--gold` / `--primary` / `--danger` and once replaced the gold gradient
+  with a near-transparent white under a dark label — the sign-in button read as
+  turning black.  Each filled variant has its own hover rule; the neutral `.btn`
+  keeps the white wash.  `components/buttonHover.test.ts` reads the stylesheet
+  and fails if a variant loses its hover or reintroduces the wash.
 - **The language pills are styled in `styles.css` and guarded (2026-11-17).**
   `.lang-picker` / `.lang-pill` (plus `.is-on`, `-label`, `-note`) are shared by
   the page, the panel and Lia.  Rewriting a large CSS block wholesale deleted

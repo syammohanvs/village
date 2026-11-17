@@ -106,8 +106,9 @@ The full guide, including how to edit its sentences, is in
 - **Bins** — one indicator LED per category. No fill level is measured or shown.
 - **Connection** — live, stale, disconnected, last update and last error.
 - **AI services** — whether Whisper and the waste model are ready.
-- **Talk to Sara** — the microphone at the top, with its name under it. The
-  panel it opens is described under *Voice commands* below.
+- **Talk to Sara** — the microphone at the top, with its name beside it. The
+  buttons under it choose **Sara's** language only; the page itself stays
+  English. The panel it opens is described under *Voice commands* below.
 - **Recent activity** — commands, recognitions, alerts and connection events.
 
 Every card is **one row**: the name and its state chip on the left, then the
@@ -281,24 +282,44 @@ This stops only the PIDs recorded by `launch.sh`. Then power off the ESP32 and
 the router. The ESP32 starts with the pump OFF next time; it never resumes an
 interrupted session.
 
-### Simulation's lab switches
+### The simulation lab
 
-In **Simulation** two controls exist that live mode deliberately does not have,
-both on the Our Village page:
+**Simulation** turns the page into a lab, and says so twice: under the mode
+knob, and again above the cards —
 
-- **Lights → the dark/bright slider**, which sets the simulated room's light so
-  Auto can be seen switching the five lamps.
-- **Watering → Pump: Auto / On / Off**, which holds the pump running or stopped
-  whatever the soil says. **Live has the same switch**, and it means the same
-  thing there: Auto is every rule, and On and Off are the operator's. The card
-  used to carry separate Water and Stop buttons beside the switch; they said the
-  same thing twice and were removed (2026-11-17). A spoken “water the plants”
-  still starts a pulse session under the rules, and “stop the pump” releases a
-  manual **On**.
+> Try changing the light, soil and water conditions. See how the village
+> responds.
+> Simulation — physical model is not controlled.
 
-Both are the simulator's own state, so they end with the simulation: switching
-back to Live, or restarting the app, returns the pump and the lamps to the
-rules.
+Six conditions can be changed, each under the row it belongs to, and each row
+then says what the village did about it:
+
+| Row | Control | What it means |
+| --- | --- | --- |
+| Watering | **Soil moisture indication**, Dry → Wet | The simulated probe. It is an indication, not a measured amount of water in the soil. The chip beside the card name is the **pump**: running or off. |
+| Rain Water Tank | **Water available** / **Low water** | Two wires in the tank can say one thing: water at the low level, or not. There is no percentage and no litre count. |
+| Lights | **Outside light**, Dark → Bright | The room's light. **Outside: Dark** and **Streetlights: On** are shown separately, because they are different facts. |
+| Solar | **Light on solar panel**, Low → Strong | The panel's own light. Volts, the current through the 330 Ω resistor and power are one circuit: **mW = V × mA**. |
+| Wind | **Windmill speed**, Still → Fast | Voltage only. Power is not measured, and nothing claims it is. |
+| Waste | **Try a sample** | Five preset items showing the guidance the camera would give. Not an AI result. |
+
+Every row ends with a sentence naming the rule that decided: *“It is dark and
+Auto is selected → streetlights on.”*, *“Manual Off selected → pump off.”*, or
+the controller's own reason on Auto.
+
+**Quick demonstrations** are one press each, and each says what it changed:
+
+- **Night-time** — outside light to dark, streetlights on Auto.
+- **Dry soil** — moisture below the dry threshold, water available, pump on Auto.
+- **Low water** — dry soil and a low tank on Auto, so watering is *blocked*.
+- **Reset demo** — the documented defaults, and the pending timers cleared.
+
+A preset changes only the conditions it names; everything else is left alone.
+
+**Nothing here touches the board.** The sliders, the presets, the samples and
+Sara's requests all go to the simulator, and the answers are labelled as
+simulated. Switching back to **Live** does not replay anything and shows only
+what the controller reports; the simulator's state ends with the simulation.
 
 **The pump switch and the tank.** Only a tank the controller *knows* to be low
 stops a manual **On**. A probe that is missing, uncalibrated or stale cannot say

@@ -62,6 +62,8 @@ export interface SolarReading {
   current_ma?: number | null;
   power_mw?: number | null;
   drop_millivolts?: number | null;
+  /** The simulator's light on the panel, 0..1.  Simulation only. */
+  light?: number | null;
   valid?: boolean | null;
 }
 
@@ -76,6 +78,8 @@ export interface SolarReading {
  */
 export interface WindReading {
   installed?: boolean;
+  /** The simulator's windmill speed, 0..1.  Simulation only. */
+  speed?: number;
   raw?: number | null;
   millivolts?: number | null;
   volts?: number | null;

@@ -244,6 +244,16 @@ Sara refuses to guess. See [calibration.md](calibration.md).
 - The app will not record while it is speaking a reply. If the microphone
   button is disabled, wait for the reply to finish.
 
+## The simulation sliders do nothing
+
+They only exist in **Simulation** — choose it on the knob at the top. In **Live**
+the page shows the controller's readings and none of the lab controls, because
+they would have nothing to change.
+
+If a slider moves and the village does not answer, look at the sentence under
+that row: it names the rule that decided. A manual **On** with a low tank, for
+example, keeps the pump off on purpose.
+
 ## The camera opens the wrong one (a laptop with a USB camera)
 
 A laptop usually has a built-in camera, and the browser's default is the

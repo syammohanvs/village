@@ -160,6 +160,10 @@ class SimulatedDevice:
         self.soil_pct = 28.0
         self.reservoir = "available"
         self.light = "dark"
+        # The lab's own two light sources: the panel under the lamp and the
+        # windmill.  Both are 0..1 so a slider maps onto them directly.
+        self.solar_light = 0.55
+        self.wind_speed = 0.6
         # The metric this demo starts at: 1820 is the room's own "light off"
         # reading, 2820 its "light on" one (measured 2026-11-15).
         self.light_metric = DARK_METRIC
@@ -218,6 +222,16 @@ class SimulatedDevice:
         if self.pump_manual == "on":
             # Held on by hand: no soil test, no cooldown, no pulse timer.  The
             # moisture still rises, so the reading on the page behaves.
+            #
+            # The tank is the ONE thing that still stops it, exactly as on the
+            # board: a manual switch must not drain a tank that is known to be
+            # empty.  The switch itself stays "on", so the page can say why the
+            # pump is not running (2026-11-17).
+            if self.reservoir != "available":
+                if self.state == "pumping":
+                    self._stop("IRRIGATION_STOPPED_LOW_WATER", 0)
+                self.soil_pct = max(0.0, self.soil_pct - dt * 0.000015)
+                return
             if self.state != "pumping":
                 self.state = "pumping"
                 self.session = "manual"
@@ -515,14 +529,18 @@ class SimulatedDevice:
             }
 
     def _wind(self) -> dict[str, Any]:
-        """A generator turning slowly: ~1.9 V, well above the 1.0 V threshold.
+        """A generator whose voltage follows the windmill's simulated speed.
 
         Simulation has to show a reading here for the same reason it shows one
         for the solar panel: a card that says "Not fitted" teaches nothing about
         what the panel will look like once the turbine is wired (asked for
         2026-11-16).
+
+        Voltage only.  There is no current or power figure because the board has
+        no second input for it — inventing one here would be the exact claim the
+        card refuses to make (2026-11-17).
         """
-        millivolts = 1900
+        millivolts = int(round(2600 * max(0.0, min(1.0, self.wind_speed))))
         return {
             "installed": True,
             "raw": millivolts,
@@ -530,13 +548,24 @@ class SimulatedDevice:
             "volts": millivolts / 1000.0,
             "generate_millivolts": self.config.get("wind", {}).get("generate_mv", 1000),
             "generating": millivolts >= self.config.get("wind", {}).get("generate_mv", 1000),
+            "speed": round(max(0.0, min(1.0, self.wind_speed)), 3),
             "valid": True,
         }
 
     def _solar(self) -> dict[str, Any]:
-        """A panel in a light-ish room: about 2.4 V across a red LED pair."""
-        panel_mv = 2400
-        junction_mv = 1900
+        """A panel lit by the lab's own slider, through a red LED and 330 ohms.
+
+        The arithmetic is the real circuit, so the three numbers cannot disagree:
+        the panel voltage is set by the light, the LED clamps the junction at its
+        forward voltage, and the current is the drop across the resistor.  Power
+        is then exactly volts x milliamps — never a fourth, invented number
+        (asked for 2026-11-17).
+        """
+        light = max(0.0, min(1.0, self.solar_light))
+        panel_mv = int(round(150 + 3850 * light))
+        # Below the LED's forward voltage nothing conducts: the junction simply
+        # follows the panel and the current is zero.
+        junction_mv = panel_mv if panel_mv <= 1800 else int(round(1800 + 0.15 * (panel_mv - 1800)))
         sense_ohms = 330
         drop_mv = panel_mv - junction_mv
         current_ma = drop_mv / sense_ohms
@@ -550,7 +579,9 @@ class SimulatedDevice:
             "sense_ohms": sense_ohms,
             "drop_millivolts": drop_mv,
             "current_ma": current_ma,
+            # W = V x A, and the app shows milliamps — so mW = V x mA.
             "power_mw": (panel_mv / 1000.0) * current_ma,
+            "light": round(light, 3),
             "valid": True,
         }
 
@@ -718,6 +749,11 @@ class SimulatedDevice:
                 code, text = reason("COMMAND_INVALID")
 
             self._add_event(code, text)
+            if self.demo:
+                # In demo mode the reply is spoken aloud, so it says what it is:
+                # "Simulated: Streetlights switched on manually."  The status
+                # reasons stay as they are — they label a card, not an answer.
+                text = f"Simulated: {text}"
             ack = {
                 "protocol_version": PROTOCOL_VERSION,
                 "command_id": command_id,
@@ -766,7 +802,7 @@ class SimulatedDevice:
         with self._lock:
             self.advance()
             if values.get("soil_pct") is not None:
-                self.soil_pct = float(values["soil_pct"])
+                self.soil_pct = max(0.0, min(100.0, float(values["soil_pct"])))
             if values.get("reservoir") is not None:
                 self.reservoir = values["reservoir"]
                 if self.reservoir == "low" and self.state != "idle":
@@ -776,6 +812,12 @@ class SimulatedDevice:
                 self.light_metric = BRIGHT_METRIC if self.light == "bright" else DARK_METRIC
             if values.get("pump_manual") is not None:
                 self._apply_pump_manual(str(values["pump_manual"]))
+            if values.get("solar_light") is not None:
+                self.solar_light = max(0.0, min(1.0, float(values["solar_light"])))
+            if values.get("wind_speed") is not None:
+                self.wind_speed = max(0.0, min(1.0, float(values["wind_speed"])))
+            if values.get("lights_mode") in {"auto", "manual_on", "manual_off"}:
+                self.light_mode = str(values["lights_mode"])
             if values.get("light_metric") is not None:
                 # The same two thresholds the firmware uses, with the gap between
                 # them keeping the last decision: a slider dragged through the
@@ -804,7 +846,9 @@ class SimulatedDevice:
         self.pump_manual = mode
         if mode == "off" and self.state == "pumping":
             self._stop("IRRIGATION_STOPPED_USER", 0)
-        if mode == "on" and self.state != "pumping":
+        # The switch stays where it was put; a tank that is known to be low
+        # simply keeps the pump off, with its own reason.
+        if mode == "on" and self.reservoir == "available" and self.state != "pumping":
             self.state = "pumping"
             self.session = "manual"
             self.pulse_started = self.now_ms
@@ -828,6 +872,8 @@ class SimulatedDevice:
             self.reservoir = "available"
             self.light = "dark"
             self.light_metric = DARK_METRIC
+            self.solar_light = 0.55
+            self.wind_speed = 0.6
             self.sensor_fault = None
             self.pump_enabled = True
             self.auto_enabled = True

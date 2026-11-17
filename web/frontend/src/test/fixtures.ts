@@ -7,6 +7,8 @@ export interface StateOptions {
   watering?: boolean;
   pumpCommissioned?: boolean;
   pumpCommanded?: boolean;
+  /** The pump's own switch: auto (the rules), on or off (the operator). */
+  pumpMode?: 'auto' | 'on' | 'off';
   soilPercent?: number | null;
   soilState?: 'dry' | 'adequate' | 'wet' | 'uncalibrated' | 'unavailable';
   soilCalibrated?: boolean;
@@ -40,6 +42,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
     watering = false,
     pumpCommissioned = true,
     pumpCommanded = false,
+    pumpMode = 'auto',
     soilPercent = 27.6,
     soilState = 'dry',
     soilCalibrated = true,
@@ -155,6 +158,8 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
       actuators: {
         pump: {
           commanded: pumpCommanded,
+          mode: pumpMode,
+          pin_high: pumpCommanded,
           commissioned: pumpCommissioned,
           feedback: 'none',
         },

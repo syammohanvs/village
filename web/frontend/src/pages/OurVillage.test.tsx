@@ -20,6 +20,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       settings: vi.fn(),
       session: vi.fn(),
       demoScenario: vi.fn(),
+      demoReset: vi.fn(),
     },
   };
 });
@@ -135,7 +136,8 @@ describe('Our Village', () => {
     await renderReady();
 
     const card = within(await screen.findByTestId('card-plants'));
-    expect(card.getByText('Idle')).toBeInTheDocument();
+    // The chip answers "what is the pump doing", never the vague "Idle".
+    expect(card.getByText('Pump off')).toBeInTheDocument();
     expect(card.getByText(/^Soil: not calibrated$/)).toBeInTheDocument();
   });
 
@@ -308,7 +310,7 @@ describe('Our Village — the microphone stands alone', () => {
   it('centres the microphone with the language choices under it', async () => {
     await renderReady();
     const mic = await screen.findByTestId('start-voice');
-    const languages = await screen.findByRole('group', { name: 'Language' });
+    const languages = await screen.findByRole('group', { name: 'Speak to Sara in' });
 
     // Both live in the one header, and the language choices follow the
     // microphone -- the layout is a column, so that is "below".
@@ -321,7 +323,7 @@ describe('Our Village — the microphone stands alone', () => {
 
   it('still offers all three spoken languages under the microphone', async () => {
     await renderReady();
-    const languages = await screen.findByRole('group', { name: 'Language' });
+    const languages = await screen.findByRole('group', { name: 'Speak to Sara in' });
     for (const code of ['en', 'ml', 'hi']) {
       expect(within(languages).getByTestId(`invite-lang-${code}`)).toBeInTheDocument();
     }
@@ -431,12 +433,12 @@ describe('the simulation lab: lamps, the light slider and the pump', () => {
     vi.mocked(api.demoScenario).mockResolvedValue({ status: {}, physical: false });
     await renderReady();
 
-    const slider = within(screen.getByTestId('light-slider')).getByRole('slider');
+    const slider = within(screen.getByTestId('sim-outside')).getByRole('slider');
     // Dark at the room's own "light off" reading.
-    expect(screen.getByTestId('light-slider-word')).toHaveTextContent('Dark');
+    expect(screen.getByTestId('sim-outside-value')).toHaveTextContent('Dark');
 
     fireEvent.change(slider, { target: { value: '3000' } });
-    expect(screen.getByTestId('light-slider-word')).toHaveTextContent('Bright');
+    expect(screen.getByTestId('sim-outside-value')).toHaveTextContent('Bright');
 
     // Debounced: the drag is one instruction.
     await waitFor(() =>
@@ -455,7 +457,7 @@ describe('the simulation lab: lamps, the light slider and the pump', () => {
 
     const pump = screen.getByTestId('pump-state');
     expect(pump).toHaveAttribute('data-on', 'true');
-    expect(pump).toHaveTextContent('Pump on');
+    expect(pump).toHaveTextContent('Pump running');
 
     cleanup();
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: false }));
@@ -503,7 +505,7 @@ describe('the pump switch', () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
     await renderReady();
     // The frame says the pump is running; the row reports it.
-    expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump on');
+    expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump running');
     expect(screen.getByTestId('pump-manual')).toBeInTheDocument();
 
     // Not a simulation-only control any more: the board has the mode too.
@@ -545,7 +547,268 @@ describe('Our Village — the words on the page', () => {
 
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('1.20 V')).toBeInTheDocument();
-    expect(card.getByText('Voltage measured; power is not measured.')).toBeInTheDocument();
+    expect(card.getByText('Simulated voltage; power is not measured.')).toBeInTheDocument();
     expect(card.queryByText(/second input/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The simulation lab, from a visitor's side: change a condition, watch the
+ * village answer, read why.  Every case here also checks the promise the lab
+ * makes — nothing in it may reach the board (asked for 2026-11-17).
+ */
+describe('the simulation lab changes conditions and explains itself', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.demoScenario).mockReset();
+    vi.mocked(api.demoScenario).mockResolvedValue({ status: {}, physical: false });
+    vi.mocked(api.demoReset).mockReset();
+    vi.mocked(api.demoReset).mockResolvedValue({ status: {}, physical: false });
+  });
+
+  afterEach(() => {
+    // The promise, in every case: no actuator command left this page.
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('says what the lab is for, and that the model is not controlled', async () => {
+    await renderReady();
+
+    expect(await screen.findByTestId('sim-intro')).toHaveTextContent(
+      'Try changing the light, soil and water conditions. See how the village responds.',
+    );
+    expect(screen.getByTestId('sim-intro')).toHaveTextContent(
+      'Simulation — physical model is not controlled.',
+    );
+  });
+
+  it('keeps the whole lab off the Live page', async () => {
+    window.localStorage.setItem('village.demoMode', 'live');
+    await renderReady();
+
+    for (const id of ['sim-intro', 'sim-presets', 'sim-soil', 'sim-tank', 'sim-outside', 'sim-panel-light', 'sim-wind-speed', 'try-sample']) {
+      expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
+    }
+  });
+
+  it('posts the soil moisture without touching the pump mode', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ soilPercent: 60, soilState: 'wet' }));
+    await renderReady();
+
+    const slider = within(await screen.findByTestId('sim-soil')).getByRole('slider');
+    fireEvent.change(slider, { target: { value: '12' } });
+
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ soil_pct: 12 }));
+    const payloads = vi.mocked(api.demoScenario).mock.calls.map((call) => call[0] as Record<string, unknown>);
+    expect(payloads.every((payload) => !('pump_manual' in payload))).toBe(true);
+    expect(payloads.every((payload) => !('lights_mode' in payload))).toBe(true);
+  });
+
+  it('offers the tank the two answers its two wires can give', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'available' }));
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('sim-tank-low'));
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ reservoir: 'low' }));
+
+    cleanup();
+    vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
+    await renderReady();
+    expect(screen.getByTestId('sim-tank-low')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('sim-tank-available')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('gives the controller\'s own reason on Auto', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ watering: false, soilState: 'dry', soilPercent: 20 }),
+    );
+    await renderReady();
+
+    expect(await screen.findByTestId('water-why')).toHaveTextContent(
+      /Soil is dry and water is available/i,
+    );
+  });
+
+  it('says a manual On cannot run the pump while the water is low', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ pumpMode: 'on', watering: false, reservoirState: 'low' }),
+    );
+    await renderReady();
+
+    expect(await screen.findByTestId('water-why')).toHaveTextContent(
+      'Manual On cannot run the pump while the water is low.',
+    );
+  });
+
+  it('shows the pump state on the chip, never a vague Idle', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByText('Pump running')).toBeInTheDocument();
+    expect(card.queryByText('Idle')).not.toBeInTheDocument();
+  });
+
+  it('separates the surroundings from the streetlights, and explains Auto', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightBrightness: 'bright', lightsMode: 'auto', lightsCommanded: false }),
+    );
+    await renderReady();
+
+    expect(await screen.findByTestId('outside-reading')).toHaveTextContent('Outside: Bright');
+    expect(screen.getByTestId('streetlights-reading')).toHaveTextContent('Streetlights: Off');
+    expect(screen.getByTestId('lights-why')).toHaveTextContent(
+      'It is bright and Auto is selected → streetlights off.',
+    );
+  });
+
+  it('says a manual On is why the lamps are on, rather than blaming Auto', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ lightBrightness: 'bright', lightsMode: 'manual_on', lightsCommanded: true }),
+    );
+    await renderReady();
+
+    expect(await screen.findByTestId('lights-why')).toHaveTextContent(
+      'Manual On selected → streetlights stay on.',
+    );
+  });
+
+  it('drives the solar panel and the windmill from their own sliders', async () => {
+    await renderReady();
+
+    fireEvent.change(within(await screen.findByTestId('sim-panel-light')).getByRole('slider'), {
+      target: { value: '20' },
+    });
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ solar_light: 0.2 }));
+
+    fireEvent.change(within(await screen.findByTestId('sim-wind-speed')).getByRole('slider'), {
+      target: { value: '90' },
+    });
+    await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ wind_speed: 0.9 }));
+  });
+
+  it('says the turbine’s power is not measured', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ windMillivolts: 1200, windInstalled: true }));
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.getByText('Simulated voltage; power is not measured.')).toBeInTheDocument();
+    expect(card.queryByText(/mW|mA/)).not.toBeInTheDocument();
+  });
+});
+
+describe('the quick demonstrations', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.demoScenario).mockReset();
+    vi.mocked(api.demoScenario).mockResolvedValue({ status: {}, physical: false });
+    vi.mocked(api.demoReset).mockReset();
+    vi.mocked(api.demoReset).mockResolvedValue({ status: {}, physical: false });
+  });
+
+  afterEach(() => {
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('Night-time sets the outside light to dark and the lamps to Auto', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('preset-night'));
+    await waitFor(() =>
+      expect(api.demoScenario).toHaveBeenCalledWith({ light_metric: 1820, lights_mode: 'auto' }),
+    );
+    expect(screen.getByTestId('preset-note')).toHaveTextContent(
+      'Night-time: outside light set to dark, streetlights on Auto.',
+    );
+  });
+
+  it('Dry soil sets dry moisture, water available and the pump on Auto', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('preset-dry'));
+    await waitFor(() =>
+      expect(api.demoScenario).toHaveBeenCalledWith({
+        soil_pct: 20,
+        reservoir: 'available',
+        pump_manual: 'auto',
+      }),
+    );
+    expect(screen.getByTestId('preset-note')).toHaveTextContent(/water available, pump on Auto/i);
+  });
+
+  it('Low water sets dry soil and a low tank so pumping is blocked', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('preset-low'));
+    await waitFor(() =>
+      expect(api.demoScenario).toHaveBeenCalledWith({
+        soil_pct: 20,
+        reservoir: 'low',
+        pump_manual: 'auto',
+      }),
+    );
+    expect(screen.getByTestId('preset-note')).toHaveTextContent(/watering is blocked/i);
+  });
+
+  it('Reset demo restores the defaults and says so', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('preset-reset'));
+    await waitFor(() => expect(api.demoReset).toHaveBeenCalled());
+    expect(screen.getByTestId('preset-note')).toHaveTextContent(/back to its starting conditions/i);
+  });
+});
+
+describe('the waste samples are not the classifier', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+  });
+
+  afterEach(() => {
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('opens a labelled set of preset items', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('try-sample'));
+    const dialog = await screen.findByTestId('waste-samples');
+    expect(within(dialog).getByRole('heading', { name: 'Try a sample' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/not a camera result/i);
+    for (const id of ['banana', 'bottle', 'newspaper', 'glass', 'battery']) {
+      expect(within(dialog).getByTestId(`waste-sample-${id}`)).toBeInTheDocument();
+    }
+  });
+
+  it('answers with the same routing rules the camera result uses', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('try-sample'));
+    await user.click(await screen.findByTestId('waste-sample-bottle'));
+
+    const result = await screen.findByTestId('waste-sample-result');
+    expect(result).toHaveTextContent('Plastic');
+    expect(result).toHaveTextContent(/Empty and rinse it/i);
+    // A sample lights no bin: nothing was classified.
+    expect(result).toHaveTextContent(/No bin LED is lit for a sample/i);
+  });
+
+  it('sends a glass bottle to the recycling route rather than a bin', async () => {
+    const user = userEvent.setup();
+    await renderReady();
+
+    await user.click(await screen.findByTestId('try-sample'));
+    await user.click(await screen.findByTestId('waste-sample-glass'));
+
+    const result = await screen.findByTestId('waste-sample-result');
+    expect(result).toHaveTextContent(/Keep separate/i);
+    expect(result).toHaveTextContent(/Gram Sahayak/);
   });
 });
