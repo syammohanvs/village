@@ -7,10 +7,15 @@ uc/include/village/secrets.h
 *.pem
 *.key
 
-# Downloaded AI models and recordings
+# Downloaded AI models and recordings.
+# The Piper voice is part of the project, not a download: losing it means Sara
+# cannot speak, so it is committed (engine, voices and the phoneme data it needs
+# to run).  The other models are far too large for git — see docs/backup.md.
 models/*
 !models/README.md
 !models/.gitkeep
+!models/piper/
+!models/piper/**
 web/frontend/public/audio/*.wav
 web/frontend/public/audio/*.mp3
 web/frontend/public/audio/*.m4a

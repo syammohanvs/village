@@ -503,3 +503,66 @@ describe('English in an Indian accent', () => {
     expect(speech.indianEnglishVoiceName()).toMatch(/Heera/);
   });
 });
+
+/**
+ * "Sara" is a name, and the English phonemiser reads it as the American
+ * "SEH-ra" (/s ˈ ɛ ɹ ə/).  Our Sara is സാറ / सारा — /ˈsɑːrə/, "SAA-ra" — so the
+ * engine is given "Sahra" for English only, while the page keeps the name it
+ * has always shown (asked 2026-11-17).
+ */
+describe('how the name is said', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    // Earlier tests leave a preference behind; this one is about the default.
+    window.localStorage.removeItem('village.englishVoice');
+  });
+
+  it('spells it for the English voice and leaves the other languages alone', async () => {
+    const speech = await import('./speech');
+
+    expect(speech.spokenText('I am Sara. How may I help you?', 'en')).toBe(
+      'I am Sahra. How may I help you?',
+    );
+    // Case is kept, and the possessive works with it.
+    expect(speech.spokenText('SARA is here', 'en')).toBe('Sahra is here');
+    expect(speech.spokenText("Sara's reply", 'en')).toBe("Sahra's reply");
+    // Malayalam and Hindi write the name in their own script; nothing to fix.
+    expect(speech.spokenText('ഞാൻ സാറയാണ്.', 'ml')).toBe('ഞാൻ സാറയാണ്.');
+    expect(speech.spokenText('मैं सारा हूँ।', 'hi')).toBe('मैं सारा हूँ।');
+    // A word that only contains it is not touched.
+    expect(speech.spokenText('Sarasota', 'en')).toBe('Sarasota');
+  });
+
+  it('sends the spoken spelling to the engine, not the written one', async () => {
+    installSpeech(VOICES);
+    const blob = new Blob(['wav'], { type: 'audio/wav' });
+    const speak = vi.fn(async () => blob);
+    vi.doMock('./api', () => ({ api: { speak } }));
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        queueMicrotask(() => this.onended?.());
+        return Promise.resolve();
+      }
+      pause() {}
+    };
+
+    const speech = await import('./speech');
+    await speech.speakText('I am Sara. How may I help you?', 'en');
+
+    expect(speak).toHaveBeenCalledWith(
+      'I am Sahra. How may I help you?',
+      'en',
+      expect.any(Number),
+      'indian',
+    );
+    vi.doUnmock('./api');
+  });
+});

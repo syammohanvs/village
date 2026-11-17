@@ -155,6 +155,14 @@ visitors cannot be used to press **Water** or change calibration.
   repeated the state word).  `messages.refused` was added to
   `shared/intents.json` in all three languages.  A test asserts the spoken
   argument is Malayalam for a Malayalam command.
+- **"Sara" is spoken "Sahra", in English only (2026-11-17).**  The English
+  phonemiser reads `Sara` as /ˈsɛrə/ ("SEH-ra", the American name); our Sara is
+  /ˈsɑːrə/ ("SAA-ra") as സാറ/सारा.  `ENGLISH_SAY` in `lib/speech.ts` rewrites it
+  for **speech only** (`spokenText`), leaving every on-screen "Sara" alone, and
+  the device-voice fallback gets the same spelling.  `Sahra` was measured with
+  `piper_phonemize` to give `s ˈ ɑː ɹ ə`; `Saara` gives a double r
+  (`s ˈ ɑː ɹ ɹ ə`) — do not "tidy" it to the obvious spelling without re-running
+  that check.
 - **Indian English is the default and it is stored server-side (2026-11-17).**
   Two English voices: `en_IN-spicor-medium` (NavGurukul, **AGPL-3.0**, neural,
   Indian — installed by `scripts/install_piper.sh`, git-ignored) and

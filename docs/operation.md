@@ -238,6 +238,17 @@ replies on/off, the camera id, the waste thresholds — all in the village
 database on the laptop. The board's own calibration lives in its NVS and also
 survives a normal OTA/USB reflash; only an explicit `erase_flash` wipes it.
 
+### How the name is said
+
+The English voice reads `Sara` the American way — /ˈsɛrə/, "SEH-ra" — while the
+Malayalam and Hindi ones say സാറ / सारा, /ˈsɑːrə/, **"SAA-ra"**. English speech
+therefore hands the engine **"Sahra"**, which phonemises to exactly
+`s ˈ ɑː ɹ ə`, and the page still writes "Sara" everywhere (asked 2026-11-17).
+
+It is one substitution, in `lib/speech.ts` (`ENGLISH_SAY`), applied to speech
+only — never to the text on screen — and "Sahra" was chosen over "Saara" because
+the latter doubles the r (`s ˈ ɑː ɹ ɹ ə`), measured with `piper_phonemize`.
+
 ### The language Sara answers in
 
 **Sara speaks the visitor's language, always.** The controller's own reason is

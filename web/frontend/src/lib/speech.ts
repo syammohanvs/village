@@ -69,6 +69,23 @@ export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
+/**
+ * How a name is *said*, as opposed to how it is written.
+ *
+ * The English phonemiser reads `Sara` as /s ˈ ɛ ɹ ə/ — "SEH-ra", the American
+ * name — while our Sara is സാറ / सारा, /ˈsɑːrə/, "SAA-ra".  Writing it `Sahra`
+ * for the engine only gives exactly that (verified with `piper_phonemize`:
+ * `s ˈ ɑː ɹ ə`, one r — `Saara` doubles the r), and the page keeps showing
+ * "Sara" (asked 2026-11-17).
+ */
+const ENGLISH_SAY: [RegExp, string][] = [[/\bSara\b/gi, 'Sahra']];
+
+/** The text to hand the voice, which is not always the text on screen. */
+export function spokenText(text: string, language: string): string {
+  if (language !== 'en') return text;
+  return ENGLISH_SAY.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), text);
+}
+
 export function speechLanguage(language: string): string {
   return SPEECH_LANG[language] ?? language;
 }
@@ -293,6 +310,7 @@ function playBlob(blob: Blob): Promise<boolean> {
  */
 export async function speakText(text: string, language: string, rate = 0.98): Promise<boolean> {
   if (!text) return false;
+  const said = spokenText(text, language);
   const ticket = ++speakSeq;
   // Whatever is playing belongs to the previous reply; the ticket above makes
   // a late synthesis inert, and this stops audio that has already started.
@@ -311,7 +329,7 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   // device voice is allowed without a gesture, so it is tried first in exactly
   // that case; Piper (the better voice) takes over once there has been a tap.
   if (!hasUserActivation()) {
-    const spoken = await speakWithDevice(text, language, rate, ticket);
+    const spoken = await speakWithDevice(said, language, rate, ticket);
     if (spoken) return true;
     if (ticket !== speakSeq) return false;
   }
@@ -328,8 +346,8 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
     // voice each, and passing an extra argument would only make the call
     // harder to read in the log.
     const blob = variant
-      ? await api.speak(text, language, spokenScale, variant)
-      : await api.speak(text, language, spokenScale);
+      ? await api.speak(said, language, spokenScale, variant)
+      : await api.speak(said, language, spokenScale);
     // A newer call (another language, another view) owns the speakers now.
     if (ticket !== speakSeq) return false;
     if (await playBlob(blob)) return true;
@@ -348,7 +366,7 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   }
   if (ticket !== speakSeq) return false;
 
-  return speakWithDevice(text, language, rate, ticket);
+  return speakWithDevice(said, language, rate, ticket);
 }
 
 /** The browser's own voices: an Indian-English one first, then the best match. */
