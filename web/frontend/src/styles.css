@@ -2145,9 +2145,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   padding: 12px 16px;
 }
 .vcard--row .vcard-head {
-  flex: 0 0 210px;
+  /* A name column shared by the cards, so the readings line up down the page --
+     but it is a MINIMUM, not a fixed width.  A fixed 300 px squeezed
+     "Rain Water Tank" into two lines as soon as the chip beside it grew to
+     "Status unknown" (2026-11-17). */
+  flex: 0 0 auto;
+  min-width: 320px;
   margin: 0;
 }
+/* A card's name is one line, always. */
+.vcard--row .vcard-head h2 { white-space: nowrap; }
 .vcard--row .vcard-state,
 .vcard--row .vcard-actions { margin: 0; }
 .vcard--row > .segmented { flex: 0 0 300px; }
@@ -2166,7 +2173,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .vcard--row .pump-manual .pump-manual-label { flex: 0 0 auto; }
 .vcard--row .pump-manual .segmented { flex: 0 0 300px; }
-.vcard--row .pump-manual .hint { flex-basis: 100%; font-size: 11px; }
 
 /* The light lab reads as one strip: lamps, then the slider beside them. */
 .vcard--row .lamp-lab {

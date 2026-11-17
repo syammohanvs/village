@@ -93,6 +93,17 @@ visitors cannot be used to press **Water** or change calibration.
   `actuators.pump.pin_high` answers "is D19 actually high” from the app.  A spoken "stop the pump"
   (IRRIGATION_STOP) also releases a manual **On** — answering "stopped" while
   the switch holds the pump running is the one answer it must never give.
+  The card shows the switch only: the sentence under it and the "tank reading is
+  unavailable" line were removed the same day (the Rain Water Tank card already
+  says **Not calibrated**, and a line repeated on every visit is furniture).
+- **Our Village is one column of rows (2026-11-17).** All six cards — Watering,
+  Rain Water Tank, Lights, Waste, Solar, Wind — use `vcard--row` inside
+  `village-rows`: name and chip left, reading next, control last.  Below 900 px
+  each row wraps back to a column.  The name column is `min-width: 320px` with a
+  `nowrap` title — a fixed 300 px squeezed "Rain Water Tank" onto two lines as
+  soon as its chip read "Status unknown".  The tank card is titled **Rain Water
+  Tank**, not "Tank", and `docs/operation.md` + the About page + Sara's topics
+  say the same.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider

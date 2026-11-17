@@ -703,7 +703,8 @@ function Irrigation() {
       <p className="hint">
         There is no commissioning gate any more. Automatic watering applies soil, water, sensor,
         cooldown and runtime limits; the pump's <strong>Auto / On / Off</strong> switch on the
-        village page overrides them by hand, and only an empty tank still stops it.
+        village page overrides them by hand, and only a tank the controller
+        <em>knows</em> to be low still stops it — a probe that is not fitted cannot say that.
       </p>
       <div className="setting-row">
         <div>
@@ -723,7 +724,7 @@ function Irrigation() {
           <p className="setting-name">Automatic watering allowed</p>
           <p className="hint">
             The pump itself is not switched off by this — the village page's manual <strong>On</strong>
-            still runs it, watched only by the tank.
+            still runs it, watched only by a tank the controller knows to be low.
           </p>
         </div>
         <Toggle

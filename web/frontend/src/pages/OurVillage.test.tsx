@@ -79,7 +79,7 @@ describe('Our Village', () => {
     await renderReady();
 
     expect(await screen.findByText('Watering')).toBeInTheDocument();
-    expect(screen.getByText('Tank')).toBeInTheDocument();
+    expect(screen.getByText('Rain Water Tank')).toBeInTheDocument();
     expect(screen.getByText('Lights')).toBeInTheDocument();
     expect(screen.getByText('Waste')).toBeInTheDocument();
     expect(screen.getByText('Solar')).toBeInTheDocument();

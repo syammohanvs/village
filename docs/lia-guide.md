@@ -63,8 +63,8 @@ not just exact commands. Say or type:
 | “Lights off”, “Please switch the lights off”, “Can you turn off the streetlights?”, “Switch the lights off, please” | the lights-off command |
 | “Turn on the lights”, “Put the lamps on” | the lights-on command |
 | “Set the lights to automatic”, “Auto mode for the lights” | automatic mode |
-| “Start watering”, “Water the plants”, “Start the pump” | the same irrigation request the button sends |
-| “Stop watering”, “Turn off the pump” | the stop command |
+| “Start watering”, “Water the plants”, “Start the pump” | the same irrigation request the pump switch's **On** sends (a pulse session under the rules) |
+| “Stop watering”, “Turn off the pump” | the stop command — it also releases a manual **On** |
 | “Are the lights off?”, “Is the pump running?”, “Are the bins full?” | an answer from the current readings — **no action** |
 | “The lights are off”, “The pump is running” | an acknowledgement — **no action** |
 | “What happens if I switch off the lights?”, “Can I turn on the pump?” | guidance — **no action** |

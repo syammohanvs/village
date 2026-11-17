@@ -150,8 +150,8 @@ const EN: LiaCopy = {
       intro: 'Let me show you the village.',
       steps: [
         { title: 'Our Village', text: 'This page shows what the village is doing now and what you can try.', icon: 'dashboard', page: '/' },
-        { title: 'The sensors', text: 'Here are the soil, the water tank and the light sensor.', icon: 'sensor', page: '/setup#sensors' },
-        { title: 'Water and lights', text: 'The first three cards water the plants and switch the lights.', icon: 'pump', page: '/' },
+        { title: 'The sensors', text: 'Here are the soil, the rain water tank and the light sensor.', icon: 'sensor', page: '/setup#sensors' },
+        { title: 'Water and lights', text: 'Each card is one row: the first three water the plants, read the rain water tank and switch the lights.', icon: 'pump', page: '/' },
         { title: 'Sort Waste', text: 'The camera looks at waste and suggests a bin.', icon: 'camera', page: '/waste' },
         { title: 'What Happened', text: 'This page lists what happened and why.', icon: 'event', page: '/activity' },
       ],
@@ -162,14 +162,14 @@ const EN: LiaCopy = {
       label: 'Water the plants',
       intro: 'The village waters plants in short, safe pulses.',
       adult: true,
-      adultNote: 'Ask a grown-up to help. The pump stays disconnected until the bench test is done.',
+      adultNote: 'Ask a grown-up to help, and stay with them while the pump runs.',
       physical:
         'With a grown-up: put the soil probe in dry soil, add a little water, and watch the number go up.',
       steps: [
         { title: 'Check the soil', text: 'A probe in the soil measures how wet it is.', icon: 'sensor' },
         { title: 'Check the tank', text: 'Two wires tell us if water is at the low level.', icon: 'tank' },
-        { title: 'Ask for water', text: 'Press Water Plants on Our Village, or say “water the plants”.', icon: 'pump', page: '/' },
-        { title: 'It stops by itself', text: 'The pump runs in short pulses. Stop works at any time.', icon: 'help' },
+        { title: 'Turn on the pump', text: 'Choose On on the Watering card, or say “water the plants”.', icon: 'pump', page: '/' },
+        { title: 'It stops by itself', text: 'On Auto the pump runs in short pulses and stops by itself. Off stops it at once.', icon: 'help' },
       ],
     },
     lights: {
@@ -209,7 +209,7 @@ const EN: LiaCopy = {
       intro: 'You can speak to the village in English, Malayalam or Hindi.',
       adultNote: 'Young children can try this with an adult.',
       steps: [
-        { title: 'Open Our Village', text: 'Press Start Speaking in the voice section at the top of Our Village.', icon: 'voice', page: '/' },
+        { title: 'Open Our Village', text: 'Press the microphone at the top of Our Village. The language buttons sit under it.', icon: 'voice', page: '/' },
         { title: 'Say a short phrase', text: 'For example: “turn on the lights” or “water the plants”.', icon: 'voice' },
         { title: 'The village checks', text: 'It repeats what it heard. If it is not sure, it does nothing.', icon: 'help' },
       ],

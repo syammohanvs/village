@@ -97,13 +97,22 @@ The full guide, including how to edit its sentences, is in
   “Soil is dry and water is available. Watering for a short pulse.” or
   “Irrigation blocked: reservoir water is low.”
 - **Soil moisture** — a calibrated relative percentage, state and age.
-- **Reservoir** — Available / Low only. It is not a tank gauge.
-- **Pump** — commanded state, mode, session reason and cumulative runtime.
+- **Rain Water Tank** — Available / Low only. It is not a tank gauge.
+- **Pump** — its switch (Auto / On / Off), the commanded state, the session
+  reason and the cumulative runtime, plus `pin_high`: whether the driver pin
+  (D19) is actually high. The pin is the honest answer to “did pressing On do
+  anything?”; the commanded state is only what the controller asked for.
 - **Streetlights** — mode, Bright/Dark and commanded state.
 - **Bins** — one indicator LED per category. No fill level is measured or shown.
 - **Connection** — live, stale, disconnected, last update and last error.
 - **AI services** — whether Whisper and the waste model are ready.
 - **Recent activity** — commands, recognitions, alerts and connection events.
+
+Every card is **one row**: the name and its state chip on the left, then the
+reading, then the control where the card has one (the pump's Auto / On / Off,
+the lamps', or **Open camera**). Solar and Wind read as a single line too —
+`2.40 V · 1.52 mA · 3.6 mW` — and below about 900 px wide each row wraps back to
+the column layout.
 
 A green “accepted” means the controller decided. It does **not** prove that
 water physically flowed. The dashboard keeps the two statements separate.
@@ -115,10 +124,12 @@ water physically flowed. The dashboard keeps the two statements separate.
 2. **Streetlights.** Show **Auto**, cover the LDR (or press the demo Night
    button in Demo mode) and watch the state change after the stable delay.
    Show Manual On and Off, then return to Auto.
-3. **Irrigation.** Press **Start irrigation** only if the soil is dry and the
-   reservoir is available. The controller may refuse with a reason — that is a
-   feature, not a failure. Point out the pulse → soak → re-check sequence.
-   Press **Stop irrigation** to show the immediate stop.
+3. **Irrigation.** The Watering card carries the pump's own switch —
+   **Auto / On / Off** — and nothing else. On **Auto**, with dry soil and water
+   available, the controller waters in pulses: pulse → soak → re-check. Choose
+   **On** to hold the pump running and **Off** to stop it, then give it back to
+   **Auto**. The controller may refuse with a reason — that is a feature, not a
+   failure — and the reason is written under the switch.
 4. **Sort Waste.** Hold a plastic item in front of the camera. The stable
    prediction lights the plastic LED. Move it away; show that repeated frames
    do not count as new items. Point out that recognition is not proof of
@@ -148,8 +159,8 @@ water physically flowed. The dashboard keeps the two statements separate.
 
 | Control | Effect |
 | --- | --- |
-| Start irrigation | Sends `IRRIGATION_REQUEST`; the controller applies every safety check. |
-| Stop irrigation | Sends `IRRIGATION_STOP`; the pump stops immediately. Always visible during a session. |
+| Pump Auto / On / Off | Sends `PUMP_AUTO`, `PUMP_ON` or `PUMP_OFF`. Auto is every rule; On and Off are yours, and only a tank the controller knows to be low stops On. |
+| Spoken “stop the pump” | Sends `IRRIGATION_STOP`; it also releases a manual **On**, so answering “stopped” is always true. |
 | Lights Auto / On / Off | Sends `LIGHTS_AUTO`, `LIGHTS_ON` or `LIGHTS_OFF`. Auto uses the LDR. |
 | Voice command | Push-to-talk, maximum 10 seconds. |
 | Sort Waste | Opens the local camera classifier. |
@@ -242,12 +253,12 @@ both on the Our Village page:
 - **Lights → the dark/bright slider**, which sets the simulated room's light so
   Auto can be seen switching the five lamps.
 - **Watering → Pump: Auto / On / Off**, which holds the pump running or stopped
-  regardless of the soil or the tank. **Live has no equivalent** — there the
-  switch is the same **Auto / On / Off** row as the simulation's: Auto is every
-  rule, and On/Off are the operator's, watched only by the tank.  (The card used
-  to carry Water and Stop buttons beside it; they said the same thing twice, so
-  they are gone.  A spoken "water the plants" still starts a session under the
-  rules, and "stop the pump" also releases the manual switch.)
+  whatever the soil says. **Live has the same switch**, and it means the same
+  thing there: Auto is every rule, and On and Off are the operator's. The card
+  used to carry separate Water and Stop buttons beside the switch; they said the
+  same thing twice and were removed (2026-11-17). A spoken “water the plants”
+  still starts a pulse session under the rules, and “stop the pump” releases a
+  manual **On**.
 
 Both are the simulator's own state, so they end with the simulation: switching
 back to Live, or restarting the app, returns the pump and the lamps to the
@@ -255,9 +266,11 @@ rules.
 
 **The pump switch and the tank.** Only a tank the controller *knows* to be low
 stops a manual **On**. A probe that is missing, uncalibrated or stale cannot say
-that, so the switch runs the pump anyway and the card says the reading is
-unavailable — this board has no tank probe fitted (2026-11-17), so that is its
-normal state. Fit and calibrate the probe and a low tank starts refusing again.
+that, so the switch runs the pump anyway — this board has no tank probe fitted
+(2026-11-17), so that is its normal state and the Rain Water Tank card reads
+**Not calibrated**. The Watering card says nothing about it: a line repeated on
+every visit is furniture, and the tank card already answers the question. Fit and
+calibrate the probe and a low tank starts refusing again.
 
 ## Honest data
 

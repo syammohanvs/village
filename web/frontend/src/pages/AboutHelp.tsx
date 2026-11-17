@@ -84,16 +84,20 @@ export function AboutHelp() {
             <li>
               <IconDroplet size={18} />
               <div>
-                <strong>Rainwater collection.</strong> Rain is collected in a tank so it can be
-                used later. Two probes in the tank then report one minimum level: water available or
-                water low. The app never invents a percentage or litres.
+                <strong>Rainwater collection.</strong> Rain is collected in the
+                <strong>rain water tank</strong> so it can be used later. Two probes in the tank
+                then report one minimum level: water available or water low. The app never invents
+                a percentage or litres.
               </div>
             </li>
             <li>
               <IconDroplet size={18} />
               <div>
-                <strong>Drip irrigation.</strong> A soil probe measures moisture. When the soil is
-                dry and the tank has water, the pump waters in short pulses and stops by itself.
+                <strong>Drip irrigation.</strong> A soil probe measures moisture. The Watering card
+                carries the pump&apos;s own three choices, the same as the streetlights&apos;:
+                <em>Auto</em> waters in short pulses while the soil is dry and stops by itself,
+                <em>On</em> holds the pump running and <em>Off</em> holds it stopped, whatever the
+                soil says. There are no separate start and stop buttons — the switch says both.
               </div>
             </li>
             <li>
@@ -171,8 +175,12 @@ export function AboutHelp() {
           <div>
             <h3 className="about-h3">Sensors do the routine work</h3>
             <ul className="plain-list">
-              <li>Soil moisture decides when watering is allowed.</li>
-              <li>The tank probes block watering when water is low.</li>
+              <li>Soil moisture decides when watering is allowed on Auto.</li>
+              <li>
+                The tank stops the pump when the water is <em>known</em> to be low — and only then:
+                a probe that is missing or not calibrated cannot refuse the operator&apos;s own
+                switch. The Rain Water Tank card always says which of those it is.
+              </li>
               <li>The light sensor switches the lamps in Automatic mode.</li>
             </ul>
             <p className="hint">
@@ -185,8 +193,12 @@ export function AboutHelp() {
 
       <Card kicker="For visitors" title="Try it in five steps">
         <ol className="steps-list">
-          <li>Look at the cards on <Link to="/">Our Village</Link> — watering, tank, lights, waste,
-            solar and wind — and read what each one says.</li>
+          <li>
+            Look at the cards on <Link to="/">Our Village</Link> — watering, rain water tank,
+            lights, waste, solar and wind. Every card is one row: its name and state on the left,
+            then its reading, then its control where it has one — the pump&apos;s
+            <em>Auto / On / Off</em>, the lamps&apos;, or <em>Open camera</em>.
+          </li>
           <li>
             On <Link to="/">Our Village</Link>, choose <em>Automatic</em> for the streetlights, then
             cover the light sensor with your hand. Watch the streetlight LEDs.

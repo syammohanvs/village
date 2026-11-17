@@ -164,10 +164,10 @@ export function OurVillage() {
           demo ? ' Use Reset in Setup → Simulation to refill the demo tank.' : ''
         }`
       : reservoir?.state !== 'available'
-        ? // An uncalibrated probe cannot say the tank is empty, so the manual
-          // switch is allowed -- but the reading really is missing, and saying
-          // so is the difference between "no water" and "no idea".
-          'The tank reading is unavailable. On and Off still run the pump by hand; watch the tank.'
+        ? // Nothing to say: a probe that is not fitted cannot report, the
+          // switch works anyway, and the Rain Water Tank card already shows
+          // "not calibrated".  Only a tank that IS low is worth a sentence.
+          ''
         : physicalDisabled
           ? 'The controller is offline. Actions are disabled.'
           : '';
@@ -247,9 +247,6 @@ export function OurVillage() {
                   </button>
                 ))}
               </div>
-              <p className="hint">
-                On holds the pump; Off stops it. Auto gives it back to the rules.
-              </p>
             </div>
           {pumpNote && (
             <p className="vcard-note" data-testid="pump-note">
@@ -262,7 +259,7 @@ export function OurVillage() {
         <article className="vcard vcard--min vcard--row" data-testid="card-tank">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconPump size={19} /></span>
-            <h2>Tank</h2>
+            <h2>Rain Water Tank</h2>
             {levelChip(tankWord, tankTone)}
           </header>
           {stateLine(
