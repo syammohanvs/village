@@ -252,9 +252,23 @@ function Preferences() {
     void primeVoices(1200).then(() => setIndianVoice(indianEnglishVoiceName()));
   }, []);
 
+  /**
+   * Save it twice: on this device (so speech changes at once, even offline) and
+   * in the village's own settings, so a new browser, a cleared profile or an
+   * ESP32 reflash does not bring the American voice back (2026-11-17).
+   */
   const chooseEnglishVoice = (choice: EnglishVoiceChoice) => {
     setEnglishVoice(choice);
     saveEnglishVoiceChoice(choice);
+    setMessage('');
+    setSaveError('');
+    void api
+      .putSettings({ english_voice: choice })
+      .then(() => {
+        setSaved((current) => (current ? { ...current, english_voice: choice } : current));
+        setMessage('Sara’s English voice saved for this village.');
+      })
+      .catch((cause: unknown) => setSaveError(errorMessage(cause)));
   };
   const [saved, setSaved] = useState<AppSettings | null>(null);
   const [draft, setDraft] = useState<AppSettings | null>(null);
@@ -393,9 +407,10 @@ function Preferences() {
               <div>
                 <p className="setting-name">Sara&apos;s English voice</p>
                 <p className="hint" data-testid="english-voice-hint">
-                  {indianVoice
-                    ? `This computer has an Indian English voice: ${indianVoice}. Hindi and Malayalam always use Sara's own voice.`
-                    : 'No Indian English voice is installed on this computer, so both choices speak with Sara’s own voice. Windows: Settings → Time & language → Language & region → English (India) → Language options → Speech.'}
+                  Indian English uses Sara&apos;s neural Indian voice when it is installed
+                  {indianVoice ? `, and otherwise this computer’s voice (${indianVoice})` : ''}. Hindi
+                  and Malayalam always use Sara&apos;s own voice. This choice is kept with the
+                  village settings, so it survives a new browser or a reflash of the board.
                 </p>
               </div>
               <div className="segmented" role="group" aria-label="Sara's English voice">

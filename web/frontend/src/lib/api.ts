@@ -193,14 +193,28 @@ export const api = {
     });
   },
 
-  async speak(text: string, language: string, lengthScale = 1): Promise<Blob> {
+  /**
+   * `voice` is English only: "sara" (American, the same speaker as hi/ml) or
+   * "indian" (the neural Indian voice).  The server ignores it elsewhere.
+   */
+  async speak(
+    text: string,
+    language: string,
+    lengthScale = 1,
+    voice?: 'sara' | 'indian',
+  ): Promise<Blob> {
     const url = withMode(`${PREFIX}/voice/speak`, activeMode);
     let response: Response;
     try {
       response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'audio/wav' },
-        body: JSON.stringify({ text, language, length_scale: lengthScale }),
+        body: JSON.stringify({
+          text,
+          language,
+          length_scale: lengthScale,
+          ...(voice ? { voice } : {}),
+        }),
       });
     } catch (cause) {
       throw new ApiError(0, 'Cannot reach the village service on this laptop.', {

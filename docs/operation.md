@@ -209,25 +209,34 @@ the app says so rather than using a remote service.
 
 ### Sara's English voice
 
-Sara's own voice is the local neural model (`en_US-lessac-medium`), which is
-**American** English — it is the same speaker as her Hindi and Malayalam, and it
-is the smoothest of the three. If the exhibit wants an **Indian** accent for
-English, **Setup → Voice & Camera → Sara's English voice → Indian English**
-switches English to this computer's own voice (Windows ships *Microsoft Heera*
-and *Microsoft Ravi*, both English (India); Android and some Linux setups have
-an `en-IN` voice too).
+English has **two** voices, and the Indian one is the default:
 
-- It is a **per-device** choice, like the camera: the voice is installed on the
-  machine, not on the account.
-- **Hindi and Malayalam always stay on Sara's own voice** — they are already
-  Indian voices.
-- The row names the voice it found, and says what to install when it finds none
-  (Windows: Settings → Time & language → Language & region → English (India) →
-  Language options → Speech).
-- Quality depends on that voice: the Windows one is a formant voice, so it is
-  more robotic than the neural model. If a *neural* Indian-English voice is
-  wanted, the alternative is a community Piper `en_IN` model, which is a
-  third-party download rather than part of the official voice set.
+| Choice | What speaks |
+| --- | --- |
+| **Indian English** (default) | Sara's neural Indian model `en_IN-spicor-medium`; if that file is missing, this computer's own English (India) voice (Windows: *Heera*, *Ravi*); if neither, Sara's own voice |
+| **Sara's own** | `en_US-lessac-medium` — American, and the same speaker as her Hindi and Malayalam |
+
+Hindi and Malayalam never change: they are already Indian voices
+(`hi_IN-priyamvada`, `ml_IN-meera`).
+
+**Where the choice lives.** It is saved in the village's own settings
+(`/api/v1/settings`), not only in the browser, so a cleared profile, a new
+laptop or a **reflash of the ESP32** does not bring the American voice back. The
+page writes it to the device copy as well, so speech changes immediately and
+still works with the backend unreachable.
+
+**The Indian model** is a community voice (NavGurukul, `en_IN-spicor-medium`),
+installed by `scripts/install_piper.sh` into `models/piper/voices/` — which is
+git-ignored, so it is never committed or distributed. **Its licence is
+AGPL-3.0**, unlike the MIT engine and the official voices: free to download and
+use, including for an exhibition, but if the app or the model is ever published
+or handed out, the AGPL terms apply to the model. To skip it, run the installer
+with `VILLAGE_INDIAN_VOICE=0`.
+
+What is *not* affected by a reflash: the voice choice, the language, spoken
+replies on/off, the camera id, the waste thresholds — all in the village
+database on the laptop. The board's own calibration lives in its NVS and also
+survives a normal OTA/USB reflash; only an explicit `erase_flash` wipes it.
 
 ### The language Sara answers in
 

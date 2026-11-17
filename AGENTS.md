@@ -155,17 +155,18 @@ visitors cannot be used to press **Water** or change calibration.
   repeated the state word).  `messages.refused` was added to
   `shared/intents.json` in all three languages.  A test asserts the spoken
   argument is Malayalam for a Malayalam command.
-- **Sara's English accent is a device choice (2026-11-17).**  Piper has **no
-  official `en_IN` voice** (only `en_US`/`en_GB`), so `VOICE_FOR_LANGUAGE['en']`
-  is American.  Setup → Voice & Camera → *Sara's English voice* writes
-  `village.englishVoice` (`sara` | `device-india`, helpers in `lib/speech.ts`);
-  `speakText` then tries this computer's `en-IN` voice first
-  (`pickIndianEnglishVoice`, name list includes Heera/Ravi) and falls back to
-  Piper.  Hindi and Malayalam never change.  The laptop has **Microsoft Heera**
-  and **Ravi** installed (OneCore), so the accent is available — a community
-  Piper `en_IN` model (navgurukul-ai-labs, **AGPL-3.0**) is the neural
-  alternative if the formant voice is not good enough; that is a licence
-  decision, not a wiring one.
+- **Indian English is the default and it is stored server-side (2026-11-17).**
+  Two English voices: `en_IN-spicor-medium` (NavGurukul, **AGPL-3.0**, neural,
+  Indian — installed by `scripts/install_piper.sh`, git-ignored) and
+  `en_US-lessac-medium` (official, American, the same speaker as hi/ml).
+  `ENGLISH_VOICES` in `web/backend/app/tts.py` maps the setting value
+  (`device-india` | `sara`) to a model; `/voice/speak` takes a `voice` field and
+  falls back to Lessac if the Indian file is missing, so a request can never
+  silence her.  `english_voice` is a **server setting** (`DEFAULT_SETTINGS` in
+  `db.py`, default `device-india`) written by Setup → Voice & Camera, mirrored
+  into `localStorage` (`village.englishVoice`) and hydrated for a fresh browser
+  by `VoiceUiProvider`.  A reflash of the board touches none of it — the
+  settings live in `data/village.db`.
 - **The simulation lab is one engine with real controls (2026-11-17).** Every
   slider, preset and sample goes through `SimulatedDevice` (`web/backend/app/
   simulator.py`) via `POST /demo/scenario` / `/demo/reset` — never a second

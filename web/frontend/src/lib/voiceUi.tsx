@@ -2,7 +2,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -64,6 +66,27 @@ export function VoiceUiProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore storage failures */
     }
+  }, []);
+
+  // A new browser (or a cleared profile) starts with the village's saved
+  // English voice, not with a default.  It is fetched once, and a choice made
+  // after this point is never overwritten by a late answer.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    void import('./api')
+      .then(({ api }) =>
+        api.settings().then((settings) => {
+          const saved = settings.english_voice;
+          if (saved === 'sara' || saved === 'device-india') {
+            void import('./speech').then(({ saveEnglishVoiceChoice }) =>
+              saveEnglishVoiceChoice(saved),
+            );
+          }
+        }),
+      )
+      .catch(() => undefined);
   }, []);
 
   const value = useMemo<VoiceUiContextValue>(

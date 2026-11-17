@@ -310,6 +310,11 @@ export interface EventsResponse {
 export interface AppSettings {
   language: 'en' | 'ml' | 'hi' | string;
   tts_enabled: boolean;
+  /**
+   * Which English voice Sara uses.  Kept with the server settings so it
+   * survives a browser reset, a new laptop and any ESP32 reflash.
+   */
+  english_voice?: 'sara' | 'device-india';
   waste_model_path: string;
   camera_device_id: string | null;
   waste_confidence: number;

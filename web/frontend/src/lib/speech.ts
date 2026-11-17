@@ -169,11 +169,12 @@ export const ENGLISH_VOICE_KEY = 'village.englishVoice';
 
 export function loadEnglishVoiceChoice(): EnglishVoiceChoice {
   try {
-    return window.localStorage.getItem(ENGLISH_VOICE_KEY) === 'device-india'
-      ? 'device-india'
-      : 'sara';
+    // Default is the Indian accent, which is what the exhibit asked for
+    // (2026-11-17).  It is safe as a default: when the machine has neither the
+    // Indian model nor an en-IN device voice, Sara's own voice is used anyway.
+    return window.localStorage.getItem(ENGLISH_VOICE_KEY) === 'sara' ? 'sara' : 'device-india';
   } catch {
-    return 'sara';
+    return 'device-india';
   }
 }
 
@@ -315,20 +316,20 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
     if (ticket !== speakSeq) return false;
   }
 
-  // English in an Indian accent, when the operator asked for it and this
-  // machine really has such a voice.  The local model stays the fallback, so a
-  // device without one still speaks.
-  if (language === 'en' && loadEnglishVoiceChoice() === 'device-india') {
-    await primeVoices(600);
-    const indian = pickIndianEnglishVoice();
-    if (indian && (await speakWithVoice(text, indian, rate, ticket))) return true;
-    if (ticket !== speakSeq) return false;
-  }
-
   // Piper's --length_scale is the inverse of a rate: >1 is slower.
   const lengthScale = Math.max(0.5, Math.min(2, 0.98 / (rate || 0.98)));
+  // English carries its own voice choice: the neural Indian model when the
+  // exhibit asked for that accent, Sara's American one otherwise.
+  const variant =
+    language === 'en' ? (loadEnglishVoiceChoice() === 'device-india' ? 'indian' : 'sara') : undefined;
   try {
-    const blob = await api.speak(text, language, Number(lengthScale.toFixed(3)));
+    const spokenScale = Number(lengthScale.toFixed(3));
+    // Only English carries a voice choice; the other two languages are one
+    // voice each, and passing an extra argument would only make the call
+    // harder to read in the log.
+    const blob = variant
+      ? await api.speak(text, language, spokenScale, variant)
+      : await api.speak(text, language, spokenScale);
     // A newer call (another language, another view) owns the speakers now.
     if (ticket !== speakSeq) return false;
     if (await playBlob(blob)) return true;

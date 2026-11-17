@@ -387,16 +387,20 @@ describe('Sara’s English voice', () => {
     render(<App />);
 
     const row = await screen.findByTestId('english-voice-row');
-    expect(within(row).getByRole('button', { name: /Sara’s own/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-
-    await user.click(within(row).getByRole('button', { name: /Indian English/i }));
+    // The Indian accent is the default the exhibit asked for (2026-11-17).
     expect(within(row).getByRole('button', { name: /Indian English/i })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(window.localStorage.getItem('village.englishVoice')).toBe('device-india');
+
+    await user.click(within(row).getByRole('button', { name: /Sara’s own/i }));
+    expect(within(row).getByRole('button', { name: /Sara’s own/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(window.localStorage.getItem('village.englishVoice')).toBe('sara');
+    // …and saved in the village's settings, so a new browser or a reflash does
+    // not bring the other voice back.
+    await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith({ english_voice: 'sara' }));
   });
 });

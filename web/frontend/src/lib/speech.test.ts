@@ -327,7 +327,9 @@ describe('Indian English', () => {
 
     expect(ok).toBe(true);
     // Default rate 0.98 -> length scale 1.0 (Lia asks for 0.92, which is 1.065).
-    expect(speak).toHaveBeenCalledWith('Hello', 'en', expect.closeTo(1.0, 3));
+    // English also carries the voice choice; the server falls back to Sara's own
+    // model when the Indian one is not installed.
+    expect(speak).toHaveBeenCalledWith('Hello', 'en', expect.closeTo(1.0, 3), 'indian');
     vi.doUnmock('./api');
   });
 });
@@ -420,9 +422,27 @@ describe('English in an Indian accent', () => {
     window.localStorage.removeItem('village.englishVoice');
   });
 
-  it('uses the device voice when Indian English is chosen', async () => {
+  it('asks the local engine for the Indian voice when that is chosen', async () => {
+    // The neural Indian model is the better voice; the computer's own en-IN
+    // voice is only the fallback when the engine cannot produce it.
+    installSpeech(INDIAN as unknown as FakeVoice[]);
+    const blob = new Blob(['wav'], { type: 'audio/wav' });
+    const speak = vi.fn(async () => blob);
+    vi.doMock('./api', () => ({ api: { speak } }));
+    stubPiperPlayback();
+
+    const speech = await import('./speech');
+    speech.saveEnglishVoiceChoice('device-india');
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(speak).toHaveBeenCalledWith('Hello', 'en', expect.any(Number), 'indian');
+    vi.doUnmock('./api');
+  });
+
+  it('falls back to the computer’s Indian voice when the engine has no model', async () => {
     const { spoken } = installSpeech(INDIAN as unknown as FakeVoice[]);
-    const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
+    const speak = vi.fn(async () => Promise.reject(new Error('400')));
     vi.doMock('./api', () => ({ api: { speak } }));
     stubPiperPlayback();
 
@@ -432,7 +452,6 @@ describe('English in an Indian accent', () => {
 
     expect(ok).toBe(true);
     expect(spoken[0]?.voice).toMatch(/Heera/);
-    expect(speak).not.toHaveBeenCalled();
     vi.doUnmock('./api');
   });
 
@@ -448,12 +467,12 @@ describe('English in an Indian accent', () => {
     const ok = await speech.speakText('Hello', 'en');
 
     expect(ok).toBe(true);
-    expect(speak).toHaveBeenCalled();
+    expect(speak).toHaveBeenCalledWith('Hello', 'en', expect.any(Number), 'sara');
     expect(spoken).toHaveLength(0);
     vi.doUnmock('./api');
   });
 
-  it('falls back to Sara when this computer has no Indian voice', async () => {
+  it('is Indian English by default, and still speaks when nothing Indian is installed', async () => {
     // Only American English here: the choice must not switch to a US device
     // voice, which would be a third accent nobody asked for.
     installSpeech([
@@ -465,11 +484,14 @@ describe('English in an Indian accent', () => {
     stubPiperPlayback();
 
     const speech = await import('./speech');
-    speech.saveEnglishVoiceChoice('device-india');
+    // No explicit choice: the default is the Indian accent.
+    expect(speech.loadEnglishVoiceChoice()).toBe('device-india');
     const ok = await speech.speakText('Hello', 'en');
 
+    // The engine is asked for the Indian voice and falls back to its own model
+    // when that file is missing — never to an American *device* voice.
     expect(ok).toBe(true);
-    expect(speak).toHaveBeenCalled();
+    expect(speak).toHaveBeenCalledWith('Hello', 'en', expect.any(Number), 'indian');
     expect(speech.indianEnglishVoiceName()).toBeNull();
     vi.doUnmock('./api');
   });

@@ -15,6 +15,17 @@ VOICE_FOR_LANGUAGE = {
     "ml": "ml_IN-meera-medium",
 }
 
+# English has two candidates, because Sara's own model is American:
+#   sara   — en_US-lessac-medium, the same speaker as her Hindi and Malayalam
+#   indian — a neural **Indian** English voice, installed separately because it
+#            is a community model (NavGurukul, AGPL-3.0) rather than one of the
+#            official Piper voices.  The exhibit asked for the accent
+#            (2026-11-17); the file is `models/piper/voices/en_IN-*.onnx`.
+ENGLISH_VOICES = {
+    "sara": "en_US-lessac-medium",
+    "indian": "en_IN-spicor-medium",
+}
+
 MAX_TEXT_CHARS = 1200
 
 
@@ -56,13 +67,36 @@ class PiperTts:
         self.cache_dir = settings.piper_cache_dir
 
     # ------------------------------------------------------------------
-    def voice_for(self, language: str) -> str:
-        """Which Piper voice speaks this language, or "" when there is none."""
-        return VOICE_FOR_LANGUAGE.get(language, "")
+    def english_variants(self) -> list[str]:
+        """Which English voices are installed: "sara", "indian", or both."""
+        return [
+            variant
+            for variant, voice in ENGLISH_VOICES.items()
+            if (self.settings.piper_voices_dir / f"{voice}.onnx").is_file()
+        ]
 
-    def _model_path(self, language: str) -> Path | None:
-        voice = VOICE_FOR_LANGUAGE.get(language)
-        if voice is None:
+    def voice_for(self, language: str, variant: str | None = None) -> str:
+        """Which Piper voice speaks this language, or "" when there is none.
+
+        `variant` only means anything for English: "sara" (American, the same
+        speaker as her Hindi and Malayalam) or "indian" (the neural Indian
+        voice).  Anything else, or a missing model, falls back to Sara's own
+        English model so a request can never silence her.
+        """
+        if language != "en":
+            return VOICE_FOR_LANGUAGE.get(language, "")
+        if variant in ENGLISH_VOICES:
+            wanted = ENGLISH_VOICES[variant]
+            if (self.settings.piper_voices_dir / f"{wanted}.onnx").is_file():
+                return wanted
+        fallback = ENGLISH_VOICES["sara"]
+        if (self.settings.piper_voices_dir / f"{fallback}.onnx").is_file():
+            return fallback
+        return ""
+
+    def _model_path(self, language: str, variant: str | None = None) -> Path | None:
+        voice = self.voice_for(language, variant)
+        if not voice:
             return None
         path = self.settings.piper_voices_dir / f"{voice}.onnx"
         return path if path.is_file() else None
@@ -91,15 +125,30 @@ class PiperTts:
             "ready": bool(languages),
             "engine": "piper",
             "languages": languages,
+            # Which English voices are actually installed, so the page can offer
+            # "Indian English" only when it would really be used.
+            "english_voices": self.english_variants(),
             "message": message,
         }
 
     # ------------------------------------------------------------------
-    async def synthesize(self, text: str, language: str, length_scale: float = 1.0) -> Path:
-        voice = VOICE_FOR_LANGUAGE.get(language)
-        if voice is None:
+    async def synthesize(
+        self,
+        text: str,
+        language: str,
+        length_scale: float = 1.0,
+        variant: str | None = None,
+    ) -> Path:
+        if language not in VOICE_FOR_LANGUAGE:
             raise TtsError(400, "UNSUPPORTED_LANGUAGE", f"no voice for language '{language}'")
-        model = self._model_path(language)
+        voice = self.voice_for(language, variant)
+        if not voice:
+            raise TtsError(
+                400,
+                "UNSUPPORTED_LANGUAGE",
+                f"no voice for language '{language}'",
+            )
+        model = self._model_path(language, variant)
         if model is None:
             raise TtsError(
                 503,

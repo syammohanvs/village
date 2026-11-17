@@ -15,6 +15,9 @@ MAX_SAMPLES = 2000
 DEFAULT_SETTINGS: dict[str, Any] = {
     "language": "en",
     "tts_enabled": True,
+    # The exhibit asked for the Indian accent (Heera on this laptop, 2026-11-17).
+    # It falls back to Sara's own voice on a machine that has no en-IN voice.
+    "english_voice": "device-india",
     "waste_model_path": "/models/waste/",
     "camera_device_id": "",
     "waste_confidence": 0.50,

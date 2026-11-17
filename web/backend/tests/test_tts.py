@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+
 import hashlib
 import wave
 from pathlib import Path
@@ -16,7 +18,7 @@ class FakeTts:
     def __init__(self, path: Path | None = None, error: TtsError | None = None):
         self.path = path
         self.error = error
-        self.calls: list[tuple[str, str, float]] = []
+        self.calls: list[tuple[str, str, float, str | None]] = []
 
     def readiness(self) -> dict[str, object]:
         return {
@@ -26,8 +28,14 @@ class FakeTts:
             "message": "fake",
         }
 
-    async def synthesize(self, text: str, language: str, length_scale: float = 1.0) -> Path:
-        self.calls.append((text, language, length_scale))
+    async def synthesize(
+        self,
+        text: str,
+        language: str,
+        length_scale: float = 1.0,
+        variant: str | None = None,
+    ) -> Path:
+        self.calls.append((text, language, length_scale, variant))
         if self.error is not None:
             raise self.error
         assert self.path is not None
@@ -88,7 +96,7 @@ async def test_speak_route_returns_wav(tmp_path):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("audio/wav")
     assert response.content[:4] == b"RIFF"
-    assert fake.calls == [("The soil is dry.", "ml", 1.1)]
+    assert fake.calls == [("The soil is dry.", "ml", 1.1, None)]
 
 
 @pytest.mark.asyncio
@@ -138,3 +146,30 @@ async def test_readiness_includes_the_speech_engine(tmp_path):
     assert body["tts"]["ready"] is True
     assert body["tts"]["engine"] == "piper"
     assert body["tts"]["languages"] == ["en", "hi", "ml"]
+
+
+# ---------------------------------------------------------------- English voices ---
+def test_english_offers_both_voices_and_falls_back_to_sara(tmp_path):
+    """The Indian model is a separate file; missing it must not silence her."""
+    voices = tmp_path / "voices"
+    voices.mkdir()
+    for name in ("en_US-lessac-medium", "hi_IN-priyamvada-medium", "ml_IN-meera-medium"):
+        (voices / f"{name}.onnx").write_bytes(b"x")
+
+    settings = dataclasses.replace(make_settings(tmp_path), piper_voices_dir=voices)
+    tts = PiperTts(settings)
+
+    # Only Sara's own English is installed.
+    assert tts.english_variants() == ["sara"]
+    assert tts.voice_for("en", "sara") == "en_US-lessac-medium"
+    # Asking for the Indian one falls back rather than failing.
+    assert tts.voice_for("en", "indian") == "en_US-lessac-medium"
+    # Hindi and Malayalam ignore the variant entirely.
+    assert tts.voice_for("ml", "indian") == "ml_IN-meera-medium"
+
+    # Install the neural Indian voice and it is chosen when asked for.
+    (voices / "en_IN-spicor-medium.onnx").write_bytes(b"x")
+    assert tts.english_variants() == ["sara", "indian"]
+    assert tts.voice_for("en", "indian") == "en_IN-spicor-medium"
+    assert tts.voice_for("en", "sara") == "en_US-lessac-medium"
+    assert tts.readiness()["english_voices"] == ["sara", "indian"]

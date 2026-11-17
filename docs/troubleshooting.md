@@ -253,6 +253,14 @@ chosen language; a refusal says so in that language and prints the controller's
 reason underneath. If it happens again, check that the language buttons under
 **Talk to Sara** show the language you are speaking.
 
+## Sara's English has the wrong accent
+
+Default is **Indian English**: Sara's neural Indian model
+(`models/piper/voices/en_IN-spicor-medium.onnx`), else this computer's English
+(India) voice. "Sara's own" is the American neural voice, chosen deliberately in
+**Setup → Voice & Camera**. If the Indian model is missing,
+`scripts/install_piper.sh` downloads it (AGPL-3.0, ~61 MB, git-ignored).
+
 ## Sara's English sounds American
 
 That is Sara's own voice: the local neural model is American English, and it is

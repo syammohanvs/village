@@ -815,12 +815,15 @@ def create_app(
         log.info(
             "tts speak language=%s voice=%s chars=%d text=%r",
             body.language,
-            getattr(tts, "voice_for", lambda _language: "")(body.language) or "-",
+            getattr(tts, "voice_for", lambda _language, _variant=None: "")(body.language, body.voice)
+            or "-",
             len(body.text or ""),
             (body.text or "")[:80],
         )
         try:
-            audio_path = await tts.synthesize(body.text, body.language, body.length_scale)
+            audio_path = await tts.synthesize(
+                body.text, body.language, body.length_scale, body.voice
+            )
         except TtsError as exc:
             return JSONResponse(
                 status_code=exc.status,

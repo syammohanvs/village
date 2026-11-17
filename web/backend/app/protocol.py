@@ -112,6 +112,11 @@ class AppSettingsUpdate(BaseModel):
 
     language: Literal["en", "ml", "hi"] | None = None
     tts_enabled: bool | None = None
+    # Which English voice Sara uses: her own local neural voice (American), or
+    # this computer's English (India) voice.  Stored with the other settings so
+    # it survives a browser reset, a new laptop and any ESP32 reflash
+    # (2026-11-17).
+    english_voice: Literal["sara", "device-india"] | None = None
     waste_model_path: str | None = Field(default=None, max_length=200)
     camera_device_id: str | None = Field(default=None, max_length=200)
     waste_confidence: float | None = Field(default=None, ge=0.3, le=0.99)
@@ -154,6 +159,9 @@ class SpeakRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1200)
     language: Literal["en", "ml", "hi"] = "en"
     length_scale: float = Field(default=1.0, ge=0.5, le=2.0)
+    # English only: "sara" (American, the same speaker as hi/ml) or "indian"
+    # (the neural Indian voice).  Ignored for the other languages.
+    voice: Literal["sara", "indian"] | None = None
 
 
 class VoiceInterpretRequest(BaseModel):
