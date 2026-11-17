@@ -842,7 +842,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
      each on the exhibition laptop, leaving the cards visible beside it. */
   width: min(640px, calc(100vw - 28px));
   max-height: calc(100vh - 28px);
-  overflow: hidden;
+  /* A panel taller than the window scrolls rather than hiding its own foot —
+     which is exactly what happened to the examples list that used to live
+     down here (reported 2026-11-18). */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -1013,6 +1016,20 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    and seen again in "Your request" when it runs. */
 .voice-try { display: grid; gap: 6px; flex: 0 0 auto; }
 .voice-try .eyebrow { margin: 0; }
+.voice-try-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.voice-more-toggle {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  color: var(--gold-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  flex: 0 0 auto;
+}
+.voice-more-toggle:hover { color: var(--gold); }
 .voice-examples-top {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1050,40 +1067,42 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.voice-help {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 10px;
-  /* The catalogue is the only thing left here, so it takes whatever height
-     remains and scrolls — the reply above it never moves. */
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-.voice-examples { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.voice-examples li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
 .help-phrase { color: var(--cream); font-size: 14.5px; line-height: 1.4; overflow-wrap: anywhere; }
 .help-note { color: var(--muted); font-size: 12.5px; }
-.voice-examples .help-note::before { content: '— '; }
 .help-label { color: var(--gold-2); font-weight: 600; font-size: 13px; }
-.voice-more > summary { cursor: pointer; color: var(--gold-2); font-size: 13px; padding: 4px 0; }
-.voice-more > summary::marker { color: var(--gold-dim); }
-/* The expanded list scrolls inside itself: the reply above it must not be
-   pushed off the screen by thirty phrases (asked for 2026-11-17). */
+/* The rest of the catalogue, opened at the top and scrolling inside itself:
+   the panel is never taller than the window, and the answer below is not
+   pushed off the screen by thirty phrases. */
 .voice-more-list {
   list-style: none;
-  margin: 4px 0 0;
-  padding: 0;
-  max-height: 168px;
+  margin: 2px 0 0;
+  padding: 2px;
+  max-height: min(264px, 42vh);
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  /* Two columns: nine commands read as five short rows, so the whole catalogue
+     fits in the box without scrolling on a laptop. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
+  background: rgba(0,0,0,.18);
 }
-.voice-more-list li { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; border-bottom: 1px dashed var(--line-soft); }
-.voice-more-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.voice-more-btn {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  text-align: left;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.voice-more-btn:hover:not(:disabled) { background: rgba(217,180,91,.10); }
+.voice-more-btn:disabled { opacity: .55; cursor: not-allowed; }
 .voice-privacy { margin: 0; color: var(--muted-2); font-size: 11.5px; line-height: 1.5; border-top: 1px solid var(--line-soft); padding-top: 10px; flex: 0 0 auto; }
 
 /* Home page invitation: the voice demonstration is the first thing on the page. */
@@ -1166,6 +1185,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
      screen and pushed the panel past its own height.  The third spans the row
      so it reads as the last of three rather than a stray. */
   .voice-examples-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .voice-more-list { grid-template-columns: minmax(0, 1fr); }
   .voice-example-btn:last-child { grid-column: 1 / -1; }
   .kpi-grid { grid-template-columns: 1fr; }
   .quick-controls { grid-template-columns: 1fr; }
@@ -2356,8 +2376,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
      taller than a 390 px phone can show).  The panel scrolls, and the help
      block keeps its own height rather than being crushed. */
   .voice-panel { overflow-y: auto; }
-  .voice-help { flex: 0 0 auto; overflow: visible; }
-  .voice-more-list { max-height: none; overflow: visible; }
 }
 
 /* The camera picker sits under the Start/Stop button, on its own line: an

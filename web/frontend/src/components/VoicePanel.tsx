@@ -157,6 +157,11 @@ export function VoicePanel() {
   // a new id and really does run.
   const typedGestureRef = useRef<{ text: string; id: string } | null>(null);
   const [typed, setTyped] = useState('');
+  // The rest of the catalogue, opened in place at the top.  It used to be a
+  // closed strip at the foot of the panel, which on a smaller window was not
+  // reachable at all (reported 2026-11-18: "needs a browser zoom out to
+  // actually even see it").
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const intents = useApi<VoiceIntentsResponse>(
     ['voice-intents', language],
@@ -587,9 +592,18 @@ export function VoicePanel() {
    * work rather than by reading a list.
    */
   async function runExample(example: VoiceExample) {
+    await runPhrase(example.phrase);
+  }
+
+  /** One pressed sentence: the box shows it, then it is sent as if typed. */
+  async function runPhrase(phrase: string) {
     if (busy || speaking || typedBusyRef.current) return;
-    setTyped(example.phrase);
-    await sendTypedText(example.phrase);
+    // A command chosen from the catalogue closes it: the answer is what the
+    // visitor came for, and the list would otherwise keep the screen for a
+    // question already asked.
+    setMoreOpen(false);
+    setTyped(phrase);
+    await sendTypedText(phrase);
   }
 
   const micSupported = recordingSupported();
@@ -743,7 +757,21 @@ export function VoicePanel() {
              parser a spoken sentence runs — so the phrase is learned by
              watching it work. */}
       <div className="voice-try" data-testid="voice-examples-top">
-        <p className="eyebrow">{copy.examples}</p>
+        <div className="voice-try-head">
+          <p className="eyebrow">{copy.examples}</p>
+          {moreIntents.length > 0 && (
+            <button
+              type="button"
+              className="voice-more-toggle"
+              onClick={() => setMoreOpen((open) => !open)}
+              aria-expanded={moreOpen}
+              aria-controls="voice-more-list"
+              data-testid="voice-more-toggle"
+            >
+              {moreOpen ? copy.fewerExamples : copy.moreExamples}
+            </button>
+          )}
+        </div>
         <div className="voice-examples-top">
           {examples.map((example) => (
             <button
@@ -760,6 +788,32 @@ export function VoicePanel() {
             </button>
           ))}
         </div>
+
+        {/* The rest of the catalogue, every row a button, opened here rather
+            than at the foot of the panel.  It scrolls inside itself, so opening
+            it cannot push the answer off the screen. */}
+        {moreOpen && (
+          <ul className="voice-more-list" id="voice-more-list" data-testid="voice-more-list">
+            {moreIntents.map((intent) => {
+              const phrase = intentPhrases(intent, language)[0] ?? intentLabel(intent, language);
+              return (
+                <li key={intent.id}>
+                  <button
+                    type="button"
+                    className="voice-more-btn"
+                    data-testid={`voice-more-${intent.id.toLowerCase()}`}
+                    onClick={() => void runPhrase(phrase)}
+                    disabled={busy || speaking}
+                    title={actionWords(copy, intent.command)}
+                  >
+                    <span className="help-phrase">“{phrase}”</span>
+                    <span className="help-note">{actionWords(copy, intent.command)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       {/* 2. The language and the state it will be spoken in, on one line. */}
@@ -942,28 +996,6 @@ export function VoicePanel() {
         </div>
         <p className="hint">{copy.typedHelper}</p>
       </form>
-
-      {/* 7. The rest of the catalogue, on request.  The three headline
-             sentences are buttons at the top now, so this is one collapsed
-             line until a visitor asks for more. */}
-      <div className="voice-help">
-        {moreIntents.length > 0 && (
-          <details className="voice-more">
-            <summary>{copy.moreExamples}</summary>
-            <ul className="voice-more-list">
-              {moreIntents.map((intent) => (
-                <li key={intent.id}>
-                  <span className="help-label">{intentLabel(intent, language)}</span>
-                  <span className="help-phrase">
-                    “{intentPhrases(intent, language)[0] ?? intentLabel(intent, language)}”
-                  </span>
-                  <span className="help-note">{actionWords(copy, intent.command)}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-      </div>
 
       <p className="voice-privacy">{copy.privacy}</p>
     </section>

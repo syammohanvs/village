@@ -305,16 +305,28 @@ visitors cannot be used to press **Water** or change calibration.
   (“Please turn on the lights.”), with the explanation on the title.  **One
   press sends that sentence through the same path as typing** (`sendTypedText`,
   shared with `submitTyped`), so "Your request" shows what was asked and the
-  phrase is learned by watching it work — never a second parser.  The bottom of
-  the panel is one collapsed **More examples** line.  On a phone the three sit
-  two-across with the last spanning the row, and at 720 px and below the
-  **panel itself scrolls**: the old comment claimed "its own scroll, nothing
-  clipped" while `overflow` was still `hidden`, which squeezed the catalogue to
-  11 px (measured 2026-11-18 — the three buttons plus a stacked request/reply
-  made the panel 27 px taller than a 390 px phone can show).
+  phrase is learned by watching it work — never a second parser.
+  **Nothing of the catalogue lives at the foot of the panel (2026-11-18, second
+  pass).**  A collapsed *More examples* strip down there was unreachable on a
+  smaller window — "it needs a browser zoom out to actually even see it" — so
+  there is no footer at all: **More commands**, at the right of *Try saying…*,
+  opens the remaining nine sentences **at the top** in a **two-column list of
+  buttons** (two columns is what makes all nine fit without scrolling on a
+  laptop; one column on a phone, where the list scrolls inside itself).
+  Choosing one sends it and **closes the list**, because the answer is what the
+  visitor asked for.  `runPhrase` is the one entry point for any pressed
+  sentence, however it was chosen.
+  **The panel scrolls at every width** — `overflow-y: auto` on `.voice-panel`,
+  not only in the phone block.  That block had promised "its own scroll,
+  nothing clipped" since it was written while `overflow` was still `hidden`,
+  which squeezed the old catalogue to **11 px**; measured 2026-11-18 at
+  1440x900 / 1280x720 / 1024x700 / 390x844, all nine commands visible on a
+  laptop with no list scroll.  On a phone the three headline buttons sit
+  two-across with the last spanning the row.
   `VoicePanel.test.tsx` asserts the buttons are the first block, that pressing
-  one calls `voiceInterpret` with the phrase (and never the microphone), and
-  that the wire names stay out of sight.
+  one calls `voiceInterpret` with the phrase (and never the microphone), that
+  the catalogue opens at the top with a row per command, that the row's shown
+  phrase is the phrase it sends, and that the wire names stay out of sight.
 - **The panel has its own words, in all three languages (2026-11-17).** All
   strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
   intro, section headings, short state words, plain action wording) and are

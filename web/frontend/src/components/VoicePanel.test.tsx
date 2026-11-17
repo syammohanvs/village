@@ -807,7 +807,9 @@ describe('the panel in plain words', () => {
     // because a list at the foot of the panel was below the fold.
     expect(panel.firstElementChild?.nextElementSibling).toBe(examples);
 
-    const buttons = within(examples).getAllByRole('button');
+    // The three cards only — the "More commands" toggle also lives in this
+    // block, and it is not an example.
+    const buttons = [...examples.querySelectorAll<HTMLButtonElement>('.voice-example-btn')];
     expect(buttons).toHaveLength(3);
     expect(buttons.map((button) => button.textContent)).toEqual([
       'Streetlights on“Please turn on the lights.”',
@@ -850,12 +852,43 @@ describe('the panel in plain words', () => {
     expect(api.voiceTranscribe).not.toHaveBeenCalled();
   });
 
-  it('puts the rest behind More examples, and still explains them in words', async () => {
+  it('opens the rest of the catalogue at the top, and each row is a command', async () => {
     const { user, panel } = await openPanel();
+    const examples = within(panel).getByTestId('voice-examples-top');
 
-    await user.click(within(panel).getByText('More examples'));
-    expect(within(panel).getByText('Turns the streetlights off.')).toBeInTheDocument();
+    // It is not at the foot of the panel any more: on a smaller window the old
+    // strip was not reachable at all (reported 2026-11-18).
+    await user.click(within(examples).getByTestId('voice-more-toggle'));
+    const list = within(examples).getByTestId('voice-more-list');
+    expect(list).toBeInTheDocument();
+    expect(within(list).getByText('Turns the streetlights off.')).toBeInTheDocument();
     expect(panel.textContent).not.toMatch(/LIGHTS_OFF|sends /i);
+
+    // …and one press runs that sentence through the parser.
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      pending_text: 'Turning the streetlights off.',
+      done_text: 'The streetlights are off.',
+    } as never);
+    const row = within(list).getByTestId('voice-more-lights_off');
+    // The phrase on the row is the phrase that is sent — no second spelling.
+    const phrase = row.querySelector('.help-phrase')?.textContent?.replace(/[“”]/g, '');
+    expect(phrase).toBeTruthy();
+    await user.click(row);
+    await waitFor(() => expect(api.voiceInterpret).toHaveBeenCalledWith(phrase, 'en'));
+
+    // Choosing a command closes the catalogue: the answer is what was asked for.
+    expect(within(examples).queryByTestId('voice-more-list')).toBeNull();
+
+    // …and the toggle is a toggle, not a one-way door.
+    await user.click(within(examples).getByTestId('voice-more-toggle'));
+    expect(within(examples).getByTestId('voice-more-toggle')).toHaveTextContent('Show fewer');
+    await user.click(within(examples).getByTestId('voice-more-toggle'));
+    expect(within(examples).queryByTestId('voice-more-list')).toBeNull();
   });
 
   it('translates every heading and example into the chosen language', async () => {

@@ -37,6 +37,8 @@ export interface VoiceCopy {
   send: string;
   examples: string;
   moreExamples: string;
+  /** The same control once the list is open — "More examples" would be a lie. */
+  fewerExamples: string;
   /** Shown in Simulation, above the control. */
   simulation: string;
   /** Where the speech is recognised.  A privacy fact, not a technical one. */
@@ -79,7 +81,8 @@ const EN: VoiceCopy = {
   typedHelper: 'You can type your request instead of speaking.',
   send: 'Send',
   examples: 'Try saying…',
-  moreExamples: 'More examples',
+  moreExamples: 'More commands',
+  fewerExamples: 'Show fewer',
   simulation: 'Simulation — physical model is not controlled.',
   privacy: 'Speech is recognised on this laptop; nothing leaves it.',
   states: {
@@ -125,7 +128,8 @@ const ML: VoiceCopy = {
   typedHelper: 'സംസാരിക്കാതെ നിങ്ങൾക്ക് ടൈപ്പ് ചെയ്യാം.',
   send: 'അയയ്ക്കുക',
   examples: 'ഇത് പറഞ്ഞു നോക്കൂ…',
-  moreExamples: 'കൂടുതൽ ഉദാഹരണങ്ങൾ',
+  moreExamples: 'കൂടുതൽ നിർദ്ദേശങ്ങൾ',
+  fewerExamples: 'ചുരുക്കുക',
   simulation: 'സിമുലേഷൻ — യഥാർത്ഥ മാതൃക നിയന്ത്രിക്കപ്പെടുന്നില്ല.',
   privacy: 'സംസാരം ഈ ലാപ്ടോപ്പിൽ തന്നെ തിരിച്ചറിയുന്നു; പുറത്തേക്ക് ഒന്നും പോകുന്നില്ല.',
   states: {
@@ -171,7 +175,8 @@ const HI: VoiceCopy = {
   typedHelper: 'बोलने के बजाय आप अपना अनुरोध लिख सकते हैं।',
   send: 'भेजें',
   examples: 'यह कहकर देखें…',
-  moreExamples: 'और उदाहरण',
+  moreExamples: 'और निर्देश',
+  fewerExamples: 'कम दिखाएँ',
   simulation: 'सिमुलेशन — असली मॉडल नियंत्रित नहीं हो रहा।',
   privacy: 'आवाज़ इसी लैपटॉप पर पहचानी जाती है; बाहर कुछ नहीं जाता।',
   states: {

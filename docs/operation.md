@@ -149,11 +149,12 @@ water physically flowed. The dashboard keeps the two statements separate.
    disposal.
 5. **Voice.** Press **Talk to Sara** at the top of **Our Village** — the
    microphone with its name under it, the language choices directly beneath.
-   The panel opens with **Try saying…** and three buttons at the top. Each
-   names the thing in plain words and shows the sentence to say, and pressing
-   one sends that sentence — so the phrase is learned by watching it work.
-   Speak one, or press one, then show **Your request** (what was asked) beside
-   **Sara's reply**. Try “do not start irrigation” to show that a
+   The panel opens with **Try saying…** and three buttons at the top, with
+   **More commands** beside them for the rest of the catalogue. Each names the
+   thing in plain words and shows the sentence to say, and pressing one sends
+   that sentence — so the phrase is learned by watching it work. Speak one, or
+   press one, then show **Your request** (what was asked) beside **Sara's
+   reply**. Try “do not start irrigation” to show that a
    negated request is refused without action, and “can you turn off the
    lights?” to show that a polite question is a command.
 6. **What Happened.** Show the command log and the recognition event.
@@ -334,8 +335,11 @@ one go:
    *Understanding…*, *Sending…*, *Confirmed*, *Answer*, *Blocked*, *Not
    connected*. The reply stays until a new request replaces it.
 6. **Or type your request**, which goes to the same parser as speech.
-7. **More examples** — the rest of the catalogue, collapsed until a visitor
-   asks for it.
+7. **More commands** — the link at the right of *Try saying…* opens the rest of
+   the catalogue **there, at the top**, as a two-column list in which every row
+   is a button. Choosing one sends it and closes the list. Nothing lives below
+   the fold any more: if the window is short the panel scrolls rather than
+   hiding its own foot.
 
 The examples are the three things a visitor actually tries: turn the lights on,
 ask whether the tank has water, ask how wet the soil is. Each is explained in
