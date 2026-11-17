@@ -881,6 +881,25 @@ export const MESSAGES = {
     'कोई बिन LED नहीं जली — अभी कुछ भी बिन में नहीं डाला गया।',
     'ബിൻ LED കത്തുന്നില്ല — ഇതുവരെ ഒന്നും ബിന്നിൽ ഇട്ടിട്ടില്ല.',
   ],
+
+  'sort.focusEmpty': [
+    'Show one item to the camera — held in your hand is fine. An empty scene is optional: set one only if the camera looks at a fixed, empty table, and then only the object that appears is classified.',
+    'कैमरे को एक चीज़ दिखाएँ — हाथ में पकड़ी हो तो भी ठीक है। खाली दृश्य ज़रूरी नहीं: इसे तभी सेट करें जब कैमरा एक स्थिर, खाली मेज़ की ओर हो; तब सिर्फ़ वही चीज़ पहचानी जाती है जो सामने आए।',
+    'ക്യാമറയ്ക്ക് ഒരു വസ്തു കാണിക്കുക — കൈയിൽ പിടിച്ചതും ആകാം. കാലി കാഴ്ച നിർബന്ധമല്ല: ക്യാമറ ഒരു സ്ഥിരമായ ഒഴിഞ്ഞ മേശയിലേക്കാണെങ്കിൽ മാത്രം അത് ക്രമീകരിക്കുക; അപ്പോൾ പ്രത്യക്ഷപ്പെടുന്ന വസ്തു മാത്രം തിരിച്ചറിയും.',
+  ],
+  'sort.backgrounds': [
+    '{count} of {max} backgrounds stored on this device. The last set remains until you clear it; {next}',
+    'इस डिवाइस पर {count} / {max} पृष्ठभूमियाँ सहेजी हैं। हटाने तक पिछली बनी रहती है; {next}',
+    'ഈ ഉപകരണത്തിൽ {count} / {max} പശ്ചാത്തലങ്ങൾ സൂക്ഷിച്ചിരിക്കുന്നു. നീക്കുന്നതുവരെ അവസാനത്തേത് തുടരും; {next}',
+  ],
+  'sort.bgReplaceOldest': [
+    'adding another replaces the oldest.', 'और जोड़ने पर सबसे पुरानी हट जाएगी।', 'മറ്റൊന്ന് ചേർത്താൽ ഏറ്റവും പഴയത് മാറും.',
+  ],
+  'sort.bgAddAnother': [
+    'add another for a door or lights that change.',
+    'दरवाज़े या बदलती रोशनी के लिए एक और जोड़ें।',
+    'വാതിലിനോ മാറുന്ന വെളിച്ചത്തിനോ വേണ്ടി മറ്റൊന്ന് ചേർക്കുക.',
+  ],
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES;

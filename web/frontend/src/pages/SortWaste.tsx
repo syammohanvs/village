@@ -1421,12 +1421,15 @@ export function SortWaste() {
             {cameraOn && installed && focusOn && (
               <p className="hint">
                 {backgroundReady
-                  ? `${backgroundCount} of ${MAX_BACKGROUNDS} background${backgroundCount === 1 ? '' : 's'} stored on this device. The last set remains until you clear it; ${
-                      backgroundCount >= MAX_BACKGROUNDS
-                        ? 'adding another replaces the oldest.'
-                        : 'add another for a door or lights that change.'
-                    }`
-                  : 'Show one item to the camera — held in your hand is fine. An empty scene is optional: set one only if the camera looks at a fixed, empty table, and then only the object that appears is classified.'}
+                  ? t('sort.backgrounds', {
+                      count: backgroundCount,
+                      max: MAX_BACKGROUNDS,
+                      next:
+                        backgroundCount >= MAX_BACKGROUNDS
+                          ? t('sort.bgReplaceOldest')
+                          : t('sort.bgAddAnother'),
+                    })
+                  : t('sort.focusEmpty')}
               </p>
             )}
             {cameraOn && (
