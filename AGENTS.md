@@ -215,10 +215,20 @@ visitors cannot be used to press **Water** or change calibration.
   controller's value, Simulation the slider's, exactly as the solar and wind
   ones do — and the lab's own controls keep their `sim-*` test ids, because
   those mean "simulation only" and the pictures are not lab controls.
+  **The waste picture also draws the camera**, because the camera is what does
+  the classifying — the bins only report the answer it gave.
   **The rule they all obey: a picture may not claim hardware the board does not
   have** (the windmill stands still when no turbine is wired; the tank never
   shows a percentage), and its accessible name comes from the message table
   (`picture.*`), so a screen reader hears the page's language too.
+  **Motion follows the same rule** (2026-11-18): the panel's rays shimmer, and a
+  **lit** LED, a **lit** lamp and the **chosen** bin's halo breathe — each is an
+  animated `<g>` around the thing, so the opacity inside still comes from the
+  reading (a dim panel shimmers more faintly, an unlit LED has no halo to
+  breathe, an unnamed bin has none). The only full rotation is still the
+  windmill's; everything else breathes in place. All of it is switched off under
+  `prefers-reduced-motion`, and `components/SimPictures.test.tsx` reads the
+  stylesheet to keep that true.
   **One measured trap:** adding a 92 px lamp to `.sim-lamps` — a row that is
   `flex: 0 0 auto` — made the kiosk **5 px wider than a 390 px phone**; the
   phone media query now lets that row wrap and draws the lamp smaller. Check

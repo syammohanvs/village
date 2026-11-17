@@ -2450,11 +2450,29 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   100% { transform: translateY(22px); opacity: 0; }
 }
 
+/* Motion that follows the drawing's own state (2026-11-18): the panel's rays
+   shimmer, a lit LED and a lit lamp breathe, and the chosen bin's halo pulses.
+   Each animated thing is a **group**, so the opacity inside it still comes from
+   the reading — a dim panel shimmers more faintly than a bright one, and an
+   unlit LED has no halo to breathe. */
+.solar-rays { animation: sim-breathe 5s ease-in-out infinite; }
+.solar-led-glow { animation: sim-breathe 2.6s ease-in-out infinite; }
+.lamp-glow { animation: sim-breathe 3.6s ease-in-out infinite; }
+.bin-glow { animation: sim-breathe 2.4s ease-in-out infinite; }
+@keyframes sim-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
 /* Gentle, and still for anyone who asked their system for less motion. */
 @media (prefers-reduced-motion: reduce) {
   .windmill-blades,
   .watering-drops circle,
-  .tank-drops line { animation: none !important; }
+  .tank-drops line,
+  .solar-rays,
+  .solar-led-glow,
+  .lamp-glow,
+  .bin-glow { animation: none !important; }
   /* Without motion the drops would sit in mid-air, which reads as a fault, so
      they are simply not drawn. */
   .watering-drops, .tank-drops { display: none; }

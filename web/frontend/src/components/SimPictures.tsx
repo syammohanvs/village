@@ -34,18 +34,23 @@ export function SolarPanel({ light, label }: { light: number; label: string }) {
     >
       {/* the lamp above it */}
       <circle cx="60" cy="9" r="6" fill="var(--gold-2)" opacity={0.25 + 0.75 * level} />
-      {[0, 1, 2, 3].map((step) => (
-        <line
-          key={step}
-          x1={60 + Math.cos((Math.PI / 3) * step) * 12}
-          y1={9 + Math.sin((Math.PI / 3) * step) * 12}
-          x2={60 + Math.cos((Math.PI / 3) * step) * 19}
-          y2={9 + Math.sin((Math.PI / 3) * step) * 19}
-          stroke="var(--gold-dim)"
-          strokeWidth="1.4"
-          opacity={0.2 + 0.8 * level}
-        />
-      ))}
+      {/* The rays breathe.  The group carries the animation, so each ray keeps
+          its own opacity from the light level and the two multiply: a dim panel
+          still shimmers less than a bright one. */}
+      <g className="solar-rays">
+        {[0, 1, 2, 3].map((step) => (
+          <line
+            key={step}
+            x1={60 + Math.cos((Math.PI / 3) * step) * 12}
+            y1={9 + Math.sin((Math.PI / 3) * step) * 12}
+            x2={60 + Math.cos((Math.PI / 3) * step) * 19}
+            y2={9 + Math.sin((Math.PI / 3) * step) * 19}
+            stroke="var(--gold-dim)"
+            strokeWidth="1.4"
+            opacity={0.2 + 0.8 * level}
+          />
+        ))}
+      </g>
       {/* the panel */}
       <g>
         <rect x="24" y="34" width="72" height="34" rx="3" fill="#0d1b2a" stroke="var(--gold-dim)" />
@@ -65,6 +70,9 @@ export function SolarPanel({ light, label }: { light: number; label: string }) {
       </g>
       {/* the LED, through its resistor */}
       <line x1="60" y1="68" x2="60" y2="72" stroke="var(--muted)" strokeWidth="1.2" />
+      {/* A lit LED has a soft halo that pulses; a dark one has none, because a
+          glow around an unlit LED would be a picture claiming current. */}
+      {glow > 0.02 && <circle className="solar-led-glow" cx="60" cy="74" r="6.4" fill="#ff5a4d" opacity="0.22" />}
       <circle
         cx="60"
         cy="74"
@@ -315,24 +323,29 @@ export function StreetLamp({ on, label }: { on: boolean; label: string }) {
       <rect x="56" y="72" width="19" height="3" rx="1.5" fill="var(--gold-dim)" />
       <path d="M65.5 30 Q65.5 20 56 20" fill="none" stroke="var(--gold-dim)" strokeWidth="3.4" />
       <ellipse cx="54" cy="20" rx="7" ry="3.4" fill={lit ? 'var(--gold-2)' : '#4a4034'} />
-      {lit && <circle cx="54" cy="20" r="12" fill="var(--gold-2)" opacity="0.18" />}
+      {lit && (
+        <g className="lamp-glow">
+          <circle cx="54" cy="20" r="12" fill="var(--gold-2)" opacity="0.18" />
+        </g>
+      )}
     </svg>
   );
 }
 
 /**
- * The three bins, with the one the camera last chose lit.
+ * The three bins, the camera that sorts them, and the one it last chose lit.
  *
  * It is an **indicator**, not a measurement: nothing here knows how full a bin
- * is, because nothing measures that (2026-11-15).  The colours match the LEDs
- * on the board (D21/D22/D23).
+ * is, because nothing measures that (2026-11-15).  The camera is drawn because
+ * that is the thing doing the classifying — the bins only say which answer it
+ * gave, and the colours match the LEDs on the board (D21/D22/D23).
  */
 export function WasteBins({ active, label }: { active: string | null; label: string }) {
   const lit = (active ?? '').trim().toLowerCase();
   const bins = [
-    { id: 'organic', colour: '#6cc596', x: 30 },
-    { id: 'plastic', colour: '#e05b67', x: 54 },
-    { id: 'paper', colour: '#e3b04b', x: 78 },
+    { id: 'organic', colour: '#6cc596', x: 54 },
+    { id: 'plastic', colour: '#e05b67', x: 72 },
+    { id: 'paper', colour: '#e3b04b', x: 90 },
   ];
   return (
     <svg
@@ -342,11 +355,25 @@ export function WasteBins({ active, label }: { active: string | null; label: str
       aria-label={label}
       data-active={lit || 'none'}
     >
+      {/* the camera, and what it is looking at */}
+      <g data-testid="waste-camera">
+        <rect x="8" y="26" width="24" height="15" rx="3.5" fill="#141010" stroke="var(--gold-dim)" strokeWidth="1.4" />
+        <rect x="14" y="21" width="9" height="5.5" rx="1.6" fill="#141010" stroke="var(--gold-dim)" strokeWidth="1.2" />
+        <circle cx="33" cy="33.5" r="5" fill="#0b1622" stroke="var(--gold-2)" strokeWidth="1.4" />
+        <circle cx="33" cy="33.5" r="2" fill="var(--gold-2)" opacity="0.9" />
+      </g>
+      {/* the line of sight: dashed, because it is a field of view and not a beam */}
+      <polygon points="38,30 50,21 50,46" fill="var(--gold-2)" opacity="0.08" />
+      <line x1="38" y1="33.5" x2="50" y2="33.5" stroke="var(--gold-dim)" strokeWidth="1" strokeDasharray="3 3" opacity="0.7" />
       {bins.map((bin) => {
         const on = lit === bin.id;
         return (
           <g key={bin.id} opacity={on ? 1 : lit ? 0.5 : 0.75}>
-            {on && <circle cx={bin.x + 8} cy="34" r="15" fill={bin.colour} opacity="0.16" />}
+            {on && (
+              <g className="bin-glow">
+                <circle cx={bin.x + 8} cy="34" r="15" fill={bin.colour} opacity="0.16" />
+              </g>
+            )}
             {/* lid and its handle, so three rectangles read as three bins */}
             <rect x={bin.x + 3} y="36" width="10" height="2.4" rx="1.2" fill={bin.colour} />
             <rect x={bin.x + 1} y="40" width="14" height="3.4" rx="1.7" fill={bin.colour} />

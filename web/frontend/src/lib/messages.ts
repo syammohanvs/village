@@ -906,7 +906,11 @@ export const MESSAGES = {
   'picture.plant': ['Potted plant', 'गमले का पौधा', 'ചട്ടിയിലെ ചെടി'],
   'picture.tank': ['Rain water tank', 'बारिश के पानी का टैंक', 'മഴവെള്ള ടാങ്ക്'],
   'picture.lamp': ['Streetlight', 'स्ट्रीट लाइट', 'തെരുവുവിളക്ക്'],
-  'picture.bins': ['The three waste bins', 'तीन कचरा बिन', 'മൂന്ന് മാലിന്യ ബിന്നുകൾ'],
+  'picture.bins': [
+    'A camera looking at the three waste bins',
+    'तीन कचरा बिनों को देखता कैमरा',
+    'മൂന്ന് മാലിന്യ ബിന്നുകളിലേക്ക് നോക്കുന്ന ക്യാമറ',
+  ],
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES;
