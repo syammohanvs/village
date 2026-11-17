@@ -35,6 +35,7 @@ IrrigationInputs dryInputs() {
   in.soil_calibrated = true;
   in.soil_percent = 20.0f;
   in.reservoir_valid = true;
+  in.reservoir_calibrated = true;
   in.reservoir_available = true;
   in.link_age_ms = 100;
   return in;
@@ -437,4 +438,19 @@ TEST(irrigation_survives_a_contact_stamp_from_the_same_tick) {
   const IrrigationStatus s = c.status(5994);
   CHECK(s.state == IrrigationState::Pumping);
   CHECK(!s.last.present);
+}
+
+TEST(a_manual_pump_says_why_it_cannot_run_when_the_tank_is_unreadable) {
+  IrrigationController c;
+  c.begin(0, autoCfg());
+  c.setMode(PumpMode::On);
+
+  IrrigationInputs in = dryInputs();
+  in.reservoir_calibrated = false;
+  in.reservoir_available = false;
+  c.tick(6000, in);
+  CHECK(!c.pumpOn());
+  // Not "the tank is low" -- that sends the operator looking for water that
+  // may be there (measured on the board, 2026-11-17).
+  CHECK(c.status(6000).reason == &reasons::kPumpManualWaterUnknown);
 }

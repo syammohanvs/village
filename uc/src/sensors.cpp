@@ -143,6 +143,7 @@ IrrigationInputs buildIrrigationInputs(uint32_t now) {
   in.soil_calibrated = soil.calibrated;
   in.soil_percent = soil.percent;
   in.reservoir_valid = reservoir.valid;
+  in.reservoir_calibrated = reservoir.calibrated;
   in.reservoir_available = reservoir.state == ReservoirState::Available;
   // ageMs, not a raw subtraction: a command handler stamps the contact time
   // with a later millis() than the `now` this loop sampled, and the unsigned

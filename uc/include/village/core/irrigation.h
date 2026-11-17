@@ -15,6 +15,7 @@ struct IrrigationInputs {
   bool soil_calibrated = false;
   float soil_percent = NAN;
   bool reservoir_valid = false;
+  bool reservoir_calibrated = false;
   bool reservoir_available = false;
   // Age of the last authenticated request from the laptop.  Only a MANUAL
   // session is stopped by this; local automatic watering continues.
@@ -251,7 +252,10 @@ class IrrigationController {
       reason_ = &reasons::kPumpManualOff;
       return;
     }
-    if (!in.reservoir_valid) {
+    // "No usable reading" is not the same as "empty": an uncalibrated probe
+    // must not send the operator looking for water (measured on the board,
+    // 2026-11-17).
+    if (!in.reservoir_valid || !in.reservoir_calibrated) {
       manual_on_ = false;
       reason_ = &reasons::kPumpManualWaterUnknown;
       return;

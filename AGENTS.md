@@ -97,6 +97,25 @@ visitors cannot be used to press **Water** or change calibration.
 
 ## ESP32 firmware
 
+> **DO THE OTA FROM THIS SESSION. This is a standing rule (2026-11-17).** The
+> upload runs on the **Windows** host, over the Mobile Hotspot, and this session
+> can drive it through interop — do not hand the command to the user and wait:
+>
+> ```bash
+> PW=$(sed -n 's/.*VILLAGE_OTA_PASSWORD "\(.*\)"/\1/p' uc/include/village/secrets.h)
+> cp uc/.pio/build/esp32doit-devkit-v1-ota/firmware.bin /mnt/c/Users/<you>/village-flash/ota-firmware.bin
+> /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command \
+>   "cd \$env:USERPROFILE\village-flash; .\espota.exe -i <board-ip> -p 3232 -I 192.168.137.1 -P 3233 -a '$PW' -f ota-firmware.bin -r"
+> ```
+>
+> `-I 192.168.137.1` is the Windows hotspot address the board can reach back on
+> (WSL's 172.29.x cannot be reached, which is the whole reason espota runs on
+> Windows). The board's address comes from `./scripts/relay.sh status` — it is
+> DHCP and has been .168, .197, .222 and .230. espota's output is often swallowed
+> by the PowerShell wrapper, so **confirm with the board itself**:
+> `firmware` in `/api/v1/status` (0.2.4, say) and a new `boot_id`. This was
+> missed on 2026-11-17 and the upload was handed over instead of run.
+
 > **ALWAYS FLASH AN OTA-CAPABLE IMAGE. This is a standing rule (2026-11-15).**
 > Never write a firmware whose USB image has OTA compiled out, and always check
 > the OTA port is answering after a flash. **The mistake it prevents, measured:**
