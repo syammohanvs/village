@@ -23,6 +23,9 @@ const ALLOWED_COMMANDS = new Set([
   'LIGHTS_AUTO',
   'IRRIGATION_REQUEST',
   'IRRIGATION_STOP',
+  // The pump's Auto mode (2026-11-18) — the same switch the Watering card has.
+  // Without this the panel refused a sentence the parser understood.
+  'PUMP_AUTO',
 ]);
 
 
@@ -269,9 +272,14 @@ export function VoicePanel() {
     if (state === 'listening' || state === 'processing' || speaking) return;
     setMicError('');
     setTtsNote('');
-    // The previous sentence and reply stay until this one replaces them: a
-    // panel that blanks itself the moment the microphone opens makes the
-    // visitor lose the answer they were reading.
+    // Clear the *request*, keep the *reply*.
+    //
+    // The request card is about to hold the sentence being spoken now, and
+    // leaving the previous one under "Your request" while the visitor talks
+    // reads as "it already heard me" (asked 2026-11-18).  The reply is a
+    // different thing: it answers the previous question, and blanking it would
+    // take away what the visitor was reading.
+    setTranscript('');
     try {
       const recorder = new VoiceRecorder();
       await recorder.start();

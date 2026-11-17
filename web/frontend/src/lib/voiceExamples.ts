@@ -17,6 +17,10 @@ export interface VoiceExample {
  * Chosen because they are the three things a visitor actually asks at an
  * exhibition — switch something, ask about water, ask about the soil — and
  * because **each one was run through the parser before it was written here**.
+ * The two status questions used to be the phrasings the parser *could* read
+ * rather than the ones a visitor would say ("मिट्टी की स्थिति", "മണ്ണ്
+ * നനവുണ്ടോ?"); the parser now reads the natural forms, so those are shown
+ * (2026-11-18).
  * `VoicePanel.test.tsx` sends every phrase in this file to the real parser, so
  * an example that stops being understood fails a test instead of quietly
  * teaching a visitor a sentence that does nothing.
@@ -54,14 +58,14 @@ export const VOICE_EXAMPLES: Record<VoiceLanguage, VoiceExample[]> = {
       intent: 'LIGHTS_ON',
     },
     {
-      label: 'വെള്ളം ഉണ്ടോ',
-      phrase: 'വെള്ളം ഉണ്ടോ?',
+      label: 'ടാങ്കിൽ വെള്ളം',
+      phrase: 'ടാങ്കിൽ വെള്ളമുണ്ടോ?',
       explanation: 'ടാങ്കിൽ വെള്ളമുണ്ടോ എന്ന് പറയുന്നു.',
       intent: 'WATER_STATUS',
     },
     {
       label: 'മണ്ണിന്റെ ഈർപ്പം',
-      phrase: 'മണ്ണ് നനവുണ്ടോ?',
+      phrase: 'മണ്ണിൽ എത്ര ഈർപ്പമുണ്ട്?',
       explanation: 'മണ്ണ് എത്ര നനവുണ്ടെന്ന് പറയുന്നു.',
       intent: 'SOIL_STATUS',
     },
@@ -74,14 +78,14 @@ export const VOICE_EXAMPLES: Record<VoiceLanguage, VoiceExample[]> = {
       intent: 'LIGHTS_ON',
     },
     {
-      label: 'पानी है क्या',
-      phrase: 'क्या पानी है?',
+      label: 'टंकी में पानी',
+      phrase: 'टंकी में पानी है?',
       explanation: 'बताता है कि टंकी में पानी है या नहीं।',
       intent: 'WATER_STATUS',
     },
     {
       label: 'मिट्टी की नमी',
-      phrase: 'मिट्टी की स्थिति',
+      phrase: 'मिट्टी में कितनी नमी है?',
       explanation: 'मिट्टी कितनी गीली है, बताता है।',
       intent: 'SOIL_STATUS',
     },

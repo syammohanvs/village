@@ -899,7 +899,7 @@ describe('the panel in plain words', () => {
     );
   });
 
-  it('keeps the last request and reply while a new recording starts', async () => {
+  it('keeps the reply but clears the request when a new recording starts', async () => {
     vi.mocked(api.voiceInterpret).mockResolvedValue({
       status: 'ok',
       kind: 'command',
@@ -918,10 +918,14 @@ describe('the panel in plain words', () => {
     );
 
     await user.click(within(panel).getByTestId('voice-start'));
+    // The answer to the previous question stays…
     expect(within(panel).getByTestId('voice-reply-text')).toHaveTextContent(
       'The streetlights are off.',
     );
-    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent('lights off');
+    // …but the request is the sentence being spoken *now*, so it empties
+    // (asked 2026-11-18: the old command sat there while the visitor talked).
+    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent(/Listening/i);
+    expect(within(panel).getByTestId('voice-staged-text')).not.toHaveTextContent('lights off');
   });
 });
 
@@ -1085,5 +1089,40 @@ describe('a language change during a recording', () => {
 
     await waitFor(() => expect(api.voiceTranscribe).toHaveBeenCalled());
     expect(vi.mocked(api.voiceTranscribe).mock.calls[0][1]).toBe('ml');
+  });
+});
+
+/**
+ * "Your request" belongs to the sentence being spoken now (asked 2026-11-18).
+ *
+ * Leaving the previous command there while the visitor talks reads as "it
+ * already heard me".  The reply is not touched: it answers the previous
+ * question and is what the visitor was reading.
+ */
+describe('a new recording clears the request, not the reply', () => {
+  it('empties "Your request" the moment Start is pressed', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'status',
+      kind: 'status',
+      intent: 'WATER_STATUS',
+      transcript: 'is water available?',
+      response_text: 'The tank has water.',
+    } as never);
+
+    const { user } = await openPanel();
+    // One complete request first.
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(screen.getByTestId('voice-start'));
+    const request = await screen.findByTestId('voice-staged-text');
+    await waitFor(() => expect(request).toHaveTextContent(/is water available/));
+    // The reply to a status question is read from the frame on screen, so this
+    // compares it rather than guessing its wording.
+    const reply = screen.getByTestId('voice-reply-text').textContent;
+    expect(reply).toBeTruthy();
+
+    // Now start again: the request empties, the reply is untouched.
+    await user.click(screen.getByTestId('voice-start'));
+    expect(screen.getByTestId('voice-staged-text')).toHaveTextContent(/Listening/i);
+    expect(screen.getByTestId('voice-reply-text').textContent).toBe(reply);
   });
 });

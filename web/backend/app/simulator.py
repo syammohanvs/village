@@ -47,6 +47,10 @@ REASONS: dict[str, tuple[str, str]] = {
     "IRRIGATION_BLOCKED_PUMP_DISABLED": ("IRRIGATION_BLOCKED_PUMP_DISABLED", "Irrigation blocked: the pump is switched off in the configuration."),
     "PUMP_MANUAL_ON": ("PUMP_MANUAL_ON", "Pump switched on by hand. Nothing but the tank is checked."),
     "PUMP_MANUAL_OFF": ("PUMP_MANUAL_OFF", "Pump switched off by hand."),
+    "PUMP_MANUAL_AUTO": (
+        "PUMP_MANUAL_AUTO",
+        "Pump returned to automatic mode. The soil and water readings decide now.",
+    ),
     "PUMP_MANUAL_WATER_LOW": ("PUMP_MANUAL_WATER_LOW", "The tank is at or below the minimum, so the pump stays off."),
     "PUMP_MANUAL_WATER_UNKNOWN": ("PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading. The manual switch runs the pump anyway — watch the tank."),
     "PUMP_MANUAL_ACTIVE": ("PUMP_MANUAL_ACTIVE", "The pump is on the manual switch. Set it back to Auto to water by the rules."),
@@ -860,6 +864,11 @@ class SimulatedDevice:
             self.dry_since = None
 
     def _pump_manual_reason(self) -> tuple[str, str]:
+        if self.pump_manual == "auto":
+            # "Pump auto" is a *mode*, not a hand switch: answering it with
+            # "switched on by hand" (as it did until 2026-11-18) is the wrong
+            # sentence about the right change.
+            return reason("PUMP_MANUAL_AUTO")
         if self.pump_manual == "off":
             return reason("PUMP_MANUAL_OFF")
         if self.reservoir == "low":

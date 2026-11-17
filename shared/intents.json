@@ -262,6 +262,55 @@
       }
     },
     {
+      "id": "PUMP_AUTO",
+      "command": "PUMP_AUTO",
+      "actuation": true,
+      "label": {
+        "en": "Automatic pump",
+        "ml": "പമ്പ് ഓട്ടോ",
+        "hi": "पंप ऑटो"
+      },
+      "phrases": {
+        "en": [
+          "automatic pump",
+          "pump automatic",
+          "auto pump",
+          "pump auto",
+          "put the pump on automatic",
+          "put the pump in automatic mode"
+        ],
+        "ml": [
+          "പമ്പ് ഓട്ടോ",
+          "പമ്പ് ഓട്ടോമാറ്റിക്",
+          "പമ്പ് സ്വയം",
+          "pump auto",
+          "pump automatic"
+        ],
+        "hi": [
+          "पंप ऑटो",
+          "पंप ऑटोमैटिक",
+          "पंप अपने आप",
+          "pump auto",
+          "pump automatic"
+        ]
+      },
+      "response_pending": {
+        "en": "Putting the pump in automatic mode.",
+        "ml": "പമ്പ് ഓട്ടോ മോഡിലാക്കുന്നു.",
+        "hi": "पंप को ऑटो मोड में डाल रहे हैं।"
+      },
+      "response_done": {
+        "en": "The pump follows the soil and water readings now.",
+        "ml": "പമ്പ് ഇപ്പോൾ മണ്ണിന്റെയും വെള്ളത്തിന്റെയും വായന അനുസരിച്ച് പ്രവർത്തിക്കും.",
+        "hi": "पंप अब मिट्टी और पानी की रीडिंग के अनुसार चलेगा।"
+      },
+      "already_text": {
+        "en": "The pump is already in automatic mode.",
+        "ml": "പമ്പ് ഇപ്പോൾത്തന്നെ ഓട്ടോമാറ്റിക് മോഡിലാണ്.",
+        "hi": "पंप पहले से ऑटोमैटिक मोड में है।"
+      }
+    },
+    {
       "id": "SOIL_STATUS",
       "command": null,
       "actuation": false,
@@ -714,6 +763,10 @@
       "ml": [
         "മണ്ണ്",
         "മണ്ണിലെ ഈർപ്പം",
+        "ഈർപ്പം",
+        "ഈർപ്പമുണ്ടോ",
+        "ഈർപ്പമുണ്ട്",
+        "നനവ്",
         "mannu",
         "mann"
       ],
@@ -734,7 +787,10 @@
       ],
       "ml": [
         "വെള്ളം",
+        "വെള്ളമുണ്ടോ",
+        "വെള്ളമുണ്ട്",
         "ടാങ്ക്",
+        "ടാങ്കിൽ",
         "ജലം",
         "റിസർവോയർ",
         "vellam",
@@ -893,6 +949,7 @@
     "pump": {
       "on": "IRRIGATION_START",
       "off": "IRRIGATION_STOP",
+      "auto": "PUMP_AUTO",
       "status": "PUMP_STATUS"
     },
     "soil": {
@@ -1096,6 +1153,9 @@
         "availability"
       ],
       "fillers": [
+        "in",
+        "into",
+        "mode",
         "the",
         "a",
         "an",
@@ -1175,6 +1235,8 @@
         "ആയിരുന്നു"
       ],
       "verbs": [
+        "ആക്കുക",
+        "ആക്കൂ",
         "ചെയ്യുക",
         "ചെയ്യൂ",
         "തുടങ്ങുക",
@@ -1197,6 +1259,8 @@
         "നില"
       ],
       "fillers": [
+        "മോഡ്",
+        "മോഡിൽ",
         "ആ",
         "ഇപ്പോൾ",
         "എന്റെ",
@@ -1298,6 +1362,7 @@
         "हालत"
       ],
       "fillers": [
+        "मोड",
         "अभी",
         "आप",
         "और",

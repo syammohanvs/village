@@ -238,6 +238,14 @@ class IntentMatcher:
 
         # --- two states in one sentence are never a guess --------------------
         unique_states = {name for _, _, name in state_hits}
+        # An explicit mode wins over a preposition and over the pump cue: "put
+        # the pump on automatic" says *on* and *automatic* in one breath, and
+        # "പമ്പ് ഓട്ടോ" / "पंप ऑटो" names the pump only to change its mode — the
+        # pump cue would otherwise read "pump" as "start watering".  Both were
+        # answered with the wrong command until 2026-11-18.
+        if "auto" in unique_states:
+            unique_states = {"auto"}
+            watering = None
         if len(unique_states) > 1:
             # "Are the lights on or off?" is a status question, not a command
             # with two actions.
@@ -303,7 +311,12 @@ class IntentMatcher:
                 return self._result("ambiguous", language, "ambiguous_generic", device=device)
             if is_request:
                 return self._result("ambiguous", language, "ambiguous_generic", device=device)
-            fallback = self._phrase_fallback(tokens, language, allow=False)
+            # A whole catalogue phrase, exactly as written.  It used to be
+            # excluded here, which is why a natural noun-phrase question
+            # ("മണ്ണിലെ ഈർപ്പം", "मिट्टी की नमी") came back AMBIGUOUS even though
+            # it is a listed phrase for that status (2026-11-18).  A question or a
+            # refusal is still never allowed through this way.
+            fallback = self._phrase_fallback(tokens, language, allow=not (is_question or negators))
             if fallback:
                 return fallback
             return self._result("ambiguous", language, "ambiguous_generic", device=device)

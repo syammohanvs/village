@@ -441,3 +441,80 @@ def test_a_long_word_one_letter_apart_is_still_the_same_word(matcher: IntentMatc
     assert not same_word("anakkukka", "nanaykkuka")
 
     assert matcher.match("விலக்குங்கள் காத்திக்குக்கா", "ml")["command"] == "LIGHTS_ON"
+
+
+# ---------------------------------------------------------------------------
+# Auto for both devices (2026-11-18).  The lights had it; the pump did not, so
+# "put the pump on automatic" fell through to "start watering" — the pump cue
+# names the pump and `_watering` read that as a watering request.
+# ---------------------------------------------------------------------------
+def test_auto_is_a_command_for_the_lights_and_the_pump(matcher: IntentMatcher) -> None:
+    for text in (
+        "lights auto",
+        "auto lights",
+        "put the lights on automatic",
+        "lights in automatic mode",
+    ):
+        assert matcher.match(text, "en")["intent"] == "LIGHTS_AUTO", text
+
+    for text in (
+        "pump auto",
+        "auto pump",
+        "put the pump on automatic",
+        "put the pump in automatic mode",
+    ):
+        assert matcher.match(text, "en")["intent"] == "PUMP_AUTO", text
+        # …and it is the *mode*, not a watering request.
+        assert matcher.match(text, "en")["command"] == "PUMP_AUTO", text
+
+
+def test_auto_is_understood_in_hindi_and_malayalam(matcher: IntentMatcher) -> None:
+    for text in ("लाइट ऑटो करें", "लाइट ऑटो", "ऑटोमैटिक लाइट"):
+        assert matcher.match(text, "hi")["intent"] == "LIGHTS_AUTO", text
+    for text in ("पंप ऑटो करें", "पंप ऑटो", "पंप को ऑटो मोड में करें"):
+        assert matcher.match(text, "hi")["intent"] == "PUMP_AUTO", text
+
+    for text in ("വിളക്കുകൾ ഓട്ടോ ചെയ്യുക", "വിളക്കുകൾ ഓട്ടോ", "വിളക്കുകൾ ഓട്ടോ ആക്കുക"):
+        assert matcher.match(text, "ml")["intent"] == "LIGHTS_AUTO", text
+    for text in ("പമ്പ് ഓട്ടോ ചെയ്യുക", "പമ്പ് ഓട്ടോ", "പമ്പ് ഓട്ടോ ആക്കുക"):
+        assert matcher.match(text, "ml")["intent"] == "PUMP_AUTO", text
+
+
+def test_an_explicit_mode_outranks_the_preposition_and_the_pump_cue(
+    matcher: IntentMatcher,
+) -> None:
+    # "on automatic" holds the preposition "on"; reading it as a state would make
+    # the sentence two states (on + auto) and the answer "ambiguous".
+    assert matcher.match("put the pump on automatic", "en")["intent"] == "PUMP_AUTO"
+    # The pump cue alone still means a watering request when there is no mode.
+    assert matcher.match("pump", "en")["intent"] in {"IRRIGATION_START", "AMBIGUOUS"}
+    # And a real stop still stops.
+    assert matcher.match("stop the pump", "en")["intent"] == "IRRIGATION_STOP"
+    assert matcher.match("പമ്പ് നിർത്തുക", "ml")["intent"] == "IRRIGATION_STOP"
+    assert matcher.match("पंप बंद करो", "hi")["intent"] == "IRRIGATION_STOP"
+
+
+# ---------------------------------------------------------------------------
+# The natural Malayalam/Hindi status questions (2026-11-18).  They are catalogue
+# phrases, but the phrase fallback was skipped exactly where these land: one
+# device, no state, no question mark — so a listed phrase came back AMBIGUOUS.
+# Malayalam also glues the verb to the noun ("വെള്ളമുണ്ടോ"), which `_find` (whole
+# words) could not see.
+# ---------------------------------------------------------------------------
+def test_natural_status_questions_in_malayalam_and_hindi(matcher: IntentMatcher) -> None:
+    for text in (
+        "മണ്ണിലെ ഈർപ്പം",
+        "മണ്ണിൽ എത്ര ഈർപ്പമുണ്ട്?",
+        "മണ്ണിന്റെ ഈർപ്പം എത്രയാണ്?",
+        "മണ്ണ് നനവുണ്ടോ?",
+    ):
+        assert matcher.match(text, "ml")["intent"] == "SOIL_STATUS", text
+
+    for text in ("മണ്ണിലെ ഈർപ്പം", "ടാങ്കിൽ വെള്ളമുണ്ടോ?", "വെള്ളം ഉണ്ടോ?"):
+        want = "WATER_STATUS" if "വെള്ള" in text else "SOIL_STATUS"
+        assert matcher.match(text, "ml")["intent"] == want, text
+
+    for text in ("मिट्टी की नमी", "मिट्टी में कितनी नमी है?", "मिट्टी कितनी गीली है?"):
+        assert matcher.match(text, "hi")["intent"] == "SOIL_STATUS", text
+    for text in ("टंकी में पानी है?", "क्या पानी है?"):
+        assert matcher.match(text, "hi")["intent"] == "WATER_STATUS", text

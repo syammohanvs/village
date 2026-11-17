@@ -275,6 +275,28 @@ visitors cannot be used to press **Water** or change calibration.
     reviewed by a native speaker; the wording is deliberately simple (Class 6,
     exhibition), and any sentence that reads oddly should be fixed in
     `messages.ts` alone — no component changes.
+- **Auto is a spoken command for *both* devices (2026-11-18).**  The lights had
+  `LIGHTS_AUTO`; the pump had only on/off, so "put the pump on automatic" fell
+  through to *start watering* — the Malayalam/Hindi watering cue is the word
+  "pump" itself.  `device_commands.pump.auto = PUMP_AUTO` and a `PUMP_AUTO`
+  intent close it, and two rules keep the two modes apart: **an explicit `auto`
+  outranks the preposition "on"** ("put the pump on automatic" is one state,
+  not two) **and outranks the pump cue**.  The panel's client-side
+  `ALLOWED_COMMANDS` had to gain `PUMP_AUTO` too, or it refused a sentence the
+  parser understood.  The demo device answered the mode change with
+  "switched on by hand"; it now says the pump follows the readings again.
+- **Natural Malayalam/Hindi status questions work (2026-11-18).**  They were
+  listed catalogue phrases that came back **AMBIGUOUS**, because the
+  whole-phrase fallback was skipped exactly where they land (one device, no
+  state, no question mark).  `_phrase_fallback` is now allowed there whenever
+  the sentence is not a question or a refusal.  Malayalam also glues the verb
+  to the noun (`വെള്ളമുണ്ടോ` = water + is-there) and `_find` matches whole words,
+  so the joined forms are listed in `devices` (`വെള്ളമുണ്ടോ`, `വെള്ളമുണ്ട്`,
+  `ടാങ്കിൽ`, `ഈർപ്പം`, …).  With those, the panel's two status examples are the
+  sentences a visitor actually says — "മണ്ണിൽ എത്ര ഈർപ്പമുണ്ട്?" and "मिट्टी में
+  कितनी नमी है?" — instead of the phrasings the parser used to force
+  ("മണ്ണ് നനവുണ്ടോ?", "मिट्टी की स्थिति").  `test_voice_examples.py` sends
+  every shown example through the parser, so this cannot drift back.
 - **The panel has its own words, in all three languages (2026-11-17).** All
   strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
   intro, section headings, short state words, plain action wording) and are
@@ -298,9 +320,12 @@ visitors cannot be used to press **Water** or change calibration.
   `LIVE_COPY` — in the visitor's language, and without inventing a percentage
   when the probe is uncalibrated. `soilDry(pct)` templates already carry the
   `%`: pass the number only (a doubled `%%` shipped once).
-- **Sara's reply and the request stay on screen while a new recording starts**,
-  and closing the panel mid-recording cancels the recorder. A reply is only
-  replaced by a newer request.
+- **A new recording clears the request but keeps the reply (2026-11-18).**  It
+  used to keep both, and the visitor saw the *previous command* sitting under
+  "Your request" while speaking the next one, which reads as "it already heard
+  me".  `start()` empties `transcript`; the reply stays because it answers the
+  previous question and is what the visitor was reading.  Closing the panel
+  mid-recording still cancels the recorder.
 - **The rows read the same in both modes; only the lab's controls are extra
   (2026-11-17).**  The pump/streetlight state, the *Outside / Streetlights*
   readings, the five-lamp strip, the SolarPanel / Windmill pictures and the
