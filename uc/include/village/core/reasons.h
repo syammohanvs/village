@@ -122,7 +122,8 @@ inline constexpr Reason kPumpManualActive{
     "PUMP_MANUAL_ACTIVE",
     "The pump is on the manual switch. Set it back to Auto to water by the rules."};
 inline constexpr Reason kPumpManualWaterUnknown{
-    "PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading, so the pump stays off."};
+    "PUMP_MANUAL_WATER_UNKNOWN",
+    "The tank probe has no usable reading. The manual switch runs the pump anyway — watch the tank."};
 
 inline constexpr Reason kLightsManualOn{
     "LIGHTS_MANUAL_ON", "Streetlights switched on manually."};

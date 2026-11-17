@@ -253,6 +253,12 @@ Both are the simulator's own state, so they end with the simulation: switching
 back to Live, or restarting the app, returns the pump and the lamps to the
 rules.
 
+**The pump switch and the tank.** Only a tank the controller *knows* to be low
+stops a manual **On**. A probe that is missing, uncalibrated or stale cannot say
+that, so the switch runs the pump anyway and the card says the reading is
+unavailable — this board has no tank probe fitted (2026-11-17), so that is its
+normal state. Fit and calibrate the probe and a low tank starts refusing again.
+
 ## Honest data
 
 The village does **not** measure tank percentage, litres, household consumption,

@@ -157,6 +157,10 @@ void buildStatus(JsonDocument& doc) {
   // pump may run is the switch (auto / on / off) plus the tank.
   pump["mode"] = toString(irr.mode);
   pump["enabled"] = rt.config.irrigation.pump_enabled;
+  // The pad itself, so "is D19 actually high?" is answerable from the app --
+  // the same readback the bench page has, and the question the manual switch
+  // raised on 2026-11-17.
+  pump["pin_high"] = digitalRead(pins::PUMP_GATE) == HIGH;
   pump["feedback"] = "none";
 
   const LightOutput lights = rt.lights.output(rt.config, now);

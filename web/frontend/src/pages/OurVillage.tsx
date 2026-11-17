@@ -164,7 +164,10 @@ export function OurVillage() {
           demo ? ' Use Reset in Setup → Simulation to refill the demo tank.' : ''
         }`
       : reservoir?.state !== 'available'
-        ? 'The tank reading is unavailable, so the pump will not run.'
+        ? // An uncalibrated probe cannot say the tank is empty, so the manual
+          // switch is allowed -- but the reading really is missing, and saying
+          // so is the difference between "no water" and "no idea".
+          'The tank reading is unavailable. On and Off still run the pump by hand; watch the tank.'
         : physicalDisabled
           ? 'The controller is offline. Actions are disabled.'
           : '';

@@ -253,6 +253,9 @@ class IrrigationController {
   // A pump must never run dry, so a low or unreadable tank stops it whatever
   // the switch says.
   void tickManual(const IrrigationInputs& in) {
+    // Reported as pumping while the switch holds it on, so the page's
+    // Watering chip and the pump agree (the state machine's pulses are not
+    // used here -- that is what manual means).
     pump_on_ = false;
     state_ = IrrigationState::Idle;
     session_ = SessionKind::None;
@@ -261,21 +264,23 @@ class IrrigationController {
       reason_ = &reasons::kPumpManualOff;
       return;
     }
-    // "No usable reading" is not the same as "empty": an uncalibrated probe
-    // must not send the operator looking for water (measured on the board,
-    // 2026-11-17).
-    if (!in.reservoir_valid || !in.reservoir_calibrated) {
-      manual_on_ = false;
-      reason_ = &reasons::kPumpManualWaterUnknown;
-      return;
-    }
-    if (!in.reservoir_available) {
+    // Only a tank that is KNOWN to be empty stops the manual switch.  A probe
+    // that cannot say (uncalibrated, stale, no sample) must not refuse a
+    // switch the operator is standing in front of — the first version did, and
+    // the button looked dead on a board whose probe had never been calibrated
+    // (reported 2026-11-17).
+    const bool tank_known_dry =
+        in.reservoir_valid && in.reservoir_calibrated && !in.reservoir_available;
+    if (tank_known_dry) {
       manual_on_ = false;
       reason_ = &reasons::kPumpManualWaterLow;
       return;
     }
     manual_on_ = true;
-    reason_ = &reasons::kPumpManualOn;
+    state_ = IrrigationState::Pumping;
+    reason_ = (in.reservoir_valid && in.reservoir_calibrated)
+                  ? &reasons::kPumpManualOn
+                  : &reasons::kPumpManualWaterUnknown;
   }
 
   void clearFailureLockout(uint32_t now) {

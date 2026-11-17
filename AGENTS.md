@@ -87,7 +87,10 @@ visitors cannot be used to press **Water** or change calibration.
   as the lights: Auto is every rule, and On/Off are the operator's, watched only
   by the tank (`PUMP_ON` / `PUMP_OFF` / `PUMP_AUTO`, status `actuators.pump.mode`).
   The card carries that switch and nothing else: Water/Stop were removed
-  (2026-11-17) because On/Off say the same thing.  A spoken "stop the pump"
+  (2026-11-17) because On/Off say the same thing.  A manual **On** is stopped
+  only by a tank the controller *knows* is low — a missing or uncalibrated probe
+  does not refuse it (this board has no tank probe fitted), and
+  `actuators.pump.pin_high` answers "is D19 actually high” from the app.  A spoken "stop the pump"
   (IRRIGATION_STOP) also releases a manual **On** — answering "stopped" while
   the switch holds the pump running is the one answer it must never give.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's

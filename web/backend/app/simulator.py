@@ -48,7 +48,7 @@ REASONS: dict[str, tuple[str, str]] = {
     "PUMP_MANUAL_ON": ("PUMP_MANUAL_ON", "Pump switched on by hand. Nothing but the tank is checked."),
     "PUMP_MANUAL_OFF": ("PUMP_MANUAL_OFF", "Pump switched off by hand."),
     "PUMP_MANUAL_WATER_LOW": ("PUMP_MANUAL_WATER_LOW", "The tank is at or below the minimum, so the pump stays off."),
-    "PUMP_MANUAL_WATER_UNKNOWN": ("PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading, so the pump stays off."),
+    "PUMP_MANUAL_WATER_UNKNOWN": ("PUMP_MANUAL_WATER_UNKNOWN", "The tank probe has no usable reading. The manual switch runs the pump anyway — watch the tank."),
     "PUMP_MANUAL_ACTIVE": ("PUMP_MANUAL_ACTIVE", "The pump is on the manual switch. Set it back to Auto to water by the rules."),
     "IRRIGATION_BLOCKED_ALREADY_ACTIVE": ("IRRIGATION_BLOCKED_ALREADY_ACTIVE", "Irrigation blocked: a watering session is already running."),
     "IRRIGATION_BLOCKED_COOLDOWN": ("IRRIGATION_BLOCKED_COOLDOWN", "Irrigation blocked: the post-session lockout is still active."),
@@ -497,6 +497,7 @@ class SimulatedDevice:
                         # "auto" (the rules) or the manual switch.
                         "mode": self.pump_manual,
                         "enabled": self.pump_enabled,
+                        "pin_high": self.state == "pumping",
                         "feedback": "none",
                     },
                     "streetlights": {

@@ -96,6 +96,8 @@ export interface PumpState {
   commanded: boolean;
   /** "auto" (the rules decide) or the manual switch. */
   mode?: 'auto' | 'on' | 'off';
+  /** The pad itself (D19), so the app can say "the pin is high" honestly. */
+  pin_high?: boolean;
   /** Older firmware reported a build-time commissioning gate; it is gone. */
   commissioned?: boolean;
   feedback?: string;

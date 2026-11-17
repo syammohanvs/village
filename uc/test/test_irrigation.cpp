@@ -458,7 +458,7 @@ TEST(stop_the_pump_releases_a_manual_switch_too) {
   CHECK(!c.pumpOn());
 }
 
-TEST(a_manual_pump_says_why_it_cannot_run_when_the_tank_is_unreadable) {
+TEST(an_unreadable_tank_does_not_refuse_the_manual_switch) {
   IrrigationController c;
   c.begin(0, autoCfg());
   c.setMode(PumpMode::On);
@@ -467,8 +467,22 @@ TEST(a_manual_pump_says_why_it_cannot_run_when_the_tank_is_unreadable) {
   in.reservoir_calibrated = false;
   in.reservoir_available = false;
   c.tick(6000, in);
-  CHECK(!c.pumpOn());
-  // Not "the tank is low" -- that sends the operator looking for water that
-  // may be there (measured on the board, 2026-11-17).
+  // The probe cannot say the tank is empty, so the operator's switch wins --
+  // and the reason says the reading is unavailable, so nobody thinks it was
+  // checked (measured on the board, 2026-11-17).
+  CHECK(c.pumpOn());
   CHECK(c.status(6000).reason == &reasons::kPumpManualWaterUnknown);
+}
+
+TEST(a_tank_that_is_known_to_be_low_still_stops_the_manual_switch) {
+  IrrigationController c;
+  c.begin(0, autoCfg());
+  c.setMode(PumpMode::On);
+
+  IrrigationInputs in = dryInputs();
+  in.reservoir_calibrated = true;
+  in.reservoir_available = false;
+  c.tick(6000, in);
+  CHECK(!c.pumpOn());
+  CHECK(c.status(6000).reason == &reasons::kPumpManualWaterLow);
 }
