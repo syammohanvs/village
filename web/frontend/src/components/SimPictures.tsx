@@ -1,12 +1,26 @@
 /**
- * The two little pictures the simulation adds: a solar panel under a lamp and a
- * windmill.  Both are drawn, not measured — they exist so a visitor can see the
- * control they moved, and neither invents a number (the numbers come from the
- * status frame, which is the simulator's own circuit arithmetic).
+ * The little pictures each card carries.
+ *
+ * They are **drawn, not measured**: every one of them exists so a visitor can
+ * see the thing the card is talking about, and not one of them invents a number
+ * — the figures beside them come from the status frame (Live) or the simulator's
+ * own circuit arithmetic (Simulation).
+ *
+ * Two rules hold across all six:
+ *
+ * 1. **A picture may not claim hardware the board does not have.**  The windmill
+ *    stands still and says so when no turbine is wired; the tank shows one of
+ *    the two states its two wires can actually report, never a percentage.
+ * 2. **It follows the same value the card does.**  Live and Simulation differ in
+ *    where the number comes from, never in what is drawn, so a picture that says
+ *    "pumping" is next to a card that says "Pump running".
+ *
+ * The accessible name is passed in already translated, because this module has
+ * no language of its own.
  */
 
-/** A panel and the LED it lights, as bright as the simulated light allows. */
-export function SolarPanel({ light }: { light: number }) {
+/** A panel and the LED it lights, as bright as the light allows. */
+export function SolarPanel({ light, label }: { light: number; label: string }) {
   const level = Math.max(0, Math.min(1, light));
   // The LED starts at its forward voltage: below ~40% light it is dark.
   const glow = Math.max(0, (level - 0.35) / 0.65);
@@ -15,7 +29,7 @@ export function SolarPanel({ light }: { light: number }) {
       className="sim-picture sim-picture--solar"
       viewBox="0 0 120 78"
       role="img"
-      aria-label={`Solar panel in ${level > 0.66 ? 'strong' : level > 0.2 ? 'some' : 'low'} light`}
+      aria-label={label}
       data-light={level.toFixed(2)}
     >
       {/* the lamp above it */}
@@ -70,7 +84,15 @@ export function SolarPanel({ light }: { light: number }) {
  * picture stands still and says so rather than turning beside the words "Not
  * fitted" (2026-11-17).
  */
-export function Windmill({ speed, fitted = true }: { speed: number; fitted?: boolean }) {
+export function Windmill({
+  speed,
+  fitted = true,
+  label,
+}: {
+  speed: number;
+  fitted?: boolean;
+  label: string;
+}) {
   const level = Math.max(0, Math.min(1, speed));
   // One turn every 6 s at a breeze, every 0.9 s in a gale; still air does not
   // turn at all, and CSS stops the animation entirely for reduced motion.
@@ -80,11 +102,7 @@ export function Windmill({ speed, fitted = true }: { speed: number; fitted?: boo
       className="sim-picture sim-picture--wind"
       viewBox="0 0 120 78"
       role="img"
-      aria-label={
-        fitted
-          ? `Windmill turning ${level > 0.66 ? 'fast' : level > 0.1 ? 'slowly' : 'not at all'}`
-          : 'Windmill not fitted'
-      }
+      aria-label={label}
       data-speed={level.toFixed(2)}
       data-fitted={fitted ? 'true' : 'false'}
     >
@@ -108,6 +126,235 @@ export function Windmill({ speed, fitted = true }: { speed: number; fitted?: boo
         ))}
         <circle cx="60" cy="30" r="3" fill="var(--gold-2)" />
       </g>
+    </svg>
+  );
+}
+
+/**
+ * A potted plant: the soil darkens as it gets wet, the leaves lift, and while
+ * the pump runs, water falls.
+ *
+ * `level` is 0 for dry and 1 for wet (`null` when the probe has said nothing —
+ * the plant is then drawn neutral rather than guessed at).  `pumping` is the
+ * controller's own state, so the drops are the same fact as the chip.
+ */
+export function Plant({
+  level,
+  pumping,
+  label,
+}: {
+  level: number | null;
+  pumping: boolean;
+  label: string;
+}) {
+  const wet = level === null ? 0.5 : Math.max(0, Math.min(1, level));
+  // Dry soil browns; wet soil goes almost black.  Interpolated, so a calibrated
+  // probe at 21% looks like 21%.
+  const soil = `rgb(${Math.round(90 - 55 * wet)}, ${Math.round(64 - 40 * wet)}, ${Math.round(46 - 30 * wet)})`;
+  const droop = 1 - wet;
+  return (
+    <svg
+      className="sim-picture sim-picture--plant"
+      viewBox="0 0 120 78"
+      role="img"
+      aria-label={label}
+      data-moisture={level === null ? 'unknown' : wet.toFixed(2)}
+      data-pumping={pumping ? 'true' : 'false'}
+    >
+      {/* water, only while the pump is actually running */}
+      {pumping && (
+        <g className="watering-drops" aria-hidden="true">
+          {[
+            { x: 55, delay: '0s' },
+            { x: 60, delay: '0.4s' },
+            { x: 65, delay: '0.8s' },
+            { x: 60, delay: '1.2s' },
+          ].map((drop, index) => (
+            <circle
+              key={`${drop.x}-${index}`}
+              cx={drop.x}
+              cy={18}
+              r="2.4"
+              fill="#7fc7e8"
+              style={{ animationDelay: drop.delay }}
+            />
+          ))}
+        </g>
+      )}
+      {/* the pot, then the soil in it */}
+      <path d="M43 57 L49 76 L71 76 L77 57 Z" fill="var(--burgundy-2)" stroke="var(--gold-dim)" strokeWidth="1.2" />
+      <rect x="45" y="55" width="30" height="4" rx="2" fill={soil} stroke="var(--gold-dim)" strokeWidth="0.6" />
+      {/* stem and leaves; the leaves fall with dryness */}
+      <line x1="60" y1="56" x2="60" y2="28" stroke="#6cc596" strokeWidth="2.4" />
+      <ellipse
+        cx="51"
+        cy="38"
+        rx="10"
+        ry="4"
+        fill="#6cc596"
+        opacity={0.55 + 0.45 * wet}
+        transform={`rotate(${-18 - 26 * droop} 60 44)`}
+      />
+      <ellipse
+        cx="69"
+        cy="34"
+        rx="10"
+        ry="4"
+        fill="#6cc596"
+        opacity={0.55 + 0.45 * wet}
+        transform={`rotate(${18 + 26 * droop} 60 44)`}
+      />
+      <ellipse
+        cx="60"
+        cy="26"
+        rx="3.4"
+        ry="6"
+        fill="#7fd3a6"
+        opacity={0.6 + 0.4 * wet}
+        transform={`rotate(${8 * droop} 60 30)`}
+      />
+    </svg>
+  );
+}
+
+/**
+ * The rain water tank, at one of the **two** levels its two wires can report.
+ *
+ * There is deliberately no percentage: the real detector only knows "water at the
+ * low wire" or "not".  A tank the controller cannot read is drawn empty and
+ * dashed rather than half full.
+ */
+export function RainTank({
+  state,
+  label,
+}: {
+  state: 'available' | 'low' | 'uncalibrated' | 'unknown';
+  label: string;
+}) {
+  const known = state === 'available' || state === 'low';
+  const fill = state === 'available' ? 32 : state === 'low' ? 11 : 0;
+  return (
+    <svg
+      className="sim-picture sim-picture--tank"
+      viewBox="0 0 120 78"
+      role="img"
+      aria-label={label}
+      data-state={state}
+    >
+      {/* the tank, then what is in it, then the rain falling into it */}
+      <rect
+        x="40"
+        y="16"
+        width="40"
+        height="56"
+        rx="5"
+        fill="#0d1b2a"
+        stroke="var(--gold-dim)"
+        strokeWidth="1.4"
+        strokeDasharray={known ? undefined : '4 3'}
+      />
+      {/* the rim, so the shape reads as an open tank rather than a battery */}
+      <ellipse cx="60" cy="16" rx="20" ry="3.4" fill="#0b1622" stroke="var(--gold-dim)" strokeWidth="1.2" />
+      {/* the water: two levels, never a measurement */}
+      {fill > 0 && (
+        <rect x="42" y={70 - fill} width="36" height={fill} rx="3" fill="#2f6f9f" opacity="0.85" />
+      )}
+      {/* rain, while there is water to collect — drawn after the tank so it falls
+          through the opening instead of behind it */}
+      {state === 'available' && (
+        <g className="tank-drops" aria-hidden="true">
+          {[
+            { x: 50, delay: '0s' },
+            { x: 60, delay: '0.5s' },
+            { x: 70, delay: '1s' },
+          ].map((drop) => (
+            <line
+              key={drop.x}
+              x1={drop.x}
+              y1="2"
+              x2={drop.x}
+              y2="10"
+              stroke="#7fc7e8"
+              strokeWidth="2"
+              strokeLinecap="round"
+              style={{ animationDelay: drop.delay }}
+            />
+          ))}
+        </g>
+      )}
+      {/* the low wire, drawn so "low" is visibly about a wire and not a gauge */}
+      <line
+        x1="40"
+        y1="59"
+        x2="80"
+        y2="59"
+        stroke="var(--gold-dim)"
+        strokeWidth="1"
+        strokeDasharray="3 3"
+        opacity={known ? 0.9 : 0.5}
+      />
+    </svg>
+  );
+}
+
+/** A streetlight: lit, or dark. */
+export function StreetLamp({ on, label }: { on: boolean; label: string }) {
+  const lit = Boolean(on);
+  return (
+    <svg
+      className="sim-picture sim-picture--lamp"
+      viewBox="0 0 120 78"
+      role="img"
+      aria-label={label}
+      data-on={lit ? 'true' : 'false'}
+    >
+      {/* the pool of light on the ground */}
+      {lit && <polygon points="42,74 78,74 68,30 52,30" fill="var(--gold-2)" opacity="0.13" />}
+      {/* post, arm, lamp head */}
+      <rect x="64" y="30" width="3.4" height="44" fill="var(--gold-dim)" />
+      <rect x="56" y="72" width="19" height="3" rx="1.5" fill="var(--gold-dim)" />
+      <path d="M65.5 30 Q65.5 20 56 20" fill="none" stroke="var(--gold-dim)" strokeWidth="3.4" />
+      <ellipse cx="54" cy="20" rx="7" ry="3.4" fill={lit ? 'var(--gold-2)' : '#4a4034'} />
+      {lit && <circle cx="54" cy="20" r="12" fill="var(--gold-2)" opacity="0.18" />}
+    </svg>
+  );
+}
+
+/**
+ * The three bins, with the one the camera last chose lit.
+ *
+ * It is an **indicator**, not a measurement: nothing here knows how full a bin
+ * is, because nothing measures that (2026-11-15).  The colours match the LEDs
+ * on the board (D21/D22/D23).
+ */
+export function WasteBins({ active, label }: { active: string | null; label: string }) {
+  const lit = (active ?? '').trim().toLowerCase();
+  const bins = [
+    { id: 'organic', colour: '#6cc596', x: 30 },
+    { id: 'plastic', colour: '#e05b67', x: 54 },
+    { id: 'paper', colour: '#e3b04b', x: 78 },
+  ];
+  return (
+    <svg
+      className="sim-picture sim-picture--bins"
+      viewBox="0 0 120 78"
+      role="img"
+      aria-label={label}
+      data-active={lit || 'none'}
+    >
+      {bins.map((bin) => {
+        const on = lit === bin.id;
+        return (
+          <g key={bin.id} opacity={on ? 1 : lit ? 0.5 : 0.75}>
+            {on && <circle cx={bin.x + 8} cy="34" r="15" fill={bin.colour} opacity="0.16" />}
+            {/* lid and its handle, so three rectangles read as three bins */}
+            <rect x={bin.x + 3} y="36" width="10" height="2.4" rx="1.2" fill={bin.colour} />
+            <rect x={bin.x + 1} y="40" width="14" height="3.4" rx="1.7" fill={bin.colour} />
+            <rect x={bin.x + 2} y="44" width="12" height="24" rx="2" fill="#141010" stroke={bin.colour} strokeWidth="1.4" />
+            {on && <rect x={bin.x + 2} y="44" width="12" height="24" rx="2" fill={bin.colour} opacity="0.3" />}
+          </g>
+        );
+      })}
     </svg>
   );
 }

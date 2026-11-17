@@ -604,7 +604,9 @@ describe('the simulation lab changes conditions and explains itself', () => {
     window.localStorage.setItem('village.demoMode', 'live');
     await renderReady();
 
-    for (const id of ['sim-intro', 'sim-presets', 'sim-soil', 'sim-tank', 'sim-outside', 'sim-panel-light', 'sim-wind-speed', 'try-sample']) {
+    // The lab's *controls* are what Live must not carry.  The pictures are not
+    // lab controls — they are on every card in both modes (2026-11-18).
+    for (const id of ['sim-intro', 'sim-presets', 'sim-soil', 'sim-tank-low', 'sim-outside', 'sim-panel-light', 'sim-wind-speed', 'try-sample']) {
       expect(screen.queryByTestId(id), id).not.toBeInTheDocument();
     }
   });
@@ -938,5 +940,76 @@ describe('cards with nothing to report say nothing', () => {
     await renderReady();
     const watering = within(await screen.findByTestId('card-plants'));
     expect(watering.getByText('Soil: dry · 21%')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Every card carries a picture, in both modes.
+ *
+ * Asked 2026-11-18: "you have given nice rotating wind mill and solar panel in
+ * respective cards. Can you give something like that for other cards in live and
+ * simulation".  The pictures follow the same value the card prints — in Live the
+ * controller's, in Simulation the sliders' — so they cannot say "watering" beside
+ * a card that says the pump is off.
+ */
+describe('every card has a picture, in both modes', () => {
+  it('draws all six in Live', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'dry', soilCalibrated: true, soilPercent: 12, reservoirState: 'low' }),
+    );
+    await renderReady();
+
+    for (const id of ['picture-watering', 'picture-tank', 'picture-waste']) {
+      expect(await screen.findByTestId(id), id).toBeInTheDocument();
+    }
+    // Solar and wind already had theirs; the lamp lives inside the light card.
+    expect(document.querySelector('.sim-picture--solar')).not.toBeNull();
+    expect(document.querySelector('.sim-picture--wind')).not.toBeNull();
+    expect(document.querySelector('.sim-picture--lamp')).not.toBeNull();
+  });
+
+  it('draws the tank at the level its two wires report, never a percentage', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
+    await renderReady();
+    const tank = document.querySelector('.sim-picture--tank');
+    expect(tank?.getAttribute('data-state')).toBe('low');
+
+    vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'available' }));
+    cleanup();
+    await renderReady();
+    expect(document.querySelector('.sim-picture--tank')?.getAttribute('data-state')).toBe('available');
+  });
+
+  it('waters the plant only while the pump is running', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'dry', soilCalibrated: true, soilPercent: 18, watering: true }),
+    );
+    await renderReady();
+    const plant = document.querySelector('.sim-picture--plant');
+    expect(plant?.getAttribute('data-moisture')).toBe('0.18');
+    expect(plant?.getAttribute('data-pumping')).toBe('true');
+  });
+
+  it('lights the bin the camera named, and nothing when it named none', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: 'plastic' }));
+    await renderReady();
+    expect(document.querySelector('.sim-picture--bins')?.getAttribute('data-active')).toBe('plastic');
+
+    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: null }));
+    cleanup();
+    await renderReady();
+    expect(document.querySelector('.sim-picture--bins')?.getAttribute('data-active')).toBe('none');
+  });
+
+  it('keeps the pictures in Simulation, with the sliders beside them', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    await renderReady();
+
+    for (const id of ['picture-watering', 'picture-tank', 'picture-waste']) {
+      expect(await screen.findByTestId(id), id).toBeInTheDocument();
+    }
+    // The controls are still the lab's, and still there.
+    expect(await screen.findByTestId('sim-soil')).toBeInTheDocument();
+    expect(screen.getByTestId('sim-tank-low')).toBeInTheDocument();
   });
 });

@@ -2432,12 +2432,32 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .sim-readings { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 15.5px; color: var(--cream); }
 .sim-readings strong { color: var(--gold-2); }
 
-.sim-picture { flex: 0 0 auto; width: 108px; height: 70px; }
+.sim-picture { flex: 0 0 auto; width: 128px; height: 84px; }
+/* Inside the lamp row the picture sits beside a caption, so it is smaller. */
+.sim-lamps .sim-picture { width: 92px; height: 62px; }
+
 .windmill-blades { animation-name: spin; animation-timing-function: linear; animation-iteration-count: infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Water falls only while the pump runs; the tank is fed by rain while it has
+   water.  Both are the same fact as the sentence beside them, drawn. */
+.watering-drops circle { animation: fall-drop 1.6s linear infinite; }
+.tank-drops line { animation: fall-drop 1.8s linear infinite; }
+@keyframes fall-drop {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(22px); opacity: 0; }
+}
+
 /* Gentle, and still for anyone who asked their system for less motion. */
 @media (prefers-reduced-motion: reduce) {
-  .windmill-blades { animation: none !important; }
+  .windmill-blades,
+  .watering-drops circle,
+  .tank-drops line { animation: none !important; }
+  /* Without motion the drops would sit in mid-air, which reads as a fault, so
+     they are simply not drawn. */
+  .watering-drops, .tank-drops { display: none; }
 }
 
 /* ------------------------------------------------------- sample waste items --- */
@@ -2502,6 +2522,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .vcard--row .pump-manual { flex: 1 1 100%; flex-wrap: wrap; }
   .vcard--row .pump-manual .segmented { flex: 1 1 100%; min-width: 0; }
   .sim-field { flex: 1 1 100%; min-width: 0; }
+  /* The lamp row cannot shrink (flex: 0 0 auto) and now carries a drawing as
+     well as its caption and five dots — 333 px of it, which pushed the kiosk
+     5 px sideways at 390 px (measured 2026-11-18).  Let it wrap, and draw the
+     lamp smaller here. */
+  .sim-lamps { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; }
+  .sim-lamps .sim-picture { width: 68px; height: 46px; }
   .sim-presets-row .btn { flex: 1 1 auto; }
   .mic-button { padding: 8px 16px 8px 8px; }
   .mic-button-label { font-size: 19px; }

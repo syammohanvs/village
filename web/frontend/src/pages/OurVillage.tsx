@@ -11,7 +11,7 @@ import {
 } from '../components/Icons';
 import { LanguagePicker } from '../components/LanguagePicker';
 import { SimSlider } from '../components/SimSlider';
-import { SolarPanel, Windmill } from '../components/SimPictures';
+import { Plant, RainTank, SolarPanel, StreetLamp, WasteBins, Windmill } from '../components/SimPictures';
 import { WasteSamples } from '../components/WasteSamples';
 import { BRIGHT_THRESHOLD, DARK_THRESHOLD, StreetLampStrip } from '../components/StreetLamps';
 import { Chip } from '../components/ui';
@@ -124,6 +124,19 @@ export function OurVillage() {
       : light?.brightness === 'bright' ? t('chip.bright') : t('chip.unknown');
 
   const soilPercent = soil?.calibrated && soil.percent !== null ? formatPercent(soil.percent, 0) : null;
+  // What the plant is drawn at.  A calibrated probe gives its own number; an
+  // uncalibrated one still knows which side of the threshold it is on; a probe
+  // that has said nothing gives null, and the picture stays neutral.
+  const soilLevel =
+    soil?.calibrated && typeof soil.percent === 'number'
+      ? soil.percent / 100
+      : soil?.state === 'dry'
+        ? 0.15
+        : soil?.state === 'wet'
+          ? 0.85
+          : soil?.state === 'adequate'
+            ? 0.5
+            : null;
   const soilWord = !hasStatus
     ? t('chip.statusUnknown')
     : soil?.calibrated
@@ -433,22 +446,25 @@ export function OurVillage() {
           <p className="sim-why sim-why--always" data-testid="water-why">
             {pumpWhy}
           </p>
-          {demo && (
-            <div className="sim-block" data-testid="sim-watering">
-              <SimSlider
-                label={t('sim.soilLabel')}
-                testId="sim-soil"
-                value={typeof soil?.percent === 'number' ? soil.percent : 0}
-                lowLabel={t('sim.dry')}
-                highLabel={t('sim.wet')}
-                valueText={`${soilWord} · ${soilPercent ?? '—'}`}
-                disabled={busy !== null}
-                onChange={(next) => void setScenario({ soil_pct: next }, 'plants')}
-                hint={t('sim.soilHint')}
-              />
-              <p className="sim-why-note">{t('sim.pumpThresholds')}</p>
-            </div>
-          )}
+          <div className="sim-block" data-testid="picture-watering">
+            <Plant level={soilLevel} pumping={pumpOn} label={t('picture.plant')} />
+            {demo && (
+              <>
+                <SimSlider
+                  label={t('sim.soilLabel')}
+                  testId="sim-soil"
+                  value={typeof soil?.percent === 'number' ? soil.percent : 0}
+                  lowLabel={t('sim.dry')}
+                  highLabel={t('sim.wet')}
+                  valueText={`${soilWord} · ${soilPercent ?? '—'}`}
+                  disabled={busy !== null}
+                  onChange={(next) => void setScenario({ soil_pct: next }, 'plants')}
+                  hint={t('sim.soilHint')}
+                />
+                <p className="sim-why-note">{t('sim.pumpThresholds')}</p>
+              </>
+            )}
+          </div>
           {notice?.card === 'plants' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 
@@ -473,8 +489,20 @@ export function OurVillage() {
           <p className="sim-hint sim-hint--always" data-testid="tank-note">
             {t('tank.hint')}
           </p>
-          {demo && (
-            <div className="sim-block" data-testid="sim-tank">
+          <div className="sim-block" data-testid="picture-tank">
+            <RainTank
+              state={
+                reservoir?.state === 'available'
+                  ? 'available'
+                  : reservoir?.state === 'low'
+                    ? 'low'
+                    : reservoir?.state === 'uncalibrated'
+                      ? 'uncalibrated'
+                      : 'unknown'
+              }
+              label={t('picture.tank')}
+            />
+            {demo && (
               <div className="sim-choice" role="group" aria-label={t('tank.simGroup')}>
                 <button
                   type="button"
@@ -495,8 +523,8 @@ export function OurVillage() {
                   {t('tank.waterLow')}
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
           {notice?.card === 'tank' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 
@@ -533,6 +561,7 @@ export function OurVillage() {
               </span>
             </div>
             <div className="sim-lamps">
+              <StreetLamp on={Boolean(lights?.commanded)} label={t('picture.lamp')} />
               <span className="sim-lamps-label">{t('sim.streetlights')}</span>
               <StreetLampStrip on={Boolean(lights?.commanded)} count={lights?.led_count ?? 5} />
             </div>
@@ -597,6 +626,12 @@ export function OurVillage() {
               </button>
             )}
           </div>
+          <div className="sim-block sim-block--waste" data-testid="picture-waste">
+            <WasteBins
+              active={waste?.active ? (waste.category ?? null) : null}
+              label={t('picture.bins')}
+            />
+          </div>
           {demo && (
             <p className="sim-hint" data-testid="sample-note">
               {t('waste.sampleNote')}
@@ -633,7 +668,7 @@ export function OurVillage() {
             the slider, and in Live it follows the volts the panel is actually
             producing — which is why a dark room shows an unlit LED. */}
         <div className="sim-block sim-block--solar" data-testid="sim-solar">
-          <SolarPanel light={solarLightLevel} />
+          <SolarPanel light={solarLightLevel} label={t('picture.solar')} />
           {demo ? (
             <SimSlider
               label={t('sim.panelLight')}
@@ -679,7 +714,11 @@ export function OurVillage() {
             volts allow — or stands still when no turbine is wired, which is this
             board's state. */}
         <div className="sim-block sim-block--wind" data-testid="sim-wind">
-          <Windmill speed={windSpeedLevel} fitted={demo || windFitted} />
+          <Windmill
+            speed={windSpeedLevel}
+            fitted={demo || windFitted}
+            label={t(demo || windFitted ? 'picture.wind' : 'picture.windOff')}
+          />
           {demo ? (
             <SimSlider
               label={t('sim.windSpeed')}

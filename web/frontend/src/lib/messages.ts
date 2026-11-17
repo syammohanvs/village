@@ -898,6 +898,15 @@ export const MESSAGES = {
     'दरवाज़े या बदलती रोशनी के लिए एक और जोड़ें।',
     'വാതിലിനോ മാറുന്ന വെളിച്ചത്തിനോ വേണ്ടി മറ്റൊന്ന് ചേർക്കുക.',
   ],
+
+  // ---------------------------------------------------------- the pictures ---
+  'picture.solar': ['Solar panel and its LED', 'सोलर पैनल और उसकी LED', 'സോളാർ പാനലും അതിന്റെ LED-യും'],
+  'picture.wind': ['Windmill', 'पवनचक्की', 'കാറ്റാടി'],
+  'picture.windOff': ['Windmill, not fitted', 'पवनचक्की, लगी नहीं है', 'കാറ്റാടി, ഘടിപ്പിച്ചിട്ടില്ല'],
+  'picture.plant': ['Potted plant', 'गमले का पौधा', 'ചട്ടിയിലെ ചെടി'],
+  'picture.tank': ['Rain water tank', 'बारिश के पानी का टैंक', 'മഴവെള്ള ടാങ്ക്'],
+  'picture.lamp': ['Streetlight', 'स्ट्रीट लाइट', 'തെരുവുവിളക്ക്'],
+  'picture.bins': ['The three waste bins', 'तीन कचरा बिन', 'മൂന്ന് മാലിന്യ ബിന്നുകൾ'],
 } as const;
 
 export type MessageKey = keyof typeof MESSAGES;

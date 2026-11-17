@@ -202,6 +202,27 @@ visitors cannot be used to press **Water** or change calibration.
   soil's own reading, prefixed with **Soil:** — unprefixed, "Idle · Not
   calibrated" read as one confused state.  `soilPercent` already carries its
   `%`, so appending another printed `Dry · 28%%` on any calibrated probe.
+- **Every card carries a drawing, and each one follows its own reading
+  (2026-11-18).**  Asked for after the solar panel and windmill: the other four
+  cards got the same treatment in `components/SimPictures.tsx` — a **potted
+  plant** (`Plant`: leaves lift and the soil darkens as moisture rises, and water
+  falls **only while the pump is actually running**), the **rain water tank**
+  (`RainTank`: one of the two levels its two wires can report, never a
+  percentage, and dashed and empty when the probe cannot be read), the
+  **streetlight** (`StreetLamp`: the lamp glows when `commanded` is true) and the
+  **three bins** (`WasteBins`: only the category the camera last named is lit).
+  The pictures are rendered in **Live and Simulation alike** — Live follows the
+  controller's value, Simulation the slider's, exactly as the solar and wind
+  ones do — and the lab's own controls keep their `sim-*` test ids, because
+  those mean "simulation only" and the pictures are not lab controls.
+  **The rule they all obey: a picture may not claim hardware the board does not
+  have** (the windmill stands still when no turbine is wired; the tank never
+  shows a percentage), and its accessible name comes from the message table
+  (`picture.*`), so a screen reader hears the page's language too.
+  **One measured trap:** adding a 92 px lamp to `.sim-lamps` — a row that is
+  `flex: 0 0 auto` — made the kiosk **5 px wider than a 390 px phone**; the
+  phone media query now lets that row wrap and draws the lamp smaller. Check
+  `document.documentElement.scrollWidth` at 390 px after touching any picture.
 - **The whole kiosk page and its dialogs are in three languages (2026-11-18).**
   One selector — **English · हिन्दी · മലയാളം**, each name in its own script —
   now sets **both** the interface and Sara's language, because a visitor who
