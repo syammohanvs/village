@@ -162,9 +162,9 @@ describe('Voice panel language and readiness', () => {
     expect(ml.className).toContain('lang-pill');
 
     await user.click(ml);
-    const list = panel.querySelector('.voice-help');
-    expect(list?.textContent).toMatch(/വിളക്കുകൾ കത്തിക്കുക/);
-    expect(list?.textContent).not.toMatch(/Lights on/);
+    const examples = panel.querySelector('.voice-examples-top');
+    expect(examples?.textContent).toMatch(/വിളക്കുകൾ കത്തിക്കുക/);
+    expect(examples?.textContent).not.toMatch(/Lights on/);
   });
 
   it('still listens while the board is away, and says that nothing will move', async () => {
@@ -799,20 +799,55 @@ describe('the panel in plain words', () => {
     );
   });
 
-  it('opens on three supported examples, each explained without a command id', async () => {
+  it('opens on three example sentences as buttons, above everything else', async () => {
     const { panel } = await openPanel();
-    const help = within(panel).getByText('Try saying…').closest('.voice-help') as HTMLElement;
+    const examples = within(panel).getByTestId('voice-examples-top');
 
-    expect(within(help).getByText('“Please turn on the lights.”')).toBeInTheDocument();
-    expect(within(help).getByText('Turns the streetlights on.')).toBeInTheDocument();
-    expect(within(help).getByText('“Is water available?”')).toBeInTheDocument();
-    expect(within(help).getByText('Tells you whether the tank has water.')).toBeInTheDocument();
-    expect(within(help).getByText('“What is the soil moisture?”')).toBeInTheDocument();
-    expect(within(help).getByText('Reads how wet the soil is.')).toBeInTheDocument();
+    // They are the first block under the heading — asked for 2026-11-18,
+    // because a list at the foot of the panel was below the fold.
+    expect(panel.firstElementChild?.nextElementSibling).toBe(examples);
+
+    const buttons = within(examples).getAllByRole('button');
+    expect(buttons).toHaveLength(3);
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Streetlights on“Please turn on the lights.”',
+      'Water in the tank“Is water available?”',
+      'Soil moisture“What is the soil moisture?”',
+    ]);
+
+    // What a control says when it is hovered is the explanation, so the panel
+    // still tells a visitor what a phrase does without a paragraph beside it.
+    expect(buttons[0].getAttribute('title')).toBe(
+      '“Please turn on the lights.” — Turns the streetlights on.',
+    );
 
     // What a visitor must never be shown: the wire names, or a claim that a
     // question does nothing (a polite question *is* a command).
-    expect(help.textContent).not.toMatch(/LIGHTS_ON|IRRIGATION_|sends /i);
+    expect(examples.textContent).not.toMatch(/LIGHTS_ON|IRRIGATION_|sends /i);
+  });
+
+  it('runs an example through the same parser a spoken sentence uses', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'status',
+      intent: 'WATER_STATUS',
+      transcript: 'Is water available?',
+      message: 'The dashboard shows which.',
+    } as never);
+    const { user, panel } = await openPanel();
+
+    await user.click(within(panel).getByTestId('voice-example-water_status'));
+
+    // The sentence it sent is the one shown as the request, so the visitor
+    // learns the phrase by watching it work.
+    await waitFor(() =>
+      expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent(
+        '“Is water available?”',
+      ),
+    );
+    expect(api.voiceInterpret).toHaveBeenCalledWith('Is water available?', 'en');
+    // …and it never opened the microphone to say it.
+    expect(api.voiceTranscribe).not.toHaveBeenCalled();
   });
 
   it('puts the rest behind More examples, and still explains them in words', async () => {

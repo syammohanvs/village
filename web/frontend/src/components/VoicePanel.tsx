@@ -14,7 +14,7 @@ import { cx } from '../lib/format';
 import type { DeviceStatus, VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
 import { IconClose, IconMic, IconPlug, IconSpeaker } from './Icons';
 import { LanguagePicker } from './LanguagePicker';
-import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
+import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES, type VoiceExample } from '../lib/voiceExamples';
 import { VOICE_COPY, actionWords } from '../lib/voiceCopy';
 
 const ALLOWED_COMMANDS = new Set([
@@ -534,9 +534,15 @@ export function VoicePanel() {
     }
   }
 
-  async function submitTyped(event?: FormEvent) {
-    event?.preventDefault();
-    const text = typed.trim();
+  /**
+   * Send one typed sentence through the parser.
+   *
+   * The typed box and the example buttons are the same route: a phrase is a
+   * phrase however it arrived, and two implementations of "ask the parser, then
+   * act" would eventually disagree.  It takes the text as an argument so a
+   * button can send a sentence the box has not been typed into yet.
+   */
+  async function sendTypedText(text: string) {
     if (!text || typedBusyRef.current) return;
     typedBusyRef.current = true;
     setMicError('');
@@ -566,6 +572,24 @@ export function VoicePanel() {
     } finally {
       typedBusyRef.current = false;
     }
+  }
+
+  async function submitTyped(event?: FormEvent) {
+    event?.preventDefault();
+    await sendTypedText(typed.trim());
+  }
+
+  /**
+   * One of the three buttons at the top of the panel.
+   *
+   * Pressing it puts its sentence in the box and sends it, so "Your request"
+   * shows exactly what was asked — the visitor learns the phrase by watching it
+   * work rather than by reading a list.
+   */
+  async function runExample(example: VoiceExample) {
+    if (busy || speaking || typedBusyRef.current) return;
+    setTyped(example.phrase);
+    await sendTypedText(example.phrase);
   }
 
   const micSupported = recordingSupported();
@@ -711,7 +735,34 @@ export function VoicePanel() {
         </button>
       </header>
 
-      {/* 1. The language and the state it will be spoken in, on one line. */}
+      {/* 1. Three sentences to try, as buttons.
+             They used to be a list at the foot of the panel, under the typed
+             box and the privacy line: below the fold on a laptop, and the
+             first thing a visitor needs (asked 2026-11-18).  A button says
+             what it does and shows the words, and pressing it runs the same
+             parser a spoken sentence runs — so the phrase is learned by
+             watching it work. */}
+      <div className="voice-try" data-testid="voice-examples-top">
+        <p className="eyebrow">{copy.examples}</p>
+        <div className="voice-examples-top">
+          {examples.map((example) => (
+            <button
+              key={example.intent}
+              type="button"
+              className="voice-example-btn"
+              data-testid={`voice-example-${example.intent.toLowerCase()}`}
+              onClick={() => void runExample(example)}
+              disabled={busy || speaking}
+              title={`“${example.phrase}” — ${example.explanation}`}
+            >
+              <span className="voice-example-btn-label">{example.label}</span>
+              <span className="voice-example-btn-phrase">“{example.phrase}”</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 2. The language and the state it will be spoken in, on one line. */}
       <div className="voice-topline">
         <LanguagePicker
           options={VOICE_LANGUAGES.map((entry) => ({
@@ -757,7 +808,7 @@ export function VoicePanel() {
         </div>
       </div>
 
-      {/* 2. Start or stop speaking. */}
+      {/* 3. Start or stop speaking. */}
       <div className={cx('voice-stage', state === 'listening' && 'is-listening')}>
         <button
           type="button"
@@ -810,7 +861,7 @@ export function VoicePanel() {
         </div>
       </div>
 
-      {/* 3 and 4. What was said, and what Sara answered.  Both stay on screen
+      {/* 4 and 5. What was said, and what Sara answered.  Both stay on screen
           until a newer request replaces them. */}
       <div className="voice-said">
         <section className="voice-block" data-testid="voice-staged">
@@ -863,7 +914,7 @@ export function VoicePanel() {
         </section>
       </div>
 
-      {/* 5. The keyboard route to the same parser. */}
+      {/* 6. The keyboard route to the same parser. */}
       <form className="voice-type" onSubmit={(event) => void submitTyped(event)}>
         <label className="eyebrow" htmlFor="voice-text">
           {copy.typed}
@@ -892,17 +943,10 @@ export function VoicePanel() {
         <p className="hint">{copy.typedHelper}</p>
       </form>
 
-      {/* 6. Three useful sentences, then the rest on request. */}
+      {/* 7. The rest of the catalogue, on request.  The three headline
+             sentences are buttons at the top now, so this is one collapsed
+             line until a visitor asks for more. */}
       <div className="voice-help">
-        <p className="eyebrow">{copy.examples}</p>
-        <ul className="voice-examples">
-          {examples.map((example) => (
-            <li key={example.intent}>
-              <span className="help-phrase">“{example.phrase}”</span>
-              <span className="help-note">{example.explanation}</span>
-            </li>
-          ))}
-        </ul>
         {moreIntents.length > 0 && (
           <details className="voice-more">
             <summary>{copy.moreExamples}</summary>

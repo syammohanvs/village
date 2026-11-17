@@ -297,6 +297,24 @@ visitors cannot be used to press **Water** or change calibration.
   कितनी नमी है?" — instead of the phrasings the parser used to force
   ("മണ്ണ് നനവുണ്ടോ?", "मिट्टी की स्थिति").  `test_voice_examples.py` sends
   every shown example through the parser, so this cannot drift back.
+- **The three examples are buttons at the top of the panel (2026-11-18).**
+  They were a list at the foot, under the typed box and the privacy line — below
+  the fold on the exhibition laptop and the last thing a visitor needs.  Now
+  **Try saying…** is the first block under the heading: one button per example,
+  carrying the plain name (*Streetlights on*) and the sentence it will send
+  (“Please turn on the lights.”), with the explanation on the title.  **One
+  press sends that sentence through the same path as typing** (`sendTypedText`,
+  shared with `submitTyped`), so "Your request" shows what was asked and the
+  phrase is learned by watching it work — never a second parser.  The bottom of
+  the panel is one collapsed **More examples** line.  On a phone the three sit
+  two-across with the last spanning the row, and at 720 px and below the
+  **panel itself scrolls**: the old comment claimed "its own scroll, nothing
+  clipped" while `overflow` was still `hidden`, which squeezed the catalogue to
+  11 px (measured 2026-11-18 — the three buttons plus a stacked request/reply
+  made the panel 27 px taller than a 390 px phone can show).
+  `VoicePanel.test.tsx` asserts the buttons are the first block, that pressing
+  one calls `voiceInterpret` with the phrase (and never the microphone), and
+  that the wire names stay out of sight.
 - **The panel has its own words, in all three languages (2026-11-17).** All
   strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
   intro, section headings, short state words, plain action wording) and are

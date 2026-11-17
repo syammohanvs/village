@@ -149,10 +149,11 @@ water physically flowed. The dashboard keeps the two statements separate.
    disposal.
 5. **Voice.** Press **Talk to Sara** at the top of **Our Village** — the
    microphone with its name under it, the language choices directly beneath.
-   The panel opens with **Try saying…** and three examples that work, each
-   explained in plain words (“Please turn on the lights.” — turns the
-   streetlights on). Speak one of them, then show **Your request** (what was
-   heard) beside **Sara's reply**. Try “do not start irrigation” to show that a
+   The panel opens with **Try saying…** and three buttons at the top. Each
+   names the thing in plain words and shows the sentence to say, and pressing
+   one sends that sentence — so the phrase is learned by watching it work.
+   Speak one, or press one, then show **Your request** (what was asked) beside
+   **Sara's reply**. Try “do not start irrigation” to show that a
    negated request is refused without action, and “can you turn off the
    lights?” to show that a polite question is a command.
 6. **What Happened.** Show the command log and the recognition event.
@@ -320,17 +321,21 @@ differently.
 **Talk to Sara** opens a panel whose order is fixed, so a visitor learns it in
 one go:
 
-1. **The language**, with the state beside it — and in Simulation the sentence
+1. **Try saying…** — three buttons across the top, the first thing in the
+   panel because it is the first thing a visitor needs. Each one says what it
+   is for (*Streetlights on*, *Water in the tank*, *Soil moisture*) and shows
+   the sentence underneath, and one press sends that sentence.
+2. **The language**, with the state beside it — and in Simulation the sentence
    *“Simulation — physical model is not controlled.”*
-2. **Start speaking** / **Stop speaking**, with “up to 10 seconds”.
-3. **Your request** — the words that were heard, or *“Your words will appear
-   here.”*
-4. **Sara's reply** — the answer, with one short state word: *Listening*,
+3. **Start speaking** / **Stop speaking**, with “up to 10 seconds”.
+4. **Your request** — the words that were heard, or *“Your words will appear
+   here.”* Pressing an example fills this card with the sentence it sent.
+5. **Sara's reply** — the answer, with one short state word: *Listening*,
    *Understanding…*, *Sending…*, *Confirmed*, *Answer*, *Blocked*, *Not
    connected*. The reply stays until a new request replaces it.
-5. **Or type your request**, which goes to the same parser as speech.
-6. **Try saying…** — three examples, then **More examples** (that list scrolls
-   inside itself, so the reply above never moves off screen).
+6. **Or type your request**, which goes to the same parser as speech.
+7. **More examples** — the rest of the catalogue, collapsed until a visitor
+   asks for it.
 
 The examples are the three things a visitor actually tries: turn the lights on,
 ask whether the tank has water, ask how wet the soil is. Each is explained in

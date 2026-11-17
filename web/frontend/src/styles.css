@@ -1007,15 +1007,59 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .voice-type-row .input { flex: 1 1 auto; min-width: 0; }
 .voice-type .hint { margin: 0; font-size: 12.5px; }
 
+/* The three sentences to try, as buttons at the top of the panel (asked
+   2026-11-18: the list at the foot was below the fold and crowded).  Each says
+   what it does and shows the words, so the phrase is read before it is pressed
+   and seen again in "Your request" when it runs. */
+.voice-try { display: grid; gap: 6px; flex: 0 0 auto; }
+.voice-try .eyebrow { margin: 0; }
+.voice-examples-top {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.voice-example-btn {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 11px;
+  border: 1px solid var(--line-soft);
+  background: rgba(217,180,91,.06);
+  color: var(--cream);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.voice-example-btn:hover:not(:disabled) {
+  border-color: var(--gold-dim);
+  background: rgba(217,180,91,.13);
+}
+.voice-example-btn:disabled { opacity: .55; cursor: not-allowed; }
+.voice-example-btn-label {
+  color: var(--gold-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.voice-example-btn-phrase {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .voice-help {
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-top: 1px solid var(--line-soft);
   padding-top: 10px;
-  /* Whatever height is left, scrolls here — the reply above never moves. */
+  /* The catalogue is the only thing left here, so it takes whatever height
+     remains and scrolls — the reply above it never moves. */
   flex: 1 1 auto;
-  min-height: 90px;
+  min-height: 0;
   overflow-y: auto;
 }
 .voice-examples { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1118,6 +1162,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 
 @media (max-width: 560px) {
+  /* Two columns on a phone: three stacked buttons cost ~200 px of a 390 px
+     screen and pushed the panel past its own height.  The third spans the row
+     so it reads as the last of three rather than a stray. */
+  .voice-examples-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .voice-example-btn:last-child { grid-column: 1 / -1; }
   .kpi-grid { grid-template-columns: 1fr; }
   .quick-controls { grid-template-columns: 1fr; }
   .appbar-title { font-size: 22px; }
@@ -2300,6 +2349,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .voice-title { font-size: 22px; }
   .voice-message { font-size: 16px; }
   .ptt-label { font-size: 17px; }
+  /* "Its own scroll, nothing clipped" — which this block said while `overflow`
+     was still `hidden` from the base rule, so the catalogue was being squeezed
+     to 11 px instead (measured 2026-11-18, when the examples moved to the top
+     and the three of them plus a stacked request/reply made the panel 27 px
+     taller than a 390 px phone can show).  The panel scrolls, and the help
+     block keeps its own height rather than being crushed. */
+  .voice-panel { overflow-y: auto; }
+  .voice-help { flex: 0 0 auto; overflow: visible; }
+  .voice-more-list { max-height: none; overflow: visible; }
 }
 
 /* The camera picker sits under the Start/Stop button, on its own line: an
