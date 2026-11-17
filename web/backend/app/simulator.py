@@ -174,6 +174,8 @@ class SimulatedDevice:
         self.failure_lockout = False
         self.last_session: dict[str, Any] | None = None
         self.light_mode = "auto"
+        # auto = the soil decides; on / off = the lab switch (demo only).
+        self.pump_manual = "auto"
         self.waste_category: str | None = None
         self.waste_until = 0
         self.commands: dict[str, dict[str, Any]] = {}
@@ -208,6 +210,23 @@ class SimulatedDevice:
             self._step(delta)
 
     def _step(self, dt: int) -> None:
+        if self.pump_manual == "on":
+            # Held on by hand: no soil test, no cooldown, no pulse timer.  The
+            # moisture still rises, so the reading on the page behaves.
+            if self.state != "pumping":
+                self.state = "pumping"
+                self.session = "manual"
+                self.pulse_started = self.now_ms
+                self.pulse_len = 1 << 60
+                self._add_event(*reason("IRRIGATION_STARTED"))
+            self.soil_pct = min(72.0, self.soil_pct + dt * 0.0045)
+            return
+        if self.pump_manual == "off":
+            if self.state == "pumping":
+                self._stop("IRRIGATION_STOPPED_USER", 0)
+            self.soil_pct = max(0.0, self.soil_pct - dt * 0.000015)
+            return
+
         if self.state == "pumping":
             self.soil_pct = min(72.0, self.soil_pct + dt * 0.0045)
             if self.now_ms - self.pulse_started >= self.pulse_len:
@@ -472,6 +491,8 @@ class SimulatedDevice:
                         "commanded": self.state == "pumping",
                         "commissioned": True,
                         "enabled": self.pump_enabled,
+                        # "auto" (the soil decides) or the lab switch.
+                        "manual": self.pump_manual,
                         "feedback": "none",
                     },
                     "streetlights": {
@@ -733,6 +754,25 @@ class SimulatedDevice:
             if values.get("light") is not None:
                 self.light = values["light"]
                 self.light_metric = BRIGHT_METRIC if self.light == "bright" else DARK_METRIC
+            if values.get("pump_manual") is not None:
+                mode = str(values["pump_manual"])
+                if mode in {"auto", "on", "off"}:
+                    self.pump_manual = mode
+                    if mode == "off" and self.state == "pumping":
+                        self._stop("IRRIGATION_STOPPED_USER", 0)
+                    if mode == "on" and self.state != "pumping":
+                        self.state = "pumping"
+                        self.session = "manual"
+                        self.pulse_started = self.now_ms
+                        self.pulse_len = 1 << 60
+                        self._add_event(*reason("IRRIGATION_STARTED"))
+                    if mode == "auto":
+                        # Handing the pump back to the rules: end the manual
+                        # session, or a pulse timer held open by hand would
+                        # keep it running under "auto" until the next reboot.
+                        if self.session == "manual":
+                            self._stop("IRRIGATION_STOPPED_USER", 0)
+                        self.dry_since = None
             if values.get("light_metric") is not None:
                 # The same two thresholds the firmware uses, with the gap between
                 # them keeping the last decision: a slider dragged through the
@@ -774,6 +814,7 @@ class SimulatedDevice:
             self.failure_lockout = False
             self.last_session = None
             self.light_mode = "auto"
+            self.pump_manual = "auto"
             self.waste_category = None
             self.waste_until = 0
             self.commands.clear()

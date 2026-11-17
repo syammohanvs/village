@@ -127,6 +127,10 @@ class ScenarioRequest(BaseModel):
     # exhibit's room was calibrated to, so a slider on this scale really does
     # exercise Auto mode rather than pretending to.
     light_metric: int | None = Field(default=None, ge=0, le=4095)
+    # A lab switch for the pump, the same idea as the streetlights' manual On.
+    # Simulation only: the firmware has no manual pump mode, and its gates
+    # (commissioning, tank, soil) are exactly what this bypasses for a demo.
+    pump_manual: Literal["auto", "on", "off"] | None = None
     sensor_fault: str | None = Field(default=None, max_length=40)
     pump_enabled: bool | None = None
     auto_enabled: bool | None = None

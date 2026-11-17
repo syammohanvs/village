@@ -83,6 +83,12 @@ visitors cannot be used to press **Water** or change calibration.
   to fuzzy edit distance, which was measured turning "turn off" into "water".
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
+- **Simulation-only lab controls** on Our Village: the light-level slider
+  (`light_metric`) and the pump switch (`pump_manual`: auto/on/off). Both are
+  fields of `POST /api/v1/demo/scenario` on `SimulatedDevice`; live has neither,
+  because the firmware's Water request is gated and the manual path there is the
+  bench panel (Test). Do not add a manual pump mode to the firmware without the
+  commissioning rule in mind.
 
 ## ESP32 firmware
 

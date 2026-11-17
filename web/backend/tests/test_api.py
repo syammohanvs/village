@@ -836,3 +836,41 @@ async def test_demo_mode_shows_a_wind_reading_like_the_solar_panel(tmp_path):
     assert wind.get("generating") is True
     # The solar card in Simulation is the model this follows.
     assert (sensors.get("solar") or {}).get("installed") is True
+
+
+@pytest.mark.asyncio
+async def test_the_demo_pump_has_a_manual_switch_like_the_lamps(tmp_path):
+    """Simulation only: the pump can be held on (or off) regardless of soil.
+
+    Live has no manual pump mode — the firmware's Water request is subject to
+    the tank, the soil and the commissioning gate — so this is the demo's lab
+    switch, and it hands the pump back to the rules when set to auto.
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, gateway, app):
+
+        async def scenario(values: dict) -> dict:
+            response = await client.post("/api/v1/demo/scenario", json=values)
+            assert response.status_code == 200
+            return (await client.get("/api/v1/state?mode=demo")).json()["status"]
+
+        # Wet soil: the rules keep the pump off.
+        wet = await scenario({"soil_pct": 60.0, "pump_manual": "auto"})
+        assert wet["actuators"]["pump"]["commanded"] is False
+        assert wet["actuators"]["pump"]["manual"] == "auto"
+
+        # Held on by hand, soil or no soil.
+        on = await scenario({"pump_manual": "on"})
+        assert on["actuators"]["pump"]["commanded"] is True
+        assert on["irrigation"]["state"] == "pumping"
+        assert on["actuators"]["pump"]["manual"] == "on"
+
+        off = await scenario({"pump_manual": "off"})
+        assert off["actuators"]["pump"]["commanded"] is False
+
+        # Back to auto: still wet, so still off — the manual session ended.
+        auto = await scenario({"pump_manual": "on"})
+        assert auto["actuators"]["pump"]["commanded"] is True
+        back = await scenario({"pump_manual": "auto"})
+        assert back["actuators"]["pump"]["commanded"] is False
+        assert back["actuators"]["pump"]["manual"] == "auto"

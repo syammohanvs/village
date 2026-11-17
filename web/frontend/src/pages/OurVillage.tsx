@@ -120,6 +120,26 @@ export function OurVillage() {
         ? levelChip('Camera ready', 'live')
         : levelChip('Model missing', 'warn');
 
+  /** The demo's pump switch: hold it on or off regardless of the soil. */
+  const [pumpManual, setPumpManual] = useState<'auto' | 'on' | 'off' | null>(null);
+  const pumpMode: 'auto' | 'on' | 'off' =
+    pumpManual ?? (status?.actuators?.pump?.manual === 'on'
+      ? 'on'
+      : status?.actuators?.pump?.manual === 'off'
+        ? 'off'
+        : 'auto');
+
+  const setPumpMode = async (mode: 'auto' | 'on' | 'off') => {
+    setPumpManual(mode);
+    try {
+      await api.demoScenario({ pump_manual: mode });
+    } catch (cause) {
+      setNotice({ card: 'plants', text: errorMessage(cause) });
+    } finally {
+      reload();
+    }
+  };
+
   /** The simulated room's light level, for exercising Auto mode without a torch. */
   const setAmbient = async (value: number) => {
     try {
@@ -255,7 +275,32 @@ export function OurVillage() {
               <IconStop size={16} /> Stop
             </button>
           </div>
-          {waterBlocked && (
+          {demo && (
+            <div className="pump-manual" data-testid="pump-manual">
+              <p className="pump-manual-label">
+                Pump <span className="pump-manual-note">manual, simulation only</span>
+              </p>
+              <div className="segmented segmented--wide" role="group" aria-label="Pump mode">
+                {(['auto', 'on', 'off'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    data-testid={`pump-${mode}`}
+                    className={cx('segment', pumpMode === mode && 'is-active')}
+                    aria-pressed={pumpMode === mode}
+                    onClick={() => void setPumpMode(mode)}
+                  >
+                    {mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'}
+                  </button>
+                ))}
+              </div>
+              <p className="hint">
+                On holds the pump running whatever the soil says; Off holds it stopped. Auto gives
+                it back to the rules.
+              </p>
+            </div>
+          )}
+          {waterBlocked && pumpMode !== 'on' && (
             <p className="vcard-note" data-testid="water-blocked">
               {waterBlocked}
               {demo && ' Use Reset in Setup → Simulation to put the demo back to dry soil.'}

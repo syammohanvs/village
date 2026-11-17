@@ -95,6 +95,8 @@ export interface Sensors {
 export interface PumpState {
   commanded: boolean;
   commissioned: boolean;
+  /** "auto" (the soil decides) or the simulation's lab switch. */
+  manual?: 'auto' | 'on' | 'off';
   feedback?: string;
 }
 

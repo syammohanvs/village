@@ -227,6 +227,23 @@ This stops only the PIDs recorded by `launch.sh`. Then power off the ESP32 and
 the router. The ESP32 starts with the pump OFF next time; it never resumes an
 interrupted session.
 
+### Simulation's lab switches
+
+In **Simulation** two controls exist that live mode deliberately does not have,
+both on the Our Village page:
+
+- **Lights → the dark/bright slider**, which sets the simulated room's light so
+  Auto can be seen switching the five lamps.
+- **Watering → Pump: Auto / On / Off**, which holds the pump running or stopped
+  regardless of the soil or the tank. **Live has no equivalent** — there the
+  Water button is a *request* the controller answers under its own rules (tank
+  level, soil, cooldown, commissioning), and the manual control is the bench
+  panel behind **Test**, which takes all five outputs and is session-only.
+
+Both are the simulator's own state, so they end with the simulation: switching
+back to Live, or restarting the app, returns the pump and the lamps to the
+rules.
+
 ## Honest data
 
 The village does **not** measure tank percentage, litres, household consumption,

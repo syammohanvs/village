@@ -477,3 +477,44 @@ describe('the simulation lab: lamps, the light slider and the pump', () => {
     expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump off');
   });
 });
+
+describe('the simulation pump switch', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+  });
+
+  it('holds the pump on regardless of the soil, and hands it back on Auto', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.state).mockResolvedValue(makeState({ soilPercent: 62, watering: false }));
+    vi.mocked(api.demoScenario).mockResolvedValue({ status: {}, physical: false });
+    await renderReady();
+
+    // Wet soil: the rules keep it off, and the switch says so.
+    expect(screen.getByTestId('pump-auto')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump off');
+
+    await user.click(screen.getByTestId('pump-on'));
+    expect(api.demoScenario).toHaveBeenCalledWith({ pump_manual: 'on' });
+    expect(screen.getByTestId('pump-on')).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByTestId('pump-off'));
+    expect(api.demoScenario).toHaveBeenCalledWith({ pump_manual: 'off' });
+
+    await user.click(screen.getByTestId('pump-auto'));
+    expect(api.demoScenario).toHaveBeenCalledWith({ pump_manual: 'auto' });
+    expect(screen.getByTestId('pump-auto')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('reads the mode the controller reports, and is absent in live', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
+    await renderReady();
+    // The frame says the pump is running; the switch reflects the device, not
+    // only what was pressed here.
+    expect(screen.getByTestId('pump-state')).toHaveTextContent('Pump on');
+
+    cleanup();
+    window.localStorage.setItem('village.demoMode', 'live');
+    await renderReady();
+    expect(screen.queryByTestId('pump-manual')).not.toBeInTheDocument();
+  });
+});

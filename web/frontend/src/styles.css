@@ -2119,3 +2119,15 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .bin-led-dot--paper { color: #e3b04b; }
 .bin-led-dot.is-on { background: currentColor; box-shadow: 0 0 10px currentColor; }
 .bin-led:has(.is-on) .bin-led-state { color: var(--cream); }
+
+/* The demo's pump switch, beside the Water/Stop buttons it overrides. */
+.pump-manual { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.pump-manual-label {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.pump-manual-note { text-transform: none; letter-spacing: 0; color: var(--muted-2); font-size: 11px; }
+.pump-manual .hint { margin: 0; font-size: 11px; }
