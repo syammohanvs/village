@@ -134,6 +134,12 @@ visitors cannot be used to press **Water** or change calibration.
 - **Sara's reply and the request stay on screen while a new recording starts**,
   and closing the panel mid-recording cancels the recorder. A reply is only
   replaced by a newer request.
+- **The language pills are styled in `styles.css` and guarded (2026-11-17).**
+  `.lang-picker` / `.lang-pill` (plus `.is-on`, `-label`, `-note`) are shared by
+  the page, the panel and Lia.  Rewriting a large CSS block wholesale deleted
+  them silently once and the selector fell back to the browser's grey buttons —
+  `components/langPills.test.ts` now reads the stylesheet from disk and fails if
+  the pills or their gold selected state go missing.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider

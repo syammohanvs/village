@@ -865,6 +865,41 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
    own rather than a chip a visitor has to interpret. */
 .voice-sim { margin: 0; color: var(--warn); font-size: 13px; line-height: 1.45; }
 
+/* One language selector for the voice panel, the home invitation and
+   wherever Lia is shown.  A selector is a promise that the three languages look
+   like choices; without these rules they fall back to the browser's own grey
+   buttons (they were lost once when a CSS block was rewritten wholesale,
+   2026-11-17). */
+.lang-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.lang-pill {
+  display: inline-flex;
+  /* The label (and its small qualifier) sits centred in the pill: a pill that
+     is wider than its word read as though the text was left behind. */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 2px;
+  min-height: 38px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.lang-pill:hover:not(:disabled) { color: var(--cream); border-color: var(--gold-dim); }
+.lang-pill.is-on {
+  background: rgba(217, 180, 91, 0.22);
+  border-color: var(--gold);
+  color: var(--gold-2);
+  box-shadow: inset 0 0 0 1px rgba(217, 180, 91, 0.45);
+}
+.lang-pill:disabled { opacity: .6; cursor: not-allowed; }
+.lang-pill-label { line-height: 1.2; }
+.lang-pill-note { font-size: 10.5px; font-weight: 500; color: var(--muted); line-height: 1.2; }
+
 /* Order: language · speaking · request · reply · typing · examples.  The reply
    is text a visitor reads aloud to somebody, so it is set larger than the
    labels around it. */
