@@ -11,12 +11,21 @@ from .config import Settings
 
 
 # A short sample of the words the village listens for, in the language itself.
-# whisper.cpp takes an initial prompt into the decoder, and it settles the
-# *script*: with no prompt the same Hindi clip came back as "Light Bandkaru."
-# (Latin) while this prompt gave "… करो" in Devanagari (measured 2026-11-17).
-# Malayalam is unaffected by its prompt, but it costs nothing and cannot hurt.
+#
+# **Hindi only.**  whisper.cpp takes an initial prompt into the decoder, and for
+# Hindi it settles the *script*: with no prompt the same clip came back as
+# "Light Bandkaru." (Latin) while this prompt gave "… करो" in Devanagari
+# (measured 2026-11-17).
+#
+# **Malayalam must have NO prompt.**  The note here used to say Malayalam was
+# "unaffected" by its prompt; measured on 2026-11-18 that is false, and the
+# prompt actively hurts: the same three clips gave
+#   "விலக்குகள் காட்டிக்குக்கா" / "தாங்கில வெள்ளம்ணு" / "தாங்கில் வெள்ளமுண்டு"
+# without it (all three parsed correctly) and
+#   "வியலகுகள் கட்டிக்குங்கள்" (with a Persian yeh), "மண்ணில் எத்தான்…" and a
+#   bare "യ്മയ്ക്കുക." with it.  Whisper names Malayalam with the *Devanagari*
+# token, so a Malayalam prompt pulls the decoder toward the wrong tokens.
 LANGUAGE_PROMPTS = {
-    "ml": "വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ കത്തിക്കുക, പമ്പ് ഓൺ, പമ്പ് ഓഫ്, വെള്ളം, നനയ്ക്കുക.",
     "hi": "लाइट बंद करो, लाइट चालू करो, पंप चालू करो, पानी, स्ट्रीट लाइट.",
 }
 

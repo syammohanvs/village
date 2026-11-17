@@ -85,16 +85,22 @@ def test_wav_info_reads_the_duration():
 def test_the_decoder_is_primed_with_the_language_it_should_expect():
     """whisper.cpp takes an initial prompt into the decoder, and it settles the
     script: the same Hindi clip came back as "Light Bandkaru." with no prompt
-    and in Devanagari with one (measured 2026-11-17).  English needs none."""
+    and in Devanagari with one (measured 2026-11-17).
+
+    **Malayalam is the opposite case (measured 2026-11-18).**  Whisper names
+    Malayalam with the Devanagari token, so a Malayalam prompt pulls the
+    decoder toward the wrong tokens: the same clips came back as
+    "வியலகுகள் கட்டிக்குங்கள்" (with a Persian yeh) and one bare "യ്മയ്ക്കുക."
+    with the prompt, and as three parseable sentences without it.  No prompt.
+    """
     from app.voice import request_fields
 
     assert "prompt" not in request_fields("en")
-    for language in ("ml", "hi"):
-        fields = request_fields(language)
-        assert fields["language"] == language
-        assert fields["prompt"].strip()
-        # The prompt has to be written in that language's own script, or it
-        # primes the wrong decoder.
-        ranges = {"ml": ("\u0d00", "\u0d7f"), "hi": ("\u0900", "\u097f")}
-        low, high = ranges[language]
-        assert any(low <= char <= high for char in fields["prompt"])
+    assert "prompt" not in request_fields("ml")
+
+    fields = request_fields("hi")
+    assert fields["language"] == "hi"
+    assert fields["prompt"].strip()
+    # The prompt has to be written in that language's own script, or it primes
+    # the wrong decoder.
+    assert any("\u0900" <= char <= "\u097f" for char in fields["prompt"])

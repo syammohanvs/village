@@ -168,6 +168,19 @@ visitors cannot be used to press **Water** or change calibration.
   speech server and the model". English is good on `ggml-base.bin`; Malayalam
   and Hindi recognition is weak on every model that fits this CPU's speed
   budget.
+- **Malayalam must be decoded with NO prompt (2026-11-18).**  `voice.py` primes
+  the decoder with a short phrase in the language, because for **Hindi** that
+  settles the script ("Light Bandkaru." → "… करो" in Devanagari, 2026-11-17).
+  The file used to carry a Malayalam prompt too and called it "unaffected"; it
+  is not, it **hurts**.  Whisper names Malayalam with the *Devanagari* token, so
+  a Malayalam prompt pulls the decoder toward the wrong tokens.  Measured on the
+  same three clips, with the prompt vs without:
+  `வியலகுகள் கட்டிக்குங்கள்` (Persian yeh) → `விலக்குகள் காட்டிக்குக்கா`,
+  `മണ്ണിൽ എത്താൻ…` → `மண்ணில் எத்தாக இருப்போமும் இரு`, and a bare
+  `യ്മയ്ക്കുക.` → `தாங்கில வெள்ளம்ணு`.  Without it all three parse
+  (LIGHTS_ON / SOIL_STATUS / WATER_STATUS) through the real
+  `/voice/transcribe` route.  `test_the_decoder_is_primed_with_the_language_it_
+  should_expect` now asserts **no** prompt for `ml`.
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
   Unicode offset) and romanised, so `വിളക്കുകൾ അണയ്ക്കുക` and

@@ -379,6 +379,13 @@ whether it is answering). The model is chosen with `VILLAGE_WHISPER_MODEL` in
 | `ggml-large-v3-turbo.bin` | 1.6 GB | 18–25 s here | good | weak, and far too slow |
 | `ggml-large-v3.bin` | 3.1 GB | 25–90 s here | good | not usable on this CPU |
 
+**Do not give the model a Malayalam prompt.**  The app sends a short Hindi
+prompt because it settles the script for Hindi, but Malayalam is the opposite
+case: measured on the same three sentences, a Malayalam prompt made the model
+wander (one answer came back as a single nonsense word) while the same audio
+without a prompt transcribed consistently enough to run the command.  The
+prompt is per language in `voice.py` — leave `ml` out of it.
+
 The decoder is **primed with a short sample of the words the village listens
 for**, in the language's own script (`app/voice.py`, `LANGUAGE_PROMPTS`).  That
 settles which script comes back: the same Hindi clip gave `Light Bandkaru.`
