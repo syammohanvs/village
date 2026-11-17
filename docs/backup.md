@@ -73,9 +73,14 @@ writes.
 ```bash
 git clone git@github.com:syammohanvs/village.git
 cd village
+./scripts/setup.sh                  # first time only: Python env + node modules
 ./scripts/download_models.sh        # the whisper weights, ~142 MB
 ./scripts/launch.sh
 ```
+
+`./scripts/setup.sh` is only needed while the Python environment or
+`node_modules` are missing — both live outside git because they are re-installed,
+not restored. It creates them beside the checkout (`.venv`, `web/frontend/node_modules`).
 
 That is the whole restore. Sign in with the admin account in `data/village.db`
 (the password is whatever was set in Setup — the default on a fresh database is
@@ -83,8 +88,10 @@ That is the whole restore. Sign in with the admin account in `data/village.db`
 
 Two things are machine-specific and may need a look:
 
-- `.env` names the WSL virtualenv path (`VILLAGE_VENV=/home/ubuntu/.venvs/aivillage`);
-  on a laptop with a different user name, point it at the right one.
+- `.env` names this laptop's WSL virtualenv (`VILLAGE_VENV=/home/ubuntu/.venvs/aivillage`).
+  A clone usually has no such directory, so the scripts fall back to `.venv`
+  beside the checkout (`scripts/venv.sh`); you only have to edit the line if you
+  keep environments somewhere else on purpose.
 - `VILLAGE_DEVICE_URL` points at the relay on the Windows host, whose WSL
   address changes per boot. `./scripts/relay.sh ensure` (which the start
   scripts run) repairs it.

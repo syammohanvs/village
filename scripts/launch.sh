@@ -24,7 +24,9 @@ set -a; . ./.env; set +a
 
 HOST="${VILLAGE_BIND_HOST:-127.0.0.1}"
 PORT="${VILLAGE_PORT:-8000}"
-VENV="${VILLAGE_VENV:-$ROOT/.venv}"
+# shellcheck source=scripts/venv.sh
+. "$ROOT/scripts/venv.sh"
+VENV="$(village_venv "$ROOT" "${VILLAGE_VENV:-}")"
 WHISPER_BIN="${VILLAGE_WHISPER_BIN:-$ROOT/models/whisper/whisper-server}"
 WHISPER_URL="${VILLAGE_WHISPER_URL:-http://127.0.0.1:8181}"
 WHISPER_MODEL="${VILLAGE_WHISPER_MODEL:-$ROOT/models/whisper/ggml-base.bin}"

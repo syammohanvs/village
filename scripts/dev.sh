@@ -17,7 +17,9 @@ if ! pgrep -f "relay[.]sh wat[c]h" >/dev/null 2>&1; then
 fi
 # shellcheck disable=SC1091
 set -a; . ./.env; set +a
-VENV="${VILLAGE_VENV:-$ROOT/.venv}"
+# shellcheck source=scripts/venv.sh
+. "$ROOT/scripts/venv.sh"
+VENV="$(village_venv "$ROOT" "${VILLAGE_VENV:-}")"
 HOST="${VILLAGE_BIND_HOST:-127.0.0.1}"
 PORT="${VILLAGE_PORT:-8000}"
 

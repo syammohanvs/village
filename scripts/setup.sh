@@ -36,7 +36,13 @@ fi
 set -a; . ./.env; set +a
 
 info "Python virtual environment"
-VENV="${VILLAGE_VENV:-$ROOT/.venv}"
+# shellcheck source=scripts/venv.sh
+. "$ROOT/scripts/venv.sh"
+VENV="$(village_venv "$ROOT" "${VILLAGE_VENV:-}")"
+if [ -n "${VILLAGE_VENV:-}" ] && [ "$VENV" != "$VILLAGE_VENV" ]; then
+  printf '%s is named in .env but cannot be used here;\n' "$VILLAGE_VENV"
+  printf 'using %s instead (a clone on another laptop gets its own).\n' "$VENV"
+fi
 if [ -x "$VENV/bin/python" ]; then
   printf 'Using existing virtual environment at %s\n' "$VENV"
 elif python3 -m venv "$VENV" >/dev/null 2>&1; then

@@ -7,7 +7,9 @@ if [ -f .env ]; then
   # shellcheck disable=SC1091
   set -a; . ./.env; set +a
 fi
-VENV="${VILLAGE_VENV:-$ROOT/.venv}"
+# shellcheck source=scripts/venv.sh
+. "$ROOT/scripts/venv.sh"
+VENV="$(village_venv "$ROOT" "${VILLAGE_VENV:-}")"
 if [ ! -x "$VENV/bin/python" ] && [ -x "$HOME/.venvs/aivillage/bin/python" ]; then
   VENV="$HOME/.venvs/aivillage"
 fi
