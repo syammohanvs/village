@@ -38,6 +38,9 @@ function levelChip(text: string, tone: 'live' | 'warn' | 'bad' | 'neutral' | 'go
 }
 
 function stateLine(text: string, tone: 'good' | 'warn' | 'bad' | 'neutral' = 'neutral') {
+  // Nothing to report: render nothing.  A card's chip already says what state it
+  // is in, so a second line reading "No reading" only repeats it in worse words.
+  if (!text) return null;
   return <p className={cx('vcard-state', `vcard-state--${tone}`)}>{text}</p>;
 }
 
@@ -385,12 +388,14 @@ export function OurVillage() {
           {/* The chip beside the name says whether a watering session is
               running; this line is the SOIL's own reading. */}
           {stateLine(
-            hasStatus
+            // Only when the soil probe has actually said something: a frame
+            // without a soil reading has nothing to add to the chip.
+            hasStatus && soil?.state
               ? soilPercent
                 ? // soilPercent is already formatted WITH its "%".
                   t('page.soilWithValue', { state: soilWord, percent: soilPercent })
                 : t('page.soilNoValue', { state: soilWord })
-              : t('page.noSoilReading'),
+              : '',
             soil?.state === 'dry' ? 'warn' : 'neutral',
           )}
           <div className="pump-manual" data-testid="pump-manual">
@@ -455,12 +460,14 @@ export function OurVillage() {
           </header>
           {stateLine(
             !hasStatus
-              ? t('page.noReading')
+              ? ''
               : reservoir?.state === 'available'
                 ? t('tank.lineAvailable')
                 : reservoir?.state === 'low'
                   ? t('tank.lineLow')
-                  : t('tank.lineUnusable'),
+                  : reservoir?.state === 'uncalibrated'
+                    ? t('tank.lineUnusable')
+                    : '',
             reservoir?.state === 'available' ? 'good' : reservoir?.state === 'low' ? 'warn' : 'neutral',
           )}
           <p className="sim-hint sim-hint--always" data-testid="tank-note">
@@ -564,11 +571,7 @@ export function OurVillage() {
             {modelChip}
           </header>
           {stateLine(
-            !hasStatus
-              ? t('page.noReading')
-              : waste?.active && waste.category
-                ? t('waste.lastItem', { item: waste.category })
-                : t('waste.noItem'),
+            waste?.active && waste.category ? t('waste.lastItem', { item: waste.category }) : '',
             waste?.active ? 'good' : 'neutral',
           )}
           <div className="vcard-actions">
@@ -623,9 +626,7 @@ export function OurVillage() {
           )}
         </header>
         {stateLine(
-          solarVolts
-            ? `${solarVolts} V · ${solarCurrent ?? '0.00'} mA · ${solarPower ?? '0.0'} mW`
-            : t('page.noReading'),
+          solarVolts ? `${solarVolts} V · ${solarCurrent ?? '0.00'} mA · ${solarPower ?? '0.0'} mW` : '',
           'neutral',
         )}
         {/* The picture is worth having in both modes: in Simulation it follows
@@ -668,7 +669,7 @@ export function OurVillage() {
             windGenerating ? 'live' : 'neutral',
           )}
         </header>
-        {stateLine(windVolts ? `${windVolts} V` : t('page.noReading'), 'neutral')}
+        {stateLine(windVolts ? `${windVolts} V` : '', 'neutral')}
         {windFitted || demo ? (
           <p className="vcard-note">
             {demo ? t('wind.simulatedLine') : t('wind.measuredLine')}

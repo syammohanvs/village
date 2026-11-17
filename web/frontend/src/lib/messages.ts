@@ -183,7 +183,6 @@ export const MESSAGES = {
   'tank.uncalibrated': ['Not calibrated', 'कैलिब्रेट नहीं', 'കാലിബ്രേറ്റ് ചെയ്തിട്ടില്ല'],
   'tank.unknown': ['Unknown', 'अज्ञात', 'അറിയില്ല'],
   'page.noReading': ['No reading', 'रीडिंग नहीं', 'വായനയില്ല'],
-  'page.noSoilReading': ['No soil reading yet', 'मिट्टी की रीडिंग अभी नहीं', 'മണ്ണിന്റെ വായന ഇതുവരെ ഇല്ല'],
   'page.soilWithValue': [
     'Soil: {state} · {percent}',
     'मिट्टी: {state} · {percent}',
@@ -353,7 +352,6 @@ export const MESSAGES = {
 
   // ------------------------------------------------------------ waste card ---
   'waste.lastItem': ['Last item: {item}', 'आख़िरी चीज़: {item}', 'അവസാന വസ്തു: {item}'],
-  'waste.noItem': ['No item yet', 'अभी कोई चीज़ नहीं', 'ഇതുവരെ വസ്തു ഇല്ല'],
   'waste.identify': ['Identify waste', 'कचरा पहचानें', 'മാലിന്യം തിരിച്ചറിയുക'],
   'waste.identifyTitle': ['Open the waste camera.', 'कचरे का कैमरा खोलें।', 'മാലിന്യ ക്യാമറ തുറക്കുക.'],
   'waste.identifyOfflineTitle': [

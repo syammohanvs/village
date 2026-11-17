@@ -307,6 +307,13 @@ describe('unknown readings', () => {
     expect(screen.queryByText(/^Idle$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/not commissioned/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Connect the board to check watering readiness/i)).toBeInTheDocument();
+    // With no frame, a card reports nothing at all: its chip already says
+    // "Status unknown", so "No reading" underneath it was the same fact twice
+    // (asked 2026-11-18).  The waste card keeps only its chip and its button.
+    expect(screen.queryByText('No reading')).not.toBeInTheDocument();
+    expect(screen.queryByText('No soil reading yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No item yet')).not.toBeInTheDocument();
+    expect(within(screen.getByTestId('card-waste')).getByTestId('open-sort-waste')).toBeInTheDocument();
 
     for (const mode of ['auto', 'on', 'off'] as const) {
       expect(screen.getByTestId(`lights-${mode}`)).toHaveAttribute('aria-pressed', 'false');
@@ -343,7 +350,9 @@ describe('wind card', () => {
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Not fitted')).toHaveClass('chip', 'chip--neutral');
-    expect(card.getByText('No reading')).toBeInTheDocument();
+    // No placeholder line: the chip already says the turbine is not fitted, and
+    // "No reading" under it repeated that in worse words (2026-11-18).
+    expect(card.queryByText('No reading')).not.toBeInTheDocument();
     // No invented power figure: one tap cannot measure current.
     expect(card.queryByText(/mW/)).not.toBeInTheDocument();
   });
@@ -910,5 +919,24 @@ describe('the language selector governs the whole page', () => {
     // The panel has its own copy of the same selector, reading the same state.
     const inPanel = within(panel).getAllByRole('button', { name: /മലയാളം/ });
     expect(inPanel.some((button) => button.getAttribute('aria-pressed') === 'true')).toBe(true);
+  });
+});
+
+/**
+ * A card says a reading when it has one, and says nothing when it does not.
+ *
+ * Asked 2026-11-18: "watercard why do u have no reading? No meaning. Here camera
+ * ready and identify waste is only needed."  The chip on each card already
+ * reports the state ("Status unknown", "Camera ready"), so a second line reading
+ * "No reading" / "No item yet" was the same fact twice.
+ */
+describe('cards with nothing to report say nothing', () => {
+  it('still reports a reading the moment there is one', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'dry', soilCalibrated: true, soilPercent: 21 }),
+    );
+    await renderReady();
+    const watering = within(await screen.findByTestId('card-plants'));
+    expect(watering.getByText('Soil: dry · 21%')).toBeInTheDocument();
   });
 });
