@@ -194,6 +194,13 @@ whether it is answering). The model is chosen with `VILLAGE_WHISPER_MODEL` in
 | `ggml-large-v3-turbo.bin` | 1.6 GB | 18–25 s here | good | weak, and far too slow |
 | `ggml-large-v3.bin` | 3.1 GB | 25–90 s here | good | not usable on this CPU |
 
+The decoder is **primed with a short sample of the words the village listens
+for**, in the language's own script (`app/voice.py`, `LANGUAGE_PROMPTS`).  That
+settles which script comes back: the same Hindi clip gave `Light Bandkaru.`
+with no prompt and Devanagari with one.  It is not a cure for a misheard word —
+"लाइट" was dropped from one clip even with the prompt — but a transcript in the
+right script is the one the parser, and the visitor, can read.
+
 Measured 2026-11-17 on this laptop: **English is reliable on every model**, and
 a *synthesized* Malayalam sentence was misheard by all of them (Tamil,
 Devanagari or Gurmukhi script). The parser itself is fine — the same sentence

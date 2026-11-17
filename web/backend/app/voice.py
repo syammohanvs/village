@@ -10,6 +10,33 @@ import httpx
 from .config import Settings
 
 
+# A short sample of the words the village listens for, in the language itself.
+# whisper.cpp takes an initial prompt into the decoder, and it settles the
+# *script*: with no prompt the same Hindi clip came back as "Light Bandkaru."
+# (Latin) while this prompt gave "… करो" in Devanagari (measured 2026-11-17).
+# Malayalam is unaffected by its prompt, but it costs nothing and cannot hurt.
+LANGUAGE_PROMPTS = {
+    "ml": "വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ കത്തിക്കുക, പമ്പ് ഓൺ, പമ്പ് ഓഫ്, വെള്ളം, നനയ്ക്കുക.",
+    "hi": "लाइट बंद करो, लाइट चालू करो, पंप चालू करो, पानी, स्ट्रीट लाइट.",
+}
+
+
+def request_fields(language: str) -> dict[str, str]:
+    """The form fields whisper.cpp is given for one transcription.
+
+    One definition, so a test can assert the prompt without a server.
+    """
+    fields = {
+        "temperature": "0",
+        "response_format": "json",
+        "language": language,
+    }
+    prompt = LANGUAGE_PROMPTS.get(language)
+    if prompt:
+        fields["prompt"] = prompt
+    return fields
+
+
 class VoiceError(Exception):
     def __init__(self, status: int, code: str, message: str):
         super().__init__(message)
@@ -147,11 +174,7 @@ class WhisperClient:
                 response = await client.post(
                     self.settings.whisper_url + "/inference",
                     files={"file": ("audio.wav", data, "audio/wav")},
-                    data={
-                        "temperature": "0",
-                        "response_format": "json",
-                        "language": language,
-                    },
+                    data=request_fields(language),
                 )
         except httpx.HTTPError as exc:
             raise VoiceError(

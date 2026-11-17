@@ -424,3 +424,20 @@ def test_phonetics_put_both_scripts_on_one_key() -> None:
     # counts.
     assert not same_word("anakkukka", "nanaykkuka")
     assert same_word("kattikkuka", "kathikkuka")
+
+
+def test_a_long_word_one_letter_apart_is_still_the_same_word(matcher: IntentMatcher) -> None:
+    """The label does not have to be spelled exactly as the book says.
+
+    "விலக்குங்கள் காத்திக்குக்கா" (what the log recorded on 2026-11-17) folds to
+    "vilakunkal katikuka": one inserted `n` away from vilakkukal + kathikkuka.
+    A long word may absorb that; a short one may not (see the pump guard).
+    """
+    from app.phonetics import same_word
+
+    assert same_word("vilakkunkal", "vilakkukal")
+    # Short words stay exact — this pair is one inserted letter too, and it is
+    # the difference between "turn off" and "water".
+    assert not same_word("anakkukka", "nanaykkuka")
+
+    assert matcher.match("விலக்குங்கள் காத்திக்குக்கா", "ml")["command"] == "LIGHTS_ON"

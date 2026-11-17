@@ -204,8 +204,10 @@ def same_word(a: str, b: str) -> bool:
         return False
     if left == right:
         return True
-    # A long word may differ by one letter and still be the same word (a
-    # misheard final vowel is common); a short one may not.
-    if min(len(left), len(right)) >= 10:
+    # A long word may differ by one letter and still be the same word:
+    # "vilakkunkal" (heard) and "vilakkukal" (expected) are one inserted `n`.
+    # A short one may not -- that is exactly how "anakuka" (turn off) was once
+    # read as "nanakuka" (water).
+    if min(len(left), len(right)) >= 9:
         return distance(left, right) <= 1
     return False

@@ -80,3 +80,21 @@ async def test_readiness_flags_an_english_only_model(tmp_path):
 
 def test_wav_info_reads_the_duration():
     assert wav_info(silence_wav(0.5))["duration_s"] == 0.5
+
+
+def test_the_decoder_is_primed_with_the_language_it_should_expect():
+    """whisper.cpp takes an initial prompt into the decoder, and it settles the
+    script: the same Hindi clip came back as "Light Bandkaru." with no prompt
+    and in Devanagari with one (measured 2026-11-17).  English needs none."""
+    from app.voice import request_fields
+
+    assert "prompt" not in request_fields("en")
+    for language in ("ml", "hi"):
+        fields = request_fields(language)
+        assert fields["language"] == language
+        assert fields["prompt"].strip()
+        # The prompt has to be written in that language's own script, or it
+        # primes the wrong decoder.
+        ranges = {"ml": ("\u0d00", "\u0d7f"), "hi": ("\u0900", "\u097f")}
+        low, high = ranges[language]
+        assert any(low <= char <= high for char in fields["prompt"])
