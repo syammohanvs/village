@@ -143,6 +143,18 @@ visitors cannot be used to press **Water** or change calibration.
   same curve the simulator uses (150 mV … 4000 mV), and the windmill is drawn
   still with `data-fitted="false"` when no turbine is wired, so the picture
   cannot claim hardware the board does not have.
+- **Sara answers in the visitor's language, never in the device's words
+  (2026-11-17).**  The firmware's `reason` texts are English; `applyUtterance`
+  used to *speak* `commandOutcome.reason` first, so a Malayalam command was
+  confirmed by an English sentence read with the `ml` Piper voice — reported as
+  "she answered in something weird".  Now the spoken text is the parser's
+  localized `done_text` (confirmed) / `already_text` (duplicate) /
+  `messages.refused` (rejected) / `messages.unconfirmed`, and the English
+  reason appears only as the **text** line under a non-confirmed outcome
+  (`CommandOutcome` line is no longer rendered for a confirmation, where it
+  repeated the state word).  `messages.refused` was added to
+  `shared/intents.json` in all three languages.  A test asserts the spoken
+  argument is Malayalam for a Malayalam command.
 - **Sara's English accent is a device choice (2026-11-17).**  Piper has **no
   official `en_IN` voice** (only `en_US`/`en_GB`), so `VOICE_FOR_LANGUAGE['en']`
   is American.  Setup → Voice & Camera → *Sara's English voice* writes

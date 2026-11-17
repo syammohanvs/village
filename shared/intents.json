@@ -641,6 +641,11 @@
       "en": "The controller did not confirm the action. Please check the board and try again.",
       "ml": "കൺട്രോളർ സ്ഥിരീകരിച്ചില്ല. ബോർഡ് പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "hi": "कंट्रोलर ने पुष्टि नहीं की। बोर्ड जाँचकर फिर कोशिश करें।"
+    },
+    "refused": {
+      "en": "The village did not accept that. The reason is on the screen.",
+      "ml": "ഗ്രാമം അത് സ്വീകരിച്ചില്ല. കാരണം സ്ക്രീനിൽ കാണാം.",
+      "hi": "गाँव ने उसे स्वीकार नहीं किया। कारण स्क्रीन पर है।"
     }
   },
   "devices": {

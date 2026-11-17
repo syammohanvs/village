@@ -444,14 +444,21 @@ export function VoicePanel() {
             'The controller confirmed the command.',
         );
       }
-      const done =
+      // Speak in the visitor's language, always.  The controller's reason is
+      // written in English by the firmware; handing that to the Malayalam voice
+      // produced a sentence of Malayalam sounds around English words, which is
+      // what a visitor reported as "she answered in something weird"
+      // (2026-11-17).  The reason is still shown on screen when it is the
+      // answer — a refusal — and a refusal has its own sentence to say.
+      const spoken =
         commandOutcome.status === 'confirmed'
-          ? response.done_text || response.response_text
-          : undefined;
-      void speak(
-        commandOutcome.reason ?? done ?? response.message ?? 'Command sent.',
-        intent,
-      );
+          ? response.done_text || response.response_text || ''
+          : commandOutcome.status === 'duplicate'
+            ? response.already_text || response.done_text || ''
+            : commandOutcome.status === 'rejected'
+              ? (intents.data?.messages?.refused?.[language] ?? '')
+              : (intents.data?.messages?.unconfirmed?.[language] ?? '');
+      if (spoken) void speak(spoken, intent);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
@@ -812,11 +819,10 @@ export function VoicePanel() {
           >
             {message || copy.replyEmpty}
           </p>
-          {outcome && (
+          {outcome && outcome.status !== 'confirmed' && (
             <p
               className={cx(
                 'voice-outcome',
-                outcome.status === 'confirmed' && 'is-ok',
                 outcome.status === 'rejected' && 'is-rejected',
                 outcome.status === 'unconfirmed' && 'is-warn',
               )}

@@ -229,6 +229,24 @@ an `en-IN` voice too).
   wanted, the alternative is a community Piper `en_IN` model, which is a
   third-party download rather than part of the official voice set.
 
+### The language Sara answers in
+
+**Sara speaks the visitor's language, always.** The controller's own reason is
+written in English by the firmware ("Streetlights switched off manually."), and
+it used to be what she read aloud — a Malayalam voice pronouncing an English
+sentence, which a visitor reported as *"she answered in something weird"*
+(2026-11-17). Now:
+
+- a **confirmed** command is spoken and shown as the parser's own sentence in
+  that language (`തെരുവ് വിളക്കുകൾ അണച്ചു.`);
+- a **refusal** is spoken as *"the village did not accept that — the reason is
+  on the screen"*, in that language, with the controller's reason shown as text
+  beneath it;
+- **"already on/off"** uses the catalogue's own sentence.
+
+Typed and spoken requests take the same path, so the two cannot answer
+differently.
+
 ### The panel itself
 
 **Talk to Sara** opens a panel whose order is fixed, so a visitor learns it in

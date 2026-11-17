@@ -139,12 +139,11 @@ describe('Voice panel', () => {
     );
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText(/switch off the lights/).length).toBeGreaterThan(0);
-    // The state word says confirmed; the line under it is the controller's own
-    // reason in plain words, not a code.
+    // The state word says confirmed, and a confirmation says nothing else: the
+    // controller's English reason used to sit under a Malayalam reply, and it
+    // was also what Sara tried to speak (2026-11-17).
     expect(await screen.findByTestId('voice-state-word')).toHaveTextContent(/confirmed/i);
-    expect(screen.getByTestId('voice-command-outcome')).toHaveTextContent(
-      'The lights were switched off.',
-    );
+    expect(screen.queryByTestId('voice-command-outcome')).not.toBeInTheDocument();
   });
 });
 
@@ -919,5 +918,120 @@ describe('the panel in plain words', () => {
       'The streetlights are off.',
     );
     expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent('lights off');
+  });
+});
+
+/**
+ * Sara must answer in the language the visitor chose.  The controller's reason
+ * is written in English by the firmware, and it used to be what she *spoke* —
+ * so a Malayalam command was confirmed by an English sentence read out by a
+ * Malayalam voice, which a visitor reported as "she answered in something
+ * weird" (2026-11-17).
+ */
+describe('the language Sara answers in', () => {
+  it('speaks the Malayalam confirmation, not the controller’s English reason', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      pending_text: 'തെരുവ് വിളക്കുകൾ അണയ്ക്കുന്നു.',
+      done_text: 'തെരുവ് വിളക്കുകൾ അണച്ചു.',
+    } as never);
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: true,
+      mode: 'demo',
+      physical: false,
+      ack: {
+        result: 'ACCEPTED',
+        reason_code: 'LIGHTS_MANUAL_OFF',
+        // The device speaks English, whatever language the visitor chose.
+        reason: 'Streetlights switched off manually.',
+      },
+      error: null,
+    } as never);
+
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+    // Spoken replies on, or the panel says nothing at all.
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+    await user.type(within(panel).getByTestId('voice-text'), 'ദയവായി ലൈറ്റുകൾ ഓഫ് ചെയ്യൂ');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    await waitFor(() =>
+      expect(vi.mocked(speech.speakReply)).toHaveBeenCalledWith(
+        'തെരുവ് വിളക്കുകൾ അണച്ചു.',
+        'ml',
+        'LIGHTS_OFF',
+      ),
+    );
+    // And the English reason is not on screen beside the Malayalam answer.
+    expect(screen.queryByTestId('voice-command-outcome')).not.toBeInTheDocument();
+  });
+
+  it('says a refusal in the visitor’s language, and shows the reason', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      done_text: 'തെരുവ് വിളക്കുകൾ അണച്ചു.',
+    } as never);
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: true,
+      mode: 'live',
+      physical: true,
+      ack: {
+        result: 'REJECTED',
+        reason_code: 'LIGHTS_NOT_INSTALLED',
+        reason: 'Streetlights are not installed in this build.',
+      },
+      error: null,
+    } as never);
+
+    const speech = await import('../lib/speech');
+    vi.mocked(speech.speakReply).mockClear();
+    // Spoken replies on, or the panel says nothing at all.  The catalogue
+    // carries the refusal sentence, as the backend's own does.
+    vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
+    vi.mocked(api.voiceIntents).mockResolvedValue({
+      intents: [
+        {
+          id: 'LIGHTS_OFF',
+          command: 'LIGHTS_OFF',
+          actuation: true,
+          label: { en: 'Lights off' },
+          phrases: { en: ['switch off the lights'] },
+        },
+      ],
+      help_order: ['LIGHTS_OFF'],
+      messages: {
+        refused: {
+          en: 'The village did not accept that. The reason is on the screen.',
+          ml: 'ഗ്രാമം അത് സ്വീകരിച്ചില്ല. കാരണം സ്ക്രീനിൽ കാണാം.',
+          hi: 'गाँव ने उसे स्वीकार नहीं किया। कारण स्क्रीन पर है।',
+        },
+      },
+    } as never);
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+    await user.type(within(panel).getByTestId('voice-text'), 'ദയവായി ലൈറ്റുകൾ ഓഫ് ചെയ്യൂ');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    await waitFor(() =>
+      expect(vi.mocked(speech.speakReply)).toHaveBeenCalledWith(
+        'ഗ്രാമം അത് സ്വീകരിച്ചില്ല. കാരണം സ്ക്രീനിൽ കാണാം.',
+        'ml',
+        'LIGHTS_OFF',
+      ),
+    );
+    // The reason itself is still readable, in the controller's own words.
+    expect(await screen.findByTestId('voice-command-outcome')).toHaveTextContent(
+      /not installed/i,
+    );
   });
 });

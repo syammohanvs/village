@@ -244,6 +244,15 @@ Sara refuses to guess. See [calibration.md](calibration.md).
 - The app will not record while it is speaking a reply. If the microphone
   button is disabled, wait for the reply to finish.
 
+## Sara answers in English (or something odd) when I speak Malayalam
+
+Fixed 2026-11-17. She used to read the *controller's* reason aloud, which the
+firmware writes in English — so a Malayalam request was confirmed by an English
+sentence in a Malayalam voice. She now answers with the parsed sentence in the
+chosen language; a refusal says so in that language and prints the controller's
+reason underneath. If it happens again, check that the language buttons under
+**Talk to Sara** show the language you are speaking.
+
 ## Sara's English sounds American
 
 That is Sara's own voice: the local neural model is American English, and it is
