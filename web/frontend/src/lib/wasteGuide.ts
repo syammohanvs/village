@@ -20,6 +20,9 @@
  * — reads from this file, so those three cannot disagree.
  */
 
+import type { MessageKey } from './messages';
+import { translate } from './translate';
+
 export type BinId = 'organic' | 'plastic' | 'paper';
 
 /** Where an item should go.  `separate` and `support` are not bins. */
@@ -120,18 +123,64 @@ export const WORDS = {
 } as const;
 
 export interface Disposal {
-  /** What the AI (or the reader) says the item is. */
+  /** What the AI (or the reader) says the item is — the classifier's label. */
   item: string;
+  /** …and that name in the visitor's language, when the class is one we know. */
+  itemKey?: MessageKey;
   destination: Destination;
-  /** The card's headline: a bin title, "Keep separate", or "Ask the Gram Sahayak". */
+  /** The card's headline, as a translation key. */
+  titleKey: MessageKey;
+  /** One short reason or preparation instruction, as a translation key. */
+  reasonKey: MessageKey;
+  keepOutKey?: MessageKey;
+  /**
+   * English, computed from the keys above.  Kept for the surfaces that are
+   * English only (the help page, tests) — never as a second hand-written copy,
+   * so the two cannot drift.
+   */
   title: string;
-  /** One short reason or preparation instruction. */
   reason: string;
+  keepOut?: string;
   /** True when the item must not go in one of the three bins. */
   separate: boolean;
   /** True when the answer is "ask the Gram Sahayak". */
   support: boolean;
   tone: 'ok' | 'warn' | 'danger';
+}
+
+/** The classifier's class name, in the visitor's language. */
+const ITEM_KEYS: Record<string, MessageKey> = {
+  organic: 'waste.item.organic',
+  plastic: 'waste.item.plastic',
+  paper: 'waste.item.paper',
+  glass: 'waste.item.glass',
+  metal: 'waste.item.metal',
+  textile: 'waste.item.textile',
+  leather: 'waste.item.leather',
+  footwear: 'waste.item.footwear',
+  thermocol: 'waste.item.thermocol',
+  ewaste: 'waste.item.ewaste',
+  background: 'waste.item.background',
+};
+
+/** One place builds a Disposal, so its English copy cannot disagree with its keys. */
+function make(parts: {
+  item: string;
+  itemKey?: MessageKey;
+  destination: Destination;
+  titleKey: MessageKey;
+  reasonKey: MessageKey;
+  keepOutKey?: MessageKey;
+  separate: boolean;
+  support: boolean;
+  tone: 'ok' | 'warn' | 'danger';
+}): Disposal {
+  return {
+    ...parts,
+    title: translate('en', parts.titleKey),
+    reason: translate('en', parts.reasonKey),
+    keepOut: parts.keepOutKey ? translate('en', parts.keepOutKey) : undefined,
+  };
 }
 
 /** Items that are never sorted by material, whatever the model says. */
@@ -149,6 +198,10 @@ function has(text: string, words: string[]): boolean {
  * The routing table.  `label` is the classifier's class (organic, plastic,
  * paper, glass, metal, textile, leather, footwear, thermocol, ewaste,
  * background) or a phrase the reader typed/chose.
+ *
+ * **Routing reads the English label, never a translated word.**  The decision
+ * is made here and only then given words, so switching the page to Hindi cannot
+ * change where an item is sent.
  */
 export function guideFor(
   label: string,
@@ -157,92 +210,106 @@ export function guideFor(
   const text = String(label ?? '').trim().toLowerCase();
 
   if (options.mixedBag) {
-    return {
+    return make({
       item: 'Mixed bag / several items',
+      itemKey: 'waste.item.mixedBag',
       destination: 'support',
-      title: 'Keep separate',
-      reason: WORDS.mixedBag,
+      titleKey: 'waste.title.keepSeparate',
+      reasonKey: 'waste.word.mixedBag',
       separate: true,
       support: true,
       tone: 'warn',
-    };
+    });
   }
   if (options.uncertain || !text || text === 'background') {
-    return {
+    return make({
       item: options.uncertain ? 'Not a clear item' : 'Nothing recognised',
+      itemKey: options.uncertain ? 'waste.item.uncertain' : 'waste.item.nothing',
       destination: 'support',
-      title: 'Ask the Gram Sahayak',
-      reason: WORDS.uncertain,
+      titleKey: 'waste.title.askSahayak',
+      reasonKey: 'waste.word.uncertain',
       separate: true,
       support: true,
       tone: 'warn',
-    };
+    });
   }
 
   // Special-care waste is decided by what it IS, never by what it is made of.
   // A syringe is plastic; it still must not go in the plastic bin.
   if (has(text, SANITARY)) {
-    return { item: label, destination: 'separate', title: 'Keep separate', reason: WORDS.sanitary, separate: true, support: true, tone: 'danger' };
+    return make({ item: label, destination: 'separate', titleKey: 'waste.title.keepSeparate',
+      reasonKey: 'waste.word.sanitary', separate: true, support: true, tone: 'danger' });
   }
   if (has(text, SHARPS)) {
-    return { item: label, destination: 'separate', title: 'Do not handle', reason: WORDS.sharps, separate: true, support: true, tone: 'danger' };
+    return make({ item: label, destination: 'separate', titleKey: 'waste.title.doNotHandle',
+      reasonKey: 'waste.word.sharps', separate: true, support: true, tone: 'danger' });
   }
   if (has(text, MEDICAL)) {
-    return { item: label, destination: 'separate', title: 'Keep separate', reason: WORDS.sharps, separate: true, support: true, tone: 'danger' };
+    return make({ item: label, destination: 'separate', titleKey: 'waste.title.keepSeparate',
+      reasonKey: 'waste.word.sharps', separate: true, support: true, tone: 'danger' });
   }
   if (has(text, CHEMICAL)) {
-    return { item: label, destination: 'separate', title: 'Keep separate', reason: WORDS.outside, separate: true, support: true, tone: 'danger' };
+    return make({ item: label, destination: 'separate', titleKey: 'waste.title.keepSeparate',
+      reasonKey: 'waste.word.outside', separate: true, support: true, tone: 'danger' });
   }
   if (has(text, BATTERY) || text.includes('ewaste') || text.includes('electronic')) {
-    return {
+    return make({
       item: label,
+      itemKey: 'waste.item.ewaste',
       destination: 'separate',
-      title: 'Keep separate',
-      reason:
-        'Electronics and batteries need their own authorised collection. Do not put them in our three bins. Contact Gram Sahayak.',
+      titleKey: 'waste.title.keepSeparate',
+      reasonKey: 'waste.word.ewaste',
       separate: true,
       support: true,
       tone: 'danger',
-    };
+    });
   }
 
   if (text === 'organic') {
-    return { item: 'Organic / food waste', destination: 'organic', title: BINS.organic.title, reason: BINS.organic.prepare, separate: false, support: false, tone: 'ok' };
+    return make({ item: 'Organic / food waste', itemKey: 'waste.item.organic', destination: 'organic',
+      titleKey: 'waste.bin.organic.title', reasonKey: 'waste.bin.organic.prepare',
+      keepOutKey: 'waste.bin.organic.keepOut', separate: false, support: false, tone: 'ok' });
   }
   if (text === 'plastic') {
-    return { item: 'Plastic', destination: 'plastic', title: BINS.plastic.title, reason: BINS.plastic.prepare, separate: false, support: false, tone: 'ok' };
+    return make({ item: 'Plastic', itemKey: 'waste.item.plastic', destination: 'plastic',
+      titleKey: 'waste.bin.plastic.title', reasonKey: 'waste.bin.plastic.prepare',
+      keepOutKey: 'waste.bin.plastic.keepOut', separate: false, support: false, tone: 'ok' });
   }
   if (text === 'paper') {
-    return { item: 'Paper & cardboard', destination: 'paper', title: BINS.paper.title, reason: BINS.paper.prepare, separate: false, support: false, tone: 'ok' };
+    return make({ item: 'Paper & cardboard', itemKey: 'waste.item.paper', destination: 'paper',
+      titleKey: 'waste.bin.paper.title', reasonKey: 'waste.bin.paper.prepare',
+      keepOutKey: 'waste.bin.paper.keepOut', separate: false, support: false, tone: 'ok' });
   }
 
   // Glass and metal: a separate collection *only when one is configured*.
   if (text === 'glass' || text === 'metal') {
     const configured = text === 'glass' ? ROUTES.glass : ROUTES.metal;
-    return {
+    return make({
       item: text === 'glass' ? 'Glass' : 'Metal',
+      itemKey: text === 'glass' ? 'waste.item.glass' : 'waste.item.metal',
       destination: configured ? 'separate' : 'support',
-      title: configured ? 'Keep separate for collection' : 'Ask the Gram Sahayak',
-      reason: configured
-        ? `Keep it separate for the ${text} collection route. It does not go in our three bins.`
-        : WORDS.separateUnconfigured,
+      titleKey: configured ? 'waste.title.keepForCollection' : 'waste.title.askSahayak',
+      reasonKey: configured
+        ? (text === 'glass' ? 'waste.word.glassRoute' : 'waste.word.metalRoute')
+        : 'waste.word.separateUnconfigured',
       separate: true,
       support: !configured,
       tone: 'warn',
-    };
+    });
   }
 
   // Everything else the model can name (textile, leather, footwear, thermocol)
   // is a material, not one of our bins.
-  return {
+  return make({
     item: label,
+    itemKey: ITEM_KEYS[text],
     destination: 'support',
-    title: 'Ask the Gram Sahayak',
-    reason: WORDS.outside,
+    titleKey: 'waste.title.askSahayak',
+    reasonKey: 'waste.word.outside',
     separate: true,
     support: true,
     tone: 'warn',
-  };
+  });
 }
 
 /** The sentence Lia says, kept in step with the card. */

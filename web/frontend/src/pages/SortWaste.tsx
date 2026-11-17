@@ -42,13 +42,13 @@ import {
 } from '../lib/camera';
 import {
   SUPPORT,
-  SUPPORT_ROLE,
-  WORDS,
   confidenceBar,
   guideFor,
   spokenFor,
   type Disposal,
 } from '../lib/wasteGuide';
+import { useT } from '../lib/i18n';
+import type { MessageKey } from '../lib/messages';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import { useDemo } from '../lib/demo';
@@ -131,18 +131,19 @@ type ModelState = 'idle' | 'loading' | 'ready' | 'error';
  * work is worse than a sentence that says where to go.
  */
 function CardActions({ onScanAnother, support }: { onScanAnother: () => void; support: { desk: string; contact: string } }) {
+  const t = useT();
   return (
     <div className="camera-actions" data-testid="waste-actions">
       <button type="button" className="btn btn--primary" onClick={onScanAnother} data-testid="scan-another">
-        Scan another item
+        {t('sort.scanAnother')}
       </button>
       {support.contact ? (
         <a className="btn btn--ghost" href={`tel:${support.contact}`} data-testid="contact-sahayak">
-          Contact {SUPPORT_ROLE}
+          {t('sort.contactSahayak')}
         </a>
       ) : (
         <span className="hint" data-testid="contact-sahayak">
-          {support.desk}
+          {t('sort.supportDesk')}
         </span>
       )}
     </div>
@@ -168,8 +169,23 @@ function capitalise(value: string): string {
 // table, the room, and ordinary objects (a car key, a phone, a wallet) that are
 // not waste.  "Background" is the engineering name; the Gram Sahayak needs the
 // plain-English one.
-function displayLabel(label: string): string {
-  return label.trim().toLowerCase() === 'background' ? 'Not a waste item' : label;
+/** The classifier's class, as a translation key — `null` when it is not one we name. */
+const LABEL_KEYS: Record<string, MessageKey> = {
+  organic: 'waste.item.organic',
+  plastic: 'waste.item.plastic',
+  paper: 'waste.item.paper',
+  glass: 'waste.item.glass',
+  metal: 'waste.item.metal',
+  textile: 'waste.item.textile',
+  leather: 'waste.item.leather',
+  footwear: 'waste.item.footwear',
+  thermocol: 'waste.item.thermocol',
+  ewaste: 'waste.item.ewaste',
+  background: 'waste.item.background',
+};
+
+function labelKey(label: string): MessageKey | null {
+  return LABEL_KEYS[label.trim().toLowerCase()] ?? null;
 }
 
 // The model names the recycler material so it can learn each one, but the app
@@ -199,6 +215,12 @@ function hazardousMaterial(label: string): string | null {
 }
 
 export function SortWaste() {
+  const t = useT();
+  /** A classifier class in the visitor's language. */
+  const displayName = (label: string) => {
+    const key = labelKey(label);
+    return key ? t(key) : label;
+  };
   const settings = useApi(['settings'], () => api.settings(), {});
   const modelStatus = useApi(['waste-resnet'], () => api.wasteResnetStatus(), {});
 
@@ -1196,7 +1218,7 @@ export function SortWaste() {
               playsInline
               muted
               autoPlay
-              aria-label="Waste camera preview"
+              aria-label={t('sort.previewAria')}
               onLoadedMetadata={(event) => {
                 const { videoWidth, videoHeight } = event.currentTarget;
                 if (videoWidth > 0 && videoHeight > 0) setVideoAspect(videoWidth / videoHeight);
@@ -1233,30 +1255,30 @@ export function SortWaste() {
                   height={112}
                   aria-hidden="true"
                 />
-                <figcaption>What it is reading</figcaption>
+                <figcaption>{t('sort.whatReading')}</figcaption>
               </figure>
             ) : null}
             {cameraOn && (
               <div className="camera-status" data-testid="camera-status">
                 {autoWatch && sceneProgress !== null ? (
                   <span className="chip chip--warn">
-                    Learning the room · {Math.round(sceneProgress * 100)}%
+                    {t('sort.learningRoom', { percent: Math.round(sceneProgress * 100) })}
                   </span>
                 ) : autoWatch ? (
                   waitingRemoval ? (
-                    <span className="chip chip--neutral">Show the next item</span>
+                    <span className="chip chip--neutral">{t('sort.showNextItem')}</span>
                   ) : (
-                    <span className="chip chip--good">Ready — show one item</span>
+                    <span className="chip chip--good">{t('sort.readyShow')}</span>
                   )
                 ) : (
-                  <span className="chip chip--good">Ready — press “Check the item”</span>
+                  <span className="chip chip--good">{t('sort.readyPress')}</span>
                 )}
               </div>
             )}
             {!cameraOn && (
               <div className="camera-placeholder">
                 <IconCamera size={34} />
-                <p>Start the camera, then show one clean item.</p>
+                <p>{t('sort.startThenShow')}</p>
                 {cameraError && <p className="error-text">{cameraError}</p>}
               </div>
             )}
@@ -1265,14 +1287,12 @@ export function SortWaste() {
           <div className="camera-actions">
             {boardOffline && (
               <p className="hint" data-testid="waste-offline">
-                The controller is offline, so the camera is not offered: a recognised item
-                could not light its bin LED. Turn on <strong>Simulation</strong> above to
-                show the classifier without the board.
+                {t('sort.offlineHint')}
               </p>
             )}
             {cameraOn ? (
               <button type="button" className="btn btn--danger btn--large" onClick={stopCamera}>
-                <IconStop size={18} /> Stop Camera
+                <IconStop size={18} /> {t('sort.stopCamera')}
               </button>
             ) : (
               <button
@@ -1284,19 +1304,19 @@ export function SortWaste() {
                 }
                 title={
                   boardOffline
-                    ? 'The controller is offline, so no bin LED could light. Choose Simulation above to show the classifier without the board.'
+                    ? t('sort.titleOffline')
                     : !cameraSupported
-                    ? 'This browser cannot open a camera in this tab.'
+                    ? t('sort.titleNoBrowser')
                     : installed && modelState !== 'ready'
-                      ? 'The classifier is still loading. The camera opens once it is ready.'
+                      ? t('sort.titleLoading')
                       : installed
-                        ? 'Open the camera preview.'
-                        : 'Open the camera preview. Recognition stays off until a model is installed.'
+                        ? t('sort.titleOpen')
+                        : t('sort.titlePreviewOnly')
                 }
                 data-testid="start-camera"
               >
                 <IconCamera size={18} />{' '}
-                {installed && modelState !== 'ready' ? 'Preparing the model…' : 'Start Camera'}
+                {installed && modelState !== 'ready' ? t('sort.preparingModel') : t('sort.startCamera')}
               </button>
             )}
             {cameraOn && (
@@ -1328,7 +1348,8 @@ export function SortWaste() {
                   }
                   data-testid="set-background"
                 >
-                  <IconRefresh size={16} /> {backgroundCount === 0 ? 'Set background' : 'Add background'}
+                  <IconRefresh size={16} />{' '}
+                  {backgroundCount === 0 ? t('sort.setBackground') : t('sort.addBackground')}
                 </button>
                 {backgroundCount > 0 && (
                   <button
@@ -1337,7 +1358,7 @@ export function SortWaste() {
                     onClick={clearBackgrounds}
                     data-testid="clear-backgrounds"
                   >
-                    Clear backgrounds
+                    {t('sort.clearBackgrounds')}
                   </button>
                 )}
                 <label className="check-row">
@@ -1346,7 +1367,7 @@ export function SortWaste() {
                     checked={focusOn}
                     onChange={(event) => setFocusOn(event.target.checked)}
                   />
-                  <span>Focus on the object</span>
+                  <span>{t('sort.focusOnObject')}</span>
                 </label>
                 <label className="check-row">
                   <input
@@ -1355,7 +1376,7 @@ export function SortWaste() {
                     onChange={(event) => setAutoWatch(event.target.checked)}
                     data-testid="auto-watch"
                   />
-                  <span>Watch automatically</span>
+                  <span>{t('sort.watchAutomatically')}</span>
                 </label>
               </div>
             )}
@@ -1365,24 +1386,20 @@ export function SortWaste() {
               data-testid="hazardous-button"
               onClick={() => void recordHazardous()}
             >
-              Hazardous / medical
+              {t('sort.hazardous')}
             </button>
             <div className="camera-picker" data-testid="camera-picker">
               <label className="field">
-                <span>Camera device</span>
+                <span>{t('sort.cameraDevice')}</span>
                 <select
                   className="select"
                   value={deviceId}
                   onChange={(event) => chooseDevice(event.target.value)}
                   disabled={cameraOn}
                   data-testid="camera-device"
-                  title={
-                    cameraOn
-                      ? 'Stop the camera to choose another device.'
-                      : 'Pick the camera to use — a laptop usually has a built-in one and may have an external USB camera as well.'
-                  }
+                  title={cameraOn ? t('sort.stopToChoose') : t('sort.pickDevice')}
                 >
-                  <option value="">Default camera</option>
+                  <option value="">{t('sort.defaultCamera')}</option>
                   {devices.map((device, index) => (
                     <option key={device.deviceId || index} value={device.deviceId}>
                       {device.label || `Camera ${index + 1}`}
@@ -1392,9 +1409,7 @@ export function SortWaste() {
               </label>
               {devices.some((device) => !device.label) && (
                 <p className="hint" data-testid="camera-labels-hint">
-                  Camera names appear after this page is allowed to use a camera once: press{' '}
-                  <strong>Start camera</strong>, allow it, then stop and pick the external camera by
-                  name.
+                  {t('sort.labelsHint')}
                 </p>
               )}
             </div>
@@ -1416,14 +1431,14 @@ export function SortWaste() {
             )}
             {cameraOn && (
               <div className="focus-controls" data-testid="special-choices">
-                <span className="hint">Not one clean item, or not sure?</span>
+                <span className="hint">{t('sort.notOneClean')}</span>
                 <button
                   type="button"
                   className="btn btn--ghost"
                   data-testid="mixed-bag"
                   onClick={() => setManualGuide(guideFor('mixed bag', { mixedBag: true }))}
                 >
-                  Mixed bag / several items
+                  {t('sort.mixedBag')}
                 </button>
                 <button
                   type="button"
@@ -1431,7 +1446,7 @@ export function SortWaste() {
                   data-testid="sanitary-waste"
                   onClick={() => setManualGuide(guideFor('sanitary pad'))}
                 >
-                  Sanitary waste
+                  {t('sort.sanitary')}
                 </button>
                 <button
                   type="button"
@@ -1439,7 +1454,7 @@ export function SortWaste() {
                   data-testid="sharps"
                   onClick={() => setManualGuide(guideFor('syringe'))}
                 >
-                  Sharp or medical
+                  {t('sort.sharps')}
                 </button>
               </div>
             )}
@@ -1450,27 +1465,22 @@ export function SortWaste() {
             )}
             <p className="camera-prompt">
               {!cameraSupported
-                ? 'This browser cannot open a camera in this tab, so Start Camera is disabled.'
+                ? t('sort.promptNoBrowser')
                 : !modelKnown
-                  ? 'The camera can be previewed, but recognition cannot be checked right now.'
+                  ? t('sort.promptModelUnknown')
                   : installed
                     ? cameraOn
-                      ? 'Show one item to the camera. Hold it still.'
-                      : 'Start the camera to begin.'
+                      ? t('sort.promptHoldStill')
+                      : t('sort.promptStart')
                     : cameraOn
-                      ? 'Preview only — the recognition model is not installed.'
-                      : 'Start the camera for a preview. Recognition needs the model.'}
+                      ? t('sort.promptPreviewOnly')
+                      : t('sort.promptPreviewModel')}
             </p>
           </div>
 
           <div className="waste-guidance">
-            <p>
-              <strong>Hold it still</strong> for a few seconds.
-            </p>
-            <p>
-              <strong>One item at a time.</strong> After an item is recognised, remove it; the camera
-              arms itself for the next one.
-            </p>
+            <p>{t('sort.holdStill')}</p>
+            <p>{t('sort.oneAtATime')}</p>
           </div>
         </div>
 
@@ -1490,15 +1500,16 @@ export function SortWaste() {
           <Card
             className="result-card"
             kicker={
-              disposal
-                ? disposal.separate
-                  ? 'Keep it out of the bins'
-                  : 'Suggested bin'
-                : 'Suggested bin'
+              disposal && disposal.separate ? t('sort.kickerKeepOut') : t('sort.kickerBin')
             }
             title={
-              disposal?.title ??
-              (manualGuide ? 'Ask the Gram Sahayak' : removing ? 'Remove the item' : 'Waiting for an item')
+              disposal
+                ? t(disposal.titleKey)
+                : manualGuide
+                  ? t('waste.title.askSahayak')
+                  : removing
+                    ? t('sort.titleRemove')
+                    : t('sort.titleWaiting')
             }
           >
             {manualGuide ? (
@@ -1510,10 +1521,10 @@ export function SortWaste() {
                   an explicit choice instead.
                 */}
                 <p className="result-big" data-testid="waste-result">
-                  {manualGuide.item}
+                  {manualGuide.itemKey ? t(manualGuide.itemKey) : manualGuide.item}
                 </p>
                 <p className="result-sub" data-testid="waste-destination">
-                  <strong>{manualGuide.title}.</strong> {manualGuide.reason}
+                  <strong>{t(manualGuide.titleKey)}.</strong> {t(manualGuide.reasonKey)}
                 </p>
                 <CardActions
                   onScanAnother={() => {
@@ -1537,14 +1548,14 @@ export function SortWaste() {
                     <>
                       <strong>
                         {disposal.separate
-                          ? disposal.title
-                          : `Put it in the ${disposal.title.toLowerCase()} bin`}
+                          ? t(disposal.titleKey)
+                          : t('sort.putInBin', { bin: t(disposal.titleKey) })}
                         .
                       </strong>{' '}
-                      {disposal.reason}
+                      {t(disposal.reasonKey)}
                     </>
                   ) : (
-                    'No destination could be worked out for this item. Contact the Gram Sahayak.'
+                    t('sort.noDestination')
                   )}
                 </p>
                 {recognition.led_note && (
@@ -1555,8 +1566,8 @@ export function SortWaste() {
                 {disposal?.support && (
                   <p className="hint" data-testid="waste-support">
                     {SUPPORT.contact
-                      ? `Call the ${SUPPORT_ROLE} on ${SUPPORT.contact}.`
-                      : SUPPORT.desk}
+                      ? `${t('sort.contactSahayak')}: ${SUPPORT.contact}`
+                      : t('sort.supportDesk')}
                   </p>
                 )}
                 {alert && <Notice tone="warn">{alert}</Notice>}
@@ -1570,20 +1581,20 @@ export function SortWaste() {
                   }}
                   support={SUPPORT}
                 />
-                <p className="hint">{WORDS.notProof}</p>
+                <p className="hint">{t('sort.notProof')}</p>
                 {captureFileRef.current && (
                   <div className="correction-row" data-testid="waste-correction">
                     {correction ? (
                       <p className="hint">{correction}</p>
                     ) : (
                       <>
-                        <span className="correction-prompt">Wrong? It was…</span>
+                        <span className="correction-prompt">{t('sort.wrongItWas')}</span>
                         {(
                           [
-                            ['organic', 'Organic'],
-                            ['plastic', 'Plastic'],
-                            ['paper', 'Paper'],
-                            ['separate', 'Keep it separate'],
+                            ['organic', t('sort.correctOrganic')],
+                            ['plastic', t('sort.correctPlastic')],
+                            ['paper', t('sort.correctPaper')],
+                            ['separate', t('sort.correctSeparate')],
                           ] as const
                         ).map(([actual, label]) => (
                           <button
@@ -1597,9 +1608,7 @@ export function SortWaste() {
                               void api
                                 .wasteCorrect(file, actual)
                                 .then(() => {
-                                  setCorrection(
-                                    `Thank you — that photo is now in the training set for ${label}.`,
-                                  );
+                                  setCorrection(t('sort.correctionThanks', { label }));
                                 })
                                 .catch((cause: unknown) => {
                                   setCorrection(errorMessage(cause));
@@ -1615,17 +1624,17 @@ export function SortWaste() {
                 )}
                 {stability?.phase === 'waiting-removal' && (
                   <p className="hint" data-testid="waste-rearm">
-                    Remove the item; the camera arms itself for the next one.
+                    {t('sort.rearm')}
                   </p>
                 )}
                 {stability?.phase === 'armed' && (
                   <p className="hint" data-testid="waste-ready">
-                    Camera armed. Show the next item when you are ready.
+                    {t('sort.armed')}
                   </p>
                 )}
                 {!cameraOn && (
                   <p className="hint" data-testid="waste-camera-stopped">
-                    The camera stopped after this item. Start it again for the next one.
+                    {t('sort.cameraStopped')}
                   </p>
                 )}
               </>
@@ -1641,36 +1650,36 @@ export function SortWaste() {
                   {LIA_COPY[voiceLanguage].wasteWelcome}
                 </p>
                 <p className="result-sub" data-testid="waste-press-hint">
-                  Hold the item up and press <strong>Check the item</strong>. Nothing is
-                  classified until you do.
+                  {t('sort.pressHint')}
                 </p>
               </>
             ) : warming ? (
               <p className="result-sub" data-testid="waste-warming">
-                Learning this room so the background is never classified as an
-                item. Hold the item up in a moment.
+                {t('sort.warming')}
               </p>
             ) : removing ? (
               <p className="result-sub" data-testid="waste-remove">
-                Take this item away — the camera re-arms by itself.
+                {t('sort.removeHint')}
               </p>
             ) : cameraOn ? (
               <p className="result-sub">
                 {top
                   ? topIsBackground
-                    ? 'Nothing to sort — this does not look like waste. Show one item, held in your hand is fine.'
+                    ? t('sort.nothingToSort')
                     : strong
-                      ? `Looking at ${displayLabel(top.label)}… hold still.`
-                      : `Not sure what this is — hold one item on its own, filling the square, and keep still. A bin needs ${Math.round(confidenceBar(confidence, guideFor(top.label)) * 100)}% on ${stabilityFrames} frames in a row.`
-                  : 'Waiting for the camera to see something.'}
+                      ? t('sort.lookingAt', { item: displayName(top.label) })
+                      : t('sort.notSure', {
+                          percent: Math.round(confidenceBar(confidence, guideFor(top.label)) * 100),
+                          frames: stabilityFrames,
+                        })
+                  : t('sort.waitingSee')}
               </p>
             ) : cameraOn && previewOnly ? (
               <p className="result-sub" data-testid="waste-preview-only">
-                Preview only — no bin is suggested because the recognition model is not available.
-                A presenter can install it from Setup → Voice &amp; Camera.
+                {t('sort.previewOnlyNote')}
               </p>
             ) : (
-              <p className="result-sub">Start the camera, then show one clean item.</p>
+              <p className="result-sub">{t('sort.startThenShow')}</p>
             )}
 
             {recognitionError && <Notice tone="bad">{recognitionError}</Notice>}
@@ -1679,24 +1688,23 @@ export function SortWaste() {
               <details className="advanced">
                 <summary>
                   {hazardous
-                    ? 'Record that the Gram Sahayak took it'
+                    ? t('sort.recordSahayak')
                     : referred
-                      ? 'Record that the recycling agent took it'
-                      : 'Record that you put it in the bin'}
+                      ? t('sort.recordRecycling')
+                      : t('sort.recordBin')}
                 </summary>
                 <div className="advanced-body">
                   <p className="hint">
-                    This is a separate record. A recognition does not prove that the item was placed
-                    in a bin.
+                    {t('sort.depositHint')}
                   </p>
                   <label className="field">
-                    <span>Note (optional)</span>
+                    <span>{t('sort.note')}</span>
                     <input
                       className="input"
                       value={note}
                       maxLength={200}
                       onChange={(event) => setNote(event.target.value)}
-                      placeholder="e.g. plastic bottle from the kitchen"
+                      placeholder={t('sort.notePlaceholder')}
                     />
                   </label>
                   <button
@@ -1705,7 +1713,12 @@ export function SortWaste() {
                     onClick={() => void confirmDeposit()}
                     disabled={recognitionId === null || Boolean(disposalMessage)}
                   >
-                    <IconCheck size={15} /> {hazardous ? 'Confirm reported' : referred ? 'Confirm handed over' : 'Confirm deposited'}
+                    <IconCheck size={15} />{' '}
+                    {hazardous
+                      ? t('sort.confirmReported')
+                      : referred
+                        ? t('sort.confirmHanded')
+                        : t('sort.confirmDeposited')}
                   </button>
                   {disposalMessage && <p className="ok-text">{disposalMessage}</p>}
                   {disposalError && <p className="error-text">{disposalError}</p>}
@@ -1715,28 +1728,26 @@ export function SortWaste() {
           </Card>
 
           {modelStatus.error ? (
-            <Notice tone="warn" title="Model status could not be checked">
+            <Notice tone="warn" title={t('sort.modelStatusUnknown')}>
               {errorMessage(modelStatus.error)}. The camera preview still works; recognition stays
               off until the model can be confirmed.
             </Notice>
           ) : modelStatus.loading ? (
-            <Notice tone="info" title="Checking the recognition model…">
+            <Notice tone="info" title={t('sort.checkingModel')}>
               The camera preview is available. Recognition starts only after the model is confirmed.
             </Notice>
           ) : !installed ? (
-            <Notice tone="warn" title="Recognition model is missing">
-              No waste model is installed, so the camera will not guess. The preview is still
-              available. A presenter can install it from{' '}
-              <Link to="/setup#voice-camera">Setup → Voice &amp; Camera</Link>.
+            <Notice tone="warn" title={t('sort.modelMissing')}>
+              {t('sort.modelMissingBody')}
             </Notice>
           ) : modelError ? (
-            <Notice tone="bad" title="The model could not be loaded">
+            <Notice tone="bad" title={t('sort.modelCouldNotLoad')}>
               {modelError}
             </Notice>
           ) : null}
 
           <details className="advanced">
-            <summary>Confidence and model details</summary>
+            <summary>{t('sort.confidenceDetails')}</summary>
             <div className="advanced-body">
               <div className="prediction-meta">
                 <span>Confidence threshold {Math.round(confidence * 100)}%</span>
@@ -1770,7 +1781,7 @@ export function SortWaste() {
                       )}
                     >
                       <div className="prediction-head">
-                        <span>{displayLabel(row.label)}</span>
+                        <span>{displayName(row.label)}</span>
                         <span className="prediction-value">{Math.round(row.confidence * 100)}%</span>
                       </div>
                       <div className="prediction-bar">
@@ -1804,7 +1815,7 @@ export function SortWaste() {
           </details>
 
           <details className="advanced">
-            <summary>How it works</summary>
+            <summary>{t('sort.howItWorks')}</summary>
             <div className="advanced-body">
               <p>
                 A label must clear the confidence threshold for several consecutive frames before it
@@ -1812,9 +1823,7 @@ export function SortWaste() {
                 frame and the next item gets a fresh session when the Gram Sahayak starts it again.
               </p>
               <p className="hint">
-                The camera recognises waste; it does not identify people, measure weight, or prove
-                that anything was placed in a bin. The bins have indicator LEDs only, so nothing
-                here measures how full one is.
+                {t('sort.safetyNote')}
               </p>
             </div>
           </details>

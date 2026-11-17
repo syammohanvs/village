@@ -2253,7 +2253,12 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   padding-top: 0;
   border-top: 0;
 }
-.vcard--row .pump-manual .pump-manual-label { flex: 0 0 auto; }
+.vcard--row .pump-manual .pump-manual-label {
+  flex: 0 0 auto;
+  /* A translated word is wider than "PUMP" and the row must not squeeze it into
+     a column of two or three glyphs (seen in Hindi and Malayalam, 2026-11-17). */
+  white-space: nowrap;
+}
 .vcard--row .pump-manual .segmented { flex: 0 0 300px; }
 
 /* The light lab reads as one strip: lamps, then the slider beside them. */

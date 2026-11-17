@@ -58,6 +58,8 @@ beforeEach(() => {
   });
 
   window.history.pushState({}, '', '/');
+  // Every test starts in the default language unless it says otherwise.
+  window.localStorage.removeItem('village.voiceLanguage');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.events).mockResolvedValue({ events: [] });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true });
@@ -178,7 +180,7 @@ describe('Our Village', () => {
     // both honest and visibly moving.
     expect(pill.textContent ?? '').toMatch(/\d{1,2}:\d{2}:\d{2}/);
     expect(pill.textContent ?? '').not.toMatch(/\d+\s*ms ago/);
-    expect(pill.getAttribute('title') ?? '').toMatch(/Last frame/i);
+    expect(pill.getAttribute('title') ?? '').toMatch(/Last news from the controller/i);
   });
 
   it('keeps the cards visible and disables actions when the controller is offline', async () => {
@@ -316,7 +318,7 @@ describe('Our Village — the microphone stands alone', () => {
   it('centres the microphone with the language choices under it', async () => {
     await renderReady();
     const mic = await screen.findByTestId('start-voice');
-    const languages = await screen.findByRole('group', { name: 'Speak to Sara in' });
+    const languages = await screen.findByRole('group', { name: 'Language' });
 
     // Both live in the one header, and the language choices follow the
     // microphone -- the layout is a column, so that is "below".
@@ -329,8 +331,8 @@ describe('Our Village — the microphone stands alone', () => {
 
   it('still offers all three spoken languages under the microphone', async () => {
     await renderReady();
-    const languages = await screen.findByRole('group', { name: 'Speak to Sara in' });
-    for (const code of ['en', 'ml', 'hi']) {
+    const languages = await screen.findByRole('group', { name: 'Language' });
+    for (const code of ['en', 'hi', 'ml']) {
       expect(within(languages).getByTestId(`invite-lang-${code}`)).toBeInTheDocument();
     }
   });
@@ -372,7 +374,7 @@ it('points at Reset when the simulated tank is empty', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ reservoirState: 'low' }));
     await renderReady();
 
-    expect(await screen.findByTestId('pump-note')).toHaveTextContent(/Reset in Setup/i);
+    expect(await screen.findByTestId('pump-note')).toHaveTextContent(/Reset demo/i);
   });
 
 describe('Waste card — the camera follows the board', () => {
@@ -819,5 +821,94 @@ describe('the waste samples are not the classifier', () => {
     const result = await screen.findByTestId('waste-sample-result');
     expect(result).toHaveTextContent(/Keep separate/i);
     expect(result).toHaveTextContent(/Gram Sahayak/);
+  });
+});
+
+/**
+ * One language for the page, the panel and Sara's voice (asked 2026-11-17).
+ *
+ * The selector used to change only what Sara spoke; it now changes the
+ * interface too.  These tests pin the three things that matter about that:
+ * the page really re-renders in the chosen language, the choice survives a
+ * reload, and **changing it touches nothing in the village** — no command, no
+ * demo scenario, no reset.  A language is a way of reading the page, not an
+ * action on it.
+ */
+describe('the language selector governs the whole page', () => {
+  it('is English when no preference has been stored', async () => {
+    await renderReady();
+    expect(await screen.findByText('Watering')).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('en');
+    expect(screen.getByText('Rain Water Tank')).toBeInTheDocument();
+    expect(screen.getByText('Talk to Sara')).toBeInTheDocument();
+  });
+
+  it('switches the page to Hindi, and sends nothing to the village', async () => {
+    await renderReady();
+
+    const languages = await screen.findByRole('group', { name: 'Language' });
+    await userEvent.click(within(languages).getByTestId('invite-lang-hi'));
+
+    // The same cards, in Hindi — including the two words a visitor reads first.
+    expect(await screen.findByText('सिंचाई')).toBeInTheDocument();
+    expect(screen.getByText('बारिश का पानी टैंक')).toBeInTheDocument();
+    expect(screen.getByText('सारा से बात करें')).toBeInTheDocument();
+    expect(screen.queryByText('Watering')).not.toBeInTheDocument();
+
+    // …and the document says so, for screen readers and font fallback.
+    expect(document.documentElement.lang).toBe('hi');
+
+    // A language change is not an action on the village.
+    expect(api.sendCommand).not.toHaveBeenCalled();
+    expect(api.demoScenario).not.toHaveBeenCalled();
+    expect(api.demoReset).not.toHaveBeenCalled();
+    // The page was not re-mounted, either: the cards are the same cards.
+    expect(screen.getByTestId('card-plants')).toBeInTheDocument();
+  });
+
+  it('switches to Malayalam, and back, without leaving a raw key on screen', async () => {
+    await renderReady();
+    const languages = await screen.findByRole('group', { name: 'Language' });
+
+    await userEvent.click(within(languages).getByTestId('invite-lang-ml'));
+    expect(await screen.findByText('നനയ്ക്കൽ')).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('ml');
+    // No dotted key leaked into the text.
+    expect(document.body.textContent ?? '').not.toMatch(/\b(page|card|sim|chip|tank|pump)\.[a-z]/i);
+
+    await userEvent.click(within(languages).getByTestId('invite-lang-en'));
+    expect(await screen.findByText('Watering')).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('en');
+  });
+
+  it('remembers the choice across a reload', async () => {
+    await renderReady();
+    const languages = await screen.findByRole('group', { name: 'Language' });
+    await userEvent.click(within(languages).getByTestId('invite-lang-hi'));
+    expect(window.localStorage.getItem('village.voiceLanguage')).toBe('hi');
+
+    // A reload is a fresh mount reading the same storage.
+    cleanup();
+    await renderReady();
+    expect(await screen.findByText('सिंचाई')).toBeInTheDocument();
+  });
+
+  it('shows the same language in Sara’s panel as on the page', async () => {
+    vi.mocked(api.voiceReadiness).mockResolvedValue({
+      whisper: { ready: true, message: 'ready' },
+      tts: { ready: true, message: 'ready', languages: ['en', 'hi', 'ml'] },
+      unavailable_languages: [],
+    } as never);
+    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [], messages: {} } as never);
+
+    await renderReady();
+    const languages = await screen.findByRole('group', { name: 'Language' });
+    await userEvent.click(within(languages).getByTestId('invite-lang-ml'));
+
+    await userEvent.click(screen.getByTestId('start-voice'));
+    const panel = await screen.findByTestId('voice-panel');
+    // The panel has its own copy of the same selector, reading the same state.
+    const inPanel = within(panel).getAllByRole('button', { name: /മലയാളം/ });
+    expect(inPanel.some((button) => button.getAttribute('aria-pressed') === 'true')).toBe(true);
   });
 });

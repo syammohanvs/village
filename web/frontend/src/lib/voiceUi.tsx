@@ -1,3 +1,4 @@
+import { LANGS, isLang, type Lang } from './lang';
 import {
   createContext,
   useCallback,
@@ -9,26 +10,25 @@ import {
   type ReactNode,
 } from 'react';
 
-export type VoiceLanguage = 'en' | 'ml' | 'hi';
+// One language for the page, for Sara's panel and for her voice.  The type and
+// the pill labels live in `lib/lang.ts`, so the selector, the message table and
+// the speech pipeline cannot disagree about which languages exist.
+export type VoiceLanguage = Lang;
 
-export const VOICE_LANGUAGES: { code: VoiceLanguage; label: string }[] = [
-  { code: 'en', label: 'English' },
-  { code: 'ml', label: 'മലയാളം' },
-  { code: 'hi', label: 'हिन्दी' },
-];
+export const VOICE_LANGUAGES: { code: VoiceLanguage; label: string }[] = LANGS;
 
 const STORAGE_KEY = 'village.voiceLanguage';
 
 function readLanguage(): VoiceLanguage {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === 'en' || stored === 'ml' || stored === 'hi') return stored;
+    if (isLang(stored)) return stored;
     // Before this was one setting, Lia kept its own copy.  Adopt it so a
     // visitor who chose Malayalam there does not silently get English.
     const legacy = window.localStorage.getItem('village.lia.v1');
     if (legacy) {
       const language = (JSON.parse(legacy) as { language?: unknown } | null)?.language;
-      if (language === 'en' || language === 'ml' || language === 'hi') return language;
+      if (isLang(language)) return language;
     }
   } catch {
     /* storage can be unavailable in private modes */
@@ -67,6 +67,13 @@ export function VoiceUiProvider({ children }: { children: ReactNode }) {
       /* ignore storage failures */
     }
   }, []);
+
+  // `<html lang>` is what a screen reader, the browser's spell checker and the
+  // font fallback read.  It is a render-side effect only — changing it cannot
+  // touch the village, and no command is involved.
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.documentElement.lang = language;
+  }, [language]);
 
   // A new browser (or a cleared profile) starts with the village's saved
   // English voice, not with a default.  It is fetched once, and a choice made

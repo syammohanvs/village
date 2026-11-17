@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { BINS, ROUTES, SUPPORT, SUPPORT_ROLE, WORDS } from '../lib/wasteGuide';
+import { useT } from '../lib/i18n';
+import type { MessageKey } from '../lib/messages';
+import { ROUTES } from '../lib/wasteGuide';
 import { IconClose } from './Icons';
 
 /**
@@ -17,44 +19,66 @@ import { IconClose } from './Icons';
  */
 interface Sample {
   id: string;
-  item: string;
+  /** The item's name, as a translation key — never a hard-coded English word. */
+  itemKey: MessageKey;
   /** A bin, or one of the two non-bin answers. */
   kind: 'organic' | 'plastic' | 'paper' | 'separate' | 'support';
 }
 
 export const WASTE_SAMPLES: Sample[] = [
-  { id: 'banana', item: 'Banana peel', kind: 'organic' },
-  { id: 'bottle', item: 'Empty plastic bottle', kind: 'plastic' },
-  { id: 'newspaper', item: 'Newspaper', kind: 'paper' },
-  { id: 'glass', item: 'Glass bottle', kind: 'separate' },
-  { id: 'battery', item: 'Used battery', kind: 'support' },
+  { id: 'banana', itemKey: 'sample.banana', kind: 'organic' },
+  { id: 'bottle', itemKey: 'sample.bottle', kind: 'plastic' },
+  { id: 'newspaper', itemKey: 'sample.newspaper', kind: 'paper' },
+  { id: 'glass', itemKey: 'sample.glass', kind: 'separate' },
+  { id: 'battery', itemKey: 'sample.battery', kind: 'support' },
 ];
 
 interface Guidance {
-  title: string;
-  reason: string;
-  keepOut?: string;
+  titleKey: MessageKey;
+  reasonKey: MessageKey;
+  keepOutKey?: MessageKey;
   tone: 'ok' | 'warn' | 'danger';
 }
 
-/** What this project already says about that kind of item. */
+/**
+ * What this project already says about that kind of item — as keys, so the same
+ * sentence is written once and translated in the visitor's language.
+ */
 export function guidanceFor(kind: Sample['kind']): Guidance {
   if (kind === 'separate') {
+    // No collection route is configured for glass here, and the wording says so
+    // rather than implying a bin exists.
     return {
-      title: ROUTES.glass ? 'Keep separate' : 'Keep separate',
-      reason: WORDS.separateUnconfigured,
+      titleKey: 'waste.title.keepSeparate',
+      reasonKey: ROUTES.glass ? 'waste.word.glassRoute' : 'waste.word.separateUnconfigured',
       tone: 'warn',
     };
   }
   if (kind === 'support') {
+    return { titleKey: 'waste.title.askSahayak', reasonKey: 'waste.word.outside', tone: 'danger' };
+  }
+  if (kind === 'organic') {
     return {
-      title: `Ask the ${SUPPORT_ROLE}`,
-      reason: `${WORDS.outside} ${SUPPORT.desk}`,
-      tone: 'danger',
+      titleKey: 'waste.bin.organic.title',
+      reasonKey: 'waste.bin.organic.prepare',
+      keepOutKey: 'waste.bin.organic.keepOut',
+      tone: 'ok',
     };
   }
-  const bin = BINS[kind];
-  return { title: bin.title, reason: bin.prepare, keepOut: bin.keepOut, tone: 'ok' };
+  if (kind === 'plastic') {
+    return {
+      titleKey: 'waste.bin.plastic.title',
+      reasonKey: 'waste.bin.plastic.prepare',
+      keepOutKey: 'waste.bin.plastic.keepOut',
+      tone: 'ok',
+    };
+  }
+  return {
+    titleKey: 'waste.bin.paper.title',
+    reasonKey: 'waste.bin.paper.prepare',
+    keepOutKey: 'waste.bin.paper.keepOut',
+    tone: 'ok',
+  };
 }
 
 /**
@@ -64,6 +88,7 @@ export function guidanceFor(kind: Sample['kind']): Guidance {
  * screen, and a visitor who walked away from it might not find their way back.
  */
 export function WasteSamples({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [open, setOpen] = useState<Sample | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const firstRef = useRef<HTMLButtonElement | null>(null);
@@ -98,19 +123,15 @@ export function WasteSamples({ onClose }: { onClose: () => void }) {
       >
         <header className="waste-samples-head">
           <div>
-            <p className="brand-eyebrow">Sample demonstration</p>
-            <h2 id="waste-samples-title">Try a sample</h2>
-            <p className="hint">
-              These five are preset examples of what the village tells you. They are{' '}
-              <strong>not</strong> a camera result — the camera on <em>Identify waste</em> is the
-              real classifier.
-            </p>
+            <p className="brand-eyebrow">{t('samples.eyebrow')}</p>
+            <h2 id="waste-samples-title">{t('samples.title')}</h2>
+            <p className="hint">{t('samples.intro')}</p>
           </div>
           <button
             type="button"
             className="icon-btn"
             onClick={onClose}
-            aria-label="Close the samples"
+            aria-label={t('samples.close')}
             ref={firstRef}
           >
             <IconClose size={18} />
@@ -127,7 +148,7 @@ export function WasteSamples({ onClose }: { onClose: () => void }) {
                 aria-pressed={open?.id === sample.id}
                 onClick={() => setOpen(sample)}
               >
-                <span>{sample.item}</span>
+                <span>{t(sample.itemKey)}</span>
                 <span className="waste-sample-go" aria-hidden="true">
                   →
                 </span>
@@ -138,16 +159,16 @@ export function WasteSamples({ onClose }: { onClose: () => void }) {
 
         {open && guidance && (
           <div className="waste-sample-result" data-testid="waste-sample-result">
-            <p className="eyebrow">Preset guidance — not a camera result</p>
-            <h3 className="waste-sample-title">{open.item}</h3>
-            <p className={`waste-sample-where is-${guidance.tone}`}>{guidance.title}</p>
-            <p className="waste-sample-reason">{guidance.reason}</p>
-            {guidance.keepOut && (
+            <p className="eyebrow">{t('samples.guidanceEyebrow')}</p>
+            <h3 className="waste-sample-title">{t(open.itemKey)}</h3>
+            <p className={`waste-sample-where is-${guidance.tone}`}>{t(guidance.titleKey)}</p>
+            <p className="waste-sample-reason">{t(guidance.reasonKey)}</p>
+            {guidance.keepOutKey && (
               <p className="hint">
-                <strong>Keep out:</strong> {guidance.keepOut}
+                <strong>{t('samples.keepOut')}</strong> {t(guidance.keepOutKey)}
               </p>
             )}
-            <p className="hint">No bin LED is lit for a sample: nothing was classified.</p>
+            <p className="hint">{t('samples.noLed')}</p>
           </div>
         )}
       </div>

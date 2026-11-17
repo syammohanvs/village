@@ -125,7 +125,7 @@ cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
 The current tree passes **499 firmware checks**, **106 backend tests** and
-**352 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+**366 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -202,6 +202,39 @@ visitors cannot be used to press **Water** or change calibration.
   soil's own reading, prefixed with **Soil:** — unprefixed, "Idle · Not
   calibrated" read as one confused state.  `soilPercent` already carries its
   `%`, so appending another printed `Dry · 28%%` on any calibrated probe.
+- **The whole kiosk page and its dialogs are in three languages (2026-11-18).**
+  One selector — **English · हिन्दी · മലയാളം**, each name in its own script —
+  now sets **both** the interface and Sara's language, because a visitor who
+  cannot read English should not have to find a second switch to read the page.
+  `lib/lang.ts` holds the codes and the order; `lib/messages.ts` holds every
+  visitor-facing sentence as `'key': [en, hi, ml]`; `lib/translate.ts` resolves a
+  key with **English as the fallback**; `useT()` in `lib/i18n.ts` binds it to the
+  shared state in `voiceUi`.  `messages.test.ts` fails the build if a key lacks a
+  language, if the three languages disagree about a `{placeholder}`, or if a key
+  would ever be displayed raw.
+  - **Whole sentences, never glued fragments**: `page.soilWithValue` is
+    `'Soil: {state} · {percent}'`, because word order differs between the three.
+  - **Numbers and units are untouched** (330 Ω, 1.8 V, mA, mW, %): only the
+    words around them change.
+  - **Routing never reads translated text.**  `wasteGuide.guideFor` still decides
+    from the English class label and returns message **keys**; the components
+    translate.  A Hindi page cannot send an item to a different bin.
+  - **A language change touches nothing else.**  No command, no demo scenario,
+    no reset, no re-record: it is a way of reading the page, not an action on it.
+    `OurVillage.test.tsx` asserts `sendCommand`/`demoScenario`/`demoReset` are
+    never called by it, and `voiceUi` writes `<html lang>`.
+  - **A request finishes in the language it began in.**  `VoicePanel` captures
+    the language when the recording starts (`startedLanguageRef`) and threads it
+    through transcription, the reply template and the spoken reply, so changing
+    the selector mid-sentence cannot re-read an utterance.
+  - **Out of scope on purpose:** the operator pages (Setup, Sensors, About,
+    What Happened, Help) stay English — the visitor never sees them — and the
+    firmware's own `reason` strings and backend error text stay English, with a
+    translated sentence used in their place where one is needed.
+  - **Translations still need a fluent speaker.**  They were written here, not
+    reviewed by a native speaker; the wording is deliberately simple (Class 6,
+    exhibition), and any sentence that reads oddly should be fixed in
+    `messages.ts` alone — no component changes.
 - **The panel has its own words, in all three languages (2026-11-17).** All
   strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
   intro, section headings, short state words, plain action wording) and are

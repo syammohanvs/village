@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
+import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { useDemo } from '../lib/demo';
 import { useVillage } from '../lib/village';
@@ -30,14 +31,15 @@ import { LiaGuide } from './LiaGuide';
 export function KioskLayout() {
   const { demo, setMode: setDemoMode } = useDemo();
   const { connected } = useVillage();
+  const t = useT();
   const { username, signOut } = useSession();
   const [testOpen, setTestOpen] = useState(false);
   const [warning, setWarning] = useState('');
 
   const testUnavailable = demo
-    ? 'Not available in Simulation — switch to Live first.'
+    ? t('mode.testNeedsLive')
     : !connected
-      ? 'Connect the controller to use test mode.'
+      ? t('mode.testNeedsController')
       : null;
 
   // Derived, not remembered: Setup keeps its own Simulation switch, and the
@@ -63,7 +65,7 @@ export function KioskLayout() {
   return (
     <div className="kiosk-shell">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {t('shell.skip')}
       </a>
 
       <header className="kiosk-head">
@@ -72,9 +74,9 @@ export function KioskLayout() {
           {/* The mark is the way home: the operator's pages (Setup, About,
               What Happened) are reachable only by address, and arriving on one
               must not strand anybody. */}
-          <Link to="/" className="kiosk-brand" aria-label="Smart Green Village — back to the village">
+          <Link to="/" className="kiosk-brand" aria-label={t('shell.home')}>
             <Emblem size={44} />
-            <span className="kiosk-name">Smart Green Village</span>
+            <span className="kiosk-name">{t('shell.name')}</span>
           </Link>
           <div className="kiosk-tools">
             <ConnectionPill />
@@ -83,8 +85,8 @@ export function KioskLayout() {
                 type="button"
                 className="icon-btn"
                 onClick={() => void signOut()}
-                title={`Signed in as ${username} — sign out`}
-                aria-label="Sign out"
+                title={t('shell.signOutNamed', { user: username })}
+                aria-label={t('shell.signOut')}
                 data-testid="sign-out"
               >
                 <IconSignOut size={17} />
@@ -103,7 +105,7 @@ export function KioskLayout() {
               the control that chose the state. */}
           {mode === 'simulation' ? (
             <p className="kiosk-note" data-testid="mode-note">
-              Simulation — physical model is not controlled.
+              {t('mode.simulationNote')}
             </p>
           ) : testUnavailable ? (
             <p className="kiosk-note" data-testid="mode-note">

@@ -64,6 +64,8 @@ beforeEach(() => {
   });
 
   window.history.pushState({}, '', '/');
+  // Each test starts in the default language unless it says otherwise.
+  window.localStorage.removeItem('village.voiceLanguage');
   vi.mocked(api.state).mockResolvedValue(makeState());
   vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: false }));
   vi.mocked(api.voiceReadiness).mockResolvedValue({
@@ -490,7 +492,7 @@ describe('typed requests use the same parser', () => {
     await user.click(screen.getByTestId('voice-send'));
 
     expect(
-      await screen.findByText(/I can't reach the village controller/i),
+      await screen.findByText(/I can.t reach the village controller/i),
     ).toBeInTheDocument();
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
@@ -716,8 +718,10 @@ describe('a transcript that came back in the wrong script', () => {
     // The stop label is in the panel's language, so press the same control.
     await user.click(screen.getByTestId('voice-start'));
 
+    // The note is written in the language the panel is in, so a Malayalam
+    // visitor reads the explanation in Malayalam (it used to be English-only).
     const note = await screen.findByTestId('voice-script-note');
-    expect(note).toHaveTextContent(/did not hear Malayalam clearly/i);
+    expect(note).toHaveTextContent(/Malayalam വ്യക്തമായി കേട്ടില്ല/);
     // The words that were heard stay visible, so the reader can see why.
     expect(screen.getByTestId('voice-staged-text')).toHaveTextContent('விலக்குகள்');
   });
@@ -1033,5 +1037,53 @@ describe('the language Sara answers in', () => {
     expect(await screen.findByTestId('voice-command-outcome')).toHaveTextContent(
       /not installed/i,
     );
+  });
+});
+
+/**
+ * A language picked *while* Sara is listening must not re-read a sentence that
+ * was already on its way (asked 2026-11-17).  The rule is the one a person would
+ * expect: the request finishes in the language it started in.
+ */
+describe('a language change during a recording', () => {
+  it('finishes the request in the language it began in', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'unknown',
+      kind: 'unknown',
+      transcript: 'something',
+      message: 'Not understood.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    // English is the default, so the recording starts in English.
+    await user.click(screen.getByTestId('voice-start'));
+
+    // The visitor changes their mind mid-sentence.
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+
+    // Pressing the same control stops the recording.
+    await user.click(screen.getByTestId('voice-start'));
+
+    await waitFor(() => expect(api.voiceTranscribe).toHaveBeenCalled());
+    // The second argument is the language Whisper is told to expect.
+    expect(vi.mocked(api.voiceTranscribe).mock.calls[0][1]).toBe('en');
+  });
+
+  it('uses the new language for the next request', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'unknown',
+      kind: 'unknown',
+      transcript: 'എന്തോ',
+      message: 'Not understood.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(screen.getByTestId('voice-start'));
+
+    await waitFor(() => expect(api.voiceTranscribe).toHaveBeenCalled());
+    expect(vi.mocked(api.voiceTranscribe).mock.calls[0][1]).toBe('ml');
   });
 });

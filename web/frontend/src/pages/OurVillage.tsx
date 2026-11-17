@@ -17,11 +17,12 @@ import { BRIGHT_THRESHOLD, DARK_THRESHOLD, StreetLampStrip } from '../components
 import { Chip } from '../components/ui';
 import { api, errorMessage } from '../lib/api';
 import { useCommands } from '../lib/commands';
-import { reservoirLabel, soilLabel } from '../lib/explain';
 import { cx, formatPercent } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { useApi } from '../lib/useApi';
 import { useVillage } from '../lib/village';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
+import type { MessageKey } from '../lib/messages';
 
 type CardKey = 'plants' | 'lights' | 'tank' | 'solar' | 'wind' | 'waste';
 
@@ -40,11 +41,42 @@ function stateLine(text: string, tone: 'good' | 'warn' | 'bad' | 'neutral' = 'ne
   return <p className={cx('vcard-state', `vcard-state--${tone}`)}>{text}</p>;
 }
 
+/** The soil state as a word, as a translation key. */
+function soilWordKey(state: string | undefined): MessageKey {
+  switch (state) {
+    case 'dry':
+      return 'soil.dry';
+    case 'adequate':
+      return 'soil.adequate';
+    case 'wet':
+      return 'soil.wet';
+    case 'uncalibrated':
+      return 'soil.uncalibrated';
+    default:
+      return 'soil.unavailable';
+  }
+}
+
+/** The tank state as a word, as a translation key. */
+function tankWordKey(state: string | undefined): MessageKey {
+  switch (state) {
+    case 'available':
+      return 'tank.available';
+    case 'low':
+      return 'tank.low';
+    case 'uncalibrated':
+      return 'tank.uncalibrated';
+    default:
+      return 'tank.unknown';
+  }
+}
+
 export function OurVillage() {
   const { status, envelope, loading, error, reload, connected, demo } = useVillage();
   const { send } = useCommands();
   const { openPanel, language, setLanguage } = useVoiceUi();
   const navigate = useNavigate();
+  const t = useT();
 
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ card: CardKey; text: string } | null>(null);
@@ -84,19 +116,20 @@ export function OurVillage() {
         ? Math.max(0, 4095 - light.raw)
         : 1820;
   const lightWord = light?.installed === false
-    ? 'No sensor'
-    : light?.brightness === 'dark' ? 'Dark' : light?.brightness === 'bright' ? 'Bright' : 'Unknown';
+    ? t('chip.noSensor')
+    : light?.brightness === 'dark' ? t('chip.dark')
+      : light?.brightness === 'bright' ? t('chip.bright') : t('chip.unknown');
 
   const soilPercent = soil?.calibrated && soil.percent !== null ? formatPercent(soil.percent, 0) : null;
   const soilWord = !hasStatus
-    ? 'Status unknown'
+    ? t('chip.statusUnknown')
     : soil?.calibrated
-      ? soilLabel(soil.state)
+      ? t(soilWordKey(soil.state))
       : soil?.state === 'uncalibrated'
-        ? 'Not calibrated'
-        : 'Status unknown';
+        ? t('soil.uncalibrated')
+        : t('chip.statusUnknown');
 
-  const tankWord = hasStatus ? reservoirLabel(reservoir?.state) : 'Status unknown';
+  const tankWord = hasStatus ? t(tankWordKey(reservoir?.state)) : t('chip.statusUnknown');
   const tankTone = !hasStatus
     ? 'neutral'
     : reservoir?.state === 'available' ? 'live' : reservoir?.state === 'low' ? 'warn' : 'neutral';
@@ -129,12 +162,12 @@ export function OurVillage() {
 
   const modelInstalled = model.data?.installed ?? model.data?.available ?? model.data?.present;
   const modelChip = model.error
-    ? levelChip('Model unknown', 'neutral')
+    ? levelChip(t('chip.modelUnknown'), 'neutral')
     : model.loading
-      ? levelChip('Checking…', 'neutral')
+      ? levelChip(t('chip.checking'), 'neutral')
       : modelInstalled
-        ? levelChip('Camera ready', 'live')
-        : levelChip('Model missing', 'warn');
+        ? levelChip(t('chip.cameraReady'), 'live')
+        : levelChip(t('chip.modelMissing'), 'warn');
 
   // Auto / On / Off, like the streetlights.  Auto is every rule; On and Off
   // are the operator's switch, watched only by the tank.
@@ -149,32 +182,36 @@ export function OurVillage() {
   // it is the sensor; in On/Off it is the switch, and saying so stops a visitor
   // thinking Auto is broken when their manual On holds the lamps on at noon.
   const lightWhy = !hasStatus
-    ? 'Waiting for the first reading from the simulator.'
+    ? t('light.whyWaiting')
     : lights?.installed === false
-      ? 'The streetlights are not fitted in this build.'
+      ? t('light.whyNotFitted')
       : lightMode === 'on'
-        ? 'Manual On selected → streetlights stay on.'
+        ? t('light.whyManualOn')
         : lightMode === 'off'
-          ? 'Manual Off selected → streetlights stay off.'
+          ? t('light.whyManualOff')
           : light?.brightness === 'dark'
-            ? 'It is dark and Auto is selected → streetlights on.'
+            ? t('light.whyDark')
             : light?.brightness === 'bright'
-              ? 'It is bright and Auto is selected → streetlights off.'
-              : 'The light reading is between the two thresholds, so the last decision holds.';
+              ? t('light.whyBright')
+              : t('light.whyBetween');
 
   // The same question for the pump.  The controller's own reason is used
-  // wherever there is one, because it is the rule that actually decided.
+  // wherever there is one, because it is the rule that actually decided — but
+  // that sentence is written by the firmware in English, so it is only used in
+  // English.  In Hindi and Malayalam the panel says the same rule in the
+  // visitor's language instead (`pump.whyAuto`).
+  const pumpReason = irrigation?.reason;
   const pumpWhy = !hasStatus
-    ? 'Waiting for the first reading from the simulator.'
+    ? t('pump.whyWaiting')
     : pumpMode === 'off'
-      ? 'Manual Off selected → pump off.'
+      ? t('pump.whyManualOff')
       : pumpMode === 'on'
         ? pumpOn
-          ? 'Manual On selected → the pump runs; only a low tank stops it.'
+          ? t('pump.whyManualOnRunning')
           : (reservoir?.state === 'low'
-              ? 'Manual On cannot run the pump while the water is low.'
-              : 'Manual On selected, but the pump is not running yet.')
-        : (irrigation?.reason ?? 'Auto is following the soil and water readings.');
+              ? t('pump.whyManualOnLow')
+              : t('pump.whyManualOnNotRunning'))
+        : (language === 'en' && pumpReason ? pumpReason : t('pump.whyAuto'));
 
   /** The simulated room's light level, for exercising Auto mode without a torch. */
   const setAmbient = async (value: number) => {
@@ -207,16 +244,16 @@ export function OurVillage() {
     try {
       if (preset === 'reset') {
         await api.demoReset();
-        setPresetNote('Demo reset: the village is back to its starting conditions.');
+        setPresetNote(t('preset.noteReset'));
       } else if (preset === 'night') {
         await api.demoScenario({ light_metric: 1820, lights_mode: 'auto' });
-        setPresetNote('Night-time: outside light set to dark, streetlights on Auto.');
+        setPresetNote(t('preset.noteNight'));
       } else if (preset === 'dry') {
         await api.demoScenario({ soil_pct: 20, reservoir: 'available', pump_manual: 'auto' });
-        setPresetNote('Dry soil: moisture below the dry threshold, water available, pump on Auto.');
+        setPresetNote(t('preset.noteDry'));
       } else {
         await api.demoScenario({ soil_pct: 20, reservoir: 'low', pump_manual: 'auto' });
-        setPresetNote('Low water: dry soil and a low tank on Auto — watering is blocked.');
+        setPresetNote(t('preset.noteLow'));
       }
     } catch (cause) {
       setNotice({ card: 'plants', text: errorMessage(cause) });
@@ -233,7 +270,7 @@ export function OurVillage() {
       if (outcome.status !== 'confirmed' && outcome.status !== 'duplicate') {
         setNotice({
           card,
-          text: outcome.reason ?? 'The controller did not confirm the action.',
+          text: outcome.reason ?? t('page.notConfirmed'),
         });
       }
     } finally {
@@ -249,21 +286,17 @@ export function OurVillage() {
   // one condition that stops the pump even on the manual switch, so it belongs
   // on the card; wet soil only means Auto has nothing to do.
   const pumpNote = !hasStatus && !demo
-    ? 'Connect the board to check watering readiness.'
+    ? t('pump.connectBoard')
     : reservoir?.state === 'low'
-      ? `The tank water is low. Refill the reservoir — the pump will not run, on Auto or by hand.${
-          demo ? ' Use Reset in Setup → Simulation to refill the demo tank.' : ''
-        }`
+      ? (demo ? t('pump.lowTankWithReset') : t('pump.lowTank'))
       : reservoir?.state !== 'available'
         ? // Nothing to say: a probe that is not fitted cannot report, the
           // switch works anyway, and the Rain Water Tank card already shows
           // "not calibrated".  Only a tank that IS low is worth a sentence.
           ''
         : physicalDisabled
-          ? 'The controller is offline. Actions are disabled.'
+          ? t('pump.offline')
           : '';
-
-
 
   return (
     <div className="page village-page village-page--minimal">
@@ -273,52 +306,49 @@ export function OurVillage() {
           className="mic-button"
           onClick={openPanel}
           data-testid="start-voice"
-          aria-label="Talk to Sara"
-          title="Talk to Sara"
+          aria-label={t('page.talkToSara')}
+          title={t('page.talkToSara')}
         >
           <span className="mic-button-icon" aria-hidden="true">
             <IconMic size={26} />
           </span>
-          <span className="mic-button-label">Talk to Sara</span>
+          <span className="mic-button-label">{t('page.talkToSara')}</span>
         </button>
-        <p className="village-simple-lang-label">Speak to Sara in…</p>
+        <p className="village-simple-lang-label" title={t('page.languageHint')}>
+          {t('page.language')}
+        </p>
         <LanguagePicker
           className="village-simple-langs"
           options={VOICE_LANGUAGES.map((entry) => ({ code: entry.code, label: entry.label }))}
           value={language}
           onChange={(code) => setLanguage(code as VoiceLanguage)}
-          label="Speak to Sara in"
+          label={t('page.language')}
           testId="invite-lang"
         />
       </header>
 
       {demo && (
         <div className="sim-banner" data-testid="sim-intro">
-          <p className="sim-banner-title">
-            Try changing the light, soil and water conditions. See how the village responds.
-          </p>
-          <p className="sim-banner-note">
-            Simulation — physical model is not controlled. Nothing on this page moves the board,
-            and these readings are invented.
-          </p>
+          <p className="sim-banner-title">{t('page.simIntroTitle')}</p>
+          <p className="sim-banner-note">{t('page.simIntroNote')}</p>
         </div>
       )}
 
       {demo && (
         <div className="sim-presets" data-testid="sim-presets">
-          <p className="sim-presets-head">Quick demonstrations</p>
+          <p className="sim-presets-head">{t('page.presets')}</p>
           <div className="sim-presets-row">
             <button type="button" className="btn btn--ghost" data-testid="preset-night" onClick={() => void runPreset('night')}>
-              Night-time
+              {t('preset.night')}
             </button>
             <button type="button" className="btn btn--ghost" data-testid="preset-dry" onClick={() => void runPreset('dry')}>
-              Dry soil
+              {t('preset.dry')}
             </button>
             <button type="button" className="btn btn--ghost" data-testid="preset-low" onClick={() => void runPreset('low')}>
-              Low water
+              {t('preset.low')}
             </button>
             <button type="button" className="btn btn--gold" data-testid="preset-reset" onClick={() => void runPreset('reset')}>
-              Reset demo
+              {t('preset.reset')}
             </button>
           </div>
           {presetNote && (
@@ -331,66 +361,62 @@ export function OurVillage() {
 
       {Boolean(error) && !envelope && (
         <p className="village-simple-note" role="alert">
-          The village service is not answering.{' '}
+          {t('page.serviceDown')}{' '}
           <button type="button" className="link-btn" onClick={reload}>
-            Try again
+            {t('page.tryAgain')}
           </button>
         </p>
       )}
       {!envelope && loading && (
-        <p className="village-simple-note" role="status">Waiting for the first frame…</p>
+        <p className="village-simple-note" role="status">{t('page.waiting')}</p>
       )}
       <div className="village-rows">
         <article className="vcard vcard--min vcard--row" data-testid="card-plants">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconDroplet size={19} /></span>
-            <h2>Watering</h2>
+            <h2>{t('card.watering')}</h2>
             <span data-testid="pump-state" data-on={pumpOn ? 'true' : 'false'}>
               {levelChip(
-                !hasStatus ? 'Status unknown' : pumpOn ? 'Pump running' : 'Pump off',
+                !hasStatus ? t('chip.statusUnknown') : pumpOn ? t('chip.pumpRunning') : t('chip.pumpOff'),
                 pumpOn ? 'live' : 'neutral',
               )}
             </span>
           </header>
           {/* The chip beside the name says whether a watering session is
-              running; this line is the SOIL's own reading.  It used to read
-              just "Not calibrated", which sat next to the "Idle" chip looking
-              like a second answer to the same question (asked 2026-11-17). */}
+              running; this line is the SOIL's own reading. */}
           {stateLine(
             hasStatus
               ? soilPercent
-                ? // soilPercent is already formatted WITH its "%" — the first
-                  // version appended another one, so a calibrated probe read
-                  // "Dry · 28%%" and no test had ever seen it (2026-11-17).
-                  `Soil: ${soilWord.toLowerCase()} · ${soilPercent}`
-                : `Soil: ${soilWord.toLowerCase()}`
-              : 'No soil reading yet',
+                ? // soilPercent is already formatted WITH its "%".
+                  t('page.soilWithValue', { state: soilWord, percent: soilPercent })
+                : t('page.soilNoValue', { state: soilWord })
+              : t('page.noSoilReading'),
             soil?.state === 'dry' ? 'warn' : 'neutral',
           )}
           <div className="pump-manual" data-testid="pump-manual">
-              <p className="pump-manual-label">Pump</p>
-              <div className="segmented segmented--wide" role="group" aria-label="Pump mode">
-                {(['auto', 'on', 'off'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    data-testid={`pump-${mode}`}
-                    className={cx('segment', pumpMode === mode && 'is-active')}
-                    aria-pressed={pumpMode === mode}
-                    disabled={physicalDisabled || busy !== null}
-                    onClick={() =>
-                      void run(
-                        `pump-${mode}`,
-                        'plants',
-                        mode === 'auto' ? 'PUMP_AUTO' : mode === 'on' ? 'PUMP_ON' : 'PUMP_OFF',
-                      )
-                    }
-                  >
-                    {mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'}
-                  </button>
-                ))}
-              </div>
+            <p className="pump-manual-label">{t('sim.pump')}</p>
+            <div className="segmented segmented--wide" role="group" aria-label={t('sim.pumpMode')}>
+              {(['auto', 'on', 'off'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  data-testid={`pump-${mode}`}
+                  className={cx('segment', pumpMode === mode && 'is-active')}
+                  aria-pressed={pumpMode === mode}
+                  disabled={physicalDisabled || busy !== null}
+                  onClick={() =>
+                    void run(
+                      `pump-${mode}`,
+                      'plants',
+                      mode === 'auto' ? 'PUMP_AUTO' : mode === 'on' ? 'PUMP_ON' : 'PUMP_OFF',
+                    )
+                  }
+                >
+                  {mode === 'auto' ? t('sim.auto') : mode === 'on' ? t('sim.on') : t('sim.off')}
+                </button>
+              ))}
             </div>
+          </div>
           {pumpNote && (
             <p className="vcard-note" data-testid="pump-note">
               {pumpNote}
@@ -405,19 +431,17 @@ export function OurVillage() {
           {demo && (
             <div className="sim-block" data-testid="sim-watering">
               <SimSlider
-                label="Soil moisture indication"
+                label={t('sim.soilLabel')}
                 testId="sim-soil"
                 value={typeof soil?.percent === 'number' ? soil.percent : 0}
-                lowLabel="Dry"
-                highLabel="Wet"
+                lowLabel={t('sim.dry')}
+                highLabel={t('sim.wet')}
                 valueText={`${soilWord} · ${soilPercent ?? '—'}`}
                 disabled={busy !== null}
                 onChange={(next) => void setScenario({ soil_pct: next }, 'plants')}
-                hint="An indication from the simulated probe, not a measured amount of water in the soil."
+                hint={t('sim.soilHint')}
               />
-              <p className="sim-why-note">
-                The pump follows the same thresholds, pulses and limits as the real controller.
-              </p>
+              <p className="sim-why-note">{t('sim.pumpThresholds')}</p>
             </div>
           )}
           {notice?.card === 'plants' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
@@ -426,26 +450,25 @@ export function OurVillage() {
         <article className="vcard vcard--min vcard--row" data-testid="card-tank">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconPump size={19} /></span>
-            <h2>Rain Water Tank</h2>
+            <h2>{t('card.tank')}</h2>
             {levelChip(tankWord, tankTone)}
           </header>
           {stateLine(
             !hasStatus
-              ? 'No reading'
+              ? t('page.noReading')
               : reservoir?.state === 'available'
-                ? 'Water above the minimum'
+                ? t('tank.lineAvailable')
                 : reservoir?.state === 'low'
-                  ? 'Water at or below the minimum'
-                  : 'No usable probe reading',
+                  ? t('tank.lineLow')
+                  : t('tank.lineUnusable'),
             reservoir?.state === 'available' ? 'good' : reservoir?.state === 'low' ? 'warn' : 'neutral',
           )}
           <p className="sim-hint sim-hint--always" data-testid="tank-note">
-            Two wires in the tank: the whole choice the real detector can make is water at the low
-            level, or not. No percentage and no litres.
+            {t('tank.hint')}
           </p>
           {demo && (
             <div className="sim-block" data-testid="sim-tank">
-              <div className="sim-choice" role="group" aria-label="Simulated water in the tank">
+              <div className="sim-choice" role="group" aria-label={t('tank.simGroup')}>
                 <button
                   type="button"
                   className={cx('sim-choice-btn', reservoir?.state === 'available' && 'is-on')}
@@ -453,7 +476,7 @@ export function OurVillage() {
                   data-testid="sim-tank-available"
                   onClick={() => void setScenario({ reservoir: 'available' }, 'tank')}
                 >
-                  Water available
+                  {t('tank.waterAvailable')}
                 </button>
                 <button
                   type="button"
@@ -462,7 +485,7 @@ export function OurVillage() {
                   data-testid="sim-tank-low"
                   onClick={() => void setScenario({ reservoir: 'low' }, 'tank')}
                 >
-                  Low water
+                  {t('tank.waterLow')}
                 </button>
               </div>
             </div>
@@ -473,10 +496,10 @@ export function OurVillage() {
         <article className="vcard vcard--min vcard--row" data-testid="card-lights">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconLamp size={19} /></span>
-            <h2>Lights</h2>
-            {levelChip(hasStatus ? lightWord : 'Status unknown', light?.brightness === 'dark' ? 'gold' : 'neutral')}
+            <h2>{t('card.lights')}</h2>
+            {levelChip(hasStatus ? lightWord : t('chip.statusUnknown'), light?.brightness === 'dark' ? 'gold' : 'neutral')}
           </header>
-          <div className="segmented segmented--wide" role="group" aria-label="Streetlight mode">
+          <div className="segmented segmented--wide" role="group" aria-label={t('sim.streetlightMode')}>
             {(['auto', 'on', 'off'] as const).map((mode) => (
               <button
                 key={mode}
@@ -489,43 +512,47 @@ export function OurVillage() {
                   void run(mode, 'lights', mode === 'auto' ? 'LIGHTS_AUTO' : mode === 'on' ? 'LIGHTS_ON' : 'LIGHTS_OFF')
                 }
               >
-                {mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'}
+                {mode === 'auto' ? t('sim.auto') : mode === 'on' ? t('sim.on') : t('sim.off')}
               </button>
             ))}
           </div>
           <div className="sim-block sim-block--lights" data-testid="lights-detail">
-              <div className="sim-readings">
-                <span data-testid="outside-reading">
-                  Outside: <strong>{lightWord}</strong>
-                </span>
-                <span data-testid="streetlights-reading">
-                  Streetlights: <strong>{lights?.commanded ? 'On' : 'Off'}</strong>
-                </span>
-              </div>
-              <div className="sim-lamps">
-                <span className="sim-lamps-label">Streetlights</span>
-                <StreetLampStrip on={Boolean(lights?.commanded)} count={lights?.led_count ?? 5} />
-              </div>
-              {demo && (
-                <SimSlider
-                  label="Outside light"
-                  testId="sim-outside"
-                  value={lightMetric}
-                  min={0}
-                  max={4095}
-                  lowLabel="Dark"
-                  highLabel="Bright"
-                  valueText={lightWord}
-                  describe={(value) =>
-                    value < DARK_THRESHOLD ? 'Dark' : value > BRIGHT_THRESHOLD ? 'Bright' : 'In between'
-                  }
-                  disabled={busy !== null}
-                  onChange={(value) => void setAmbient(value)}
-                />
-              )}
-              <p className="sim-why" data-testid="lights-why">
-                {lightWhy}
-              </p>
+            <div className="sim-readings">
+              <span data-testid="outside-reading">
+                {t('sim.outside')}: <strong>{lightWord}</strong>
+              </span>
+              <span data-testid="streetlights-reading">
+                {t('sim.streetlights')}: <strong>{lights?.commanded ? t('sim.on') : t('sim.off')}</strong>
+              </span>
+            </div>
+            <div className="sim-lamps">
+              <span className="sim-lamps-label">{t('sim.streetlights')}</span>
+              <StreetLampStrip on={Boolean(lights?.commanded)} count={lights?.led_count ?? 5} />
+            </div>
+            {demo && (
+              <SimSlider
+                label={t('sim.outsideLight')}
+                testId="sim-outside"
+                value={lightMetric}
+                min={0}
+                max={4095}
+                lowLabel={t('chip.dark')}
+                highLabel={t('chip.bright')}
+                valueText={lightWord}
+                describe={(value) =>
+                  value < DARK_THRESHOLD
+                    ? t('chip.dark')
+                    : value > BRIGHT_THRESHOLD
+                      ? t('chip.bright')
+                      : t('sim.inBetween')
+                }
+                disabled={busy !== null}
+                onChange={(value) => void setAmbient(value)}
+              />
+            )}
+            <p className="sim-why" data-testid="lights-why">
+              {lightWhy}
+            </p>
           </div>
           {notice?.card === 'lights' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
@@ -533,15 +560,15 @@ export function OurVillage() {
         <article className="vcard vcard--min vcard--row" data-testid="card-waste">
           <header className="vcard-head">
             <span className="vcard-icon" aria-hidden="true"><IconCamera size={19} /></span>
-            <h2>Waste</h2>
+            <h2>{t('card.waste')}</h2>
             {modelChip}
           </header>
           {stateLine(
             !hasStatus
-              ? 'No reading'
+              ? t('page.noReading')
               : waste?.active && waste.category
-                ? `Last item: ${waste.category}`
-                : 'No item yet',
+                ? t('waste.lastItem', { item: waste.category })
+                : t('waste.noItem'),
             waste?.active ? 'good' : 'neutral',
           )}
           <div className="vcard-actions">
@@ -551,13 +578,9 @@ export function OurVillage() {
               onClick={() => navigate('/waste')}
               data-testid="open-sort-waste"
               disabled={physicalDisabled}
-              title={
-                physicalDisabled
-                  ? 'The controller is offline. Choose Simulation above to show the classifier without the board.'
-                  : 'Open the waste camera.'
-              }
+              title={physicalDisabled ? t('waste.identifyOfflineTitle') : t('waste.identifyTitle')}
             >
-              <IconCamera size={16} /> Identify waste
+              <IconCamera size={16} /> {t('waste.identify')}
             </button>
             {demo && (
               <button
@@ -565,22 +588,20 @@ export function OurVillage() {
                 className="btn btn--ghost"
                 data-testid="try-sample"
                 onClick={() => setSamplesOpen(true)}
-                title="Five preset items, showing what the village tells you. Not a camera result."
+                title={t('waste.trySampleTitle')}
               >
-                Try a sample
+                {t('waste.trySample')}
               </button>
             )}
           </div>
           {demo && (
             <p className="sim-hint" data-testid="sample-note">
-              A sample shows the guidance for one preset item; <strong>Identify waste</strong> is the
-              real camera classifier.
+              {t('waste.sampleNote')}
             </p>
           )}
           {physicalDisabled && (
             <p className="vcard-note" data-testid="waste-offline-note">
-              The controller is offline. Use <strong>Simulation</strong> in Setup to show the
-              classifier without the board.
+              {t('waste.offlineNote')}
             </p>
           )}
         </article>
@@ -589,22 +610,22 @@ export function OurVillage() {
       <article className="vcard vcard--min vcard--solar vcard--row" data-testid="card-solar">
         <header className="vcard-head">
           <span className="vcard-icon" aria-hidden="true"><IconSun size={19} /></span>
-          <h2>Solar</h2>
+          <h2>{t('card.solar')}</h2>
           {levelChip(
             !hasStatus
-              ? 'Status unknown'
+              ? t('chip.statusUnknown')
               : !solarVolts
-                ? 'No reading'
+                ? t('page.noReading')
                 : solarGenerating
-                  ? 'Generating'
-                  : 'Not generating',
+                  ? t('chip.generating')
+                  : t('chip.notGenerating'),
             solarGenerating ? 'live' : 'neutral',
           )}
         </header>
         {stateLine(
           solarVolts
             ? `${solarVolts} V · ${solarCurrent ?? '0.00'} mA · ${solarPower ?? '0.0'} mW`
-            : 'No reading',
+            : t('page.noReading'),
           'neutral',
         )}
         {/* The picture is worth having in both modes: in Simulation it follows
@@ -614,20 +635,19 @@ export function OurVillage() {
           <SolarPanel light={solarLightLevel} />
           {demo ? (
             <SimSlider
-              label="Light on solar panel"
+              label={t('sim.panelLight')}
               testId="sim-panel-light"
               value={solarLightLevel * 100}
-              lowLabel="Low light"
-              highLabel="Strong light"
+              lowLabel={t('sim.lowLight')}
+              highLabel={t('sim.strongLight')}
               valueText={`${Math.round(solarLightLevel * 100)}%`}
               disabled={busy !== null}
               onChange={(next) => void setScenario({ solar_light: next / 100 }, 'solar')}
-              hint="Simulated values from the panel's own circuit — volts, the current through the 330 Ω resistor, and power = volts × milliamps. Not a measurement of the real panel."
+              hint={t('sim.solarHint')}
             />
           ) : (
             <p className="sim-hint sim-hint--live" data-testid="solar-live-note">
-              Measured across the panel and its 330 Ω resistor: power = volts × milliamps. The LED
-              lights only once the panel reaches about 1.8 V, so a dim panel honestly reads zero.
+              {t('solar.liveHint')}
             </p>
           )}
         </div>
@@ -636,22 +656,22 @@ export function OurVillage() {
       <article className="vcard vcard--min vcard--solar vcard--row" data-testid="card-wind">
         <header className="vcard-head">
           <span className="vcard-icon" aria-hidden="true"><IconWind size={19} /></span>
-          <h2>Wind</h2>
+          <h2>{t('card.wind')}</h2>
           {levelChip(
             !hasStatus
-              ? 'Status unknown'
+              ? t('chip.statusUnknown')
               : !windFitted
-                ? 'Not fitted'
+                ? t('chip.notFitted')
                 : windGenerating
-                  ? 'Generating'
-                  : 'Not generating',
+                  ? t('chip.generating')
+                  : t('chip.notGenerating'),
             windGenerating ? 'live' : 'neutral',
           )}
         </header>
-        {stateLine(windVolts ? `${windVolts} V` : 'No reading', 'neutral')}
+        {stateLine(windVolts ? `${windVolts} V` : t('page.noReading'), 'neutral')}
         {windFitted || demo ? (
           <p className="vcard-note">
-            {demo ? 'Simulated voltage' : 'Voltage measured'}; power is not measured.
+            {demo ? t('wind.simulatedLine') : t('wind.measuredLine')}
           </p>
         ) : null}
         {/* The windmill turns in Simulation, and in Live it turns as fast as the
@@ -661,21 +681,20 @@ export function OurVillage() {
           <Windmill speed={windSpeedLevel} fitted={demo || windFitted} />
           {demo ? (
             <SimSlider
-              label="Windmill speed"
+              label={t('sim.windSpeed')}
               testId="sim-wind-speed"
               value={windSpeedLevel * 100}
-              lowLabel="Still"
-              highLabel="Fast"
+              lowLabel={t('sim.still')}
+              highLabel={t('sim.fast')}
               valueText={`${Math.round(windSpeedLevel * 100)}%`}
               disabled={busy !== null}
               onChange={(next) => void setScenario({ wind_speed: next / 100 }, 'wind')}
-              hint="Simulated voltage; power is not measured — the board has no second input for current."
+              hint={t('sim.windHint')}
             />
           ) : (
             !windFitted && (
               <p className="sim-hint sim-hint--live" data-testid="wind-live-note">
-                No turbine is wired to this board, so the windmill stands still; only the pin’s own{' '}
-                {windVolts ?? '0.00'} V is reported.
+                {t('wind.noTurbine', { volts: windVolts ?? '0.00' })}
               </p>
             )
           )}

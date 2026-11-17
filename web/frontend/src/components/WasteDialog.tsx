@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useT } from '../lib/i18n';
 import { SortWaste } from '../pages/SortWaste';
 
 /**
@@ -16,6 +17,7 @@ import { SortWaste } from '../pages/SortWaste';
  * answer by more than it saves.
  */
 export function WasteDialog() {
+  const t = useT();
   const navigate = useNavigate();
   const doneRef = useRef<HTMLButtonElement | null>(null);
 
@@ -47,11 +49,11 @@ export function WasteDialog() {
 
   return (
     <div className="overlay-over" role="presentation" data-testid="waste-dialog">
-      <div className="waste-dialog" role="dialog" aria-modal="true" aria-label="Sort waste">
+      <div className="waste-dialog" role="dialog" aria-modal="true" aria-label={t('wasteDialog.aria')}>
         <header className="waste-dialog-head">
           <div>
-            <p className="brand-eyebrow">Sort waste</p>
-            <h2 className="waste-dialog-title">Show one item to the camera</h2>
+            <p className="brand-eyebrow">{t('wasteDialog.eyebrow')}</p>
+            <h2 className="waste-dialog-title">{t('wasteDialog.title')}</h2>
           </div>
           <button
             type="button"
@@ -60,7 +62,7 @@ export function WasteDialog() {
             ref={doneRef}
             data-testid="waste-done"
           >
-            Done — back to the village
+            {t('wasteDialog.done')}
           </button>
         </header>
         <div className="waste-dialog-body">

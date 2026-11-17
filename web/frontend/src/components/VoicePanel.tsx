@@ -7,6 +7,7 @@ import { VoiceRecorder, recordingSupported } from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
+import { useT } from '../lib/i18n';
 import { LIVE_COPY, VOICE_GREETING, describeVillage, inScript } from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
@@ -110,6 +111,7 @@ function orderedIntents(data: VoiceIntentsResponse | null): VoiceIntent[] {
 
 export function VoicePanel() {
   const { open, closePanel, language, setLanguage } = useVoiceUi();
+  const t = useT();
   const { demo } = useDemo();
   const { send } = useCommands();
   // `status` is also a local name inside finish() (the intent status), so the
@@ -137,6 +139,10 @@ export function VoicePanel() {
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(0);
+  // The language this recording was *started* in.  A request already on its way
+  // finishes in the language it began in — never re-read through a selector the
+  // visitor changed while waiting.
+  const startedLanguageRef = useRef<VoiceLanguage>(language);
   const speakingRef = useRef(false);
   // A completed utterance is processed once: these guard the double press, a
   // duplicated transcription event and a double submit of typed text.
@@ -209,20 +215,22 @@ export function VoicePanel() {
     }
   }, [open]);
 
-  const speak = async (text: string, intent: string | null) => {
+  const speak = async (text: string, intent: string | null, spokenLanguage = language) => {
     if (!text || speakingRef.current) return;
     if (settings.data && settings.data.tts_enabled === false) return;
     speakingRef.current = true;
     setSpeaking(true);
     setTtsNote('');
     try {
-      const how = await speakReply(text, language, intent);
+      const how = await speakReply(text, spokenLanguage, intent);
       if (how === 'none') {
         const ttsReady = Boolean(readiness.data?.tts?.ready);
         setTtsNote(
-          !ttsReady && speechSupported() && !voiceAvailable(language)
-            ? `This computer has no ${VOICE_LANGUAGE_NAMES[language] ?? language} voice, so the reply is shown as text.`
-            : 'The reply could not be read aloud. The text above is the full reply.',
+          !ttsReady && speechSupported() && !voiceAvailable(spokenLanguage)
+            ? t('panel.noVoiceForLanguage', {
+                language: VOICE_LANGUAGE_NAMES[spokenLanguage] ?? spokenLanguage,
+              })
+            : t('panel.replyNotRead'),
         );
       }
     } finally {
@@ -269,6 +277,7 @@ export function VoicePanel() {
       await recorder.start();
       recorderRef.current = recorder;
       startedRef.current = Date.now();
+      startedLanguageRef.current = language;
       setElapsed(0);
       setState('listening');
       clearTimer();
@@ -283,8 +292,8 @@ export function VoicePanel() {
       setState('idle');
       setMicError(
         cause instanceof Error
-          ? `The microphone could not start: ${cause.message}`
-          : 'The microphone could not start.',
+          ? `${t('panel.micFailed')} (${cause.message})`
+          : t('panel.micFailed'),
       );
     }
   }
@@ -298,6 +307,7 @@ export function VoicePanel() {
     response: VoiceTranscribeResponse,
     transcript: string,
     requestId: string,
+    lang: VoiceLanguage,
   ) {
     const kind = kindOf(response);
     const intent = response.intent ?? null;
@@ -306,9 +316,9 @@ export function VoicePanel() {
 
     if (kind === 'no_speech') {
       setState('rejected');
-      const reply = response.message ?? 'No speech was detected. Press Start Speaking again and speak clearly.';
+      const reply = response.message ?? t('panel.noSpeech');
       setMessage(reply);
-      void speak(reply, intent);
+      void speak(reply, intent, lang);
       return;
     }
 
@@ -316,11 +326,11 @@ export function VoicePanel() {
       let reply =
         response.message ??
         response.response_text ??
-        'That one does not move anything. It only answers.';
+        t('panel.onlyAnswers');
       // A status question is answered from the frame on screen, in the selected
-      // language, rather than from a canned sentence.
+      // lang, rather than from a canned sentence.
       if (kind === 'status' && villageStatus) {
-        const copy = LIVE_COPY[language as 'en' | 'ml' | 'hi'] ?? LIVE_COPY.en;
+        const copy = LIVE_COPY[lang as 'en' | 'ml' | 'hi'] ?? LIVE_COPY.en;
         if (intent === 'LIGHTS_STATUS') {
           const lamps = villageStatus.actuators?.streetlights;
           reply = lamps?.commanded ? copy.lightsOn : copy.lightsOff;
@@ -359,7 +369,7 @@ export function VoicePanel() {
         } else if (intent === 'VILLAGE_STATUS') {
           const live = describeVillage(
             { status: villageStatus, connected, stale, ageMs, demo: villageDemo },
-            language as 'en' | 'ml' | 'hi',
+            lang as 'en' | 'ml' | 'hi',
           )
             .map((item) => item.text)
             .join(' ');
@@ -368,16 +378,16 @@ export function VoicePanel() {
       }
       setState(kind === 'status' || kind === 'statement' || kind === 'hypothetical' ? 'success' : 'rejected');
       setMessage(reply);
-      void speak(reply, intent);
+      void speak(reply, intent, lang);
       return;
     }
 
     const command = response.command ?? null;
     if (!command || !ALLOWED_COMMANDS.has(command)) {
       setState('rejected');
-      const reply = response.message ?? 'That command is not supported here. Nothing was sent.';
+      const reply = response.message ?? t('panel.notSupported');
       setMessage(reply);
-      void speak(reply, intent);
+      void speak(reply, intent, lang);
       return;
     }
 
@@ -385,23 +395,23 @@ export function VoicePanel() {
     // stale reading must never make Sara skip an action the user asked for.
     const frameFresh = connected && !stale && (ageMs == null || ageMs < 5000);
     const already = response.already_text
-      || (command === 'LIGHTS_OFF' ? 'The lights are already off.'
-        : command === 'LIGHTS_ON' ? 'The lights are already on.'
+      || (command === 'LIGHTS_OFF' ? t('panel.alreadyOff')
+        : command === 'LIGHTS_ON' ? t('panel.alreadyOn')
         : '');
     if (frameFresh && alreadyInState(command, villageStatus) && already) {
       setState('success');
       setMessage(already);
-      void speak(already, intent);
+      void speak(already, intent, lang);
       return;
     }
 
     if (!connected) {
       const reply =
-        intents.data?.messages?.disconnected?.[language]
-        ?? "I can't reach the village controller. Please check its connection.";
+        intents.data?.messages?.disconnected?.[lang]
+        ?? t('panel.cannotReach');
       setState('disconnected');
       setMessage(reply);
-      void speak(reply, intent);
+      void speak(reply, intent, lang);
       return;
     }
 
@@ -409,7 +419,7 @@ export function VoicePanel() {
     setMessage(
       response.pending_text ??
         response.message ??
-        'Command understood. Sending it to the village controller.',
+        t('panel.sending'),
     );
     try {
       const commandOutcome = await send(command, {}, 'voice', requestId);
@@ -418,20 +428,20 @@ export function VoicePanel() {
         setState('rejected');
         setMessage(
           commandOutcome.reason ??
-            'The controller received the command and refused it. Nothing changed.',
+            t('panel.refused'),
         );
       } else if (commandOutcome.status === 'unconfirmed') {
         setState('disconnected');
         setMessage(
-          intents.data?.messages?.unconfirmed?.[language]
+          intents.data?.messages?.unconfirmed?.[lang]
             ?? commandOutcome.reason
-            ?? 'The controller did not confirm the action. Do not assume anything happened.',
+            ?? t('panel.unconfirmed'),
         );
       } else if (commandOutcome.status === 'duplicate') {
         // A repeated id is a real answer: the first decision stands.
         setState('success');
         setMessage(
-          commandOutcome.reason ?? 'This command was already processed. The original decision stands.',
+          commandOutcome.reason ?? t('panel.duplicate'),
         );
       } else if (commandOutcome.status === 'confirmed') {
         // The pending sentence is true only while it is being sent; once the
@@ -441,10 +451,10 @@ export function VoicePanel() {
         setMessage(
           response.done_text ||
             response.response_text ||
-            'The controller confirmed the command.',
+            t('panel.confirmed'),
         );
       }
-      // Speak in the visitor's language, always.  The controller's reason is
+      // Speak in the visitor's lang, always.  The controller's reason is
       // written in English by the firmware; handing that to the Malayalam voice
       // produced a sentence of Malayalam sounds around English words, which is
       // what a visitor reported as "she answered in something weird"
@@ -456,17 +466,17 @@ export function VoicePanel() {
           : commandOutcome.status === 'duplicate'
             ? response.already_text || response.done_text || ''
             : commandOutcome.status === 'rejected'
-              ? (intents.data?.messages?.refused?.[language] ?? '')
-              : (intents.data?.messages?.unconfirmed?.[language] ?? '');
-      if (spoken) void speak(spoken, intent);
+              ? (intents.data?.messages?.refused?.[lang] ?? '')
+              : (intents.data?.messages?.unconfirmed?.[lang] ?? '');
+      if (spoken) void speak(spoken, intent, lang);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
       setState(unreachable ? 'disconnected' : 'rejected');
       setMessage(
         unreachable
-          ? (intents.data?.messages?.disconnected?.[language]
-             ?? "I can't reach the village controller. Please check its connection.")
+          ? (intents.data?.messages?.disconnected?.[lang]
+             ?? t('panel.cannotReach'))
           : errorMessage(cause),
       );
     }
@@ -491,15 +501,17 @@ export function VoicePanel() {
     }
     if (!blob || blob.size === 0) {
       setState('rejected');
-      setMessage('No speech was detected. Press Start Speaking again and speak clearly.');
+      setMessage(t('panel.noSpeech'));
       finishingRef.current = false;
       return;
     }
 
     try {
-      const response = await api.voiceTranscribe(blob, language);
+      // The recording's own language, captured when Start was pressed.
+      const spokenIn = startedLanguageRef.current;
+      const response = await api.voiceTranscribe(blob, spokenIn);
       const text = response.text ?? response.transcript ?? '';
-      await applyUtterance(response, text, utteranceId(text, startedRef.current));
+      await applyUtterance(response, text, utteranceId(text, startedRef.current), spokenIn);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
@@ -529,10 +541,11 @@ export function VoicePanel() {
     try {
       // Same parser as the microphone: Whisper only changes how the words
       // arrive, never what they mean.
-      const response = await api.voiceInterpret(text, language);
+      const typedIn = language;
+      const response = await api.voiceInterpret(text, typedIn);
       setTyped('');
       typedGestureRef.current = null;
-      await applyUtterance(response, response.transcript ?? text, requestId);
+      await applyUtterance(response, response.transcript ?? text, requestId, typedIn);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
       const unreachable = apiError ? apiError.status === 0 || apiError.status === 503 : true;
@@ -560,11 +573,17 @@ export function VoicePanel() {
   const examples = VOICE_EXAMPLES[language] ?? VOICE_EXAMPLES.en;
 
   const blocker = !micSupported
-    ? 'This browser cannot record audio, so spoken commands are unavailable here. Use the buttons on the cards instead.'
+    ? t('panel.noRecording')
     : speechState === 'off'
-      ? `The speech service is not available on this laptop: ${readiness.data?.whisper?.message ?? 'the local model is missing.'}`
+      ? // The service's own reason is English; it is useful to the presenter, so
+        // English keeps it and the other two languages say the same thing.
+        `${t('panel.speechUnavailable')}${
+          language === 'en' && readiness.data?.whisper?.message
+            ? ` (${readiness.data.whisper.message})`
+            : ''
+        }`
       : speechState === 'unknown'
-        ? 'The speech service could not be checked, so recording is paused. The cards still work.'
+        ? t('panel.speechUnknown')
         : '';
 
   // A board that is not answering is not a reason to refuse to listen: the
@@ -574,7 +593,7 @@ export function VoicePanel() {
   // microphone (reported 2026-11-17, with the board powered off).
   const offlineNote =
     !demo && !connected
-      ? 'The board is not answering. You can still speak, but nothing will move until it reconnects.'
+      ? t('panel.offlineNote')
       : '';
 
   const supported = micSupported && speechState !== 'off' && speechState !== 'unknown';
@@ -678,7 +697,7 @@ export function VoicePanel() {
           className="icon-btn voice-close"
           type="button"
           onClick={closePanel}
-          aria-label="Close voice panel"
+          aria-label={t('panel.close')}
         >
           <IconClose size={18} />
         </button>
@@ -725,7 +744,7 @@ export function VoicePanel() {
             </p>
           )}
           {!blocker && villageLoading && (
-            <p className="voice-blocker">Waiting for the first reading from the board…</p>
+            <p className="voice-blocker">{t('panel.waitingBoard')}</p>
           )}
         </div>
       </div>
@@ -793,9 +812,9 @@ export function VoicePanel() {
           </p>
           {wrongScript && (
             <p className="voice-blocker" data-testid="voice-script-note">
-              The speech model did not hear {VOICE_LANGUAGE_NAMES[language] ?? language} clearly —
-              that is not {VOICE_LANGUAGE_NAMES[language] ?? language} script. Say it again a little
-              slower, or type it below.
+              {t('panel.notLanguageScript', {
+                language: VOICE_LANGUAGE_NAMES[language] ?? language,
+              })}
             </p>
           )}
         </section>

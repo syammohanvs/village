@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { cx, formatAge } from '../lib/format';
+import { cx, formatAgeValue } from '../lib/format';
+import { useT } from '../lib/i18n';
+import { useVoiceUi } from '../lib/voiceUi';
 import { useVillage } from '../lib/village';
 import { useDemo } from '../lib/demo';
 
@@ -19,6 +21,8 @@ function clockOf(iso: string | null | undefined): string | null {
 export function ConnectionPill() {
   const { connected, stale, connection, ageMs } = useVillage();
   const { demo, setMode } = useDemo();
+  const t = useT();
+  const { language } = useVoiceUi();
   // A clock that advances once a second is the cheapest honest proof that the
   // page is still being fed.  A relative "N ms ago" flickers between 0 and
   // 1000 because the backend polls every second, which reads as a frozen
@@ -30,7 +34,13 @@ export function ConnectionPill() {
     return () => clearInterval(timer);
   }, []);
 
-  const label = demo ? 'Simulation' : !connected ? 'Offline' : stale ? 'Stale' : 'Live';
+  const label = demo
+    ? t('conn.simulation')
+    : !connected
+      ? t('conn.offline')
+      : stale
+        ? t('conn.stale')
+        : t('conn.live');
   const tone = demo ? 'demo' : !connected ? 'offline' : stale ? 'stale' : 'live';
   const lastSuccess = connection?.last_success_at ?? null;
   const clock = clockOf(lastSuccess);
@@ -40,12 +50,22 @@ export function ConnectionPill() {
       className={cx('conn-pill', `conn-pill--${tone}`)}
       title={
         demo
-          ? 'Simulation mode: these readings are invented on the laptop. Press to go back to live readings.'
+          ? t('conn.simulationTitle')
           : connected
-            ? `Last frame from the controller: ${
-                Number.isFinite(sinceLast) ? formatAge(sinceLast) : formatAge(ageMs)
-              }${lastSuccess ? ` (${lastSuccess})` : ''}`
-            : connection?.last_error ?? 'No live frame from the controller.'
+            ? t('conn.lastFrame', {
+                // The duration is a number and a unit ("3s", "2m 5s"); only the
+                // "ago" around it is a word, and that comes from the table.
+                age: t('conn.age', {
+                  duration: formatAgeValue(Number.isFinite(sinceLast) ? sinceLast : ageMs),
+                }),
+              }) + (lastSuccess ? ` (${lastSuccess})` : '')
+            : // The backend's own error text is English and is the useful thing
+              // to read while fixing a cable, so English keeps it.  The other
+              // two languages say the same truth in the visitor's language
+              // rather than switching alphabets mid-sentence.
+              (language === 'en' && connection?.last_error
+                ? connection.last_error
+                : t('conn.noFrame'))
       }
       data-testid="connection-pill"
       onClick={demo ? () => setMode('live') : undefined}
@@ -65,7 +85,9 @@ export function ConnectionPill() {
       <span className="dot" aria-hidden="true" />
       {label}
       {!demo && connected && !stale && clock && <span className="conn-age">{clock}</span>}
-      {!demo && connected && stale && <span className="conn-age">{formatAge(ageMs)}</span>}
+      {!demo && connected && stale && (
+        <span className="conn-age">{t('conn.age', { duration: formatAgeValue(ageMs) })}</span>
+      )}
     </span>
   );
 }

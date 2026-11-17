@@ -264,6 +264,39 @@ untouched. The rendering is 200 → 280 ms on the same measurement.
 Both substitutions are speech only, English only: Malayalam and Hindi already
 write the name in their own script, and their text is handed over unchanged.
 
+### The language of the page
+
+The selector on the kiosk page — **English · हिन्दी · മലയാളം** — sets the
+language of **the whole page and of Sara**: the cards, the buttons, the
+simulation controls, the waste dialog, Sara's panel and her voice. There is
+deliberately only one selector (the panel has a copy of the same control, and
+both read one shared state, so they cannot disagree).
+
+The choice is remembered on this device (`village.voiceLanguage`) and applied to
+`<html lang>` so a screen reader and the font fallback agree with it. It is a
+reading choice, not an action: changing it never sends a command, never changes
+a device state and never resets the simulation.
+
+**Which surfaces are translated:** the exhibit page and everything it opens —
+Sara's panel, the waste sorter, the sample dialog, the bin LEDs, the mode knob
+and the connection pill.
+
+**Which are not, and why:** the operator pages (Setup, Sensors, About, What
+Happened, Help) are English. They are reachable by address for a presenter, not
+by a visitor, and keeping them out keeps the translation table to what a visitor
+actually reads. The firmware's own reason sentences and backend error text are
+written in English; where one would otherwise appear on a translated page, a
+translated sentence says the same thing.
+
+**Adding a language:** add it to `LANGS` in `lib/lang.ts` and add one entry per
+key in `lib/messages.ts` — `messages.test.ts` fails until every key has it, which
+is what stops a half-translated page from shipping with a raw key on screen.
+
+**The translations were not reviewed by a fluent speaker.** They were written
+for this project in short, everyday language (Class 6, exhibition visitors). If
+a sentence reads oddly, it is wrong in exactly one place — `lib/messages.ts` —
+and fixing it needs no code change.
+
 ### The language Sara answers in
 
 **Sara speaks the visitor's language, always.** The controller's own reason is

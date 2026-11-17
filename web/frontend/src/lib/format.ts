@@ -2,6 +2,25 @@ export function cx(...values: (string | false | null | undefined)[]): string {
   return values.filter(Boolean).join(' ');
 }
 
+/**
+ * The same duration without the word "ago".
+ *
+ * "ago" is a word, and this app is read in three languages: the number and its
+ * unit are kept as they are (3s, 2m 5s), and the sentence around them comes from
+ * the message table (`conn.age`).
+ */
+export function formatAgeValue(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || Number.isNaN(ms)) return '—';
+  if (ms < 1000) return `${Math.max(0, Math.round(ms))} ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.round(seconds % 60);
+  if (minutes < 60) return `${minutes}m ${rest}s`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
 export function formatAge(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || Number.isNaN(ms)) return '—';
   if (ms < 1000) return `${Math.max(0, Math.round(ms))} ms ago`;

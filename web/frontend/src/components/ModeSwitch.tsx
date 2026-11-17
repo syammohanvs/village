@@ -1,21 +1,15 @@
 import { useId } from 'react';
 import { cx } from '../lib/format';
+import { useT } from '../lib/i18n';
+import type { MessageKey } from '../lib/messages';
 
 /** What the exhibit is showing.  Live is the middle stop, and the default. */
 export type VillageMode = 'simulation' | 'live' | 'test';
 
-const STOPS: { id: VillageMode; label: string; title: string }[] = [
-  {
-    id: 'simulation',
-    label: 'Simulation',
-    title: 'Invented readings, so the page can be shown without the board.',
-  },
-  { id: 'live', label: 'Live', title: 'What the controller is reporting now.' },
-  {
-    id: 'test',
-    label: 'Test',
-    title: 'Bench test: drive the pump and the four LEDs by hand. Closing the panel returns to live.',
-  },
+const STOPS: { id: VillageMode; label: MessageKey; title: MessageKey }[] = [
+  { id: 'simulation', label: 'mode.simulation', title: 'mode.simulationTitle' },
+  { id: 'live', label: 'mode.live', title: 'mode.liveTitle' },
+  { id: 'test', label: 'mode.test', title: 'mode.testTitle' },
 ];
 
 /**
@@ -37,13 +31,14 @@ export function ModeSwitch({
   testUnavailable: string | null;
 }) {
   const group = useId();
+  const t = useT();
   const index = Math.max(0, STOPS.findIndex((stop) => stop.id === value));
 
   return (
     <div
       className="mode-switch"
       role="radiogroup"
-      aria-label="Village mode"
+      aria-label={t('mode.group')}
       data-testid="mode-switch"
       style={{ '--stop': index } as React.CSSProperties}
     >
@@ -57,15 +52,15 @@ export function ModeSwitch({
             role="radio"
             id={`${group}-${stop.id}`}
             aria-checked={value === stop.id}
-            aria-label={stop.label}
+            aria-label={t(stop.label)}
             disabled={disabled}
-            title={disabled ? testUnavailable : stop.title}
+            title={disabled ? testUnavailable : t(stop.title)}
             className={cx('mode-stop', value === stop.id && 'is-on')}
             data-testid={`mode-${stop.id}`}
             onClick={() => onChange(stop.id)}
           >
             <span className="mode-dot" aria-hidden="true" />
-            <span className="mode-label">{stop.label}</span>
+            <span className="mode-label">{t(stop.label)}</span>
           </button>
         );
       })}
