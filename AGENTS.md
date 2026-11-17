@@ -16,6 +16,94 @@ Smart Green Village: ESP32 firmware (`uc/`), FastAPI backend
 (`web/backend/`), React/Vite dashboard (`web/frontend/`), Whisper voice and a
 local waste classifier. Keep the app running at <http://127.0.0.1:8010/>.
 
+## A new machine: clone and run (2026-11-17)
+
+The repository is a **complete copy of the working exhibit** — code, firmware,
+Sara's four voices, both waste models, the village database and the credentials —
+so a fresh session on another laptop is four commands, not a rebuild. This is the
+runbook; do not invent a different one.
+
+**1. Check the machine.** WSL/Ubuntu as on the original: `git`, `python3` ≥ 3.11
+with **`python3-venv`**, Node ≥ 22, `rsync`, `curl`.
+
+```bash
+sudo apt install python3-venv python3-pip rsync curl
+```
+
+`python3 -m venv` failing with *"ensurepip is not available"* is exactly the
+missing `python3-venv`; `setup.sh` names it and stops rather than half-installing.
+
+**2. Clone** — `git@github.com:syammohanvs/village.git`, **private**, so the key
+must have access. It is ~600 MB, so expect a wait:
+
+```bash
+git clone git@github.com:syammohanvs/village.git
+cd village
+```
+
+**3. Install what git cannot hold** (once per machine):
+
+```bash
+./scripts/setup.sh             # .venv, backend, classifier, node_modules
+./scripts/download_models.sh   # whisper ggml-base.bin (~142 MB)
+```
+
+`setup.sh` installs three requirement files: the API (`requirements.txt`), the
+**classifier** (`requirements-waste.txt` — `torch` is ~200 MB the first time, and
+without it the app starts and cannot sort waste), and the test tools. It creates
+the Python environment in `.venv` beside the checkout when `.env` names one that
+does not exist on this machine — `scripts/venv.sh` is the single rule, shared by
+`setup.sh`, `launch.sh`, `dev.sh` and `test_all.sh`.
+
+**4. Run**:
+
+```bash
+./scripts/launch.sh            # build web/dist, start whisper, backend on :8010
+```
+
+**5. Verify — do not assume.** Three checks that fail loudly when something is
+missing:
+
+```bash
+curl -s http://127.0.0.1:8010/api/v1/system/health | python3 -m json.tool
+```
+
+- `status: ok` **and `voice.ready: true`**. A `false` with
+  `server_reachable: true` is the whisper binary without its model — step 3.
+- Sign in at :8010 with **`admin` / `village`** (the committed database's
+  account) and open **Talk to Sara**: she should speak, and
+  `/api/v1/voice/readiness` reports `Piper is ready for en, hi, ml` with
+  `english_voices: [sara, indian]`.
+- **Sort waste** with a real item, or `POST /api/v1/waste/classify` with a photo
+  from `data/waste-samples/` — a clear plastic item answers `Plastic ≈ 0.92`.
+
+Measured 2026-11-17 by cloning into a clean directory and starting it on **:8099**
+(so the original kept :8010): health ok, `admin`/`village` sign-in from the
+committed database, a 143 KB RIFF from `/voice/speak`, and the classifier
+answering `Plastic 0.924`. That is the standard this setup is held to.
+
+**6. What is per-machine, and repairs itself**
+
+- `.env` carries this laptop's paths. `VILLAGE_VENV` falls back to `.venv` as
+  above; `VILLAGE_DEVICE_URL` is the relay on the **Windows host**, whose WSL
+  address changes every boot — `./scripts/relay.sh ensure` (called by both start
+  scripts) rewrites it, and `./scripts/relay.sh status` says whether the board is
+  reachable (hotspot on, relay running, board's lease).
+- The board needs the **Windows Mobile Hotspot** on; its Wi-Fi credentials are in
+  `uc/include/village/secrets.h` (committed). Moving laptops reflashes nothing —
+  the board keeps its own NVS calibration.
+- `web/dist` and `node_modules` are deliberately not in git: `launch.sh` builds
+  the first, `setup.sh` installs the second.
+
+**7. If it does not start**, in this order: `./scripts/stop.sh` then `launch.sh`
+(a stale pid holds the port), `data/logs/backend.log` for the traceback,
+`./scripts/whisper.sh status` for the speech server. Never `rm -rf data/` —
+`data/village.db` is the village's own state, and it is the point of this repo.
+
+**8. Pushing** works from the new machine with the same key (see the banner at the
+top). Settings, accounts and voice choices travel with the repository, so a new
+laptop speaks, sorts and signs in exactly as the old one did.
+
 ## Daily commands
 
 ```bash
@@ -36,8 +124,8 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **484 firmware checks**, **80 backend tests** and
-**268 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+The current tree passes **499 firmware checks**, **106 backend tests** and
+**352 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
