@@ -182,10 +182,13 @@ export function OurVillage() {
           className="mic-button"
           onClick={openPanel}
           data-testid="start-voice"
-          aria-label="Talk to the village"
-          title="Talk to the village"
+          aria-label="Talk to Sara"
+          title="Talk to Sara"
         >
-          <IconMic size={28} />
+          <span className="mic-button-icon" aria-hidden="true">
+            <IconMic size={30} />
+          </span>
+          <span className="mic-button-label">Talk to Sara</span>
         </button>
         <LanguagePicker
           className="village-simple-langs"
@@ -354,7 +357,7 @@ export function OurVillage() {
                   : 'Open the waste camera.'
               }
             >
-              <IconCamera size={16} /> Open camera
+              <IconCamera size={16} /> Identify waste
             </button>
           </div>
           {physicalDisabled && (
@@ -407,8 +410,7 @@ export function OurVillage() {
         {stateLine(windVolts ? `${windVolts} V` : 'No reading', 'neutral')}
         {windFitted ? (
           <p className="vcard-note">
-            A generator's voltage alone; current needs a second input this board does not have
-            free.
+            Voltage measured; power is not measured.
           </p>
         ) : null}
       </article>

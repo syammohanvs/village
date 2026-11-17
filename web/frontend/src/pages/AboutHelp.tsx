@@ -197,7 +197,7 @@ export function AboutHelp() {
             Look at the cards on <Link to="/">Our Village</Link> — watering, rain water tank,
             lights, waste, solar and wind. Every card is one row: its name and state on the left,
             then its reading, then its control where it has one — the pump&apos;s
-            <em>Auto / On / Off</em>, the lamps&apos;, or <em>Open camera</em>.
+            <em>Auto / On / Off</em>, the lamps&apos;, or <em>Identify waste</em>.
           </li>
           <li>
             On <Link to="/">Our Village</Link>, choose <em>Automatic</em> for the streetlights, then
@@ -231,8 +231,9 @@ export function AboutHelp() {
               waste apart — plastic and paper are both dry waste.
             </span>
           </li>
-          <li>Press the microphone at the top of <Link to="/">Our Village</Link> and say “turn on the
-            lights”. The language buttons sit directly under it.</li>
+          <li>Press <strong>Talk to Sara</strong> at the top of <Link to="/">Our Village</Link> — the
+            microphone with its name under it — and say “turn on the lights”. The language buttons
+            sit directly under it, and the panel opens with three examples to try.</li>
           <li>Open <Link to="/activity">What Happened</Link> to read why each action happened.</li>
         </ol>
         {rows.length === 0 && (

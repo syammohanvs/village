@@ -11,9 +11,10 @@ import { LIVE_COPY, VOICE_GREETING, describeVillage, inScript } from '../lib/lia
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
 import type { DeviceStatus, VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
-import { IconClose, IconMic, IconPlug, IconSpeaker, IconSparkle } from './Icons';
+import { IconClose, IconMic, IconPlug, IconSpeaker } from './Icons';
 import { LanguagePicker } from './LanguagePicker';
 import { VOICE_EXAMPLES, VOICE_LANGUAGE_NAMES } from '../lib/voiceExamples';
+import { VOICE_COPY, actionWords } from '../lib/voiceCopy';
 
 const ALLOWED_COMMANDS = new Set([
   'LIGHTS_ON',
@@ -82,7 +83,7 @@ function utteranceId(text: string, stamp: number): string {
 
 const MAX_SECONDS = 10;
 
-type VoiceState = 'idle' | 'listening' | 'processing' | 'success' | 'rejected' | 'disconnected';
+type VoiceState = 'idle' | 'listening' | 'processing' | 'sending' | 'success' | 'rejected' | 'disconnected';
 
 function intentLabel(intent: VoiceIntent, language: string): string {
   if (typeof intent.label === 'string') return intent.label;
@@ -259,11 +260,10 @@ export function VoicePanel() {
   async function start() {
     if (state === 'listening' || state === 'processing' || speaking) return;
     setMicError('');
-    setMessage('');
-    setTranscript('');
-    setResult(null);
-    setOutcome(null);
     setTtsNote('');
+    // The previous sentence and reply stay until this one replaces them: a
+    // panel that blanks itself the moment the microphone opens makes the
+    // visitor lose the answer they were reading.
     try {
       const recorder = new VoiceRecorder();
       await recorder.start();
@@ -328,6 +328,34 @@ export function VoicePanel() {
           const irrigation = villageStatus.irrigation;
           const running = irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
           reply = running ? copy.pumpOn : copy.pumpOff;
+        } else if (intent === 'WATER_STATUS') {
+          // The catalogue's answer is generic ("the dashboard shows which"),
+          // which is no use to somebody standing in front of the panel.  The
+          // frame is right here, so answer from it.
+          const tank = villageStatus.sensors?.reservoir;
+          reply =
+            tank?.state === 'available'
+              ? copy.tankAvailable
+              : tank?.state === 'low'
+                ? copy.tankLow
+                : tank?.state === 'uncalibrated'
+                  ? copy.tankUncalibrated
+                  : copy.tankUnavailable;
+        } else if (intent === 'SOIL_STATUS') {
+          const soil = villageStatus.sensors?.soil;
+          // The sentence already ends with "%", so this is the number only.
+          const pct =
+            soil?.calibrated && soil.percent != null ? `${Math.round(soil.percent)}` : '';
+          reply =
+            soil?.state === 'dry'
+              ? copy.soilDry(pct)
+              : soil?.state === 'adequate'
+                ? copy.soilAdequate(pct)
+                : soil?.state === 'wet'
+                  ? copy.soilWet(pct)
+                  : soil?.state === 'uncalibrated'
+                    ? copy.soilUncalibrated
+                    : copy.soilUnavailable;
         } else if (intent === 'VILLAGE_STATUS') {
           const live = describeVillage(
             { status: villageStatus, connected, stale, ageMs, demo: villageDemo },
@@ -377,7 +405,7 @@ export function VoicePanel() {
       return;
     }
 
-    setState('success');
+    setState('sending');
     setMessage(
       response.pending_text ??
         response.message ??
@@ -400,6 +428,8 @@ export function VoicePanel() {
             ?? 'The controller did not confirm the action. Do not assume anything happened.',
         );
       } else if (commandOutcome.status === 'duplicate') {
+        // A repeated id is a real answer: the first decision stands.
+        setState('success');
         setMessage(
           commandOutcome.reason ?? 'This command was already processed. The original decision stands.',
         );
@@ -407,6 +437,7 @@ export function VoicePanel() {
         // The pending sentence is true only while it is being sent; once the
         // controller acknowledges, the panel must state the new state, not the
         // intention.
+        setState('success');
         setMessage(
           response.done_text ||
             response.response_text ||
@@ -518,6 +549,9 @@ export function VoicePanel() {
         ? 'off'
         : 'ready';
 
+  const copy = VOICE_COPY[language] ?? VOICE_COPY.en;
+  const examples = VOICE_EXAMPLES[language] ?? VOICE_EXAMPLES.en;
+
   const blocker = !micSupported
     ? 'This browser cannot record audio, so spoken commands are unavailable here. Use the buttons on the cards instead.'
     : speechState === 'off'
@@ -533,41 +567,81 @@ export function VoicePanel() {
   // microphone (reported 2026-11-17, with the board powered off).
   const offlineNote =
     !demo && !connected
-      ? 'The board is not answering. You can still speak and see what the village understood, but nothing will move until it reconnects.'
+      ? 'The board is not answering. You can still speak, but nothing will move until it reconnects.'
       : '';
 
   const supported = micSupported && speechState !== 'off' && speechState !== 'unknown';
-  const disabled = speaking || state === 'processing' || !supported;
-  const helpIntents = orderedIntents(intents.data);
+  const busy = state === 'processing' || state === 'sending';
+  const disabled = speaking || busy || !supported;
   const unavailable = new Set(readiness.data?.unavailable_languages ?? []);
-  // Prose uses the English name (the pills already show each language naming
-  // itself), so a sentence does not switch script halfway through.
-  const languageLabel = VOICE_LANGUAGE_NAMES[language] ?? 'English';
-  const examples = VOICE_EXAMPLES[language] ?? VOICE_EXAMPLES.en;
-  // Four phrases fit beside the microphone on a 768 px laptop; the rest are a
-  // folded list rather than a scrollbar inside a panel.
-  const visibleIntents = helpIntents.slice(0, 4);
-  const moreIntents = helpIntents.slice(4);
-  // Exactly what the panel will send: the typed box while it has something in
-  // it (it clears once the answer arrives), else the sentence Whisper heard.
+
+  // The three examples a visitor is shown are the headline ones; "More
+  // examples" is the parser's own catalogue, minus anything already above it.
+  const headlineIntents = new Set(examples.map((example) => example.intent));
+  const moreIntents = orderedIntents(intents.data).filter(
+    (intent) => !headlineIntents.has(intent.id),
+  );
+
+  // Whichever sentence is in front of the visitor right now.
   const typedNow = typed.trim();
   const staged = typedNow || transcript;
+
   // Whisper can answer in another script even when told which language it is:
   // Malayalam audio came back in Tamil script here (2026-11-17).  Saying that
   // is more useful than a generic "not understood", and the sentence stays on
-  // screen so the reader can see what was actually heard.
-  // Only worth saying when the village did not understand it: the parser
-  // reads a sister script by sound now, so a Tamil spelling of a Malayalam
-  // command is acted on, and an apology over a command that worked would be
-  // its own confusion.
-  const unclear =
-    !result || result.status === 'unknown' || result.status === 'unsupported';
+  // screen so the reader can see what was actually heard.  The parser reads a
+  // sister script by sound now, so the note waits until the village really did
+  // not understand it.
+  const unclear = !result || result.status === 'unknown' || result.status === 'unsupported';
   const wrongScript =
     !typedNow &&
     Boolean(transcript) &&
     language !== 'en' &&
     !inScript(transcript, language) &&
     unclear;
+
+  // One short word for "what is happening", so the six states are told apart
+  // by text and not only by colour.
+  const stateWord =
+    state === 'listening'
+      ? copy.states.listening
+      : state === 'processing'
+        ? copy.states.understanding
+        : state === 'sending'
+          ? copy.states.sending
+          : state === 'disconnected'
+            ? copy.states.notConnected
+            : state === 'rejected'
+              ? copy.states.blocked
+              : state === 'success'
+                ? outcome?.status === 'confirmed'
+                  ? copy.states.confirmed
+                  : copy.states.answer
+                : '';
+  const stateTone =
+    state === 'rejected'
+      ? 'is-blocked'
+      : state === 'disconnected'
+        ? 'is-offline'
+        : state === 'success' && outcome?.status === 'confirmed'
+          ? 'is-ok'
+          : state === 'listening'
+            ? 'is-live'
+            : '';
+
+  const readinessWord = demo
+    ? copy.states.simulation
+    : !micSupported
+      ? copy.states.noMic
+      : !connected
+        ? copy.states.offline
+        : speechState === 'off'
+          ? copy.states.serviceOff
+          : speechState === 'unknown'
+            ? copy.states.unchecked
+            : speechState === 'checking'
+              ? copy.states.checking
+              : copy.states.ready;
 
   if (!open) return null;
 
@@ -576,7 +650,7 @@ export function VoicePanel() {
       className="voice-panel"
       role="dialog"
       aria-modal="true"
-      aria-label="Voice command"
+      aria-labelledby="voice-panel-title"
       tabIndex={-1}
       ref={panelRef}
       data-testid="voice-panel"
@@ -587,15 +661,14 @@ export function VoicePanel() {
             <IconMic size={18} />
           </span>
           <div>
-            <h2 className="voice-title">Talk to the village</h2>
-            <p className="voice-subtitle">
-              Say one short command in {languageLabel}, or type it below. Speech is recognised on
-              this laptop.
-            </p>
+            <h2 className="voice-title" id="voice-panel-title">
+              {copy.title}
+            </h2>
+            <p className="voice-subtitle">{copy.intro}</p>
           </div>
         </div>
         <button
-          className="icon-btn"
+          className="icon-btn voice-close"
           type="button"
           onClick={closePanel}
           aria-label="Close voice panel"
@@ -604,57 +677,53 @@ export function VoicePanel() {
         </button>
       </header>
 
-      <div className="voice-readiness" data-testid="voice-readiness">
-        <span
-          className={cx(
-            'chip',
-            demo
-              ? 'chip--warn'
-              : blocker
-                ? 'chip--bad'
-                : speechState === 'checking'
-                  ? 'chip--neutral'
-                  : 'chip--live',
+      {/* 1. The language and the state it will be spoken in, on one line. */}
+      <div className="voice-topline">
+        <LanguagePicker
+          options={VOICE_LANGUAGES.map((entry) => ({
+            code: entry.code,
+            label: entry.label,
+            note: unavailable.has(entry.code) ? 'understood, not spoken' : undefined,
+          }))}
+          value={language}
+          onChange={(code) => setLanguage(code as VoiceLanguage)}
+          label="Spoken language"
+          disabled={state === 'listening' || busy}
+          testId="voice-lang"
+        />
+        <div className="voice-readiness" data-testid="voice-readiness">
+          <span
+            className={cx(
+              'chip',
+              demo
+                ? 'chip--warn'
+                : blocker
+                  ? 'chip--bad'
+                  : speechState === 'checking'
+                    ? 'chip--neutral'
+                    : 'chip--live',
+            )}
+          >
+            {readinessWord}
+          </span>
+          {demo && (
+            <p className="voice-sim" data-testid="voice-simulation">
+              {copy.simulation}
+            </p>
           )}
-        >
-          {demo
-            ? 'Simulation'
-            : !micSupported
-              ? 'No microphone'
-              : !connected
-                ? 'Board offline'
-                : speechState === 'checking'
-                  ? 'Checking speech…'
-                  : speechState === 'unknown'
-                    ? 'Speech not checked'
-                    : speechState === 'off'
-                      ? 'Speech service unavailable'
-                      : 'Speech ready'}
-        </span>
-        {blocker && <p className="voice-blocker">{blocker}</p>}
-        {!blocker && offlineNote && (
-          <p className="voice-blocker voice-blocker--warn" data-testid="voice-offline-note">
-            {offlineNote}
-          </p>
-        )}
-        {!blocker && villageLoading && (
-          <p className="voice-blocker">Waiting for the first reading from the board…</p>
-        )}
+          {blocker && <p className="voice-blocker">{blocker}</p>}
+          {!blocker && offlineNote && (
+            <p className="voice-blocker voice-blocker--warn" data-testid="voice-offline-note">
+              {offlineNote}
+            </p>
+          )}
+          {!blocker && villageLoading && (
+            <p className="voice-blocker">Waiting for the first reading from the board…</p>
+          )}
+        </div>
       </div>
 
-      <LanguagePicker
-        options={VOICE_LANGUAGES.map((entry) => ({
-          code: entry.code,
-          label: entry.label,
-          note: unavailable.has(entry.code) ? 'understood, not spoken' : undefined,
-        }))}
-        value={language}
-        onChange={(code) => setLanguage(code as VoiceLanguage)}
-        label="Spoken language"
-        disabled={state === 'listening' || state === 'processing'}
-        testId="voice-lang"
-      />
-
+      {/* 2. Start or stop speaking. */}
       <div className={cx('voice-stage', state === 'listening' && 'is-listening')}>
         <button
           type="button"
@@ -664,7 +733,7 @@ export function VoicePanel() {
             else void start();
           }}
           disabled={disabled && state !== 'listening'}
-          aria-label={state === 'listening' ? 'Stop Recording' : 'Start Speaking'}
+          aria-label={state === 'listening' ? copy.stop : copy.start}
           title={disabled && blocker ? blocker : undefined}
           data-testid="voice-start"
         >
@@ -679,20 +748,16 @@ export function VoicePanel() {
           </span>
           <span className="ptt-copy">
             <span className="ptt-label">
-              {state === 'listening'
-                ? 'Stop Recording'
-                : speaking
-                  ? 'Playing the reply…'
-                  : 'Start Speaking'}
+              {state === 'listening' ? copy.stop : speaking ? copy.states.listening : copy.start}
             </span>
             <span className="ptt-hint">
               {state === 'listening'
-                ? `${elapsed.toFixed(1)}s of ${MAX_SECONDS}s — press to finish`
+                ? `${elapsed.toFixed(1)}s / ${MAX_SECONDS}s · ${copy.stop}`
                 : blocker
                   ? // Named here, at the control that is off, not only in the
                     // status chip above it.
                     'The microphone is off — see the reason above.'
-                  : `Up to ${MAX_SECONDS} seconds, then it stops by itself.`}
+                  : copy.pttHint}
             </span>
           </span>
         </button>
@@ -703,95 +768,50 @@ export function VoicePanel() {
               <span className="wave" aria-hidden="true">
                 <i /> <i /> <i /> <i />
               </span>
-              Listening — speak one short command.
+              {copy.listening}
             </p>
           )}
-          {state === 'processing' && <p>Understanding your words…</p>}
           {micError && <p className="error-text">{micError}</p>}
           {ttsNote && <p className="hint">{ttsNote}</p>}
         </div>
       </div>
 
-      {/*
-        Asked for 2026-11-17: the panel must say, in words, what it is about to
-        send.  It used to show the sentence only after the round trip and below
-        the type box, which read as a leftover rather than as the payload.
-      */}
-      <div className="voice-staged" data-testid="voice-staged">
-        <p className="eyebrow">What will be sent</p>
-        {state === 'listening' ? (
-          <p className="voice-heard" data-testid="voice-staged-text">
-            Listening — the sentence appears here the moment you stop.
+      {/* 3 and 4. What was said, and what Sara answered.  Both stay on screen
+          until a newer request replaces them. */}
+      <div className="voice-said">
+        <section className="voice-block" data-testid="voice-staged">
+          <p className="eyebrow">{copy.request}</p>
+          <p className={cx('voice-heard', !staged && 'is-empty')} data-testid="voice-staged-text">
+            {staged ? `“${staged}”` : state === 'listening' ? copy.listening : copy.requestEmpty}
           </p>
-        ) : staged ? (
-          <>
-            <p className="voice-heard" data-testid="voice-staged-text">
-              “{staged}”
+          {wrongScript && (
+            <p className="voice-blocker" data-testid="voice-script-note">
+              The speech model did not hear {VOICE_LANGUAGE_NAMES[language] ?? language} clearly —
+              that is not {VOICE_LANGUAGE_NAMES[language] ?? language} script. Say it again a little
+              slower, or type it below.
             </p>
-            <p className="hint">
-              {typedNow
-                ? 'This is exactly what Send gives the village.'
-                : 'This is the sentence the village was given — Whisper only changes how the words arrive.'}
-            </p>
-            {wrongScript && (
-              <p className="voice-blocker" data-testid="voice-script-note">
-                The speech model did not hear {VOICE_LANGUAGE_NAMES[language] ?? language} clearly —
-                that is not {VOICE_LANGUAGE_NAMES[language] ?? language} script. Say it again a
-                little slower, or type it below.
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="voice-heard" data-testid="voice-staged-text">
-            Nothing yet — speak, or type below, and the sentence appears here.
-          </p>
-        )}
-      </div>
-
-      <form className="voice-type" onSubmit={(event) => void submitTyped(event)}>
-        <label className="eyebrow" htmlFor="voice-text">
-          Or type it
-        </label>
-        <div className="voice-type-row">
-          <input
-            id="voice-text"
-            className="input"
-            data-testid="voice-text"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            placeholder="e.g. please switch the lights off"
-            disabled={state === 'processing' || speaking}
-            autoComplete="off"
-            enterKeyHint="send"
-          />
-          <button
-            className="btn btn--primary"
-            type="submit"
-            data-testid="voice-send"
-            disabled={!typed.trim() || state === 'processing' || speaking}
-          >
-            Send
-          </button>
-        </div>
-        <p className="hint">
-          Typed words use the same rules as speech. A question, a refusal or an unclear
-          request never sends anything.
-        </p>
-      </form>
-
-      {result && (
-        <div className="voice-result">
-          <div className="voice-result-row">
-            <span className="eyebrow">Intent</span>
-            <span className="chip chip--neutral">
-              {result.intent ?? 'not matched'}
-              {result.kind ? ` · ${result.kind}` : ''}
-            </span>
-            {result.command && <span className="chip chip--gold">command: {result.command}</span>}
-          </div>
-          {message && (
-            <p className={cx('voice-message', state === 'rejected' && 'is-rejected')}>{message}</p>
           )}
+        </section>
+
+        <section className="voice-block voice-block--reply" data-testid="voice-reply">
+          <div className="voice-block-head">
+            <p className="eyebrow">{copy.reply}</p>
+            {stateWord && (
+              <span className={cx('voice-state-word', stateTone)} data-testid="voice-state-word">
+                {stateWord}
+              </span>
+            )}
+          </div>
+          <p
+            className={cx(
+              'voice-message',
+              !message && 'is-empty',
+              state === 'rejected' && 'is-rejected',
+            )}
+            data-testid="voice-reply-text"
+          >
+            {message || copy.replyEmpty}
+          </p>
           {outcome && (
             <p
               className={cx(
@@ -802,83 +822,73 @@ export function VoicePanel() {
               )}
               data-testid="voice-command-outcome"
             >
-              Command {outcome.status}
-              {outcome.reasonCode ? ` · ${outcome.reasonCode}` : ''}
-              {outcome.reason ? ` — ${outcome.reason}` : ''}
+              {/* The state word is already on the row above; this line is the
+                  controller's own reason, in words — never a reason code. */}
+              {outcome.reason || stateWord}
             </p>
           )}
-        </div>
-      )}
+        </section>
+      </div>
 
-      <div className="voice-help">
-        <div className="voice-help-head">
-          <div>
-            <p className="eyebrow">Say one of these</p>
-            <p className="voice-help-note">
-              {helpIntents.length > 0
-                ? `${helpIntents.length} commands are understood in ${languageLabel}.`
-                : `Example commands in ${languageLabel}.`}
-            </p>
-          </div>
+      {/* 5. The keyboard route to the same parser. */}
+      <form className="voice-type" onSubmit={(event) => void submitTyped(event)}>
+        <label className="eyebrow" htmlFor="voice-text">
+          {copy.typed}
+        </label>
+        <div className="voice-type-row">
+          <input
+            id="voice-text"
+            className="input"
+            data-testid="voice-text"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            placeholder={examples[0]?.phrase ?? ''}
+            disabled={busy || speaking}
+            autoComplete="off"
+            enterKeyHint="send"
+          />
+          <button
+            className="btn btn--primary"
+            type="submit"
+            data-testid="voice-send"
+            disabled={!typed.trim() || busy || speaking}
+          >
+            {copy.send}
+          </button>
         </div>
-        {helpIntents.length > 0 ? (
-          <>
-            <ul>
-              {visibleIntents.map((intent) => (
+        <p className="hint">{copy.typedHelper}</p>
+      </form>
+
+      {/* 6. Three useful sentences, then the rest on request. */}
+      <div className="voice-help">
+        <p className="eyebrow">{copy.examples}</p>
+        <ul className="voice-examples">
+          {examples.map((example) => (
+            <li key={example.intent}>
+              <span className="help-phrase">“{example.phrase}”</span>
+              <span className="help-note">{example.explanation}</span>
+            </li>
+          ))}
+        </ul>
+        {moreIntents.length > 0 && (
+          <details className="voice-more">
+            <summary>{copy.moreExamples}</summary>
+            <ul className="voice-more-list">
+              {moreIntents.map((intent) => (
                 <li key={intent.id}>
                   <span className="help-label">{intentLabel(intent, language)}</span>
                   <span className="help-phrase">
-                    {intentPhrases(intent, language)[0]
-                      ? `“${intentPhrases(intent, language)[0]}”`
-                      : intent.id}
-                    {intent.command ? <em> · sends {intent.command}</em> : <em> · answer only</em>}
+                    “{intentPhrases(intent, language)[0] ?? intentLabel(intent, language)}”
                   </span>
+                  <span className="help-note">{actionWords(copy, intent.command)}</span>
                 </li>
               ))}
             </ul>
-            {moreIntents.length > 0 && (
-              <details className="voice-more">
-                <summary>More phrases ({moreIntents.length})</summary>
-                <ul>
-                  {moreIntents.map((intent) => (
-                    <li key={intent.id}>
-                      <span className="help-label">{intentLabel(intent, language)}</span>
-                      <span className="help-phrase">
-                        {intentPhrases(intent, language)[0]
-                          ? `“${intentPhrases(intent, language)[0]}”`
-                          : intent.id}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
-        ) : (
-          <ul>
-            {examples.map((example) => (
-              <li key={example.label}>
-                <span className="help-label">{example.label}</span>
-                <span className="help-phrase">“{example.phrase}”</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {helpIntents.length === 0 && (
-          <p className="hint">
-            The full phrase list needs the local service. These examples are the words the parser
-            accepts, so they work when it returns.
-          </p>
+          </details>
         )}
       </div>
 
-      <footer className="voice-foot">
-        <IconSparkle size={15} />
-        <span>
-          Speech recognition runs on this laptop. Spoken replies use this browser&apos;s own voice
-          {speechSupported() ? '' : ' (not available here, so replies are text only)'}.
-        </span>
-      </footer>
+      <p className="voice-privacy">{copy.privacy}</p>
     </section>
   );
 }

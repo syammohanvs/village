@@ -95,14 +95,21 @@ export function KioskLayout() {
 
         <div className="kiosk-modes">
           <ModeSwitch value={mode} onChange={choose} testUnavailable={testUnavailable} />
-          {/* Said out loud only where it is something to fix.  In Simulation
-              the answer is on the knob itself ("switch to Live"), so a
-              permanent sentence under it would be furniture. */}
-          {testUnavailable && mode !== 'simulation' && (
+          {/* One line under the knob, and it is always about what the current
+              stop means.  Signed "Simulation" in the pill alone left a visitor
+              to work out that the model does not respond; a judge reading
+              invented numbers as measurements is the one mistake this must not
+              allow (asked for 2026-11-17).  It is not a banner: it sits under
+              the control that chose the state. */}
+          {mode === 'simulation' ? (
+            <p className="kiosk-note" data-testid="mode-note">
+              Simulation — physical model is not controlled.
+            </p>
+          ) : testUnavailable ? (
             <p className="kiosk-note" data-testid="mode-note">
               {testUnavailable}
             </p>
-          )}
+          ) : null}
         </div>
         {warning && (
           <p className="kiosk-note kiosk-note--warn" role="alert" data-testid="mode-warning">

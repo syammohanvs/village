@@ -201,3 +201,20 @@ describe('the single-page exhibit', () => {
     expect(screen.getByTestId('card-plants')).toBeInTheDocument();
   });
 });
+
+describe('the mode knob says what the stop means', () => {
+  it('says Simulation does not control the physical model', async () => {
+    const user = userEvent.setup();
+    await renderExhibit();
+
+    await user.click(screen.getByRole('radio', { name: 'Simulation' }));
+    expect(screen.getByTestId('mode-note')).toHaveTextContent(
+      'Simulation — physical model is not controlled.',
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'Live' }));
+    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live');
+    // The sentence belongs to Simulation; Live says nothing extra.
+    expect(screen.queryByTestId('mode-note')).not.toBeInTheDocument();
+  });
+});

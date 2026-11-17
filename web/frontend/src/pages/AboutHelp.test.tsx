@@ -61,9 +61,17 @@ describe('About & Help — the architecture it states', () => {
     ).toBeInTheDocument();
   });
 
-  it('sends a visitor to the microphone, not to a button called Start Speaking', async () => {
+  it('sends a visitor to Talk to Sara, not to a button called Start Speaking', async () => {
+    // The microphone has a visible name now (asked for 2026-11-17), so the
+    // manual has to use it: "press the microphone" made a child hunt for a
+    // glyph that the page labels.
     render(<App />);
-    expect(await screen.findByText(/microphone at the top of/i)).toBeInTheDocument();
+    // "Talk to Sara" is the page's own button as well as the microphone's
+    // label, so this asserts the sentence rather than a count of the words.
+    expect(
+      (await screen.findAllByText(/microphone with its name under it/i)).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Talk to Sara/i }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Start Speaking/)).not.toBeInTheDocument();
   });
 });

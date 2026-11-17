@@ -108,6 +108,32 @@ visitors cannot be used to press **Water** or change calibration.
   soil's own reading, prefixed with **Soil:** — unprefixed, "Idle · Not
   calibrated" read as one confused state.  `soilPercent` already carries its
   `%`, so appending another printed `Dry · 28%%` on any calibrated probe.
+- **The panel has its own words, in all three languages (2026-11-17).** All
+  strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
+  intro, section headings, short state words, plain action wording) and are
+  checked complete for `en`/`ml`/`hi` by `voiceCopy.test.ts`. Nothing internal
+  may reach a visitor: no command ids, no `sends LIGHTS_ON`, no confidence and
+  no parser rules. Order is fixed — language + state (with the Simulation
+  sentence), Start/Stop speaking, **Your request**, **Sara's reply**, typed
+  input, three examples + **More examples** — and only the examples area
+  scrolls, so the reply never leaves the screen.
+- **The three examples are tested against the real parser.** They live in
+  `web/frontend/src/lib/voiceExamples.ts` and
+  `web/backend/tests/test_voice_examples.py` reads that file and sends every
+  phrase through `IntentMatcher` in its own language, expecting the intent the
+  file claims. An example nobody understands fails a test. Malayalam and Hindi
+  cannot use the English sentences verbatim: “മണ്ണിലെ ഈർപ്പം” and “मिट्टी की नमी”
+  come back AMBIGUOUS, so the examples use “മണ്ണ് നനവുണ്ടോ?” and “मिट्टी की
+  स्थिति” — do not "tidy" them back to the literal translations.
+- **A status question is answered from the frame, not from the catalogue.** The
+  catalogue's WATER_STATUS/SOIL_STATUS replies only say "the dashboard shows
+  which", so the panel answers from `sensors.reservoir` / `sensors.soil` using
+  `LIVE_COPY` — in the visitor's language, and without inventing a percentage
+  when the probe is uncalibrated. `soilDry(pct)` templates already carry the
+  `%`: pass the number only (a doubled `%%` shipped once).
+- **Sara's reply and the request stay on screen while a new recording starts**,
+  and closing the panel mid-recording cancels the recorder. A reply is only
+  replaced by a newer request.
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 - **Simulation-only lab controls** on Our Village: the light-level slider

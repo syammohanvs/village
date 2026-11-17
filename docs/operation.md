@@ -106,11 +106,13 @@ The full guide, including how to edit its sentences, is in
 - **Bins** — one indicator LED per category. No fill level is measured or shown.
 - **Connection** — live, stale, disconnected, last update and last error.
 - **AI services** — whether Whisper and the waste model are ready.
+- **Talk to Sara** — the microphone at the top, with its name under it. The
+  panel it opens is described under *Voice commands* below.
 - **Recent activity** — commands, recognitions, alerts and connection events.
 
 Every card is **one row**: the name and its state chip on the left, then the
 reading, then the control where the card has one (the pump's Auto / On / Off,
-the lamps', or **Open camera**). Solar and Wind read as a single line too —
+the lamps', or **Identify waste**). Solar and Wind read as a single line too —
 `2.40 V · 1.52 mA · 3.6 mW` — and below about 900 px wide each row wraps back to
 the column layout.
 
@@ -134,10 +136,14 @@ water physically flowed. The dashboard keeps the two statements separate.
    prediction lights the plastic LED. Move it away; show that repeated frames
    do not count as new items. Point out that recognition is not proof of
    disposal.
-5. **Voice.** Press the microphone at the top of **Our Village** (the language
-   choices sit directly under it if a visitor wants another language first),
-   speak one command, show the recognised text and the matched command. Try “do not start irrigation” to show that a
-   negated request is refused without action.
+5. **Voice.** Press **Talk to Sara** at the top of **Our Village** — the
+   microphone with its name under it, the language choices directly beneath.
+   The panel opens with **Try saying…** and three examples that work, each
+   explained in plain words (“Please turn on the lights.” — turns the
+   streetlights on). Speak one of them, then show **Your request** (what was
+   heard) beside **Sara's reply**. Try “do not start irrigation” to show that a
+   negated request is refused without action, and “can you turn off the
+   lights?” to show that a polite question is a command.
 6. **What Happened.** Show the command log and the recognition event.
    **The connection state is reported in exactly one place**, the pill in the top
    bar: Live / Stale / Offline / Simulation, with the raw reason (and the last
@@ -183,9 +189,37 @@ Supported in English, Malayalam and Hindi:
 
 Push-to-talk is deliberate: the app does not listen continuously. It rejects
 unsupported, ambiguous and negated phrases with the exact support sentence.
+A **polite question is a command** when it asks for an act — “Can you turn off
+the lights?” turns them off — while “should I…” and “what happens if…” are
+advice and move nothing.
 Whisper is speech-to-text only; replies are prepared text, optional local
 recordings, or the browser's own voice. If a language voice is unavailable,
 the app says so rather than using a remote service.
+
+### The panel itself
+
+**Talk to Sara** opens a panel whose order is fixed, so a visitor learns it in
+one go:
+
+1. **The language**, with the state beside it — and in Simulation the sentence
+   *“Simulation — physical model is not controlled.”*
+2. **Start speaking** / **Stop speaking**, with “up to 10 seconds”.
+3. **Your request** — the words that were heard, or *“Your words will appear
+   here.”*
+4. **Sara's reply** — the answer, with one short state word: *Listening*,
+   *Understanding…*, *Sending…*, *Confirmed*, *Answer*, *Blocked*, *Not
+   connected*. The reply stays until a new request replaces it.
+5. **Or type your request**, which goes to the same parser as speech.
+6. **Try saying…** — three examples, then **More examples** (that list scrolls
+   inside itself, so the reply above never moves off screen).
+
+The examples are the three things a visitor actually tries: turn the lights on,
+ask whether the tank has water, ask how wet the soil is. Each is explained in
+plain words, and every one of them is checked against the real parser by the
+backend test suite.
+
+The panel deliberately does **not** show command names, intent ids, confidence
+scores or parser rules. What it shows is what a visitor can act on.
 
 Malayalam and Hindi recognition must be tested with the child's actual speech.
 The phrase dictionary is `shared/intents.json`; add the words the child really

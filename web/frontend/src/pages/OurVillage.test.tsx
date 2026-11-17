@@ -513,3 +513,39 @@ describe('the pump switch', () => {
     expect(screen.getByTestId('pump-manual')).toBeInTheDocument();
   });
 });
+
+/**
+ * The words a visitor reads at the exhibit.  Asked for 2026-11-17: the glyph
+ * alone did not say what it was for, "Open camera" did not say what pressing
+ * it does, and the turbine note explained the board's missing inputs instead of
+ * telling the visitor what is measured.
+ */
+describe('Our Village — the words on the page', () => {
+  it('names the microphone, and keeps it one press target', async () => {
+    await renderReady();
+
+    const mic = await screen.findByTestId('start-voice');
+    expect(mic).toHaveTextContent('Talk to Sara');
+    expect(mic).toHaveAttribute('aria-label', 'Talk to Sara');
+  });
+
+  it('calls the waste button what it does', async () => {
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-waste'));
+    expect(card.getByText('Identify waste')).toBeInTheDocument();
+    expect(card.queryByText('Open camera')).not.toBeInTheDocument();
+  });
+
+  it('says the turbine measures volts and not power', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ windMillivolts: 1200, windInstalled: true }),
+    );
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.getByText('1.20 V')).toBeInTheDocument();
+    expect(card.getByText('Voltage measured; power is not measured.')).toBeInTheDocument();
+    expect(card.queryByText(/second input/i)).not.toBeInTheDocument();
+  });
+});

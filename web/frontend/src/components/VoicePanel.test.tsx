@@ -106,7 +106,8 @@ describe('Voice panel', () => {
 
     const { user, panel } = await openPanel();
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     expect(await screen.findByText('Unsupported request. No command was sent.')).toBeInTheDocument();
     expect(screen.getByText(/open the gate/)).toBeInTheDocument();
@@ -128,7 +129,8 @@ describe('Voice panel', () => {
 
     const { user } = await openPanel();
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     await waitFor(() =>
       expect(api.sendCommand).toHaveBeenCalledWith(
@@ -137,7 +139,12 @@ describe('Voice panel', () => {
     );
     expect(api.sendCommand).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText(/switch off the lights/).length).toBeGreaterThan(0);
-    expect(await screen.findByTestId('voice-command-outcome')).toHaveTextContent(/confirmed/i);
+    // The state word says confirmed; the line under it is the controller's own
+    // reason in plain words, not a code.
+    expect(await screen.findByTestId('voice-state-word')).toHaveTextContent(/confirmed/i);
+    expect(screen.getByTestId('voice-command-outcome')).toHaveTextContent(
+      'The lights were switched off.',
+    );
   });
 });
 
@@ -237,7 +244,8 @@ describe('voice replies', () => {
 
     const { user } = await openPanel();
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     // The frame is available in this test, so the live summary replaces the
     // canned sentence — either way it must not be the generic "does not move
@@ -264,7 +272,8 @@ describe('voice replies', () => {
 
     const { user } = await openPanel();
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     await waitFor(() =>
       expect(speech.speakReply).toHaveBeenCalledWith(
@@ -705,7 +714,8 @@ describe('a transcript that came back in the wrong script', () => {
     const { user, panel } = await openPanel();
     await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     const note = await screen.findByTestId('voice-script-note');
     expect(note).toHaveTextContent(/did not hear Malayalam clearly/i);
@@ -741,7 +751,8 @@ describe('a sister-script transcript the village could still read', () => {
     const { user, panel } = await openPanel();
     await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
     await user.click(screen.getByTestId('voice-start'));
-    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+    // The stop label is in the panel's language, so press the same control.
+    await user.click(screen.getByTestId('voice-start'));
 
     await waitFor(() =>
       expect(api.sendCommand).toHaveBeenCalledWith(
@@ -749,5 +760,164 @@ describe('a sister-script transcript the village could still read', () => {
       ),
     );
     expect(screen.queryByTestId('voice-script-note')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The panel's own words.  Asked for 2026-11-17: a visiting judge has to know
+ * what the panel is for, and a Class 6 child has to be told what to say — so
+ * every heading below is load-bearing, and the example explanations never name
+ * an internal command.
+ */
+describe('the panel in plain words', () => {
+  it('names itself and the two things it is for', async () => {
+    const { panel } = await openPanel();
+
+    expect(within(panel).getByRole('heading', { name: 'Talk to Sara' })).toBeInTheDocument();
+    expect(
+      within(panel).getByText('Ask Sara to control the village or check its status.'),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText('Your request')).toBeInTheDocument();
+    expect(within(panel).getByText('Sara’s reply')).toBeInTheDocument();
+    expect(within(panel).getByText('Or type your request')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('You can type your request instead of speaking.'),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText('Try saying…')).toBeInTheDocument();
+  });
+
+  it('says what it asks before anything has been said', async () => {
+    const { panel } = await openPanel();
+    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent(
+      'Your words will appear here.',
+    );
+    expect(within(panel).getByTestId('voice-reply-text')).toHaveTextContent(
+      'Sara’s answer will appear here.',
+    );
+  });
+
+  it('opens on three supported examples, each explained without a command id', async () => {
+    const { panel } = await openPanel();
+    const help = within(panel).getByText('Try saying…').closest('.voice-help') as HTMLElement;
+
+    expect(within(help).getByText('“Please turn on the lights.”')).toBeInTheDocument();
+    expect(within(help).getByText('Turns the streetlights on.')).toBeInTheDocument();
+    expect(within(help).getByText('“Is water available?”')).toBeInTheDocument();
+    expect(within(help).getByText('Tells you whether the tank has water.')).toBeInTheDocument();
+    expect(within(help).getByText('“What is the soil moisture?”')).toBeInTheDocument();
+    expect(within(help).getByText('Reads how wet the soil is.')).toBeInTheDocument();
+
+    // What a visitor must never be shown: the wire names, or a claim that a
+    // question does nothing (a polite question *is* a command).
+    expect(help.textContent).not.toMatch(/LIGHTS_ON|IRRIGATION_|sends /i);
+  });
+
+  it('puts the rest behind More examples, and still explains them in words', async () => {
+    const { user, panel } = await openPanel();
+
+    await user.click(within(panel).getByText('More examples'));
+    expect(within(panel).getByText('Turns the streetlights off.')).toBeInTheDocument();
+    expect(panel.textContent).not.toMatch(/LIGHTS_OFF|sends /i);
+  });
+
+  it('translates every heading and example into the chosen language', async () => {
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+
+    expect(within(panel).getByRole('heading', { name: 'സാറയോട് സംസാരിക്കുക' })).toBeInTheDocument();
+    expect(within(panel).getByText('നിങ്ങളുടെ അഭിവാദനം'.replace('അഭിവാദനം', 'അഭ്യർത്ഥന'))).toBeInTheDocument();
+    expect(within(panel).getByText('സാറയുടെ മറുപടി')).toBeInTheDocument();
+    expect(within(panel).getByText('ഇത് പറഞ്ഞു നോക്കൂ…')).toBeInTheDocument();
+    expect(within(panel).getByText('“ദയവായി വിളക്കുകൾ കത്തിക്കുക”')).toBeInTheDocument();
+  });
+
+  it('says Simulation means the model is not controlled', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
+    const { panel } = await openPanel();
+
+    expect(within(panel).getByTestId('voice-simulation')).toHaveTextContent(
+      'Simulation — physical model is not controlled.',
+    );
+  });
+
+  it('answers a water question from the frame, not from a canned sentence', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'status',
+      intent: 'WATER_STATUS',
+      command: null,
+      message: 'The dashboard shows which.',
+    } as never);
+    const { user, panel } = await openPanel();
+
+    await user.type(within(panel).getByTestId('voice-text'), 'is water available');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'There is water at the low level in the tank.',
+    );
+  });
+
+  it('answers a soil question with the reading the card shows', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ soilPercent: 27.6, soilState: 'dry' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'status',
+      intent: 'SOIL_STATUS',
+      command: null,
+    } as never);
+    const { user, panel } = await openPanel();
+
+    await user.type(within(panel).getByTestId('voice-text'), 'soil moisture');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'The soil is dry (28%).',
+    );
+  });
+
+  it('stops listening when the panel is closed mid-recording', async () => {
+    // A microphone left open behind a closed panel records a room without
+    // telling anyone it is doing it (asked for 2026-11-17).
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByTestId('voice-start'));
+    expect(within(panel).getByTestId('voice-start')).toHaveAttribute(
+      'aria-label',
+      'Stop speaking',
+    );
+
+    await user.click(within(panel).getByRole('button', { name: 'Close voice panel' }));
+    await user.click(await screen.findByTestId('start-voice'));
+
+    const reopened = await screen.findByTestId('voice-panel');
+    expect(within(reopened).getByTestId('voice-start')).toHaveAttribute(
+      'aria-label',
+      'Start speaking',
+    );
+  });
+
+  it('keeps the last request and reply while a new recording starts', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      pending_text: 'Turning the streetlights off.',
+      done_text: 'The streetlights are off.',
+    } as never);
+    const { user, panel } = await openPanel();
+
+    await user.type(within(panel).getByTestId('voice-text'), 'lights off');
+    await user.click(within(panel).getByTestId('voice-send'));
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'The streetlights are off.',
+    );
+
+    await user.click(within(panel).getByTestId('voice-start'));
+    expect(within(panel).getByTestId('voice-reply-text')).toHaveTextContent(
+      'The streetlights are off.',
+    );
+    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent('lights off');
   });
 });

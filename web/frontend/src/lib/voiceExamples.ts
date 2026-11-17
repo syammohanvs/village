@@ -1,38 +1,90 @@
 import type { VoiceLanguage } from './voiceUi';
 
 export interface VoiceExample {
+  /** Short name, for the heading of the row. */
   label: string;
+  /** Exactly what to say. */
   phrase: string;
+  /** Plain words for what it does — never a command id. */
+  explanation: string;
+  /** The intent the parser reaches, so the full list can skip a repeat. */
+  intent: string;
 }
 
 /**
- * One source for the offline example list.  The phrases are copied from
- * `shared/intents.json`, which is the catalogue the parser is built from, so
- * the words shown under a Malayalam or Hindi heading are words the parser
- * really accepts — not English shown under a translated title.
+ * The three examples the panel opens with.
  *
- * They are deliberately available with the backend down: the home page
- * invitation and the voice panel both read this list, so a visitor can still
- * be shown what to say when the local service is not running.
+ * Chosen because they are the three things a visitor actually asks at an
+ * exhibition — switch something, ask about water, ask about the soil — and
+ * because **each one was run through the parser before it was written here**.
+ * `VoicePanel.test.tsx` sends every phrase in this file to the real parser, so
+ * an example that stops being understood fails a test instead of quietly
+ * teaching a visitor a sentence that does nothing.
+ *
+ * They are available with the backend down on purpose: the panel is the one
+ * place a visitor is told what to say, and an empty help box during a startup
+ * hiccup reads as "voice does not work".
  */
 export const VOICE_EXAMPLES: Record<VoiceLanguage, VoiceExample[]> = {
   en: [
-    { label: 'Lights on', phrase: 'lights on' },
-    { label: 'Lights off', phrase: 'lights off' },
-    { label: 'Water the plants', phrase: 'start irrigation' },
-    { label: 'Stop watering', phrase: 'stop irrigation' },
+    {
+      label: 'Streetlights on',
+      phrase: 'Please turn on the lights.',
+      explanation: 'Turns the streetlights on.',
+      intent: 'LIGHTS_ON',
+    },
+    {
+      label: 'Water in the tank',
+      phrase: 'Is water available?',
+      explanation: 'Tells you whether the tank has water.',
+      intent: 'WATER_STATUS',
+    },
+    {
+      label: 'Soil moisture',
+      phrase: 'What is the soil moisture?',
+      explanation: 'Reads how wet the soil is.',
+      intent: 'SOIL_STATUS',
+    },
   ],
   ml: [
-    { label: 'വിളക്കുകൾ കത്തിക്കുക', phrase: 'വിളക്കുകൾ കത്തിക്കുക' },
-    { label: 'വിളക്കുകൾ അണയ്ക്കുക', phrase: 'വിളക്കുകൾ അണയ്ക്കുക' },
-    { label: 'നനയ്ക്കാൻ തുടങ്ങുക', phrase: 'നനയ്ക്കാൻ തുടങ്ങുക' },
-    { label: 'നനയ്ക്കുന്നത് നിർത്തുക', phrase: 'നനയ്ക്കുന്നത് നിർത്തുക' },
+    {
+      label: 'വിളക്കുകൾ കത്തിക്കുക',
+      phrase: 'ദയവായി വിളക്കുകൾ കത്തിക്കുക',
+      explanation: 'തെരുവുവിളക്കുകൾ കത്തിക്കുന്നു.',
+      intent: 'LIGHTS_ON',
+    },
+    {
+      label: 'വെള്ളം ഉണ്ടോ',
+      phrase: 'വെള്ളം ഉണ്ടോ?',
+      explanation: 'ടാങ്കിൽ വെള്ളമുണ്ടോ എന്ന് പറയുന്നു.',
+      intent: 'WATER_STATUS',
+    },
+    {
+      label: 'മണ്ണിന്റെ ഈർപ്പം',
+      phrase: 'മണ്ണ് നനവുണ്ടോ?',
+      explanation: 'മണ്ണ് എത്ര നനവുണ്ടെന്ന് പറയുന്നു.',
+      intent: 'SOIL_STATUS',
+    },
   ],
   hi: [
-    { label: 'लाइट चालू करें', phrase: 'लाइट चालू करो' },
-    { label: 'लाइट बंद करें', phrase: 'लाइट बंद करो' },
-    { label: 'पानी देना शुरू करें', phrase: 'पानी देना शुरू करो' },
-    { label: 'पानी देना बंद करें', phrase: 'पानी देना बंद करो' },
+    {
+      label: 'लाइट चालू',
+      phrase: 'कृपया लाइट चालू करें',
+      explanation: 'सड़क की बत्तियाँ चालू करता है।',
+      intent: 'LIGHTS_ON',
+    },
+    {
+      label: 'पानी है क्या',
+      phrase: 'क्या पानी है?',
+      explanation: 'बताता है कि टंकी में पानी है या नहीं।',
+      intent: 'WATER_STATUS',
+    },
+    {
+      label: 'मिट्टी की नमी',
+      phrase: 'मिट्टी की स्थिति',
+      explanation: 'मिट्टी कितनी गीली है, बताता है।',
+      intent: 'SOIL_STATUS',
+    },
   ],
 };
 
