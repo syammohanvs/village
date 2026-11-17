@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .phonetics import romanise, same_word, script_of
+from .phonetics import fold, romanise, same_word, script_of
 
 import json
 import unicodedata
@@ -196,7 +196,8 @@ class IntentMatcher:
         # romanised key of the words against the same vocabulary; if that finds
         # one device and one state, use it.
         script = script_of(transcript)
-        if language in {"ml", "hi"} and script != language:
+        sounds_first = language in {"ml", "hi"} and script != language
+        if sounds_first:
             roman = self._romanised_intent(tokens, language)
             if roman is not None:
                 return roman
@@ -300,6 +301,19 @@ class IntentMatcher:
             # question about which device, not an instruction.
             if device_hits or pronouns:
                 return self._result("ambiguous", language, "clarify_device")
+            # Last chance, and only for a language whose spelling this build
+            # cannot keep up with: a Malayalam sentence the *script* matcher
+            # missed is tried again by sound.  A speech model trained on English
+            # hears "വിളക്കുകൾ" and writes "വിലക്കുകൾ" — one letter apart, and
+            # the whole command is lost (measured 2026-11-18).  This runs only
+            # after the grammar has already found nothing, so ordinary input is
+            # untouched, and `same_word` keeps its own guards (a short word may
+            # not differ by a letter — that is what once turned "switch off"
+            # into "water").
+            if language in {"ml", "hi"} and not sounds_first:
+                roman = self._romanised_intent(tokens, language)
+                if roman is not None:
+                    return roman
             return self._result("unsupported", language, "unknown")
 
         command_for_device = self.device_commands.get(device, {})
@@ -311,6 +325,15 @@ class IntentMatcher:
                 status_command = command_for_device.get("status")
                 if status_command:
                     return self._intent_result(status_command, language, device=device, action="status")
+            # The device was read, the *state* word was not: a Malayalam speech
+            # model writes "ഓട്ടോ" as "ഓത്ടോ" and the action is lost.  Try the
+            # words by sound before answering "which state?" — `_romanised_intent`
+            # still needs exactly one device and one state, and refuses a
+            # question or a negation, so this cannot guess.
+            if language in {"ml", "hi"} and not sounds_first:
+                roman = self._romanised_intent(tokens, language)
+                if roman is not None:
+                    return roman
             if copula and not verb_hits:
                 return self._result("statement", language, "statement", device=device)
             if verb_hits:
@@ -376,11 +399,24 @@ class IntentMatcher:
                 if alias
             )
 
+        # A verb is not a state.  `roman_aliases` splits multi-word aliases so
+        # that "ഓൺ ചെയ്യുക" can be found by sound through either half, but
+        # "ചെയ്യുക" on its own is *the word for doing* and appears in half the
+        # sentences — matching it as "on" made "വിളക്കുകൾ ഓത്ടോ ചെയുക" three
+        # states at once (measured 2026-11-18).  Verb spellings are dropped
+        # from the sound path; the whole alias is kept, and a one-word state
+        # word ("ഓൺ") still matches on its own.
+        verb_sounds = {
+            fold(word) for word in romanise(" ".join(g.get("verbs") or [])).split()
+        }
+
         def roman_aliases(aliases: list[str] | None) -> list[str]:
             out: list[str] = []
             for alias in aliases or []:
                 out.append(alias)
-                out.extend(part for part in romanise(alias).split() if part)
+                for part in romanise(alias).split():
+                    if part and fold(part) not in verb_sounds:
+                        out.append(part)
             return out
 
         # A refusal or a question must never be turned into an action.

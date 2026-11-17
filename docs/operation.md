@@ -379,6 +379,34 @@ whether it is answering). The model is chosen with `VILLAGE_WHISPER_MODEL` in
 | `ggml-large-v3-turbo.bin` | 1.6 GB | 18–25 s here | good | weak, and far too slow |
 | `ggml-large-v3.bin` | 3.1 GB | 25–90 s here | good | not usable on this CPU |
 
+### Malayalam has its own speech model
+
+The multilingual `ggml-base` model cannot write Malayalam.  It hears the sentence
+— the sounds are right — but it spells them in **Tamil letters** (or Devanagari,
+or even Arabic ones) and mangles the less common word, so the parser has nothing
+to match.  Measured through the app's own `/api/v1/voice/transcribe` route on six
+catalogue sentences: **2 of 6**.
+
+So Malayalam is read by a **Whisper-small fine-tuned on Malayalam**
+(`kavyamanohar/whisper-small-malayalam`) in `models/whisper/ml-asr/`, which
+writes Malayalam script and gets the words right: the same six sentences are
+**6 of 6** at about **2.5–3 s each** on this laptop (the first one waits a few
+seconds while the model loads).  `scripts/download_models.sh` fetches it
+(~950 MB, too big for git).
+
+- It is only used for **Malayalam**.  English and Hindi stay on whisper.cpp,
+  which is fast and good at them.
+- If the model is missing, or fails to load, the app **falls back** to
+  whisper-server: a missing model must never stop the exhibit from listening.
+- The language is **always sent**, never detected: the request carries
+  `language=ml`.  Measured directly against the server — the same clip with
+  `language=en` comes back as English ("Vila Google Cut Tikuga"), and a request
+  with the field misspelled (`lang=ml`) is ignored and falls through to
+  auto-detection.  So the field name matters, and it is right.
+- Malayalam gets **no decoder prompt** (see above); the fine-tuned model is given
+  a short list of the village's own phrases instead, which straightens spelling
+  ("വിലക്കുകൾ" → "വിളക്കുകൾ") without pulling the decoder off track.
+
 **Do not give the model a Malayalam prompt.**  The app sends a short Hindi
 prompt because it settles the script for Hindi, but Malayalam is the opposite
 case: measured on the same three sentences, a Malayalam prompt made the model

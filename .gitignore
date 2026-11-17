@@ -27,6 +27,9 @@ models/*
 !models/waste-resnet50/**
 !models/whisper/
 !models/whisper/whisper-server
+# The Malayalam speech model (whisper-small fine-tuned, ~950 MB) is too big for
+# GitHub and is fetched by scripts/download_models.sh like the whisper weights.
+models/whisper/ml-asr/
 
 web/frontend/public/audio/*.wav
 web/frontend/public/audio/*.mp3

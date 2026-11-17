@@ -28,6 +28,34 @@ if [ "$ACTUAL" != "$SHA" ]; then
 fi
 echo "OK: $ACTUAL"
 
+# The Malayalam speech model.  It is what makes a spoken Malayalam sentence
+# usable: the multilingual base model hears the words but writes them in Tamil
+# letters, so the parser has nothing to match (measured 2026-11-18).  ~950 MB,
+# too big for GitHub, fetched from Hugging Face.
+ML_DIR="models/whisper/ml-asr"
+if [ -f "$ML_DIR/model.safetensors" ]; then
+  echo "Malayalam speech model already present: $ML_DIR"
+else
+  echo "Downloading the Malayalam speech model (~950 MB)..."
+  python3 - "$ML_DIR" <<'PY'
+import sys
+from huggingface_hub import snapshot_download
+
+target = sys.argv[1]
+snapshot_download(
+    repo_id="kavyamanohar/whisper-small-malayalam",
+    local_dir=target,
+    allow_patterns=[
+        "config.json", "model.safetensors", "preprocessor_config.json",
+        "tokenizer_config.json", "vocab.json", "merges.txt",
+        "added_tokens.json", "special_tokens_map.json", "normalizer.json",
+        "generation_config.json",
+    ],
+)
+print("done:", target)
+PY
+fi
+
 if [ ! -x models/whisper/whisper-server ] && [ ! -x /tmp/opencode/whisper.cpp/build/bin/whisper-server ]; then
   cat <<'EOF'
 

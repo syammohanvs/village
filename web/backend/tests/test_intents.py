@@ -568,3 +568,42 @@ def test_an_unreadable_pump_command_is_never_answered_as_a_status(
         result = matcher.match(text, "ml")
         assert result["command"] != "IRRIGATION_REQUEST", text
         assert result["intent"] != "PUMP_STATUS", text
+
+
+# ---------------------------------------------------------------------------
+# What the Malayalam speech model actually returns (2026-11-18).
+#
+# `kavyamanohar/whisper-small-malayalam` writes Malayalam script, but a spoken
+# word still comes back spelled the way the model heard it: "വിളക്കുകൾ" as
+# "വിലക്കുകൾ", "ഓട്ടോ" as "ഓത്ടോ", "പമ്പ്" as "പമ്പു".  The parser has to reach
+# the command anyway, which is why a Malayalam sentence gets a second pass **by
+# sound** once the exact-word pass has found nothing.
+# ---------------------------------------------------------------------------
+def test_transcripts_from_the_malayalam_speech_model_are_understood(
+    matcher: IntentMatcher,
+) -> None:
+    cases = (
+        ("തയവായി വിളക്കുകൾ കത്തിക്കുക.", "LIGHTS_ON"),
+        ("വിലക്കുകൾ അനയ്കുക.", "LIGHTS_OFF"),
+        ("മാന്നിൽ എത്താ ഈപ്പമുണ്ട്.", "SOIL_STATUS"),
+        ("റാവ്യില് വേളമുണ്ടോ", "WATER_STATUS"),
+        ("വിളക്കുകൾ ഓത്ടോ ചെയുക.", "LIGHTS_AUTO"),
+        ("പമ്പു ഒപ്ര് ചെയുക.", "IRRIGATION_STOP"),
+    )
+    for text, want in cases:
+        assert matcher.match(text, "ml")["intent"] == want, text
+
+
+def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:
+    """`ചെയ്യുക` ("to do") is in half the sentences.
+
+    It is listed inside the on/off aliases as part of the phrases "ഓൺ ചെയ്യുക" /
+    "ഓഫ് ചെയ്യുക", and the by-sound pass splits aliases into their words — so it
+    matched *both* states and made "വിളക്കുകൾ ഓത്ടോ ചെയുക" three states at once.
+    Verb spellings are now dropped from the by-sound path.
+    """
+    assert matcher.match("വിളക്കുകൾ ഓത്ടോ ചെയുക.", "ml")["intent"] == "LIGHTS_AUTO"
+    # …and the phrases it belongs to still mean what they say.
+    assert matcher.match("പമ്പ് ഓൺ ചെയ്യുക", "ml")["intent"] == "IRRIGATION_START"
+    assert matcher.match("പമ്പ് ഓഫ് ചെയ്യുക", "ml")["intent"] == "IRRIGATION_STOP"
+

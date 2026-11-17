@@ -181,6 +181,29 @@ visitors cannot be used to press **Water** or change calibration.
   (LIGHTS_ON / SOIL_STATUS / WATER_STATUS) through the real
   `/voice/transcribe` route.  `test_the_decoder_is_primed_with_the_language_it_
   should_expect` now asserts **no** prompt for `ml`.
+- **Malayalam is read by its own model, and the language really is forced
+  (2026-11-18).**  The user asked whether we set the language code instead of
+  letting Whisper auto-detect.  We do: `request_fields` always sends
+  `language=<code>`, proven against the server — the same clip with
+  `language=en` answers "Vila Google Cut Tikuga", and `lang=ml` (the wrong field
+  name) is ignored and falls back to auto-detection.  **The language was never
+  the problem; the model was.**  `ggml-base` hears Malayalam and writes it in
+  Tamil/Arabic letters, so `kavyamanohar/whisper-small-malayalam` (a whisper-small
+  fine-tune, `models/whisper/ml-asr/`, ~950 MB, fetched by
+  `scripts/download_models.sh`, git-ignored) now answers Malayalam in
+  `web/backend/app/ml_asr.py`.  Measured through the real
+  `/voice/transcribe` route on six catalogue sentences: **base 2/6**, whisper
+  `small` 3/6 and up to 24 s, the fine-tune **6/6 at 2.5–2.9 s**.  It is used
+  only for `ml`; English and Hindi stay on whisper.cpp, and **any failure falls
+  back** to whisper-server — a missing model must never stop the exhibit
+  listening.  `tests/test_ml_asr.py` pins availability, the language routing and
+  the fallback (the model itself is never loaded in a test).
+  Two parser changes came with it: a Malayalam **second pass by sound** when the
+  exact-word pass finds nothing (the model writes "വിലക്കുകൾ" for "വിളക്കുകൾ"),
+  and `roman_aliases` no longer treats a **verb** spelling as a state — the word
+  "ചെയ്യുക" ("to do") is inside the "ഓൺ ചെയ്യുക"/"ഓഫ് ചെയ്യുക" aliases and made
+  one sentence three states at once.  **`no_repeat_ngram_size` corrupts this
+  model's output** (replacement characters) — do not add it back.
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
   Unicode offset) and romanised, so `വിളക്കുകൾ അണയ്ക്കുക` and

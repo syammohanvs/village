@@ -89,6 +89,11 @@ class Settings:
     disconnect_after_ms: int
     whisper_url: str
     whisper_model_path: Path
+    # A Whisper-small fine-tuned on Malayalam (`models/whisper/ml-asr`).  It is
+    # what makes a spoken Malayalam sentence usable — the multilingual base
+    # model writes Malayalam sounds in Tamil letters (measured 2026-11-18).
+    # Missing, it simply falls back to whisper-server.
+    ml_asr_dir: Path
     whisper_timeout_s: float
     models_dir: Path
     waste_model_dir: Path
@@ -163,6 +168,9 @@ class Settings:
             whisper_url=os.getenv("VILLAGE_WHISPER_URL", "http://127.0.0.1:8080").rstrip("/"),
             whisper_model_path=Path(
                 os.getenv("VILLAGE_WHISPER_MODEL", models / "whisper" / "ggml-base.bin")
+            ),
+            ml_asr_dir=Path(
+                os.getenv("VILLAGE_ML_ASR_DIR", models / "whisper" / "ml-asr")
             ),
             whisper_timeout_s=_float("VILLAGE_WHISPER_TIMEOUT_SECS", 90.0),
             models_dir=models,

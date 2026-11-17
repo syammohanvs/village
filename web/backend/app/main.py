@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import COOKIE_NAME, Sessions, verify_password
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
-from . import waste_resnet
+from . import ml_asr, waste_resnet
 from .device import (
     DeviceError,
     DeviceGateway,
@@ -213,6 +213,9 @@ def create_app(
     tts: PiperTts | None = None,
 ) -> FastAPI:
     settings = settings or Settings.load()
+    # The Malayalam fine-tune, if this machine has it.  `available()` decides;
+    # the route falls back to whisper-server when it does not.
+    ml_asr.configure(settings.ml_asr_dir)
     database = database or Database(settings.db_path)
     gateway = gateway or DeviceGateway(settings)
     voice = voice or WhisperClient(settings)
@@ -874,13 +877,30 @@ def create_app(
         data = await audio.read(settings.voice_max_bytes + 1)
         if len(data) > settings.voice_max_bytes:
             raise HTTPException(status_code=413, detail="recording is too large")
-        try:
-            transcript = await voice.transcribe(data, language)
-            text = transcript["text"]
-        except VoiceError as exc:
-            if exc.code == "NO_SPEECH":
-                return matcher.match("", language)
-            raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message}) from exc
+        # Malayalam first goes to its own model.  The multilingual whisper model
+        # cannot write Malayalam — it spells the sounds in Tamil letters — so a
+        # spoken sentence there was mostly lost (measured 2026-11-18).  Any
+        # failure falls back to whisper-server rather than failing the request:
+        # a missing model must never stop the exhibit from listening.
+        engine = "whisper"
+        text: str | None = None
+        if language == "ml" and ml_asr.available():
+            try:
+                text = await asyncio.to_thread(ml_asr.transcribe, data)
+                engine = "malayalam-asr"
+            except Exception as exc:  # noqa: BLE001 - fall back, never fail
+                log.warning("Malayalam speech model failed (%s); using whisper", exc)
+                text = None
+        if text is None:
+            try:
+                transcript = await voice.transcribe(data, language)
+                text = transcript["text"]
+            except VoiceError as exc:
+                if exc.code == "NO_SPEECH":
+                    return matcher.match("", language)
+                raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message}) from exc
+        elif not text.strip():
+            return matcher.match("", language)
         result = matcher.match(text, language)
         await db.add_event(
             "live" if not settings.device_is_simulator else "live",
@@ -892,7 +912,8 @@ def create_app(
             "info" if result["reason"] == "matched" else "warning",
             "voice",
             {"intent": result["intent"], "reason": result["reason"],
-             "confidence": result["confidence"], "transcript": text, "language": language},
+             "confidence": result["confidence"], "transcript": text,
+             "language": language, "engine": engine},
         )
         result["transcript"] = text
         return result
