@@ -713,3 +713,41 @@ describe('a transcript that came back in the wrong script', () => {
     expect(screen.getByTestId('voice-staged-text')).toHaveTextContent('விலக்குகள்');
   });
 });
+
+describe('a sister-script transcript the village could still read', () => {
+  it('acts on it, and says nothing about the script', async () => {
+    // The backend reads the words by sound now, so a Tamil spelling of a
+    // Malayalam command is carried out.  An apology over a command that
+    // worked would be its own confusion.
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: true }));
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+      transcript: 'விலக்குகள் ஆனக்குக்கா',
+      pending_text: 'Turning the streetlights off.',
+      done_text: 'The streetlights are off.',
+    } as never);
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: true,
+      mode: 'live',
+      physical: true,
+      error: null,
+      ack: { result: 'ACCEPTED', reason_code: 'OK', reason: 'Accepted.' },
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+    await user.click(screen.getByTestId('voice-start'));
+    await user.click(await screen.findByRole('button', { name: /stop recording/i }));
+
+    await waitFor(() =>
+      expect(api.sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'LIGHTS_OFF', source: 'voice' }),
+      ),
+    );
+    expect(screen.queryByTestId('voice-script-note')).not.toBeInTheDocument();
+  });
+});

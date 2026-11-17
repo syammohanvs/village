@@ -1,0 +1,211 @@
+"""Turning a transcript in one Indic script into a coarse Latin key.
+
+Why this exists (2026-11-17): a visitor said **വിളക്കുകൾ അണയ്ക്കുക** ("turn the
+lights off") and the local speech model answered in **Tamil** script —
+விலக்குகள் ஆனக்குக்கா — which is the same sentence, word for word, in a sister
+script.  The parser then refused it as unsupported, because its Malayalam
+vocabulary is written in Malayalam.
+
+The scripts are laid out side by side in Unicode, so the same letter is a fixed
+distance apart:
+
+    Tamil      0B80 + 0x180 -> Malayalam  0D15 (ക), 0BB5 (വ), 0BCD (്)
+    Kannada    0C80 + 0x080 -> Malayalam
+    Telugu     0C00 + 0x100 -> Malayalam
+    Devanagari 0900 + 0x400 -> Malayalam
+    Bengali    0980 + 0x380 -> Malayalam
+
+So the job is: shift the text into Malayalam, romanise it with one table, then
+fold the result hard (drop the glide `y`, collapse doubled letters) so
+`anakkukka` and `anaykkuka` meet.  Only used as a fallback when the transcript
+is in a script the requested language does not use, so ordinary input is
+matched exactly as before.
+"""
+
+from __future__ import annotations
+
+# script -> (first codepoint, offset to the Malayalam block)
+SHIFTS: dict[str, tuple[int, int]] = {
+    "ta": (0x0B80, 0x180),  # Tamil
+    "kn": (0x0C80, 0x080),  # Kannada
+    "te": (0x0C00, 0x100),  # Telugu
+    "hi": (0x0900, 0x400),  # Devanagari
+    "bn": (0x0980, 0x380),  # Bengali
+}
+
+SCRIPT_NAMES = {"ta": "Tamil", "kn": "Kannada", "te": "Telugu", "hi": "Devanagari", "bn": "Bengali"}
+
+MALAYALAM = (0x0D00, 0x0D7F)
+
+VOWELS = {
+    0x0D05: "a", 0x0D06: "a", 0x0D07: "i", 0x0D08: "i", 0x0D09: "u", 0x0D0A: "u",
+    0x0D0B: "r", 0x0D0C: "l", 0x0D0E: "e", 0x0D0F: "e", 0x0D10: "ai",
+    0x0D12: "o", 0x0D13: "o", 0x0D14: "au",
+}
+
+MATRAS = {
+    0x0D3E: "a", 0x0D3F: "i", 0x0D40: "i", 0x0D41: "u", 0x0D42: "u", 0x0D43: "r",
+    0x0D46: "e", 0x0D47: "e", 0x0D48: "ai", 0x0D4A: "o", 0x0D4B: "o", 0x0D4C: "au",
+}
+
+# Retroflex and dental letters collapse: the exhibit's words are told apart by
+# their consonants and vowels, not by which of the two the model happened to
+# write, and Tamil has fewer of them than Malayalam anyway.
+CONSONANTS = {
+    0x0D15: "k", 0x0D16: "k", 0x0D17: "g", 0x0D18: "g", 0x0D19: "n",
+    0x0D1A: "ch", 0x0D1B: "ch", 0x0D1C: "j", 0x0D1D: "j", 0x0D1E: "n",
+    0x0D1F: "t", 0x0D20: "t", 0x0D21: "d", 0x0D22: "d", 0x0D23: "n",
+    0x0D24: "t", 0x0D25: "t", 0x0D26: "d", 0x0D27: "d", 0x0D28: "n",
+    0x0D29: "n", 0x0D2A: "p", 0x0D2B: "p", 0x0D2C: "b", 0x0D2D: "b", 0x0D2E: "m",
+    0x0D2F: "y", 0x0D30: "r", 0x0D31: "r", 0x0D32: "l", 0x0D33: "l", 0x0D34: "zh",
+    0x0D35: "v", 0x0D36: "s", 0x0D37: "s", 0x0D38: "s", 0x0D39: "h",
+}
+
+VIRAMA = 0x0D4D
+ANUSVARA = 0x0D02
+VISARGA = 0x0D03
+CANDRABINDU = 0x0D01
+
+SIGNS = {ANUSVARA: "n", VISARGA: "h", CANDRABINDU: "n"}
+
+# The atomic chillu letters (Malayalam writes ള് as ൾ, final -n as ൻ, …).  A
+# modern text uses them, so a table without them silently drops the last letter
+# of exactly the words this file exists for.
+CHILLUS = {0x0D7A: "n", 0x0D7B: "n", 0x0D7C: "r", 0x0D7D: "l", 0x0D7E: "l", 0x0D7F: "k"}
+
+
+def script_of(text: str) -> str | None:
+    """The Indic script a string is written in, or None for Latin/none."""
+    counts: dict[str, int] = {}
+    for char in text:
+        code = ord(char)
+        for name, (start, _shift) in SHIFTS.items():
+            if start <= code < start + 0x80:
+                counts[name] = counts.get(name, 0) + 1
+                break
+        if 0x0D00 <= code < 0x0D80:
+            counts["ml"] = counts.get("ml", 0) + 1
+    if not counts:
+        return None
+    return max(counts, key=counts.get)
+
+
+def to_malayalam(text: str) -> str:
+    """Shift a sister script's letters into the Malayalam block.
+
+    Only characters inside that script's own block move: an ASCII space is not
+    a Tamil letter, and shifting it lands outside the block (a space + 0x180 is
+    `Ơ`, which then glues two words together).
+    """
+    script = script_of(text)
+    if script not in SHIFTS:
+        return text
+    start, offset = SHIFTS[script]
+    return "".join(
+        chr(ord(char) + offset) if start <= ord(char) < start + 0x80 else char
+        for char in text
+    )
+
+
+def romanise(text: str) -> str:
+    """Malayalam (or a shifted sister script) to coarse Latin, letter by letter."""
+    source = to_malayalam(text)
+    out: list[str] = []
+    pending_consonant = False
+    for char in source:
+        code = ord(char)
+        if code in CONSONANTS:
+            if pending_consonant:
+                out.append("a")  # the previous consonant carried no vowel sign
+            out.append(CONSONANTS[code])
+            pending_consonant = True
+        elif code in MATRAS:
+            out.append(MATRAS[code])
+            pending_consonant = False
+        elif code in VOWELS:
+            if pending_consonant:
+                out.append("a")
+                pending_consonant = False
+            out.append(VOWELS[code])
+        elif code == VIRAMA:
+            pending_consonant = False
+        elif code in CHILLUS:
+            if pending_consonant:
+                out.append("a")
+            out.append(CHILLUS[code])
+            pending_consonant = False
+        elif code in SIGNS:
+            out.append(SIGNS[code])
+            pending_consonant = False
+        elif char.isascii():
+            out.append(char)
+            pending_consonant = False
+        else:
+            # A space or any other separator ends the word.
+            if pending_consonant:
+                out.append("a")
+                pending_consonant = False
+            out.append(char)
+    if pending_consonant:
+        out.append("a")
+    return "".join(out)
+
+
+def fold(word: str) -> str:
+    """One spelling for two ways of hearing the same word.
+
+    The glide `y` is the difference between `anaykkuka` and `anakkukka`, and
+    doubled letters between `kk` and `k`; neither changes which lamp the visitor
+    meant.
+    """
+    value = (word or "").lower()
+    value = "".join(char for char in value if char.isalnum())
+    # `h` only ever marks aspiration or a dental letter in these scripts
+    # (kathikkuka / kattikkuka are the same word), and `y` is a glide the ear
+    # may or may not catch.
+    value = value.replace("h", "").replace("y", "")
+    out: list[str] = []
+    for char in value:
+        if out and out[-1] == char:
+            continue
+        out.append(char)
+    return "".join(out)
+
+
+def distance(a: str, b: str) -> int:
+    """Levenshtein distance, for words that are close but not identical."""
+    if a == b:
+        return 0
+    if not a or not b:
+        return max(len(a), len(b))
+    previous = list(range(len(b) + 1))
+    for i, left in enumerate(a, start=1):
+        current = [i]
+        for j, right in enumerate(b, start=1):
+            current.append(min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + (left != right),
+            ))
+        previous = current
+    return previous[-1]
+
+
+def same_word(a: str, b: str) -> bool:
+    """Are these two renderings of one spoken word?
+
+    Exact after folding, and only that.  A tolerance of one edit was measured
+    and rejected on 2026-11-17: it turned "anakkukka" (turn off) into
+    "nanaykkuka" (water) by the one letter the fold cannot see, and the exhibit
+    would have started the pump on a request to put a lamp out.
+    """
+    left, right = fold(a), fold(b)
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    # A long word may differ by one letter and still be the same word (a
+    # misheard final vowel is common); a short one may not.
+    if min(len(left), len(right)) >= 10:
+        return distance(left, right) <= 1
+    return False

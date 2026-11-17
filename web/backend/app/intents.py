@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .phonetics import romanise, same_word, script_of
+
 import json
 import unicodedata
 from pathlib import Path
@@ -187,6 +189,18 @@ class IntentMatcher:
         if not tokens:
             return self._result("no_speech", language, "no_speech")
 
+        # A transcript in another script is still the same sentence.  Whisper
+        # answered Malayalam audio in Tamil script on this machine (2026-11-17),
+        # and the visitor was told the command was unsupported although they had
+        # said exactly the right words.  Before the grammar runs, try the
+        # romanised key of the words against the same vocabulary; if that finds
+        # one device and one state, use it.
+        script = script_of(transcript)
+        if language in {"ml", "hi"} and script != language:
+            roman = self._romanised_intent(tokens, language)
+            if roman is not None:
+                return roman
+
         # --- sentence type, in the order that keeps a question from acting ---
         if self._has(tokens, g.get("hypothetical")) or self._starts(tokens, ["if"]):
             return self._result("hypothetical", language, "hypothetical")
@@ -319,6 +333,75 @@ class IntentMatcher:
             # half of it, in any language.
             return self._result("ambiguous", language, "ambiguous_generic", device=device)
         return self._intent_result(command, language, device=device, action=action)
+
+    # ------------------------------------------------- foreign-script words
+    def _romanised_intent(self, tokens: list[str], language: str) -> dict[str, Any] | None:
+        """One device and one state, found by sound rather than by script.
+
+        Deliberately narrow: it needs exactly one device and exactly one state,
+        and it refuses anything that matches a negation or a question marker, so
+        it can only ever confirm a plain instruction.  Everything else falls
+        through to the grammar, whose answer for a sentence it cannot read is
+        the honest "please name a device".
+        """
+        roman = [word for word in romanise(" ".join(tokens)).split() if word]
+        if not roman:
+            return None
+        g = self.grammar.get(language, {})
+
+        def hits(aliases: list[str]) -> bool:
+            return any(
+                same_word(word, alias)
+                for word in roman
+                for alias in aliases
+                if alias
+            )
+
+        def roman_aliases(aliases: list[str] | None) -> list[str]:
+            out: list[str] = []
+            for alias in aliases or []:
+                out.append(alias)
+                out.extend(part for part in romanise(alias).split() if part)
+            return out
+
+        # A refusal or a question must never be turned into an action.
+        for group in ("negations", "question_starts", "question_suffixes", "hypothetical",
+                      "corrections"):
+            if hits(roman_aliases(g.get(group))):
+                return None
+
+        devices: set[str] = set()
+        for name, aliases in self.devices.items():
+            if hits(roman_aliases(aliases.get(language))):
+                devices.add(name)
+        states: set[str] = set()
+        for name, aliases in self.states.items():
+            if hits(roman_aliases(aliases.get(language))):
+                states.add(name)
+
+        # Watering is its own vocabulary ("water the plants" / "stop watering").
+        # Both halves are required here: a pump word whose state could not be
+        # read must not be taken as "start", or a request to put a lamp out
+        # could open the valve.
+        watering = self.watering.get(language) or {}
+        if hits(roman_aliases(watering.get("cue"))):
+            if hits(roman_aliases(watering.get("stop"))):
+                states.add("off")
+                devices.add("pump")
+            elif hits(roman_aliases(watering.get("start"))):
+                states.add("on")
+                devices.add("pump")
+
+        if len(devices) != 1 or len(states) != 1:
+            return None
+        device = next(iter(devices))
+        action = next(iter(states))
+        command = self.device_commands.get(device, {}).get(action)
+        if not command:
+            return None
+        return self._intent_result(
+            command, language, device=device, action=action, matched_phrase="romanised"
+        )
 
     # ------------------------------------------------------------- providers
     def _device_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:

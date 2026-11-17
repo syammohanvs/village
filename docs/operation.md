@@ -201,9 +201,21 @@ typed as Malayalam gives the right command — so the gap is in recognition, and
 it may be the synthetic test voice rather than the model. Test with real speech
 before changing the model; the big ones are unusable at 20 s per command here.
 
-When the speech model returns text in another script, the panel says so plainly
-inside **What will be sent** and keeps the words it heard on screen, instead of
-asking the visitor to name a device it never understood.
+### A transcript in the wrong script is still read
+
+If the speech model answers in a sister script — it once heard Malayalam and
+wrote **Tamil** — the village still understands it.  The words are shifted into
+the Malayalam alphabet by their Unicode position (Tamil is 0x180 below it,
+Devanagari 0x400, Kannada 0x80, Telugu 0x100, Bengali 0x380) and romanised with
+one table, so `വിളക്കുകൾ അണയ്ക്കുക` and `விலக்குகள் ஆனக்குக்கா` meet on
+`vilakkukal anakkuka`.  English words spoken while Malayalam is chosen
+("light off") work the same way, because the vocabulary already lists those
+spellings.
+
+It is deliberately narrow: exactly one device and one state, and never when a
+refusal or a question word is recognised — so a pump whose state could not be
+read is refused rather than started.  If nothing matches, the panel says the
+model did not hear the language clearly and keeps the words on screen.
 
 ## Shutdown
 

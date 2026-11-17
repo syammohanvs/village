@@ -351,3 +351,76 @@ def test_a_supported_command_plus_an_unsupported_action_refuses_in_every_languag
         assert result["kind"] == "ambiguous", text
         assert result["command"] is None, text
         assert result["actuation"] is False, text
+
+
+# ---------------------------------------------------------------------------
+# A transcript in a sister script is still the same sentence (2026-11-17).
+# ---------------------------------------------------------------------------
+def test_a_tamil_transcript_of_a_malayalam_command_is_understood(matcher: IntentMatcher) -> None:
+    """The measured failure: whisper answered Malayalam in Tamil script.
+
+    "വിളക്കുകൾ അണയ്ക്കുക" came back as "விலக்குகள் ஆனக்குக்கா" — the same words,
+    letter for letter, in the script next door.  The parser answered
+    "unsupported" because its vocabulary is written in Malayalam, which is what
+    the visitor heard as "it does not understand Malayalam".
+    """
+    for said in ("விலக்குகள் ஆனக்குக்கா", "விலக்குகள் அனக்குக்கா", "விலக்குகள் ஆனக்குக்கா."):
+        result = matcher.match(said, "ml")
+        assert result["command"] == "LIGHTS_OFF", said
+        assert result["status"] == "ok"
+
+
+def test_the_same_fallback_reads_a_lamps_on_request(matcher: IntentMatcher) -> None:
+    assert matcher.match("വിളക്കുകൾ കത്തിക്കുക", "ml")["command"] == "LIGHTS_ON"
+    # The Tamil form of the same two words.
+    assert matcher.match("விலக்குகள் கத்திக்குக்கா", "ml")["command"] == "LIGHTS_ON"
+
+
+def test_english_words_are_read_while_malayalam_is_chosen(matcher: IntentMatcher) -> None:
+    assert matcher.match("light off", "ml")["command"] == "LIGHTS_OFF"
+    assert matcher.match("lights on", "ml")["command"] == "LIGHTS_ON"
+
+
+def test_an_unreadable_pump_state_never_starts_the_pump(matcher: IntentMatcher) -> None:
+    """A pump word with a state the reader could not match is not "start".
+
+    "பம்ப் ஆஃப்" (pump off, in Tamil letters) once came back as
+    IRRIGATION_REQUEST through the sound-alike path — one wrong answer away from
+    opening the valve on a request to close it.  Both halves must match.
+    """
+    result = matcher.match("பம்ப் ஆஃப்", "ml")
+    assert result.get("command") != "IRRIGATION_REQUEST"
+    assert result["status"] == "unknown"
+
+
+def test_sound_alike_matching_does_not_invent_commands(matcher: IntentMatcher) -> None:
+    for said in ("अजगर कुर्सी", "இன்று வானிலை எப்படி", "quantum flux capacitor"):
+        result = matcher.match(said, "ml")
+        assert result["status"] == "unknown", said
+        assert result.get("command") in (None, "")
+
+
+def test_phonetics_put_both_scripts_on_one_key() -> None:
+    from app.phonetics import fold, romanise, same_word, script_of, to_malayalam
+
+    assert script_of("വിളക്കുകൾ") == "ml"
+    assert script_of("விலக்குகள்") == "ta"
+    assert script_of("lights") is None
+
+    # Tamil shifted into the Malayalam block, then one romanisation table.
+    # (Compared by what they sound like, not by codepoint: Tamil writes the
+    # final ള് as an explicit virama where Malayalam uses the atomic ൾ.)
+    assert romanise(to_malayalam("விலக்குகள்")) == romanise("വിളക്കുകൾ")
+    assert romanise("വിളക്കുകൾ അണയ്ക്കുക") == "vilakkukal anaykkuka"
+    assert romanise("விலக்குகள் ஆனக்குக்கா") == "vilakkukal anakkukka"
+    assert fold("anaykkuka") == fold("anakkukka") == "anakuka"
+    assert same_word("vilakkukal", romanise("விலக்குகள்"))
+
+    # The atomic chillu letters carry the last letter of the word.
+    assert romanise("വിളക്കുകൾ").endswith("l")
+
+    # Measured and rejected: one edit of tolerance turned "turn off" into
+    # "water".  Only an exact folded match (or a long word one letter apart)
+    # counts.
+    assert not same_word("anakkukka", "nanaykkuka")
+    assert same_word("kattikkuka", "kathikkuka")

@@ -556,11 +556,18 @@ export function VoicePanel() {
   // Malayalam audio came back in Tamil script here (2026-11-17).  Saying that
   // is more useful than a generic "not understood", and the sentence stays on
   // screen so the reader can see what was actually heard.
+  // Only worth saying when the village did not understand it: the parser
+  // reads a sister script by sound now, so a Tamil spelling of a Malayalam
+  // command is acted on, and an apology over a command that worked would be
+  // its own confusion.
+  const unclear =
+    !result || result.status === 'unknown' || result.status === 'unsupported';
   const wrongScript =
     !typedNow &&
     Boolean(transcript) &&
     language !== 'en' &&
-    !inScript(transcript, language);
+    !inScript(transcript, language) &&
+    unclear;
 
   if (!open) return null;
 

@@ -72,9 +72,15 @@ visitors cannot be used to press **Water** or change calibration.
   reachable" in a dev session (2026-11-17).
 - Model choice and its measured behaviour are in `docs/operation.md` § "The
   speech server and the model". English is good on `ggml-base.bin`; Malayalam
-  and Hindi recognition is weak on every model that fits this CPU's speed budget
-  — the **parser** understands Malayalam/Hindi text correctly, so do not "fix"
-  `intents.py` for a bad transcript.
+  and Hindi recognition is weak on every model that fits this CPU's speed
+  budget.
+- **A transcript in a sister script is understood** (`web/backend/app/
+  phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
+  Unicode offset) and romanised, so `വിളക്കുകൾ അണയ്ക്കുക` and
+  `விலக்குகள் ஆனக்குக்கா` meet on `vilakkukal anakkuka`. `_romanised_intent` in
+  `intents.py` uses that only when the script is not the chosen language's, and
+  only for exactly one device + one state with no refusal word — do not widen it
+  to fuzzy edit distance, which was measured turning "turn off" into "water".
 - The panel greets on open ("I am Sara. How may I help you?") in the page's
   language, once per opening, and stays silent when `tts_enabled` is off.
 
