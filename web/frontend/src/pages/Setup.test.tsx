@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
@@ -372,5 +372,31 @@ describe('Setup — the simulation can be put back to a demo state', () => {
     const reset = await openSimulation();
     await userEvent.click(reset);
     expect(await screen.findByTestId('demo-scenario-error')).toHaveTextContent(/backend said no/);
+  });
+});
+
+/**
+ * Sara's English voice is a per-device choice (the voice is installed on this
+ * computer, not on the account), so it lives beside the camera id rather than
+ * with the server settings (2026-11-17).
+ */
+describe('Sara’s English voice', () => {
+  it('offers an Indian-English voice and remembers the choice', async () => {
+    const user = userEvent.setup();
+    window.localStorage.removeItem('village.englishVoice');
+    render(<App />);
+
+    const row = await screen.findByTestId('english-voice-row');
+    expect(within(row).getByRole('button', { name: /Sara’s own/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(within(row).getByRole('button', { name: /Indian English/i }));
+    expect(within(row).getByRole('button', { name: /Indian English/i })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(window.localStorage.getItem('village.englishVoice')).toBe('device-india');
   });
 });

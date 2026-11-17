@@ -143,6 +143,17 @@ visitors cannot be used to press **Water** or change calibration.
   same curve the simulator uses (150 mV … 4000 mV), and the windmill is drawn
   still with `data-fitted="false"` when no turbine is wired, so the picture
   cannot claim hardware the board does not have.
+- **Sara's English accent is a device choice (2026-11-17).**  Piper has **no
+  official `en_IN` voice** (only `en_US`/`en_GB`), so `VOICE_FOR_LANGUAGE['en']`
+  is American.  Setup → Voice & Camera → *Sara's English voice* writes
+  `village.englishVoice` (`sara` | `device-india`, helpers in `lib/speech.ts`);
+  `speakText` then tries this computer's `en-IN` voice first
+  (`pickIndianEnglishVoice`, name list includes Heera/Ravi) and falls back to
+  Piper.  Hindi and Malayalam never change.  The laptop has **Microsoft Heera**
+  and **Ravi** installed (OneCore), so the accent is available — a community
+  Piper `en_IN` model (navgurukul-ai-labs, **AGPL-3.0**) is the neural
+  alternative if the formant voice is not good enough; that is a licence
+  decision, not a wiring one.
 - **The simulation lab is one engine with real controls (2026-11-17).** Every
   slider, preset and sample goes through `SimulatedDevice` (`web/backend/app/
   simulator.py`) via `POST /demo/scenario` / `/demo/reset` — never a second

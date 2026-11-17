@@ -15,6 +15,13 @@ import { Card, Chip, EmptyState, ErrorBlock, KeyValue, Notice } from '../compone
 import { LanguagePicker } from '../components/LanguagePicker';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { loadLiaPrefs, saveLiaPrefs } from '../lib/lia';
+import {
+  indianEnglishVoiceName,
+  loadEnglishVoiceChoice,
+  primeVoices,
+  saveEnglishVoiceChoice,
+  type EnglishVoiceChoice,
+} from '../lib/speech';
 import { IconAlert, IconCheck, IconPlug, IconRefresh, IconWaste } from '../components/Icons';
 import type {
   AppSettings,
@@ -234,6 +241,21 @@ function Preferences() {
   const model = useApi(['waste-model-setup'], () => api.wasteModelStatus(), { intervalMs: 30000 });
   const { language, setLanguage: setVoiceLanguage } = useVoiceUi();
   const [autoRead, setAutoRead] = useState(() => loadLiaPrefs().autoRead);
+  const [englishVoice, setEnglishVoice] = useState<EnglishVoiceChoice>(() =>
+    loadEnglishVoiceChoice(),
+  );
+  // Browsers fill their voice list asynchronously, so the name is asked for
+  // once they have answered — a hint that says "none" before the list arrives
+  // would be wrong on a machine that has Heera installed.
+  const [indianVoice, setIndianVoice] = useState<string | null>(null);
+  useEffect(() => {
+    void primeVoices(1200).then(() => setIndianVoice(indianEnglishVoiceName()));
+  }, []);
+
+  const chooseEnglishVoice = (choice: EnglishVoiceChoice) => {
+    setEnglishVoice(choice);
+    saveEnglishVoiceChoice(choice);
+  };
   const [saved, setSaved] = useState<AppSettings | null>(null);
   const [draft, setDraft] = useState<AppSettings | null>(null);
   const [saveError, setSaveError] = useState('');
@@ -364,6 +386,36 @@ function Preferences() {
                   checked={draft.tts_enabled}
                   onChange={(next) => update({ tts_enabled: next })}
                 />
+              </div>
+            </div>
+
+            <div className="setting-row setting-row--compact" data-testid="english-voice-row">
+              <div>
+                <p className="setting-name">Sara&apos;s English voice</p>
+                <p className="hint" data-testid="english-voice-hint">
+                  {indianVoice
+                    ? `This computer has an Indian English voice: ${indianVoice}. Hindi and Malayalam always use Sara's own voice.`
+                    : 'No Indian English voice is installed on this computer, so both choices speak with Sara’s own voice. Windows: Settings → Time & language → Language & region → English (India) → Language options → Speech.'}
+                </p>
+              </div>
+              <div className="segmented" role="group" aria-label="Sara's English voice">
+                {(
+                  [
+                    ['sara', 'Sara’s own'],
+                    ['device-india', 'Indian English'],
+                  ] as const
+                ).map(([choice, label]) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    className={cx('segment', englishVoice === choice && 'is-active')}
+                    aria-pressed={englishVoice === choice}
+                    data-testid={`english-voice-${choice}`}
+                    onClick={() => chooseEnglishVoice(choice)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 

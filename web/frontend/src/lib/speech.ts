@@ -151,6 +151,45 @@ export function pickIndianEnglishVoice(): SpeechSynthesisVoice | null {
   return (female[0] ?? indian[0]) as SpeechSynthesisVoice;
 }
 
+/**
+ * Which English voice Sara uses.
+ *
+ * `sara` is the local neural voice — one speaker across all three languages —
+ * but its English model is American.  `device-india` uses this computer's
+ * Indian-English voice instead (Windows ships "Heera" and "Ravi"; Android and
+ * some Linux setups have an en-IN one too), which has the accent the exhibit
+ * wants at the cost of a different speaker for English only.
+ *
+ * It is a per-device choice, like the camera and the volume: a voice is
+ * installed on a machine, not on an account.
+ */
+export type EnglishVoiceChoice = 'sara' | 'device-india';
+
+export const ENGLISH_VOICE_KEY = 'village.englishVoice';
+
+export function loadEnglishVoiceChoice(): EnglishVoiceChoice {
+  try {
+    return window.localStorage.getItem(ENGLISH_VOICE_KEY) === 'device-india'
+      ? 'device-india'
+      : 'sara';
+  } catch {
+    return 'sara';
+  }
+}
+
+export function saveEnglishVoiceChoice(choice: EnglishVoiceChoice): void {
+  try {
+    window.localStorage.setItem(ENGLISH_VOICE_KEY, choice);
+  } catch {
+    /* private modes can refuse storage; the choice still holds this visit */
+  }
+}
+
+/** The name of this device's Indian-English voice, or null when it has none. */
+export function indianEnglishVoiceName(): string | null {
+  return pickIndianEnglishVoice()?.name ?? null;
+}
+
 /** The best voice for a language: same language, female first. */
 export function pickVoice(language: string): SpeechSynthesisVoice | null {
   const voices = voiceList();
@@ -273,6 +312,16 @@ export async function speakText(text: string, language: string, rate = 0.98): Pr
   if (!hasUserActivation()) {
     const spoken = await speakWithDevice(text, language, rate, ticket);
     if (spoken) return true;
+    if (ticket !== speakSeq) return false;
+  }
+
+  // English in an Indian accent, when the operator asked for it and this
+  // machine really has such a voice.  The local model stays the fallback, so a
+  // device without one still speaks.
+  if (language === 'en' && loadEnglishVoiceChoice() === 'device-india') {
+    await primeVoices(600);
+    const indian = pickIndianEnglishVoice();
+    if (indian && (await speakWithVoice(text, indian, rate, ticket))) return true;
     if (ticket !== speakSeq) return false;
   }
 

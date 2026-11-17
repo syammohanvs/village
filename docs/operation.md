@@ -207,6 +207,28 @@ Whisper is speech-to-text only; replies are prepared text, optional local
 recordings, or the browser's own voice. If a language voice is unavailable,
 the app says so rather than using a remote service.
 
+### Sara's English voice
+
+Sara's own voice is the local neural model (`en_US-lessac-medium`), which is
+**American** English — it is the same speaker as her Hindi and Malayalam, and it
+is the smoothest of the three. If the exhibit wants an **Indian** accent for
+English, **Setup → Voice & Camera → Sara's English voice → Indian English**
+switches English to this computer's own voice (Windows ships *Microsoft Heera*
+and *Microsoft Ravi*, both English (India); Android and some Linux setups have
+an `en-IN` voice too).
+
+- It is a **per-device** choice, like the camera: the voice is installed on the
+  machine, not on the account.
+- **Hindi and Malayalam always stay on Sara's own voice** — they are already
+  Indian voices.
+- The row names the voice it found, and says what to install when it finds none
+  (Windows: Settings → Time & language → Language & region → English (India) →
+  Language options → Speech).
+- Quality depends on that voice: the Windows one is a formant voice, so it is
+  more robotic than the neural model. If a *neural* Indian-English voice is
+  wanted, the alternative is a community Piper `en_IN` model, which is a
+  third-party download rather than part of the official voice set.
+
 ### The panel itself
 
 **Talk to Sara** opens a panel whose order is fixed, so a visitor learns it in

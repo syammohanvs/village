@@ -244,6 +244,16 @@ Sara refuses to guess. See [calibration.md](calibration.md).
 - The app will not record while it is speaking a reply. If the microphone
   button is disabled, wait for the reply to finish.
 
+## Sara's English sounds American
+
+That is Sara's own voice: the local neural model is American English, and it is
+the same speaker as her Hindi and Malayalam. For an Indian accent, choose
+**Setup → Voice & Camera → Sara's English voice → Indian English**, which uses
+this computer's own English (India) voice (Windows: *Heera* or *Ravi*). If the
+row says no such voice is installed, add English (India) under Windows settings
+→ Time & language → Language & region → English (India) → Language options →
+Speech. The choice is remembered on this device only.
+
 ## The simulation sliders do nothing
 
 They only exist in **Simulation** — choose it on the knob at the top. In **Live**

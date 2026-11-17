@@ -385,3 +385,99 @@ describe('a voice that has started is never repeated', () => {
     }
   });
 });
+
+/**
+ * Sara's English can be spoken by the local neural voice (American) or by an
+ * Indian-English voice installed on this computer — the exhibit asked for the
+ * accent, and Windows ships "Heera" and "Ravi" for exactly this (2026-11-17).
+ */
+describe('English in an Indian accent', () => {
+  const INDIAN = [
+    { name: 'Microsoft Heera - English (India)', lang: 'en-IN', default: false, localService: true, voiceURI: 'heera' },
+    { name: 'Microsoft David - English (United States)', lang: 'en-US', default: true, localService: true, voiceURI: 'david' },
+  ];
+
+  function stubPiperPlayback() {
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: () => 'blob:tts' });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: () => undefined });
+    (globalThis as unknown as { Audio: unknown }).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src: string) {
+        this.src = src;
+      }
+      play() {
+        queueMicrotask(() => this.onended?.());
+        return Promise.resolve();
+      }
+      pause() {}
+    };
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    window.localStorage.removeItem('village.englishVoice');
+  });
+
+  it('uses the device voice when Indian English is chosen', async () => {
+    const { spoken } = installSpeech(INDIAN as unknown as FakeVoice[]);
+    const speak = vi.fn(async () => new Blob(['wav'], { type: 'audio/wav' }));
+    vi.doMock('./api', () => ({ api: { speak } }));
+    stubPiperPlayback();
+
+    const speech = await import('./speech');
+    speech.saveEnglishVoiceChoice('device-india');
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(spoken[0]?.voice).toMatch(/Heera/);
+    expect(speak).not.toHaveBeenCalled();
+    vi.doUnmock('./api');
+  });
+
+  it('keeps Sara’s own voice when that is chosen', async () => {
+    const { spoken } = installSpeech(INDIAN as unknown as FakeVoice[]);
+    const blob = new Blob(['wav'], { type: 'audio/wav' });
+    const speak = vi.fn(async () => blob);
+    vi.doMock('./api', () => ({ api: { speak } }));
+    stubPiperPlayback();
+
+    const speech = await import('./speech');
+    speech.saveEnglishVoiceChoice('sara');
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(speak).toHaveBeenCalled();
+    expect(spoken).toHaveLength(0);
+    vi.doUnmock('./api');
+  });
+
+  it('falls back to Sara when this computer has no Indian voice', async () => {
+    // Only American English here: the choice must not switch to a US device
+    // voice, which would be a third accent nobody asked for.
+    installSpeech([
+      { name: 'Microsoft David - English (United States)', lang: 'en-US', default: true, localService: true, voiceURI: 'david' },
+    ]);
+    const blob = new Blob(['wav'], { type: 'audio/wav' });
+    const speak = vi.fn(async () => blob);
+    vi.doMock('./api', () => ({ api: { speak } }));
+    stubPiperPlayback();
+
+    const speech = await import('./speech');
+    speech.saveEnglishVoiceChoice('device-india');
+    const ok = await speech.speakText('Hello', 'en');
+
+    expect(ok).toBe(true);
+    expect(speak).toHaveBeenCalled();
+    expect(speech.indianEnglishVoiceName()).toBeNull();
+    vi.doUnmock('./api');
+  });
+
+  it('names the voice it would use, so Setup can say which one', async () => {
+    installSpeech(INDIAN as unknown as FakeVoice[]);
+    const speech = await import('./speech');
+    await speech.primeVoices();
+    expect(speech.indianEnglishVoiceName()).toMatch(/Heera/);
+  });
+});
