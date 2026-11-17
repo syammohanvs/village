@@ -1,0 +1,30 @@
+{
+  "tfjsVersion": "4.22.0",
+  "tmVersion": "2.4.4",
+  "packageVersion": "0.8.5",
+  "packageName": "@teachablemachine/image",
+  "timeStamp": "2026-11-13T09:17:44.101Z",
+  "userMetadata": {
+    "trainedBy": "scripts/waste/train_waste_model.mjs",
+    "base": "mobilenet_v1_1.0_224_gap",
+    "validationAccuracy": 0.8823000898472596,
+    "probeAccuracy": 0.6271186440677966,
+    "classWeight": "sqrt",
+    "seed": 42
+  },
+  "modelName": "waste",
+  "labels": [
+    "Organic",
+    "Plastic",
+    "Paper",
+    "Glass",
+    "Metal",
+    "Textile",
+    "Leather",
+    "Footwear",
+    "Thermocol",
+    "Ewaste",
+    "Background"
+  ],
+  "imageSize": 224
+}

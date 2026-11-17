@@ -9,7 +9,9 @@
 # The engine is the MIT standalone release; it bundles its own onnxruntime and
 # espeak-ng, so no system packages and no sudo are needed.
 #
-# Everything lands in models/ (git-ignored), like the Whisper model:
+# Everything lands in models/piper/ — which is COMMITTED, unlike the Whisper
+# models: Sara's voice is part of the project, and losing it would leave her
+# silent until this script could run again on a machine with internet.
 #   models/piper/piper            the engine
 #   models/piper/voices/*.onnx    the voices
 #

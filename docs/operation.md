@@ -226,12 +226,13 @@ page writes it to the device copy as well, so speech changes immediately and
 still works with the backend unreachable.
 
 **The Indian model** is a community voice (NavGurukul, `en_IN-spicor-medium`),
-installed by `scripts/install_piper.sh` into `models/piper/voices/` — which is
-git-ignored, so it is never committed or distributed. **Its licence is
-AGPL-3.0**, unlike the MIT engine and the official voices: free to download and
-use, including for an exhibition, but if the app or the model is ever published
-or handed out, the AGPL terms apply to the model. To skip it, run the installer
-with `VILLAGE_INDIAN_VOICE=0`.
+installed by `scripts/install_piper.sh` into `models/piper/voices/`. That folder
+is **committed** (2026-11-17) so a lost laptop cannot leave Sara silent: losing
+her voice would mean re-downloading it on a machine that can reach the internet.
+**Its licence is AGPL-3.0**, unlike the MIT engine and the official voices: free
+to download and use, including for an exhibition; if the app or the model is
+ever published or handed out, the AGPL terms follow the *model*. To skip the
+download on a new machine, run the installer with `VILLAGE_INDIAN_VOICE=0`.
 
 What is *not* affected by a reflash: the voice choice, the language, spoken
 replies on/off, the camera id, the waste thresholds — all in the village

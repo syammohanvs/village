@@ -171,7 +171,7 @@ visitors cannot be used to press **Water** or change calibration.
     mid-sentence "you" is a normal pronoun and is left alone.
 - **Indian English is the default and it is stored server-side (2026-11-17).**
   Two English voices: `en_IN-spicor-medium` (NavGurukul, **AGPL-3.0**, neural,
-  Indian — installed by `scripts/install_piper.sh`, git-ignored) and
+  Indian — installed by `scripts/install_piper.sh`) and
   `en_US-lessac-medium` (official, American, the same speaker as hi/ml).
   `ENGLISH_VOICES` in `web/backend/app/tts.py` maps the setting value
   (`device-india` | `sara`) to a model; `/voice/speak` takes a `voice` field and
@@ -632,7 +632,8 @@ backend — it reads that variable once at start-up. A DHCP reservation for the
 board's MAC on the router is the permanent fix.
 
 The OTA password is `VILLAGE_OTA_PASSWORD` in
-`uc/include/village/secrets.h` (git-ignored — never copy it into this file or a
+`uc/include/village/secrets.h` (committed to this private repository — never copy
+it into this file or a
 commit).
 
 **Why plain OTA from this container fails** (read this before retrying):
@@ -962,7 +963,23 @@ Calibration.  The calibration endpoints themselves are preserved.
 
 ## Waste classifier
 
-`models/waste/` is git-ignored. It holds the 11-class model trained in
+**The repository is the master copy of the exhibit (2026-11-17).**  A fresh
+clone on another laptop must run as this one was left, so these are committed
+on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +
+`models/waste-resnet50/` (104 MB), `models/whisper/whisper-server`,
+`data/village.db`, `data/waste-samples/` (1134 corrected photos — the only copy)
+and the credentials `.env` + `uc/include/village/secrets.h`.  It is a **private**
+repository: it holds one board's tokens.  **Do not publish it.**
+
+The only thing that cannot be committed is the whisper **weights** —
+`ggml-base.bin` is 142 MB and GitHub refuses any file over 100 MB (`small` is
+466 MB, `large-v3-turbo` 1.6 GB).  `scripts/download_models.sh` fetches
+`ggml-base.bin` on a new machine; `data/waste-captures/` (322 MB of rolling log)
+and `data/cache|logs|run` stay ignored too.  `scripts/backup.sh` writes a second
+copy — whisper weights, the crop log and a consistent database snapshot — to
+another disk, and `docs/backup.md` is the runbook.
+
+`models/waste/` holds the 11-class model trained in
 `scripts/waste/`; the recycler classes (glass, metal, textile, leather,
 footwear, thermocol, e-waste) all map to **Recycling agent** in the UI with no
 bin LED. Medical waste is handled by the manual **Hazardous / medical** button,
@@ -1001,7 +1018,7 @@ in the browser.** Measured on the same 953 held-out photos it is **91.5% exact,
 against 86.7 / 91.4 / 86.0 / 95.8 / 64.0 for the last MobileNetV1 build. It fixes
 the **business card** (25/25, was 14/25) and improves **pins** (4/8, was 3/8); the
 handkerchief is the one regression (1/8 against 4/8) and stays hard. The model is
-`models/waste-resnet50/model.pt` (~95 MB, git-ignored), loaded by
+`models/waste-resnet50/model.pt` (~95 MB, committed), loaded by
 `web/backend/app/waste_resnet.py` and served by **`POST /api/v1/waste/classify`**
 (about 50-85 ms per frame on this CPU, no internet). The browser sends the 224x224
 crop as a JPEG data URL; `SortWaste.tsx` no longer imports TensorFlow, and

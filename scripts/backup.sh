@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
-# Back up everything in this project that git does NOT carry.
+# Take a full second copy of the project, including the few things git cannot
+# hold.
 #
-# `models/piper` is committed (Sara's voice is part of the project).  What is
-# left is too large for a git repository:
+# The repository is the master copy (code, models, settings, secrets, the
+# village database and the venue's corrected photos are all committed) — this
+# script is the belt-and-braces copy for a disk failure or a lost GitHub
+# account.  It adds what a clone cannot give you:
 #
 #   models/whisper/      the speech-recognition models (2.2 GB, one file 1.6 GB)
 #   models/waste*/       the waste classifier weights (~1.2 GB with history)
-#   data/                the live village database, caches and backups
+#   data/village.db      the live database (settings, accounts, waste corrections)
+#   data/waste-samples/  photos of items the classifier got wrong — the only
+#                        copy of that training data, and it cannot be re-created
+#   data/waste-captures/ every crop the classifier judged (the venue log)
 #   .env                 settings and the admin/e-mail credentials
 #   uc/include/village/secrets.h   the OTA password and the device token
+#
+# Everything else — code, `models/piper`, `models/waste*`, `.env`,
+# `secrets.h` and `data/village.db` — is in git, so it is copied here only as a
+# point-in-time duplicate.
 #
 # Usage:
 #   ./scripts/backup.sh                 # to ~/village-backups
@@ -61,6 +71,19 @@ if [ "$ALL" = "1" ]; then
     "${RSYNC[@]}" "$dir" "$TARGET/models/"
   done
 fi
+
+# --------------------------------------------------------- what a person made ---
+# These are not downloads and cannot be regenerated: the photos of items the
+# classifier got wrong are the only copy of that training data, and the crop
+# log is what the venue report and the corrections were measured from.
+info "Waste photos and the venue crop log"
+for folder in waste-samples waste-captures; do
+  if [ -d "$ROOT/data/$folder" ]; then
+    "${RSYNC[@]}" "$ROOT/data/$folder" "$TARGET/data/"
+  else
+    printf '  data/%s not present, skipped\n' "$folder"
+  fi
+done
 
 # ------------------------------------------------------ the database, properly ---
 # A live SQLite file cannot be copied with `cp` while the app writes to it: the

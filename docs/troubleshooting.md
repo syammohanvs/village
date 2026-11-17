@@ -258,8 +258,9 @@ reason underneath. If it happens again, check that the language buttons under
 Default is **Indian English**: Sara's neural Indian model
 (`models/piper/voices/en_IN-spicor-medium.onnx`), else this computer's English
 (India) voice. "Sara's own" is the American neural voice, chosen deliberately in
-**Setup → Voice & Camera**. If the Indian model is missing,
-`scripts/install_piper.sh` downloads it (AGPL-3.0, ~61 MB, git-ignored).
+**Setup → Voice & Camera**. The model is part of the repository
+(`models/piper/voices/`), so a fresh clone already has it; if the file has been
+deleted, `scripts/install_piper.sh` downloads it again (AGPL-3.0, ~61 MB).
 
 ## Sara's English sounds American
 

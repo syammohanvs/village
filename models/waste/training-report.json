@@ -1,0 +1,857 @@
+{
+  "trainedAt": "2026-11-13T09:17:44.101Z",
+  "data": "/home/ubuntu/.cache/village-waste/v12",
+  "alpha": 1,
+  "seed": 42,
+  "epochs": 60,
+  "augmentCopies": 2,
+  "denseUnits": 128,
+  "pooling": "gap",
+  "learningRate": 0.002,
+  "classWeight": "sqrt",
+  "labelSmoothing": 0.05,
+  "counts": [
+    {
+      "label": "Organic",
+      "train": 153,
+      "val": 27
+    },
+    {
+      "label": "Plastic",
+      "train": 964,
+      "val": 170
+    },
+    {
+      "label": "Paper",
+      "train": 1576,
+      "val": 277
+    },
+    {
+      "label": "Glass",
+      "train": 470,
+      "val": 83
+    },
+    {
+      "label": "Metal",
+      "train": 744,
+      "val": 132
+    },
+    {
+      "label": "Textile",
+      "train": 1055,
+      "val": 186
+    },
+    {
+      "label": "Leather",
+      "train": 182,
+      "val": 32
+    },
+    {
+      "label": "Footwear",
+      "train": 168,
+      "val": 30
+    },
+    {
+      "label": "Thermocol",
+      "train": 218,
+      "val": 38
+    },
+    {
+      "label": "Ewaste",
+      "train": 687,
+      "val": 120
+    },
+    {
+      "label": "Background",
+      "train": 96,
+      "val": 18
+    }
+  ],
+  "validation": {
+    "accuracy": 0.8823000898472596,
+    "correct": 982,
+    "total": 1113,
+    "perClass": [
+      {
+        "label": "Organic",
+        "total": 27,
+        "correct": 27,
+        "accuracy": 1
+      },
+      {
+        "label": "Plastic",
+        "total": 170,
+        "correct": 138,
+        "accuracy": 0.8117647058823529
+      },
+      {
+        "label": "Paper",
+        "total": 277,
+        "correct": 264,
+        "accuracy": 0.9530685920577617
+      },
+      {
+        "label": "Glass",
+        "total": 83,
+        "correct": 64,
+        "accuracy": 0.7710843373493976
+      },
+      {
+        "label": "Metal",
+        "total": 132,
+        "correct": 115,
+        "accuracy": 0.8712121212121212
+      },
+      {
+        "label": "Textile",
+        "total": 186,
+        "correct": 182,
+        "accuracy": 0.978494623655914
+      },
+      {
+        "label": "Leather",
+        "total": 32,
+        "correct": 25,
+        "accuracy": 0.78125
+      },
+      {
+        "label": "Footwear",
+        "total": 30,
+        "correct": 26,
+        "accuracy": 0.8666666666666667
+      },
+      {
+        "label": "Thermocol",
+        "total": 38,
+        "correct": 25,
+        "accuracy": 0.6578947368421053
+      },
+      {
+        "label": "Ewaste",
+        "total": 120,
+        "correct": 103,
+        "accuracy": 0.8583333333333333
+      },
+      {
+        "label": "Background",
+        "total": 18,
+        "correct": 13,
+        "accuracy": 0.7222222222222222
+      }
+    ],
+    "matrix": {
+      "Organic": {
+        "Organic": 27,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Plastic": {
+        "Organic": 0,
+        "Plastic": 138,
+        "Paper": 10,
+        "Glass": 7,
+        "Metal": 4,
+        "Textile": 0,
+        "Leather": 1,
+        "Footwear": 0,
+        "Thermocol": 4,
+        "Ewaste": 6,
+        "Background": 0
+      },
+      "Paper": {
+        "Organic": 0,
+        "Plastic": 4,
+        "Paper": 264,
+        "Glass": 1,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 4,
+        "Ewaste": 3,
+        "Background": 1
+      },
+      "Glass": {
+        "Organic": 0,
+        "Plastic": 8,
+        "Paper": 1,
+        "Glass": 64,
+        "Metal": 7,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 1,
+        "Ewaste": 2,
+        "Background": 0
+      },
+      "Metal": {
+        "Organic": 0,
+        "Plastic": 1,
+        "Paper": 1,
+        "Glass": 7,
+        "Metal": 115,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 8,
+        "Background": 0
+      },
+      "Textile": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 1,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 182,
+        "Leather": 3,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Leather": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 5,
+        "Leather": 25,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 2,
+        "Background": 0
+      },
+      "Footwear": {
+        "Organic": 0,
+        "Plastic": 1,
+        "Paper": 1,
+        "Glass": 1,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 26,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 1
+      },
+      "Thermocol": {
+        "Organic": 0,
+        "Plastic": 7,
+        "Paper": 6,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 25,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Ewaste": {
+        "Organic": 0,
+        "Plastic": 14,
+        "Paper": 1,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 1,
+        "Footwear": 0,
+        "Thermocol": 1,
+        "Ewaste": 103,
+        "Background": 0
+      },
+      "Background": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 1,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 2,
+        "Ewaste": 2,
+        "Background": 13
+      }
+    }
+  },
+  "probe": {
+    "accuracy": 0.6271186440677966,
+    "correct": 148,
+    "total": 236,
+    "perClass": [
+      {
+        "label": "Organic",
+        "total": 0,
+        "correct": 0,
+        "accuracy": null
+      },
+      {
+        "label": "Plastic",
+        "total": 80,
+        "correct": 62,
+        "accuracy": 0.775
+      },
+      {
+        "label": "Paper",
+        "total": 54,
+        "correct": 30,
+        "accuracy": 0.5555555555555556
+      },
+      {
+        "label": "Glass",
+        "total": 13,
+        "correct": 4,
+        "accuracy": 0.3076923076923077
+      },
+      {
+        "label": "Metal",
+        "total": 17,
+        "correct": 3,
+        "accuracy": 0.17647058823529413
+      },
+      {
+        "label": "Textile",
+        "total": 0,
+        "correct": 0,
+        "accuracy": null
+      },
+      {
+        "label": "Leather",
+        "total": 5,
+        "correct": 1,
+        "accuracy": 0.2
+      },
+      {
+        "label": "Footwear",
+        "total": 0,
+        "correct": 0,
+        "accuracy": null
+      },
+      {
+        "label": "Thermocol",
+        "total": 27,
+        "correct": 18,
+        "accuracy": 0.6666666666666666
+      },
+      {
+        "label": "Ewaste",
+        "total": 40,
+        "correct": 30,
+        "accuracy": 0.75
+      },
+      {
+        "label": "Background",
+        "total": 0,
+        "correct": 0,
+        "accuracy": null
+      }
+    ],
+    "matrix": {
+      "Organic": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Plastic": {
+        "Organic": 0,
+        "Plastic": 62,
+        "Paper": 4,
+        "Glass": 1,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 5,
+        "Ewaste": 6,
+        "Background": 2
+      },
+      "Paper": {
+        "Organic": 0,
+        "Plastic": 2,
+        "Paper": 30,
+        "Glass": 1,
+        "Metal": 2,
+        "Textile": 3,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 13,
+        "Ewaste": 2,
+        "Background": 1
+      },
+      "Glass": {
+        "Organic": 0,
+        "Plastic": 1,
+        "Paper": 2,
+        "Glass": 4,
+        "Metal": 1,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 1,
+        "Thermocol": 1,
+        "Ewaste": 3,
+        "Background": 0
+      },
+      "Metal": {
+        "Organic": 0,
+        "Plastic": 2,
+        "Paper": 1,
+        "Glass": 0,
+        "Metal": 3,
+        "Textile": 1,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 1,
+        "Ewaste": 9,
+        "Background": 0
+      },
+      "Textile": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Leather": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 2,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 1,
+        "Footwear": 0,
+        "Thermocol": 1,
+        "Ewaste": 1,
+        "Background": 0
+      },
+      "Footwear": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      },
+      "Thermocol": {
+        "Organic": 0,
+        "Plastic": 5,
+        "Paper": 2,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 18,
+        "Ewaste": 2,
+        "Background": 0
+      },
+      "Ewaste": {
+        "Organic": 0,
+        "Plastic": 4,
+        "Paper": 2,
+        "Glass": 1,
+        "Metal": 1,
+        "Textile": 1,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 1,
+        "Ewaste": 30,
+        "Background": 0
+      },
+      "Background": {
+        "Organic": 0,
+        "Plastic": 0,
+        "Paper": 0,
+        "Glass": 0,
+        "Metal": 0,
+        "Textile": 0,
+        "Leather": 0,
+        "Footwear": 0,
+        "Thermocol": 0,
+        "Ewaste": 0,
+        "Background": 0
+      }
+    },
+    "sources": [
+      {
+        "source": "advertising-fobs",
+        "class": "Ewaste",
+        "total": 6,
+        "correct": 5,
+        "accuracy": 0.8333333333333334,
+        "wrong": {
+          "Plastic": 1
+        }
+      },
+      {
+        "source": "automobile-keys",
+        "class": "Metal",
+        "total": 10,
+        "correct": 3,
+        "accuracy": 0.3,
+        "wrong": {
+          "Ewaste": 6,
+          "Thermocol": 1
+        }
+      },
+      {
+        "source": "ball-pointed-pens",
+        "class": "Plastic",
+        "total": 14,
+        "correct": 14,
+        "accuracy": 1,
+        "wrong": {}
+      },
+      {
+        "source": "ballpens",
+        "class": "Plastic",
+        "total": 13,
+        "correct": 12,
+        "accuracy": 0.9230769230769231,
+        "wrong": {
+          "Background": 1
+        }
+      },
+      {
+        "source": "bottle-caps",
+        "class": "Plastic",
+        "total": 11,
+        "correct": 10,
+        "accuracy": 0.9090909090909091,
+        "wrong": {
+          "Ewaste": 1
+        }
+      },
+      {
+        "source": "brown-paper",
+        "class": "Paper",
+        "total": 1,
+        "correct": 1,
+        "accuracy": 1,
+        "wrong": {}
+      },
+      {
+        "source": "cardboard-boxes",
+        "class": "Paper",
+        "total": 14,
+        "correct": 11,
+        "accuracy": 0.7857142857142857,
+        "wrong": {
+          "Background": 1,
+          "Metal": 1,
+          "Ewaste": 1
+        }
+      },
+      {
+        "source": "circuit-boards",
+        "class": "Ewaste",
+        "total": 3,
+        "correct": 3,
+        "accuracy": 1,
+        "wrong": {}
+      },
+      {
+        "source": "corrugated-board",
+        "class": "Paper",
+        "total": 14,
+        "correct": 6,
+        "accuracy": 0.42857142857142855,
+        "wrong": {
+          "Thermocol": 3,
+          "Textile": 2,
+          "Plastic": 1,
+          "Ewaste": 1,
+          "Metal": 1
+        }
+      },
+      {
+        "source": "drinking-glasses",
+        "class": "Glass",
+        "total": 1,
+        "correct": 0,
+        "accuracy": 0,
+        "wrong": {
+          "Paper": 1
+        }
+      },
+      {
+        "source": "electronic-key-fobs",
+        "class": "Ewaste",
+        "total": 9,
+        "correct": 5,
+        "accuracy": 0.5555555555555556,
+        "wrong": {
+          "Plastic": 2,
+          "Metal": 1,
+          "Glass": 1
+        }
+      },
+      {
+        "source": "electronic-waste",
+        "class": "Ewaste",
+        "total": 3,
+        "correct": 2,
+        "accuracy": 0.6666666666666666,
+        "wrong": {
+          "Paper": 1
+        }
+      },
+      {
+        "source": "expanded-polystyrene",
+        "class": "Thermocol",
+        "total": 9,
+        "correct": 7,
+        "accuracy": 0.7777777777777778,
+        "wrong": {
+          "Ewaste": 1,
+          "Paper": 1
+        }
+      },
+      {
+        "source": "foam-cups",
+        "class": "Thermocol",
+        "total": 6,
+        "correct": 3,
+        "accuracy": 0.5,
+        "wrong": {
+          "Plastic": 3
+        }
+      },
+      {
+        "source": "foam-food-containers",
+        "class": "Thermocol",
+        "total": 12,
+        "correct": 8,
+        "accuracy": 0.6666666666666666,
+        "wrong": {
+          "Plastic": 2,
+          "Ewaste": 1,
+          "Paper": 1
+        }
+      },
+      {
+        "source": "glass-bottles",
+        "class": "Glass",
+        "total": 4,
+        "correct": 1,
+        "accuracy": 0.25,
+        "wrong": {
+          "Ewaste": 2,
+          "Plastic": 1
+        }
+      },
+      {
+        "source": "glass-jars",
+        "class": "Glass",
+        "total": 3,
+        "correct": 1,
+        "accuracy": 0.3333333333333333,
+        "wrong": {
+          "Paper": 1,
+          "Thermocol": 1
+        }
+      },
+      {
+        "source": "key-fobs-electronic",
+        "class": "Ewaste",
+        "total": 6,
+        "correct": 5,
+        "accuracy": 0.8333333333333334,
+        "wrong": {
+          "Textile": 1
+        }
+      },
+      {
+        "source": "key-rings",
+        "class": "Metal",
+        "total": 7,
+        "correct": 1,
+        "accuracy": 0.14285714285714285,
+        "wrong": {
+          "Ewaste": 2,
+          "Plastic": 2,
+          "Textile": 1,
+          "Paper": 1
+        }
+      },
+      {
+        "source": "keys",
+        "class": "Metal",
+        "total": 1,
+        "correct": 0,
+        "accuracy": 0,
+        "wrong": {
+          "Ewaste": 1
+        }
+      },
+      {
+        "source": "kraft-paper",
+        "class": "Paper",
+        "total": 8,
+        "correct": 3,
+        "accuracy": 0.375,
+        "wrong": {
+          "Thermocol": 4,
+          "Glass": 1
+        }
+      },
+      {
+        "source": "mobile-phones",
+        "class": "Ewaste",
+        "total": 4,
+        "correct": 2,
+        "accuracy": 0.5,
+        "wrong": {
+          "Paper": 1,
+          "Thermocol": 1
+        }
+      },
+      {
+        "source": "paper-bags",
+        "class": "Paper",
+        "total": 14,
+        "correct": 8,
+        "accuracy": 0.5714285714285714,
+        "wrong": {
+          "Thermocol": 4,
+          "Plastic": 1,
+          "Textile": 1
+        }
+      },
+      {
+        "source": "paperboard",
+        "class": "Paper",
+        "total": 3,
+        "correct": 1,
+        "accuracy": 0.3333333333333333,
+        "wrong": {
+          "Thermocol": 2
+        }
+      },
+      {
+        "source": "plastic-bottles",
+        "class": "Plastic",
+        "total": 14,
+        "correct": 8,
+        "accuracy": 0.5714285714285714,
+        "wrong": {
+          "Ewaste": 2,
+          "Thermocol": 2,
+          "Background": 1,
+          "Paper": 1
+        }
+      },
+      {
+        "source": "plastic-containers",
+        "class": "Plastic",
+        "total": 14,
+        "correct": 10,
+        "accuracy": 0.7142857142857143,
+        "wrong": {
+          "Ewaste": 2,
+          "Paper": 1,
+          "Thermocol": 1
+        }
+      },
+      {
+        "source": "plastic-cups",
+        "class": "Plastic",
+        "total": 14,
+        "correct": 8,
+        "accuracy": 0.5714285714285714,
+        "wrong": {
+          "Paper": 2,
+          "Thermocol": 2,
+          "Ewaste": 1,
+          "Glass": 1
+        }
+      },
+      {
+        "source": "smartwatches",
+        "class": "Ewaste",
+        "total": 4,
+        "correct": 4,
+        "accuracy": 1,
+        "wrong": {}
+      },
+      {
+        "source": "sunglasses",
+        "class": "Glass",
+        "total": 5,
+        "correct": 2,
+        "accuracy": 0.4,
+        "wrong": {
+          "Footwear": 1,
+          "Metal": 1,
+          "Ewaste": 1
+        }
+      },
+      {
+        "source": "wallets",
+        "class": "Leather",
+        "total": 5,
+        "correct": 1,
+        "accuracy": 0.2,
+        "wrong": {
+          "Paper": 2,
+          "Ewaste": 1,
+          "Thermocol": 1
+        }
+      },
+      {
+        "source": "wristwatches",
+        "class": "Ewaste",
+        "total": 4,
+        "correct": 3,
+        "accuracy": 0.75,
+        "wrong": {
+          "Plastic": 1
+        }
+      }
+    ]
+  },
+  "labels": [
+    "Organic",
+    "Plastic",
+    "Paper",
+    "Glass",
+    "Metal",
+    "Textile",
+    "Leather",
+    "Footwear",
+    "Thermocol",
+    "Ewaste",
+    "Background"
+  ],
+  "imageSize": 224
+}

@@ -1,21 +1,33 @@
-# Secrets and local configuration
-.env
+# Local configuration and device secrets ARE committed (2026-11-17).
+# This repository is the private master copy of the exhibit: a fresh clone on
+# another laptop must run exactly as this one was left.  Nothing here is a
+# shared credential — it is one private board and one laptop.  Do not publish
+# this repository.
 .env.*
 !.env.example
-uc/include/village/secrets.h
 !uc/include/village/secrets.example.h
 *.pem
 *.key
 
-# Downloaded AI models and recordings.
-# The Piper voice is part of the project, not a download: losing it means Sara
-# cannot speak, so it is committed (engine, voices and the phoneme data it needs
-# to run).  The other models are far too large for git — see docs/backup.md.
+# AI models.
+#   models/piper/        committed — Sara's voice is the project (293 MB)
+#   models/waste*/       committed — the classifier must run on a fresh clone
+#   models/whisper/      the server binary is committed; the WEIGHTS are not,
+#                        because GitHub refuses any file over 100 MB and they
+#                        are 142 MB / 466 MB / 1.6 GB.  scripts/download_models.sh
+#                        fetches them, and docs/backup.md explains the rest.
 models/*
 !models/README.md
 !models/.gitkeep
 !models/piper/
 !models/piper/**
+!models/waste/
+!models/waste/**
+!models/waste-resnet50/
+!models/waste-resnet50/**
+!models/whisper/
+!models/whisper/whisper-server
+
 web/frontend/public/audio/*.wav
 web/frontend/public/audio/*.mp3
 web/frontend/public/audio/*.m4a
@@ -52,8 +64,11 @@ uc/.vscode/
 *.elf
 *.map
 
-# Runtime data, logs, databases
-data/
+# Runtime data.  `data/village.db` and `data/waste-samples/` are committed on
+# purpose (see the end of this file): the database is the village's own state
+# and the photos are the only copy of what the classifier got wrong.  Caches,
+# logs, PID files and the rolling crop log are not.
+data/*
 run/
 logs/
 *.sqlite
@@ -69,3 +84,14 @@ Thumbs.db
 *.swp
 *.swo
 /tmp/
+
+# --- Committed on purpose -----------------------------------------------------
+# Last rules win, so these undo the runtime-data block above.
+!data/village.db
+!data/waste-samples/
+!data/waste-samples/**
+!data/waste-corrections.jsonl
+# …and these undo the firmware's `*.bin` rule, which would otherwise swallow the
+# MobileNet weights (`models/waste/weights.bin`).
+!models/waste/**
+!models/waste-resnet50/**
