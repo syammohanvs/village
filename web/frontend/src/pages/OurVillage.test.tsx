@@ -88,8 +88,12 @@ describe('Our Village', () => {
 
     expect(screen.getByText(/28%/)).toBeInTheDocument();
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
-    // The Lights card carries the sensor reading as a chip, not a sentence.
-    expect(within(screen.getByTestId('card-lights')).getByText('Dark')).toBeInTheDocument();
+    // The Lights card carries the sensor reading as a chip, and the row repeats
+    // it beside the lamps ("Outside: Dark") — two different facts, both shown.
+    const lightsCard = within(screen.getByTestId('card-lights'));
+    expect(lightsCard.getAllByText('Dark').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('outside-reading')).toHaveTextContent('Outside: Dark');
+    expect(screen.getByTestId('streetlights-reading')).toHaveTextContent(/Streetlights: (On|Off)/);
     // Nothing on this page claims to know how full a bin is.
     expect(screen.queryByText(/distance sensor/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/full/i)).not.toBeInTheDocument();
@@ -108,7 +112,9 @@ describe('Our Village', () => {
     await renderReady();
 
     const card = within(await screen.findByTestId('card-lights'));
-    expect(card.getByText('No sensor')).toBeInTheDocument();
+    // Both the chip and the row's own reading say the sensor is missing — and
+    // neither invents a level.
+    expect(card.getAllByText('No sensor').length).toBeGreaterThan(0);
     expect(card.queryByText('Dark')).not.toBeInTheDocument();
     expect(card.queryByText('Bright')).not.toBeInTheDocument();
   });
@@ -547,7 +553,8 @@ describe('Our Village — the words on the page', () => {
 
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('1.20 V')).toBeInTheDocument();
-    expect(card.getByText('Simulated voltage; power is not measured.')).toBeInTheDocument();
+    // Live says *measured*: the figure comes from the board.
+    expect(card.getByText('Voltage measured; power is not measured.')).toBeInTheDocument();
     expect(card.queryByText(/second input/i)).not.toBeInTheDocument();
   });
 });
@@ -689,10 +696,12 @@ describe('the simulation lab changes conditions and explains itself', () => {
   });
 
   it('says the turbine’s power is not measured', async () => {
+    window.localStorage.setItem('village.demoMode', 'demo');
     vi.mocked(api.state).mockResolvedValue(makeState({ windMillivolts: 1200, windInstalled: true }));
     await renderReady();
 
     const card = within(await screen.findByTestId('card-wind'));
+    // In the lab the number is simulated, and the card says so.
     expect(card.getByText('Simulated voltage; power is not measured.')).toBeInTheDocument();
     expect(card.queryByText(/mW|mA/)).not.toBeInTheDocument();
   });

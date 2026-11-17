@@ -134,6 +134,15 @@ visitors cannot be used to press **Water** or change calibration.
 - **Sara's reply and the request stay on screen while a new recording starts**,
   and closing the panel mid-recording cancels the recorder. A reply is only
   replaced by a newer request.
+- **The rows read the same in both modes; only the lab's controls are extra
+  (2026-11-17).**  The pump/streetlight state, the *Outside / Streetlights*
+  readings, the five-lamp strip, the SolarPanel / Windmill pictures and the
+  "why" sentence under each row are rendered for Live as well — the sliders,
+  the tank choices, the quick demonstrations and *Try a sample* stay inside
+  `{demo && …}`.  In Live the pictures follow the **measured** volts through the
+  same curve the simulator uses (150 mV … 4000 mV), and the windmill is drawn
+  still with `data-fitted="false"` when no turbine is wired, so the picture
+  cannot claim hardware the board does not have.
 - **The simulation lab is one engine with real controls (2026-11-17).** Every
   slider, preset and sample goes through `SimulatedDevice` (`web/backend/app/
   simulator.py`) via `POST /demo/scenario` / `/demo/reset` — never a second

@@ -63,8 +63,14 @@ export function SolarPanel({ light }: { light: number }) {
   );
 }
 
-/** A windmill whose blades turn as fast as the simulated wind. */
-export function Windmill({ speed }: { speed: number }) {
+/**
+ * A windmill whose blades turn as fast as the wind.
+ *
+ * `fitted` is the honest half in Live: this board has no turbine wired, so the
+ * picture stands still and says so rather than turning beside the words "Not
+ * fitted" (2026-11-17).
+ */
+export function Windmill({ speed, fitted = true }: { speed: number; fitted?: boolean }) {
   const level = Math.max(0, Math.min(1, speed));
   // One turn every 6 s at a breeze, every 0.9 s in a gale; still air does not
   // turn at all, and CSS stops the animation entirely for reduced motion.
@@ -74,8 +80,13 @@ export function Windmill({ speed }: { speed: number }) {
       className="sim-picture sim-picture--wind"
       viewBox="0 0 120 78"
       role="img"
-      aria-label={`Windmill turning ${level > 0.66 ? 'fast' : level > 0.1 ? 'slowly' : 'not at all'}`}
+      aria-label={
+        fitted
+          ? `Windmill turning ${level > 0.66 ? 'fast' : level > 0.1 ? 'slowly' : 'not at all'}`
+          : 'Windmill not fitted'
+      }
       data-speed={level.toFixed(2)}
+      data-fitted={fitted ? 'true' : 'false'}
     >
       <path d="M60 34 L54 74 L66 74 Z" fill="var(--burgundy-2)" stroke="var(--gold-dim)" />
       <g

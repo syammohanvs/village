@@ -2501,3 +2501,13 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .mic-button { padding: 8px 16px 8px 8px; }
   .mic-button-label { font-size: 19px; }
 }
+
+/* In Live the picture has no slider beside it, so its sentence takes that space
+   instead of starting a new line under a short drawing. */
+.sim-hint--live { flex: 1 1 320px; }
+
+/* A sentence that belongs to the row in both modes, above whatever the lab
+   adds under it. */
+.sim-why--always,
+.sim-hint--always { flex: 1 1 100%; margin: 0; }
+.sim-why--always { font-size: 15px; color: var(--gold-2); }

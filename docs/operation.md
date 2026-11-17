@@ -109,6 +109,14 @@ The full guide, including how to edit its sentences, is in
 - **Talk to Sara** — the microphone at the top, with its name beside it. The
   buttons under it choose **Sara's** language only; the page itself stays
   English. The panel it opens is described under *Voice commands* below.
+- **The sentence under each row** — the rule that decided, in the controller's
+  own words on Auto and in plain words on a manual switch. It is there in Live
+  as well as in Simulation, because "why is the pump off?" is a question for
+  both.
+- **The two pictures** — the solar panel with its LED, and the windmill — are on
+  the page in both modes. In Simulation they follow the sliders; in Live they
+  follow the measured volts, so a dark panel shows an unlit LED and an unwired
+  turbine stands still.
 - **Recent activity** — commands, recognitions, alerts and connection events.
 
 Every card is **one row**: the name and its state chip on the left, then the

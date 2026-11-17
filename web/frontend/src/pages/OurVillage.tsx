@@ -107,6 +107,23 @@ export function OurVillage() {
   const solarGenerating = Boolean(solarVolts) && (solar?.power_mw ?? 0) >= SOLAR_GENERATING_MW;
 
   const windVolts = hasStatus && wind?.millivolts != null ? (wind.millivolts / 1000).toFixed(2) : null;
+
+  // What the two pictures follow.  In Simulation the slider's own value is in
+  // the frame; in Live the picture follows the measured volts, through the same
+  // curve the simulator draws (150 mV dark … 4000 mV strong).  A dark panel
+  // therefore shows an unlit LED rather than a decorative glow.
+  const solarLightLevel = (() => {
+    if (!hasStatus) return 0;
+    if (typeof solar?.light === 'number') return Math.max(0, Math.min(1, solar.light));
+    const mv = solar?.millivolts ?? 0;
+    return Math.max(0, Math.min(1, (mv - 150) / 3850));
+  })();
+  const windSpeedLevel = (() => {
+    if (!hasStatus) return 0;
+    if (typeof wind?.speed === 'number') return Math.max(0, Math.min(1, wind.speed));
+    if (!wind?.installed) return 0;
+    return Math.max(0, Math.min(1, (wind?.millivolts ?? 0) / 2600));
+  })();
   const windFitted = wind?.installed ?? false;
   const windGenerating = Boolean(wind?.generating);
 
@@ -379,6 +396,12 @@ export function OurVillage() {
               {pumpNote}
             </p>
           )}
+          {/* The sentence comes first in both modes: it is the rule that
+              decided, and in Live it is the controller's own reason.  Only the
+              slider is the lab's. */}
+          <p className="sim-why sim-why--always" data-testid="water-why">
+            {pumpWhy}
+          </p>
           {demo && (
             <div className="sim-block" data-testid="sim-watering">
               <SimSlider
@@ -392,9 +415,6 @@ export function OurVillage() {
                 onChange={(next) => void setScenario({ soil_pct: next }, 'plants')}
                 hint="An indication from the simulated probe, not a measured amount of water in the soil."
               />
-              <p className="sim-why" data-testid="water-why">
-                {pumpWhy}
-              </p>
               <p className="sim-why-note">
                 The pump follows the same thresholds, pulses and limits as the real controller.
               </p>
@@ -419,6 +439,10 @@ export function OurVillage() {
                   : 'No usable probe reading',
             reservoir?.state === 'available' ? 'good' : reservoir?.state === 'low' ? 'warn' : 'neutral',
           )}
+          <p className="sim-hint sim-hint--always" data-testid="tank-note">
+            Two wires in the tank: the whole choice the real detector can make is water at the low
+            level, or not. No percentage and no litres.
+          </p>
           {demo && (
             <div className="sim-block" data-testid="sim-tank">
               <div className="sim-choice" role="group" aria-label="Simulated water in the tank">
@@ -441,10 +465,6 @@ export function OurVillage() {
                   Low water
                 </button>
               </div>
-              <p className="sim-hint">
-                Two wires in the tank: this is the whole choice the real detector can make. The pump
-                and any reason it is blocked are shown in the Watering row.
-              </p>
             </div>
           )}
           {notice?.card === 'tank' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
@@ -473,8 +493,7 @@ export function OurVillage() {
               </button>
             ))}
           </div>
-          {demo && (
-            <div className="sim-block sim-block--lights" data-testid="lamp-lab">
+          <div className="sim-block sim-block--lights" data-testid="lights-detail">
               <div className="sim-readings">
                 <span data-testid="outside-reading">
                   Outside: <strong>{lightWord}</strong>
@@ -487,26 +506,27 @@ export function OurVillage() {
                 <span className="sim-lamps-label">Streetlights</span>
                 <StreetLampStrip on={Boolean(lights?.commanded)} count={lights?.led_count ?? 5} />
               </div>
-              <SimSlider
-                label="Outside light"
-                testId="sim-outside"
-                value={lightMetric}
-                min={0}
-                max={4095}
-                lowLabel="Dark"
-                highLabel="Bright"
-                valueText={lightWord}
-                describe={(value) =>
-                  value < DARK_THRESHOLD ? 'Dark' : value > BRIGHT_THRESHOLD ? 'Bright' : 'In between'
-                }
-                disabled={busy !== null}
-                onChange={(value) => void setAmbient(value)}
-              />
+              {demo && (
+                <SimSlider
+                  label="Outside light"
+                  testId="sim-outside"
+                  value={lightMetric}
+                  min={0}
+                  max={4095}
+                  lowLabel="Dark"
+                  highLabel="Bright"
+                  valueText={lightWord}
+                  describe={(value) =>
+                    value < DARK_THRESHOLD ? 'Dark' : value > BRIGHT_THRESHOLD ? 'Bright' : 'In between'
+                  }
+                  disabled={busy !== null}
+                  onChange={(value) => void setAmbient(value)}
+                />
+              )}
               <p className="sim-why" data-testid="lights-why">
                 {lightWhy}
               </p>
-            </div>
-          )}
+          </div>
           {notice?.card === 'lights' && <p className="vcard-note vcard-note--warn">{notice.text}</p>}
         </article>
 
@@ -587,22 +607,30 @@ export function OurVillage() {
             : 'No reading',
           'neutral',
         )}
-        {demo && (
-          <div className="sim-block sim-block--solar" data-testid="sim-solar">
-            <SolarPanel light={solar?.light ?? 0.55} />
+        {/* The picture is worth having in both modes: in Simulation it follows
+            the slider, and in Live it follows the volts the panel is actually
+            producing — which is why a dark room shows an unlit LED. */}
+        <div className="sim-block sim-block--solar" data-testid="sim-solar">
+          <SolarPanel light={solarLightLevel} />
+          {demo ? (
             <SimSlider
               label="Light on solar panel"
               testId="sim-panel-light"
-              value={(solar?.light ?? 0.55) * 100}
+              value={solarLightLevel * 100}
               lowLabel="Low light"
               highLabel="Strong light"
-              valueText={`${Math.round((solar?.light ?? 0.55) * 100)}%`}
+              valueText={`${Math.round(solarLightLevel * 100)}%`}
               disabled={busy !== null}
               onChange={(next) => void setScenario({ solar_light: next / 100 }, 'solar')}
               hint="Simulated values from the panel's own circuit — volts, the current through the 330 Ω resistor, and power = volts × milliamps. Not a measurement of the real panel."
             />
-          </div>
-        )}
+          ) : (
+            <p className="sim-hint sim-hint--live" data-testid="solar-live-note">
+              Measured across the panel and its 330 Ω resistor: power = volts × milliamps. The LED
+              lights only once the panel reaches about 1.8 V, so a dim panel honestly reads zero.
+            </p>
+          )}
+        </div>
       </article>
 
       <article className="vcard vcard--min vcard--solar vcard--row" data-testid="card-wind">
@@ -621,27 +649,37 @@ export function OurVillage() {
           )}
         </header>
         {stateLine(windVolts ? `${windVolts} V` : 'No reading', 'neutral')}
-        {windFitted ? (
+        {windFitted || demo ? (
           <p className="vcard-note">
-            Simulated voltage; power is not measured.
+            {demo ? 'Simulated voltage' : 'Voltage measured'}; power is not measured.
           </p>
         ) : null}
-        {demo && (
-          <div className="sim-block sim-block--wind" data-testid="sim-wind">
-            <Windmill speed={wind?.speed ?? 0.6} />
+        {/* The windmill turns in Simulation, and in Live it turns as fast as the
+            volts allow — or stands still when no turbine is wired, which is this
+            board's state. */}
+        <div className="sim-block sim-block--wind" data-testid="sim-wind">
+          <Windmill speed={windSpeedLevel} fitted={demo || windFitted} />
+          {demo ? (
             <SimSlider
               label="Windmill speed"
               testId="sim-wind-speed"
-              value={(wind?.speed ?? 0.6) * 100}
+              value={windSpeedLevel * 100}
               lowLabel="Still"
               highLabel="Fast"
-              valueText={`${Math.round((wind?.speed ?? 0.6) * 100)}%`}
+              valueText={`${Math.round(windSpeedLevel * 100)}%`}
               disabled={busy !== null}
               onChange={(next) => void setScenario({ wind_speed: next / 100 }, 'wind')}
               hint="Simulated voltage; power is not measured — the board has no second input for current."
             />
-          </div>
-        )}
+          ) : (
+            !windFitted && (
+              <p className="sim-hint sim-hint--live" data-testid="wind-live-note">
+                No turbine is wired to this board, so the windmill stands still; only the pin’s own{' '}
+                {windVolts ?? '0.00'} V is reported.
+              </p>
+            )
+          )}
+        </div>
       </article>
       {samplesOpen && <WasteSamples onClose={() => setSamplesOpen(false)} />}
     </div>
