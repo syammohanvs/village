@@ -378,8 +378,25 @@ export function WasteBins({ active, label }: { active: string | null; label: str
         stroke="var(--gold-2)"
         strokeWidth="1.6"
         strokeDasharray="4 4"
-        opacity="0.85"
+        opacity="0.7"
       />
+      {/* the flash: a star at the lens that fires every few seconds.  It is the
+          camera's own motion — the bins still only light when one is named. */}
+      <g className="camera-flash" aria-hidden="true">
+        <circle cx="33" cy="33.5" r="4.6" fill="#fff6d8" opacity="0.95" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+          <line
+            key={angle}
+            x1={33 + Math.cos((angle * Math.PI) / 180) * 6}
+            y1={33.5 + Math.sin((angle * Math.PI) / 180) * 6}
+            x2={33 + Math.cos((angle * Math.PI) / 180) * 10}
+            y2={33.5 + Math.sin((angle * Math.PI) / 180) * 10}
+            stroke="#fff6d8"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        ))}
+      </g>
       {bins.map((bin) => {
         const on = lit === bin.id;
         return (

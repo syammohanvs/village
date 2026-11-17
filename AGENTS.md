@@ -223,7 +223,9 @@ visitors cannot be used to press **Water** or change calibration.
   (`picture.*`), so a screen reader hears the page's language too.
   **Motion follows the same rule** (2026-11-18): the sun pulses and its rays
   shimmer, a **lit** lamp and the **chosen** bin's halo swell, and the waste
-  camera's sight line walks — each is an animated `<g>` around the thing, so the
+  **camera flashes** (a star at the lens, every 3.2 s, dark for most of the
+  cycle — a flash that never goes out is a lamp) — each is an animated `<g>`
+  around the thing, so the
   colours inside still come from the reading (a dim panel shimmers more faintly,
   an unlit lamp has no halo, an unnamed bin has none). The only full rotation is
   still the windmill's; everything else pulses in place. All of it is switched
@@ -232,8 +234,8 @@ visitors cannot be used to press **Water** or change calibration.
   **A first cut animated opacity only, and it was invisible** — 18 px of halo at
   16 % on a dark card changing 0.18 → 0.10 is not motion anyone can see
   (reported 2026-11-18). The glows now **scale 0.82 → 1.12 as well as
-  brighten**, and the sight line marches so the waste card is alive before
-  anything is recognised. Measure motion with `getComputedStyle(el).transform`
+  brighten**, and the camera flashes so the waste card is alive before anything
+  is recognised. Measure motion with `getComputedStyle(el).transform`
   over two samples, not with `animationName`: the name being attached says
   nothing about whether a person can see it.
   **One measured trap:** adding a 92 px lamp to `.sim-lamps` — a row that is

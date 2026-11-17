@@ -51,8 +51,10 @@ describe('the waste picture shows the camera and the bins it sorts', () => {
     render(<WasteBins active={null} label="Bins" />);
     expect(query('.sim-picture--bins')?.getAttribute('data-active')).toBe('none');
     expect(document.querySelectorAll('.bin-glow')).toHaveLength(0);
-    // The camera is still there: it is the card, not the recognition.
+    // The camera is still there: it is the card, not the recognition.  Its
+    // flash is motion, not a claim — the bins are what report an answer.
     expect(query('[data-testid="waste-camera"]')).not.toBeNull();
+    expect(query('.camera-flash')).not.toBeNull();
   });
 });
 
@@ -91,13 +93,13 @@ describe('the motion is gentle and can be turned off', () => {
       ['.solar-sun', /animation:\s*sim-pulse/],
       ['.lamp-glow', /animation:\s*sim-pulse/],
       ['.bin-glow', /animation:\s*sim-pulse/],
-      ['.sight-line', /animation:\s*sight-walk/],
+      ['.camera-flash', /animation:\s*camera-flash/],
     ];
     for (const [selector, wanted] of rules) {
       const rule = new RegExp(`\\${selector}\\s*\\{([^}]*)\\}`).exec(styles)?.[1] ?? '';
       expect(rule, selector).toMatch(wanted);
     }
-    for (const frames of ['sim-breathe', 'sim-pulse', 'sight-walk']) {
+    for (const frames of ['sim-breathe', 'sim-pulse', 'camera-flash']) {
       expect(styles, frames).toMatch(new RegExp(`@keyframes ${frames}\\s*\\{`));
     }
     // A pulsing glow has to scale about itself, not about the whole canvas.
@@ -117,7 +119,7 @@ describe('the motion is gentle and can be turned off', () => {
       '.solar-led-glow',
       '.lamp-glow',
       '.bin-glow',
-      '.sight-line',
+      '.camera-flash',
     ]) {
       expect(drawings, selector).toContain(selector);
     }
