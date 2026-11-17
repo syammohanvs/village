@@ -2513,8 +2513,17 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 /* Water falls only while the pump runs; the tank is fed by rain while it has
    water.  Both are the same fact as the sentence beside them, drawn. */
-.watering-drops circle { animation: fall-drop 1.6s linear infinite; }
+.watering-can { transform-box: fill-box; transform-origin: center; }
+.watering-drop { animation: fall-water 1.7s linear infinite; }
 .tank-drops line { animation: fall-drop 1.8s linear infinite; }
+/* Long enough to leave the spout and reach the pot (38 units in a 78-unit
+   picture), or the stream stops in mid-air and reads as a fault. */
+@keyframes fall-water {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(44px); opacity: 0; }
+}
 @keyframes fall-drop {
   0% { transform: translateY(0); opacity: 0; }
   20% { opacity: 1; }
@@ -2565,7 +2574,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 /* Gentle, and still for anyone who asked their system for less motion. */
 @media (prefers-reduced-motion: reduce) {
   .windmill-blades,
-  .watering-drops circle,
+  .watering-drop,
   .tank-drops line,
   .solar-rays,
   .solar-sun,
@@ -2578,11 +2587,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
      say "water is flowing" without moving, and it is still true only while the
      pump runs (reported 2026-11-18: "the watering animation seems gone", on a
      machine whose system asks for less motion, where it was being hidden). */
-  .watering-drops circle { opacity: 1; }
-  .watering-drops circle:nth-child(1) { transform: translateY(1px); }
-  .watering-drops circle:nth-child(2) { transform: translateY(7px); }
-  .watering-drops circle:nth-child(3) { transform: translateY(13px); }
-  .watering-drops circle:nth-child(4) { transform: translateY(19px); }
+  .watering-drop { opacity: 1; }
+  .watering-drop:nth-child(1) { transform: translateY(2px); }
+  .watering-drop:nth-child(2) { transform: translateY(12px); }
+  .watering-drop:nth-child(3) { transform: translateY(23px); }
+  .watering-drop:nth-child(4) { transform: translateY(33px); }
   .camera-flash { opacity: 0; }
 }
 

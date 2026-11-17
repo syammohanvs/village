@@ -161,3 +161,27 @@ def test_a_demo_answer_says_it_is_simulated() -> None:
     plain = SimulatedDevice(demo=False)
     plain_ack = plain.command({"type": "LIGHTS_ON", "command_id": "sim-lights-1"})
     assert not plain_ack["reason"].startswith("Simulated: ")
+
+
+def test_a_scenario_clears_the_controller_lockout_so_the_demo_can_water_again() -> None:
+    """A demonstration that cannot demonstrate is a broken control.
+
+    The simulated controller locks itself out after repeated watering with no
+    moisture rise (30 minutes of cooldown).  A presenter who had played with the
+    lab could then press "Dry soil" and see nothing happen for the rest of the
+    session — reported as "the watering animation is not visible" (2026-11-18).
+    Every scenario is a fresh experiment, so it clears the lockout with it.
+    """
+    device = SimulatedDevice(demo=True)
+    with device._lock:
+        device.failure_lockout = True
+        device.cooldown_until = device.now_ms + 30 * 60 * 1000
+        device.dry_since = device.now_ms
+
+    device.scenario({"soil_pct": 20, "reservoir": "available", "pump_manual": "auto"})
+    device.advance(6000)
+    device.advance(6100)
+    irrigation = status(device)["irrigation"]
+    assert irrigation["failure_lockout"] is False, irrigation["reason"]
+    assert irrigation["cooldown_remaining_ms"] == 0, irrigation["reason"]
+    assert irrigation["state"] == "pumping", irrigation["reason"]

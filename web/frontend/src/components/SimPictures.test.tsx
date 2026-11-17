@@ -15,6 +15,10 @@ function query(selector: string) {
   return document.querySelector(selector);
 }
 
+function queryAll(selector: string) {
+  return document.querySelectorAll(selector);
+}
+
 describe('the card pictures follow their reading', () => {
   it('shimmers the sun and haloes the LED only when it is lit', () => {
     render(<SolarPanel light={0.05} label="Solar" />);
@@ -59,13 +63,20 @@ describe('the waste picture shows the camera and the bins it sorts', () => {
 });
 
 describe('the plant waters only while the pump runs', () => {
-  it('draws falling water with the pump, and none without it', () => {
+  it('draws a can pouring water with the pump, and none without it', () => {
     const { unmount } = render(<Plant level={0.2} pumping={false} label="Plant" />);
+    // Nothing that says "water is flowing" when it is not.
     expect(query('.watering-drops')).toBeNull();
+    expect(query('.watering-can')).toBeNull();
+    expect(query('.watering-splash')).toBeNull();
     unmount();
 
     render(<Plant level={0.2} pumping label="Plant" />);
-    expect(query('.watering-drops')).not.toBeNull();
+    // The can is what makes it read as watering: four dots above the leaves
+    // without one looked like berries (reported 2026-11-18).
+    expect(query('.watering-can')).not.toBeNull();
+    expect(queryAll('.watering-drop')).toHaveLength(4);
+    expect(query('.watering-splash')).not.toBeNull();
   });
 });
 

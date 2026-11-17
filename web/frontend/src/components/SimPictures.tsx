@@ -173,24 +173,63 @@ export function Plant({
       data-moisture={level === null ? 'unknown' : wet.toFixed(2)}
       data-pumping={pumping ? 'true' : 'false'}
     >
-      {/* water, only while the pump is actually running */}
+      {/* Watering, only while the pump is actually running: a can in the
+          corner and a stream falling from its spout onto the pot.  The first
+          version drew four dots a little above the leaves with nothing holding
+          them, so it read as berries on the plant rather than as water
+          (reported 2026-11-18: "watering animation is not visible"). */}
       {pumping && (
-        <g className="watering-drops" aria-hidden="true">
-          {[
-            { x: 55, delay: '0s' },
-            { x: 60, delay: '0.4s' },
-            { x: 65, delay: '0.8s' },
-            { x: 60, delay: '1.2s' },
-          ].map((drop, index) => (
-            <circle
-              key={`${drop.x}-${index}`}
-              cx={drop.x}
-              cy={18}
-              r="2.4"
-              fill="#7fc7e8"
-              style={{ animationDelay: drop.delay }}
+        <g className="watering" aria-hidden="true">
+          <g className="watering-can">
+            <path
+              d="M10 9 h20 a3 3 0 0 1 3 3 v5 a3 3 0 0 1 -3 3 h-20 a3 3 0 0 1 -3 -3 v-5 a3 3 0 0 1 3 -3 z"
+              fill="#9fc2d0"
+              stroke="var(--gold-dim)"
+              strokeWidth="1"
             />
-          ))}
+            <path
+              d="M31 12 L45 5 L48 10 L32 18 Z"
+              fill="#9fc2d0"
+              stroke="var(--gold-dim)"
+              strokeWidth="1"
+            />
+            <path
+              d="M13 9 a6.5 5.5 0 0 1 13 0"
+              fill="none"
+              stroke="var(--gold-dim)"
+              strokeWidth="1.3"
+            />
+          </g>
+          <g className="watering-drops">
+            {[
+              { x: 50, delay: '0s' },
+              { x: 56, delay: '0.42s' },
+              { x: 52.5, delay: '0.84s' },
+              { x: 58, delay: '1.26s' },
+            ].map((drop, index) => (
+              <circle
+                key={`${drop.x}-${index}`}
+                className="watering-drop"
+                cx={drop.x}
+                cy={11}
+                r="2.6"
+                fill="#8fd4f0"
+                style={{ animationDelay: drop.delay }}
+              />
+            ))}
+          </g>
+          {/* Water reaching the soil: a small, faint pool where the stream
+              lands, so the picture reads as watering the pot rather than as
+              something happening above it. */}
+          <ellipse
+            className="watering-splash"
+            cx="54"
+            cy="54"
+            rx="8"
+            ry="2.2"
+            fill="#8fd4f0"
+            opacity="0.35"
+          />
         </g>
       )}
       {/* the pot, then the soil in it */}

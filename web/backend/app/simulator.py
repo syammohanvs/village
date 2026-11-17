@@ -805,6 +805,16 @@ class SimulatedDevice:
     def scenario(self, values: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             self.advance()
+            # A scenario is a fresh demonstration, so the controller's own
+            # "no moisture rise" lockout and its 30-minute cooldown are cleared
+            # with it.  Without this the lab could be left in a state where
+            # "Dry soil" changes nothing and the watering picture never moves —
+            # which is exactly how "the watering animation is not visible" was
+            # reported (2026-11-18), after a few demonstrations had exhausted
+            # the simulated session limits.
+            self.failure_lockout = False
+            self.cooldown_until = 0
+            self.dry_since = None
             if values.get("soil_pct") is not None:
                 self.soil_pct = max(0.0, min(100.0, float(values["soil_pct"])))
             if values.get("reservoir") is not None:

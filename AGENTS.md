@@ -378,6 +378,20 @@ visitors cannot be used to press **Water** or change calibration.
   (`test_an_unreadable_pump_command_is_never_answered_as_a_status`).  Measured
   after: `விலகுகள் காட்டிக்குக்கா` → LIGHTS_ON, `தாங்கில வெள்ளമ്ണു` →
   WATER_STATUS, `மண்ணில் எத்தாக இருப்போமும் இரு` → SOIL_STATUS.
+- **The watering picture is a can, not four dots (2026-11-18).**  Reported
+  twice as "the watering animation is not visible": the first drawing put four
+  pale-blue circles a little above the leaves with nothing holding them, which
+  reads as **berries on the plant**.  It is now a watering can in the corner
+  with a spout, four droplets falling from it onto the pot, and a faint splash
+  where the stream lands — all of it only while `pumping` is true, so the
+  picture still cannot claim water that is not flowing.
+  **Two other reasons a presenter saw nothing, both now handled:** the
+  simulated controller pulses for ~4.5 s and then **soaks** (pump off) for much
+  longer, so the stream is only on for part of each cycle; and a lab left in the
+  controller's own "no moisture rise" **failure lockout** (30-minute cooldown)
+  would not water at all until reset.  A demo **scenario** now clears that
+  lockout and cooldown with it
+  (`test_a_scenario_clears_the_controller_lockout_so_the_demo_can_water_again`).
 - **Where the drawings move, they still say the truth without motion
   (2026-11-18).**  Under `prefers-reduced-motion` the watering stream used to be
   `display: none`, so a machine asking for less motion saw a card that looked
