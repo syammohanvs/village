@@ -114,6 +114,71 @@ export async function toWav16k(blob: Blob): Promise<Blob> {
   }
 }
 
+/**
+ * Below this peak (of 1.0) a recording is treated as silence.
+ *
+ * Not a speech detector — just "did the microphone hear anything at all".  A
+ * quiet talker in a room still peaks well above this; a muted or far-away
+ * microphone sits near zero, and handing that to Whisper is what produced a
+ * Japanese transcript for a Malayalam command (2026-11-18).
+ */
+export const SILENCE_PEAK = 0.02;
+
+/** A Blob's bytes, on browsers that have `Blob.arrayBuffer` and on those that
+ *  only have `FileReader` (jsdom is in the second group, which is how this was
+ *  found: the guard threw, and the panel reported it as "the service did not
+ *  answer"). */
+async function readBlob(blob: Blob): Promise<ArrayBuffer | null> {
+  if (typeof blob.arrayBuffer === 'function') {
+    try {
+      return await blob.arrayBuffer();
+    } catch {
+      return null;
+    }
+  }
+  if (typeof FileReader !== 'undefined') {
+    return new Promise<ArrayBuffer | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(reader.result instanceof ArrayBuffer ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsArrayBuffer(blob);
+    });
+  }
+  return null;
+}
+
+/**
+ * The peak sample of a 16-bit PCM WAV, 0..1.
+ *
+ * Returns **1** ("cannot judge") for anything that is not the WAV this module
+ * wrote — a browser without `AudioContext` falls back to sending the raw
+ * `MediaRecorder` blob, and refusing that on a parser we do not have would be
+ * worse than sending it.
+ */
+export async function peakLevel(wav: Blob): Promise<number> {
+  const buffer = await readBlob(wav);
+  // No way to read it here (a very old browser, or a test environment without
+  // `Blob.arrayBuffer`): "cannot judge" rather than a false silence.
+  if (!buffer) return 1;
+  const view = new DataView(buffer);
+  if (buffer.byteLength < 46) return 1;
+  const tag = String.fromCharCode(
+    view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3),
+  );
+  const wave = String.fromCharCode(
+    view.getUint8(8), view.getUint8(9), view.getUint8(10), view.getUint8(11),
+  );
+  if (tag !== 'RIFF' || wave !== 'WAVE') return 1;
+  let peak = 0;
+  // encodeWav writes a 44-byte header and 16-bit little-endian samples.
+  for (let offset = 44; offset + 1 < buffer.byteLength; offset += 2) {
+    const sample = Math.abs(view.getInt16(offset, true));
+    if (sample > peak) peak = sample;
+  }
+  return peak / 0x8000;
+}
+
 export function recordingSupported(): boolean {
   return Boolean(
     typeof navigator !== 'undefined' &&

@@ -2573,9 +2573,16 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   .lamp-glow,
   .bin-glow,
   .camera-flash { animation: none !important; }
-  /* Without motion the drops would sit in mid-air, which reads as a fault, so
-     they are simply not drawn; the flash's 0 % frame is already invisible. */
-  .watering-drops, .tank-drops { display: none; }
+  /* Without motion a falling drop sits in mid-air, which reads as a fault — so
+     the stream is drawn **still** instead: four droplets held at four heights
+     say "water is flowing" without moving, and it is still true only while the
+     pump runs (reported 2026-11-18: "the watering animation seems gone", on a
+     machine whose system asks for less motion, where it was being hidden). */
+  .watering-drops circle { opacity: 1; }
+  .watering-drops circle:nth-child(1) { transform: translateY(1px); }
+  .watering-drops circle:nth-child(2) { transform: translateY(7px); }
+  .watering-drops circle:nth-child(3) { transform: translateY(13px); }
+  .watering-drops circle:nth-child(4) { transform: translateY(19px); }
   .camera-flash { opacity: 0; }
 }
 

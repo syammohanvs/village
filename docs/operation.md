@@ -354,6 +354,13 @@ backend test suite.
 The panel deliberately does **not** show command names, intent ids, confidence
 scores or parser rules. What it shows is what a visitor can act on.
 
+**A refusal is answered in the visitor's language.** When the controller refuses
+— the soil is already wet, the tank is low, the pump is on the manual switch —
+the reason is a sentence in the chosen language, spoken and shown, not the
+controller's English. A recording that never moved, or that came back in a
+script nobody here reads, is answered "I did not hear that" instead of being
+printed.
+
 Malayalam and Hindi recognition must be tested with the child's actual speech.
 The phrase dictionary is `shared/intents.json`; add the words the child really
 uses, then re-run the backend.

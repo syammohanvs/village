@@ -411,6 +411,25 @@ class IntentMatcher:
                 states.add("on")
                 devices.add("pump")
 
+        # A status question has no state in it: "tankil vellamundo" names one
+        # device and asks.  Refusing it left the exhibit answering "not
+        # understood" to the very question its buttons ask, because the model
+        # mangles the question word and only the device survives.
+        #
+        # **Only for a device that has nothing BUT a status** — soil and water.
+        # The pump and the lights have commands, and a mangled command ("pump
+        # off" heard as something the state list does not hold) must be refused,
+        # never quietly answered with a reading.  That is the trap the existing
+        # `an unreadable pump state never starts the pump` test guards.
+        if len(devices) == 1 and not states:
+            only = next(iter(devices))
+            commands = self.device_commands.get(only, {})
+            if set(commands) == {"status"}:
+                return self._intent_result(
+                    commands["status"], language, device=only,
+                    action="status", matched_phrase="romanised",
+                )
+
         if len(devices) != 1 or len(states) != 1:
             return None
         device = next(iter(devices))

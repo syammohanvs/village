@@ -9,6 +9,7 @@ import {
   loadLiaPrefs,
   recentVillageMessages,
   saveLiaPrefs,
+  usableTranscript,
 } from './lia';
 import { makeState } from '../test/fixtures';
 
@@ -199,5 +200,27 @@ describe('Lia live narration', () => {
     const messages = recentVillageMessages(withEvents ?? null, 'en');
     expect(messages[0]).toBe('The last message from the village: Irrigation pulse started.');
     expect(messages[1]).toContain('Streetlights switched on manually.');
+  });
+});
+
+describe('usable transcripts', () => {
+  it('accepts the three languages, a romanised sentence and a sister script', () => {
+    expect(usableTranscript('turn the lights off', 'en')).toBe(true);
+    expect(usableTranscript('മണ്ണിൽ ഈർപ്പം', 'ml')).toBe(true);
+    expect(usableTranscript('लाइट बंद करो', 'hi')).toBe(true);
+    // Romanaised input is a supported way to say the same thing.
+    expect(usableTranscript('vilakkukal auto', 'ml')).toBe(true);
+    // Whisper answers Malayalam audio in Tamil script; the parser shifts it.
+    expect(usableTranscript('விலகுகள் காட்டிக்குக்கா', 'ml')).toBe(true);
+    expect(usableTranscript('ಲೈಟ್ ಬಂದ್', 'hi')).toBe(true);
+  });
+
+  it('refuses a transcript in a script nothing here reads', () => {
+    // The exact invention that was printed under "Your request" (2026-11-18).
+    expect(usableTranscript('ずいら屋子座', 'ml')).toBe(false);
+    expect(usableTranscript('안녕하세요', 'ml')).toBe(false);
+    expect(usableTranscript('Привет', 'en')).toBe(false);
+    expect(usableTranscript('', 'ml')).toBe(false);
+    expect(usableTranscript('   ', 'ml')).toBe(false);
   });
 });

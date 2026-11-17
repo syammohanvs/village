@@ -800,6 +800,86 @@ export const MESSAGES = {
     'आदेश समझ गया। गाँव के कंट्रोलर को भेजा जा रहा है।',
     'നിർദ്ദേശം മനസ്സിലായി. ഗ്രാമ കൺട്രോളറിലേക്ക് അയക്കുന്നു.',
   ],
+  // ------------------------------------------------------- refusal reasons ---
+  // The controller answers a refusal with a code and an English sentence.  The
+  // visitor's panel used to show that English sentence under a Malayalam
+  // heading (reported 2026-11-18), so the codes a visitor can actually meet are
+  // translated here.  An unknown code falls back to `panel.refused` and the
+  // raw reason stays visible as the presenter's detail — `reasonKey` in
+  // `VoicePanel` is the one place that decides.
+  'reason.IRRIGATION_BLOCKED_SOIL_WET': [
+    'The soil is already wet enough, so there is nothing to water.',
+    'मिट्टी पहले से काफ़ी गीली है, इसलिए पानी देने की ज़रूरत नहीं।',
+    'മണ്ണ് മതിയായി നനഞ്ഞിരിക്കുന്നു, അതിനാൽ നനയ്ക്കേണ്ടതില്ല.',
+  ],
+  'reason.IRRIGATION_BLOCKED_WATER_LOW': [
+    'The tank is low, so the pump is not started.',
+    'टंकी में पानी कम है, इसलिए पंप शुरू नहीं होगा।',
+    'ടാങ്കിൽ വെള്ളം കുറവാണ്, അതിനാൽ പമ്പ് തുടങ്ങില്ല.',
+  ],
+  'reason.IRRIGATION_BLOCKED_WATER_UNKNOWN': [
+    'The tank has no usable reading, so watering is held.',
+    'टंकी की कोई भरोसेमंद रीडिंग नहीं है, इसलिए सिंचाई रोकी गई है।',
+    'ടാങ്കിന്റെ വായന വിശ്വസനീയമല്ല, അതിനാൽ നനയ്ക്കൽ നിർത്തിവച്ചിരിക്കുന്നു.',
+  ],
+  'reason.IRRIGATION_BLOCKED_SOIL_UNCALIBRATED': [
+    'The soil probe is not calibrated yet, so watering is held.',
+    'मिट्टी की जाँच अभी कैलिब्रेट नहीं है, इसलिए सिंचाई रोकी गई है।',
+    'മണ്ണ് പരിശോധന ഇപ്പോൾ കാലിബ്രേറ്റ് ചെയ്തിട്ടില്ല, അതിനാൽ നനയ്ക്കൽ നിർത്തിവച്ചിരിക്കുന്നു.',
+  ],
+  'reason.IRRIGATION_BLOCKED_SENSOR_INVALID': [
+    'A sensor reading is not current, so watering is held.',
+    'किसी सेंसर की रीडिंग पुरानी है, इसलिए सिंचाई रोकी गई है।',
+    'ഒരു സെൻസർ വായന പഴയതാണ്, അതിനാൽ നനയ്ക്കൽ നിർത്തിവച്ചിരിക്കുന്നു.',
+  ],
+  'reason.IRRIGATION_BLOCKED_PUMP_DISABLED': [
+    'Irrigation is switched off in the settings.',
+    'सेटिंग्स में सिंचाई बंद है।',
+    'ക്രമീകരണങ്ങളിൽ നനയ്ക്കൽ ഓഫാണ്.',
+  ],
+  'reason.IRRIGATION_BLOCKED_ALREADY_ACTIVE': [
+    'Watering is already running.',
+    'सिंचाई पहले से चल रही है।',
+    'നനയ്ക്കൽ ഇപ്പോൾത്തന്നെ നടക്കുന്നു.',
+  ],
+  'reason.IRRIGATION_BLOCKED_COOLDOWN': [
+    'A short waiting period is still running, so watering must wait.',
+    'अभी थोड़ा इंतज़ार बाकी है, इसलिए सिंचाई बाद में होगी।',
+    'ഇനിയും കുറച്ച് കാത്തിരിക്കണം, അതിനാൽ നനയ്ക്കൽ പിന്നീട്.',
+  ],
+  'reason.IRRIGATION_BLOCKED_LOCKOUT': [
+    'Watering stopped several times without the soil getting wetter, so it is locked for now.',
+    'मिट्टी गीली न होने पर सिंचाई कई बार रुकी, इसलिए यह अभी बंद है।',
+    'മണ്ണ് നനയാത്തതിനാൽ നനയ്ക്കൽ പലതവണ നിന്നു, അതിനാൽ ഇപ്പോൾ ഇത് നിർത്തിയിരിക്കുന്നു.',
+  ],
+  'reason.IRRIGATION_BLOCKED_BOOT_GUARD': [
+    'The controller has just started and is still settling.',
+    'कंट्रोलर अभी शुरू हुआ है और स्थिर हो रहा है।',
+    'കൺട്രോളർ ഇപ്പോൾ തുടങ്ങിയതാണ്, ഇപ്പോഴും സ്ഥിരമാകുന്നു.',
+  ],
+  'reason.LIGHTS_NOT_INSTALLED': [
+    'The streetlights are not fitted on this board.',
+    'इस बोर्ड पर स्ट्रीट लाइट लगी नहीं है।',
+    'ഈ ബോർഡിൽ തെരുവുവിളക്കുകൾ ഘടിപ്പിച്ചിട്ടില്ല.',
+  ],
+  'reason.PUMP_MANUAL_ACTIVE': [
+    'The pump is on the manual switch. Set it back to Auto to water by the rules.',
+    'पंप मैनुअल स्विच पर है। नियम से सिंचाई के लिए इसे ऑटो पर लौटाएँ।',
+    'പമ്പ് മാനുവൽ സ്വിച്ചിലാണ്. നിയമപ്രകാരം നനയ്ക്കാൻ അത് ഓട്ടോയിലേക്ക് തിരികെ വയ്ക്കുക.',
+  ],
+  'reason.PUMP_MANUAL_WATER_LOW': [
+    'The tank is at its minimum, so the pump stays off.',
+    'टंकी अपने न्यूनतम स्तर पर है, इसलिए पंप बंद रहेगा।',
+    'ടാങ്ക് ഏറ്റവും കുറഞ്ഞ നിലയിലാണ്, അതിനാൽ പമ്പ് ഓഫായി തുടരും.',
+  ],
+  'reason.COMMAND_INVALID': [
+    'That command was not recognised.',
+    'वह कमांड समझ नहीं आया।',
+    'ആ കമാൻഡ് മനസ്സിലായില്ല.',
+  ],
+  // A demo answer must never imply the physical model moved, so a translated
+  // refusal keeps the same marker the simulator puts on its own sentence.
+  'panel.simulatedPrefix': ['Simulated:', 'सिमुलेटेड:', 'സിമുലേറ്റഡ്:'],
   'panel.refused': [
     'The controller received the command and refused it. Nothing changed.',
     'कंट्रोलर को आदेश मिला और उसने मना कर दिया। कुछ नहीं बदला।',
@@ -829,6 +909,16 @@ export const MESSAGES = {
     'The reply could not be read aloud. The text above is the full reply.',
     'जवाब पढ़कर सुनाया नहीं जा सका। ऊपर लिखा पूरा जवाब है।',
     'മറുപടി വായിച്ച് കേൾപ്പിക്കാനായില്ല. മുകളിലുള്ളതാണ് പൂർണ മറുപടി.',
+  ],
+  'panel.silent': [
+    'I did not hear anything. Please speak a little louder, or type your request.',
+    'मुझे कुछ सुनाई नहीं दिया। कृपया थोड़ा ऊँचा बोलें, या अपना अनुरोध लिखें।',
+    'ഒന്നും കേട്ടില്ല. അൽപ്പം ഉച്ചത്തിൽ പറയുക, അല്ലെങ്കിൽ നിങ്ങളുടെ അഭ്യർത്ഥന എഴുതുക.',
+  ],
+  'panel.notHeard': [
+    'I did not hear that clearly. Please say it again a little slower, or type it.',
+    'मैंने वह साफ़ नहीं सुना। कृपया थोड़ा धीमे फिर कहें, या लिखें।',
+    'അത് വ്യക്തമായി കേട്ടില്ല. അൽപ്പം പതുക്കെ വീണ്ടും പറയുക, അല്ലെങ്കിൽ എഴുതുക.',
   ],
   'panel.notLanguageScript': [
     'The speech model did not hear {language} clearly — that is not {language} script. Say it again a little slower, or type it.',

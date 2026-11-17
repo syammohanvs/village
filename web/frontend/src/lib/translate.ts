@@ -19,6 +19,18 @@ export function fillTemplate(text: string, vars?: Vars): string {
 }
 
 /**
+ * Is this string a key the table holds?
+ *
+ * The controller's refusals arrive as codes (`IRRIGATION_BLOCKED_SOIL_WET`),
+ * and most of them have a translated sentence while some do not.  A lookup that
+ * cannot say "I do not know this one" would print the key on screen, so the
+ * caller asks first and falls back to a general sentence.
+ */
+export function hasMessage(key: string): key is MessageKey {
+  return Object.prototype.hasOwnProperty.call(MESSAGES, key);
+}
+
+/**
  * One key, one language, **English as the fallback**.
  *
  * The fallback is why a missing translation is never a blank screen or a raw

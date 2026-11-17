@@ -738,6 +738,31 @@ export const VOICE_GREETING: Record<string, string> = {
   hi: 'मैं सारा हूँ। मैं आपकी क्या मदद कर सकती हूँ?',
 };
 
+/**
+ * Can the parser do anything with this transcript?
+ *
+ * Whisper answers near-silence with an invention, and the invention is often in
+ * a script nobody here reads: a Malayalam command came back as **ずいら屋子座**
+ * (2026-11-18) and the panel printed it under "Your request".  Nothing in this
+ * app can read that, so it is treated as *not heard* rather than shown.
+ *
+ * What IS usable:
+ *  - the chosen language's own script (Malayalam, Devanagari, Latin),
+ *  - a **sister** Indic script — the parser shifts Tamil/Kannada/Telugu/
+ *    Bengali/Devanagari into Malayalam and romanises it, which is how a Tamil
+ *    spelling of a Malayalam sentence still runs the command (`phonetics.py`),
+ *  - Latin letters, because a romanised sentence is a supported input.
+ *
+ * Everything else — kana, han, hangul, Thai, Cyrillic, Arabic — is a
+ * hallucination, not a sentence.
+ */
+export function usableTranscript(text: string, _language: string): boolean {
+  const value = (text ?? '').trim();
+  if (!value) return false;
+  // Arabic and Cyrillic are not Indic; the Indic blocks run 0900–0D7F.
+  return /[\u0900-\u0D7F]/.test(value) || /[A-Za-z]/.test(value);
+}
+
 /** True when the text carries at least one character of that language's script. */
 export function inScript(text: string, language: string): boolean {
   const value = (text ?? '').trim();

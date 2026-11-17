@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
+import { encodeWav } from '../lib/audio';
 import { makeSettings, makeState } from '../test/fixtures';
 
 vi.mock('../lib/api', async (importOriginal) => {
@@ -25,20 +26,37 @@ vi.mock('../lib/api', async (importOriginal) => {
   };
 });
 
-vi.mock('../lib/audio', () => ({
-  recordingSupported: () => true,
-  VoiceRecorder: class {
-    async start() {
-      /* ready */
-    }
-    async stop() {
-      return new Blob(['fake-wav'], { type: 'audio/wav' });
-    }
-    cancel() {
-      /* nothing */
-    }
-  },
-}));
+// `stop()` returns `recorderBlob.next` when a test sets one, else a loud tone —
+// so the silence guard never fires by accident.
+const recorderBlob = vi.hoisted(() => ({ next: null as Blob | null }));
+
+vi.mock('../lib/audio', async (importOriginal) => {
+  // Spread the real module: `peakLevel`, `SILENCE_PEAK` and `encodeWav` are
+  // used by the panel and by the silence case below, and a bare mock made
+  // `peakLevel` undefined — which the panel's catch turned into "the service
+  // did not answer", reddening every voice test at once.
+  const actual = await importOriginal<typeof import('../lib/audio')>();
+  return {
+    ...actual,
+    recordingSupported: () => true,
+    VoiceRecorder: class {
+      async start() {
+        /* ready */
+      }
+      async stop() {
+        return (
+          recorderBlob.next ??
+          actual.encodeWav(
+            Float32Array.from({ length: 1600 }, (_, i) => Math.sin(i / 8) * 0.4),
+          )
+        );
+      }
+      cancel() {
+        /* nothing */
+      }
+    },
+  };
+});
 
 vi.mock('../lib/speech', () => ({
   speechSupported: () => true,
@@ -57,6 +75,7 @@ async function openPanel() {
 }
 
 beforeEach(() => {
+  recorderBlob.next = null;
   vi.mocked(api.session).mockResolvedValue({
     authenticated: true,
     username: null,
@@ -1026,7 +1045,7 @@ describe('the language Sara answers in', () => {
     expect(screen.queryByTestId('voice-command-outcome')).not.toBeInTheDocument();
   });
 
-  it('says a refusal in the visitor’s language, and shows the reason', async () => {
+  it('says a refusal in the visitor’s language, not the controller’s', async () => {
     vi.mocked(api.voiceInterpret).mockResolvedValue({
       status: 'ok',
       kind: 'command',
@@ -1049,20 +1068,10 @@ describe('the language Sara answers in', () => {
 
     const speech = await import('../lib/speech');
     vi.mocked(speech.speakReply).mockClear();
-    // Spoken replies on, or the panel says nothing at all.  The catalogue
-    // carries the refusal sentence, as the backend's own does.
     vi.mocked(api.settings).mockResolvedValue(makeSettings({ tts_enabled: true }));
     vi.mocked(api.voiceIntents).mockResolvedValue({
-      intents: [
-        {
-          id: 'LIGHTS_OFF',
-          command: 'LIGHTS_OFF',
-          actuation: true,
-          label: { en: 'Lights off' },
-          phrases: { en: ['switch off the lights'] },
-        },
-      ],
-      help_order: ['LIGHTS_OFF'],
+      intents: [],
+      help_order: [],
       messages: {
         refused: {
           en: 'The village did not accept that. The reason is on the screen.',
@@ -1076,16 +1085,51 @@ describe('the language Sara answers in', () => {
     await user.type(within(panel).getByTestId('voice-text'), 'ദയവായി ലൈറ്റുകൾ ഓഫ് ചെയ്യൂ');
     await user.click(within(panel).getByTestId('voice-send'));
 
+    // A known refusal code has its own sentence, so this is not the generic
+    // "the village did not accept that" — the visitor is told *why*, in their
+    // own language (reported 2026-11-18: the English reason was printed under
+    // a Malayalam heading, twice).
+    const expected = 'ഈ ബോർഡിൽ തെരുവുവിളക്കുകൾ ഘടിപ്പിച്ചിട്ടില്ല.';
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(expected);
     await waitFor(() =>
-      expect(vi.mocked(speech.speakReply)).toHaveBeenCalledWith(
-        'ഗ്രാമം അത് സ്വീകരിച്ചില്ല. കാരണം സ്ക്രീനിൽ കാണാം.',
-        'ml',
-        'LIGHTS_OFF',
-      ),
+      expect(vi.mocked(speech.speakReply)).toHaveBeenCalledWith(expected, 'ml', 'LIGHTS_OFF'),
     );
-    // The reason itself is still readable, in the controller's own words.
-    expect(await screen.findByTestId('voice-command-outcome')).toHaveTextContent(
-      /not installed/i,
+    // …and the controller's English sentence is not repeated underneath.
+    expect(within(panel).queryByTestId('voice-command-outcome')).toBeNull();
+    expect(panel.textContent).not.toMatch(/not installed/i);
+  });
+
+  it('keeps the controller’s own words when the refusal code is unknown', async () => {
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_OFF',
+      command: 'LIGHTS_OFF',
+      actuation: true,
+    } as never);
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      confirmed: true,
+      mode: 'live',
+      physical: true,
+      ack: {
+        result: 'REJECTED',
+        reason_code: 'SOMETHING_NEW_FROM_THE_BOARD',
+        reason: 'A reason this build has never seen.',
+      },
+      error: null,
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'lights off');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    // The general sentence, plus the controller's own words as the detail — the
+    // only case where English is still the honest answer.
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      /controller received the command and refused it/i,
+    );
+    expect(within(panel).getByTestId('voice-command-outcome')).toHaveTextContent(
+      /A reason this build has never seen/,
     );
   });
 });
@@ -1170,5 +1214,84 @@ describe('a new recording clears the request, not the reply', () => {
     await user.click(screen.getByTestId('voice-start'));
     expect(screen.getByTestId('voice-staged-text')).toHaveTextContent(/Listening/i);
     expect(screen.getByTestId('voice-reply-text').textContent).toBe(reply);
+  });
+});
+
+/**
+ * A recording that never moved, and a transcript in a script nothing here can
+ * read, are both "I did not hear you" — not a sentence (reported 2026-11-18:
+ * the panel printed **ずいら屋子座** under "Your request" for a Malayalam
+ * command, because Whisper invents text when it is handed silence).
+ */
+describe('a recording that is not a sentence', () => {
+  it('does not send silence to the speech model', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'status', kind: 'status', intent: 'WATER_STATUS',
+      transcript: 'is water available', response_text: 'Yes.',
+    } as never);
+    recorderBlob.next = encodeWav(new Float32Array(1600));
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByTestId('voice-start'));
+    await user.click(within(panel).getByTestId('voice-start'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      /did not hear anything/i,
+    );
+    expect(api.voiceTranscribe).not.toHaveBeenCalled();
+    expect(api.voiceInterpret).not.toHaveBeenCalled();
+    // Nothing was "heard", so the request card keeps its empty sentence.
+    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent(
+      'Your words will appear here.',
+    );
+  });
+
+  it('refuses a transcript in a script the parser cannot read', async () => {
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'status', kind: 'status', intent: 'UNKNOWN',
+      transcript: 'ずいら屋子座', response_text: '',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByTestId('voice-start'));
+    await user.click(within(panel).getByTestId('voice-start'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      /did not hear that clearly/i,
+    );
+    // The invention is never shown, and never parsed.
+    expect(within(panel).getByTestId('voice-staged-text')).not.toHaveTextContent('ずいら');
+    expect(within(panel).queryByTestId('voice-script-note')).toBeNull();
+    expect(api.voiceInterpret).not.toHaveBeenCalled();
+  });
+
+  it('still sends a Malayalam transcript spoken in a sister script', async () => {
+    // The parser shifts Tamil into Malayalam; the gate must not stop that.
+    vi.mocked(api.voiceTranscribe).mockResolvedValue({
+      status: 'ok', kind: 'command', intent: 'LIGHTS_ON', command: 'LIGHTS_ON',
+      actuation: true, transcript: 'விலகுகள் காட்டிக்குக்கா',
+      pending_text: 'Turning the streetlights on.',
+      done_text: 'The streetlights are on.',
+    } as never);
+    // The lamps must be off, or the panel correctly answers "already on"
+    // without sending anything.
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsCommanded: false }));
+    vi.mocked(api.sendCommand).mockResolvedValue({
+      ok: true, status: 'confirmed', reason: 'Streetlights switched on manually.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByTestId('voice-start'));
+    await user.click(within(panel).getByTestId('voice-start'));
+
+    // The whole point: the sister-script transcript reaches the parser and the
+    // command is sent — the gate must not turn it into "not heard".
+    await waitFor(() =>
+      expect(api.sendCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'LIGHTS_ON', source: 'voice' }),
+      ),
+    );
+    expect(within(panel).getByTestId('voice-staged-text')).toHaveTextContent('விலகுகள்');
+    expect(within(panel).queryByTestId('voice-script-note')).toBeNull();
   });
 });

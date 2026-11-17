@@ -164,6 +164,12 @@ def fold(word: str) -> str:
     # (kathikkuka / kattikkuka are the same word), and `y` is a glide the ear
     # may or may not catch.
     value = value.replace("h", "").replace("y", "")
+    # Voicing is not phonemic in Malayalam/Tamil/Hindi: k and g, t and d, p and
+    # b are the same letter of the varga, and the ear (or the model) picks one.
+    # Whisper wrote "Thangil" for "tankil" and "Velamundo" for "vellamunto"
+    # (2026-11-18) — both are one class away from the word that was said.
+    value = value.translate(str.maketrans({"g": "k", "b": "p", "d": "t",
+                                           "j": "c", "z": "s", "v": "w"}))
     out: list[str] = []
     for char in value:
         if out and out[-1] == char:

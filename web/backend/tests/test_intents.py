@@ -531,3 +531,40 @@ def test_natural_status_questions_in_malayalam_and_hindi(matcher: IntentMatcher)
         assert matcher.match(text, "hi")["intent"] == "SOIL_STATUS", text
     for text in ("टंकी में पानी है?", "क्या पानी है?"):
         assert matcher.match(text, "hi")["intent"] == "WATER_STATUS", text
+
+
+# ---------------------------------------------------------------------------
+# What the speech model actually returns (2026-11-18).  These are the literal
+# transcripts `ggml-base` produced for Malayalam audio synthesised with Sara's
+# own voice: it writes Malayalam in **Tamil** script, and the question word is
+# mangled while the device noun survives.  The parser must still act.
+# ---------------------------------------------------------------------------
+def test_whisper_style_malayalam_transcripts_are_understood(matcher: IntentMatcher) -> None:
+    cases = (
+        # "turn the lights on" — a command, read by sound
+        ("விலகுகள் காட்டிக்குக்கா.", "LIGHTS_ON"),
+        # "is there water in the tank?" — the question word is lost
+        ("தாங்கில வெள்ளம்ணு", "WATER_STATUS"),
+        ("Thangil Velamundo.", "WATER_STATUS"),
+        # "how much moisture is in the soil?" — only the device survives
+        ("மண்ணில் எத்தாக இருப்போமும் இரு.", "SOIL_STATUS"),
+    )
+    for text, want in cases:
+        result = matcher.match(text, "ml")
+        assert result["intent"] == want, text
+        if want.endswith("_STATUS"):
+            # A status answer moves nothing.
+            assert result["command"] is None, text
+            assert result["kind"] == "status", text
+
+
+def test_an_unreadable_pump_command_is_never_answered_as_a_status(
+    matcher: IntentMatcher,
+) -> None:
+    # The status-only fallback is for soil and water, whose only command *is*
+    # status.  The pump has commands, so a mangled "pump off" must be refused —
+    # answering it with a reading would look like the command worked.
+    for text in ("பம்ப் ஆஃப்", "பம்ப் ஆன்"):
+        result = matcher.match(text, "ml")
+        assert result["command"] != "IRRIGATION_REQUEST", text
+        assert result["intent"] != "PUMP_STATUS", text

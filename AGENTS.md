@@ -327,6 +327,49 @@ visitors cannot be used to press **Water** or change calibration.
   one calls `voiceInterpret` with the phrase (and never the microphone), that
   the catalogue opens at the top with a row per command, that the row's shown
   phrase is the phrase it sends, and that the wire names stay out of sight.
+- **A refusal is shown and spoken in the visitor's language (2026-11-18).**
+  A rejected command used to print the controller's own English sentence under a
+  Malayalam heading — twice, because the same string was also the detail line
+  ("നിരസിച്ചു / Simulated: Irrigation blocked: the soil is already wet
+  enough.").  The refusal codes a visitor can meet now have sentences in
+  `lib/messages.ts` (`reason.<CODE>`, ~14 of them), `refusalKey()` is the single
+  lookup, the reply **and** the spoken sentence use it, and the English detail
+  line is rendered **only** for a code this build has no translation for.  In
+  Simulation the sentence keeps the simulator's marker (`panel.simulatedPrefix`)
+  so a translated refusal cannot imply the physical model moved.
+- **Silence is not a sentence, and neither is a script nobody reads
+  (2026-11-18).**  A Malayalam command came back as **ずいら屋子座** and the panel
+  printed it under "Your request" — Whisper invents text when it is handed
+  near-silence.  Two guards, in `VoicePanel.finish()`:
+  **`peakLevel`** (`lib/audio.ts`, threshold `SILENCE_PEAK` 0.02) refuses a
+  recording that never moved before the model is asked at all, and
+  **`usableTranscript`** (`lib/lia.ts`) refuses a transcript with no Indic or
+  Latin character — kana, han, hangul, Thai, Cyrillic.  Both answer
+  `panel.silent` / `panel.notHeard` in the panel's language, leave "Your
+  request" empty, and never parse.  A **sister** script (Tamil for Malayalam) is
+  deliberately usable: that path still runs the command.  `peakLevel` reads
+  through `Blob.arrayBuffer` **or `FileReader`** — jsdom has no `arrayBuffer`,
+  and the first version threw, which the panel's catch reported as "the service
+  did not answer".
+- **Malayalam speech: the model mangles the question word, so the device is
+  what survives (2026-11-18).**  Measured with audio synthesised by Sara's own
+  voice: `ggml-base` writes Malayalam **in Tamil script** (`താങ്കില വെള്ളമ്ണു`)
+  and loses `ഉണ്ടോ`/`എത്ര` while keeping the noun.  Two changes make the exhibit's
+  own questions work: `fold()` now merges the **varga** classes (g→k, b→p, d→t,
+  j→c, z→s, v→w — voicing is not phonemic in these languages, and Whisper wrote
+  "Thangil"/"Velamundo" for `tankil`/`vellamunto`), and `_romanised_intent`
+  answers **a device whose only command is status** (soil, water) when exactly
+  one device and no state were heard.  That last rule is **restricted on
+  purpose**: the pump and the lights have commands, so a mangled "pump off"
+  stays refused rather than being quietly answered with a reading
+  (`test_an_unreadable_pump_command_is_never_answered_as_a_status`).  Measured
+  after: `விலகுகள் காட்டிக்குக்கா` → LIGHTS_ON, `தாங்கில வெள்ளമ്ണു` →
+  WATER_STATUS, `மண்ணில் எத்தாக இருப்போமும் இரு` → SOIL_STATUS.
+- **Where the drawings move, they still say the truth without motion
+  (2026-11-18).**  Under `prefers-reduced-motion` the watering stream used to be
+  `display: none`, so a machine asking for less motion saw a card that looked
+  broken ("the watering animation seems gone").  The drops are now drawn **held
+  still** at four heights instead — still only while the pump actually runs.
 - **The panel has its own words, in all three languages (2026-11-17).** All
   strings live in `web/frontend/src/lib/voiceCopy.ts` (title *Talk to Sara*,
   intro, section headings, short state words, plain action wording) and are

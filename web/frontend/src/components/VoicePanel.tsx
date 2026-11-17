@@ -3,12 +3,25 @@ import type { CommandOutcome } from '../lib/commands';
 import { useCommands } from '../lib/commands';
 import { useDemo } from '../lib/demo';
 import { ApiError, api, errorMessage } from '../lib/api';
-import { VoiceRecorder, recordingSupported } from '../lib/audio';
+import {
+  SILENCE_PEAK,
+  VoiceRecorder,
+  peakLevel,
+  recordingSupported,
+} from '../lib/audio';
 import { useApi } from '../lib/useApi';
 import { speakReply, speechSupported, stopSpeaking, voiceAvailable } from '../lib/speech';
 import { useVillage } from '../lib/village';
 import { useT } from '../lib/i18n';
-import { LIVE_COPY, VOICE_GREETING, describeVillage, inScript } from '../lib/lia';
+import { hasMessage } from '../lib/translate';
+import type { MessageKey } from '../lib/messages';
+import {
+  LIVE_COPY,
+  VOICE_GREETING,
+  describeVillage,
+  inScript,
+  usableTranscript,
+} from '../lib/lia';
 import { VOICE_LANGUAGES, useVoiceUi, type VoiceLanguage } from '../lib/voiceUi';
 import { cx } from '../lib/format';
 import type { DeviceStatus, VoiceIntent, VoiceIntentsResponse, VoiceTranscribeResponse } from '../types';
@@ -110,6 +123,14 @@ function orderedIntents(data: VoiceIntentsResponse | null): VoiceIntent[] {
     const right = index.get(b.id) ?? 99;
     return left - right;
   });
+}
+
+/** The message key for a controller refusal, or null when this build has no
+ *  translation for that code. */
+function refusalKey(code: string | null | undefined): MessageKey | null {
+  if (!code) return null;
+  const key = `reason.${code}`;
+  return hasMessage(key) ? key : null;
 }
 
 export function VoicePanel() {
@@ -437,12 +458,17 @@ export function VoicePanel() {
     try {
       const commandOutcome = await send(command, {}, 'voice', requestId);
       setOutcome(commandOutcome);
+      // A refusal arrives as a code plus the controller's English sentence.
+      // The panel used to print that sentence under a Malayalam heading
+      // (reported 2026-11-18), so a known code is answered in the visitor's
+      // language and the English is kept only when there is no translation.
+      const reasonForRefusal = refusalKey(commandOutcome.reasonCode);
+      const refusal = reasonForRefusal
+        ? `${demo ? `${t('panel.simulatedPrefix')} ` : ''}${t(reasonForRefusal)}`
+        : '';
       if (commandOutcome.status === 'rejected') {
         setState('rejected');
-        setMessage(
-          commandOutcome.reason ??
-            t('panel.refused'),
-        );
+        setMessage(refusal || t('panel.refused'));
       } else if (commandOutcome.status === 'unconfirmed') {
         setState('disconnected');
         setMessage(
@@ -479,7 +505,7 @@ export function VoicePanel() {
           : commandOutcome.status === 'duplicate'
             ? response.already_text || response.done_text || ''
             : commandOutcome.status === 'rejected'
-              ? (intents.data?.messages?.refused?.[lang] ?? '')
+              ? (refusal || intents.data?.messages?.refused?.[lang] || t('panel.refused'))
               : (intents.data?.messages?.unconfirmed?.[lang] ?? '');
       if (spoken) void speak(spoken, intent, lang);
     } catch (cause) {
@@ -522,8 +548,33 @@ export function VoicePanel() {
     try {
       // The recording's own language, captured when Start was pressed.
       const spokenIn = startedLanguageRef.current;
+
+      // A microphone that heard nothing is not a sentence.  Handing silence to
+      // Whisper gets an invention back — a Malayalam command came back as
+      // ずいら屋子座 on 2026-11-18 — so the level is checked first.
+      const peak = await peakLevel(blob);
+      if (peak < SILENCE_PEAK) {
+        setState('rejected');
+        const quiet = t('panel.silent');
+        setMessage(quiet);
+        void speak(quiet, 'NO_SPEECH', spokenIn);
+        return;
+      }
+
       const response = await api.voiceTranscribe(blob, spokenIn);
       const text = response.text ?? response.transcript ?? '';
+
+      // A transcript in a script the parser cannot read (kana, han, hangul …)
+      // is the model's invention, not the visitor's words.  Saying "not heard"
+      // is honest; printing it under "Your request" is not.
+      if (!usableTranscript(text, spokenIn)) {
+        setState('rejected');
+        const unclearSpeech = t('panel.notHeard');
+        setMessage(unclearSpeech);
+        void speak(unclearSpeech, 'NO_SPEECH', spokenIn);
+        return;
+      }
+
       await applyUtterance(response, text, utteranceId(text, startedRef.current), spokenIn);
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
@@ -953,7 +1004,7 @@ export function VoicePanel() {
           >
             {message || copy.replyEmpty}
           </p>
-          {outcome && outcome.status !== 'confirmed' && (
+          {outcome && outcome.status !== 'confirmed' && !(outcome.status === 'rejected' && refusalKey(outcome.reasonCode)) && (
             <p
               className={cx(
                 'voice-outcome',
