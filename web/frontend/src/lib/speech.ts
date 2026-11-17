@@ -70,15 +70,28 @@ export function speechSupported(): boolean {
 }
 
 /**
- * How a name is *said*, as opposed to how it is written.
+ * How a word is *said*, as opposed to how it is written.
  *
- * The English phonemiser reads `Sara` as /s ˈ ɛ ɹ ə/ — "SEH-ra", the American
- * name — while our Sara is സാറ / सारा, /ˈsɑːrə/, "SAA-ra".  Writing it `Sahra`
- * for the engine only gives exactly that (verified with `piper_phonemize`:
- * `s ˈ ɑː ɹ ə`, one r — `Saara` doubles the r), and the page keeps showing
- * "Sara" (asked 2026-11-17).
+ * 1. The English phonemiser reads `Sara` as /s ˈ ɛ ɹ ə/ — "SEH-ra", the
+ *    American name — while our Sara is സാറ / सारा, /ˈsɑːrə/, "SAA-ra".  Writing
+ *    it `Sahra` for the engine only gives exactly that (verified with
+ *    `piper_phonemize`: `s ˈ ɑː ɹ ə`, one r — `Saara` doubles the r), and the
+ *    page keeps showing "Sara" (asked 2026-11-17).
+ *
+ * 2. A sentence-final `you` is an unstressed pronoun, so the voice reduces it:
+ *    `j u ː`, a short vowel squeezed into the gap before the question mark.
+ *    Measured on the greeting, the closing word was 140 ms at 13.3 % of the
+ *    sentence's peak — audible on a phone, easy to lose across a room.  The
+ *    stressed spelling `yoo` is the *same* sound (`j ˈ u ː`, still one long
+ *    vowel, unlike `yuu` which doubles it) and measured 200 ms at 15.9 %,
+ *    which is a fully spoken word.  Only a sentence-final `you` is respelled:
+ *    mid-sentence it is a normal unstressed pronoun and nothing is wrong with
+ *    it, so "Can you turn off the lights?" is passed through untouched.
  */
-const ENGLISH_SAY: [RegExp, string][] = [[/\bSara\b/gi, 'Sahra']];
+const ENGLISH_SAY: [RegExp, string][] = [
+  [/\bSara\b/gi, 'Sahra'],
+  [/\byou\b(?=\s*(?:[.?!…]|$))/gi, 'yoo'],
+];
 
 /** The text to hand the voice, which is not always the text on screen. */
 export function spokenText(text: string, language: string): string {

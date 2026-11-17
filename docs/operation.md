@@ -238,16 +238,30 @@ replies on/off, the camera id, the waste thresholds — all in the village
 database on the laptop. The board's own calibration lives in its NVS and also
 survives a normal OTA/USB reflash; only an explicit `erase_flash` wipes it.
 
-### How the name is said
+### How words are said
 
-The English voice reads `Sara` the American way — /ˈsɛrə/, "SEH-ra" — while the
-Malayalam and Hindi ones say സാറ / सारा, /ˈsɑːrə/, **"SAA-ra"**. English speech
-therefore hands the engine **"Sahra"**, which phonemises to exactly
-`s ˈ ɑː ɹ ə`, and the page still writes "Sara" everywhere (asked 2026-11-17).
+English speech is not always the text on screen: two words are spelled
+differently for the engine, in `lib/speech.ts` (`ENGLISH_SAY`). The page always
+shows the normal spelling.
 
-It is one substitution, in `lib/speech.ts` (`ENGLISH_SAY`), applied to speech
-only — never to the text on screen — and "Sahra" was chosen over "Saara" because
-the latter doubles the r (`s ˈ ɑː ɹ ɹ ə`), measured with `piper_phonemize`.
+**"Sara" is said "Sahra".** The English voice reads `Sara` the American way —
+/ˈsɛrə/, "SEH-ra" — while the Malayalam and Hindi voices say സാറ / सारा,
+/ˈsɑːrə/, **"SAA-ra"**. `Sahra` phonemises to exactly `s ˈ ɑː ɹ ə`, and was
+chosen over `Saara` because the latter doubles the r (`s ˈ ɑː ɹ ɹ ə`), measured
+with `piper_phonemize` (asked 2026-11-17).
+
+**A sentence-final "you" is said "yoo".** At the end of a sentence English makes
+the pronoun unstressed, and the voice reduced it to a short vowel squeezed into
+the gap before the question mark: in the greeting the closing word measured
+**140 ms at 13.3 %** of the sentence's peak — audible on a phone, easy to lose
+across a room. `yoo` is the *same* sound with stress (`j ˈ uː`, still one long
+vowel — `yuu` would double it) and measured **200 ms at 15.9 %**, a fully spoken
+word. Only a sentence-final `you` is respelled: mid-sentence it is an ordinary
+unstressed pronoun, so "Can you turn off the lights?" is passed through
+untouched. The rendering is 200 → 280 ms on the same measurement.
+
+Both substitutions are speech only, English only: Malayalam and Hindi already
+write the name in their own script, and their text is handed over unchanged.
 
 ### The language Sara answers in
 

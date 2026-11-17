@@ -509,6 +509,12 @@ describe('English in an Indian accent', () => {
  * "SEH-ra" (/s ˈ ɛ ɹ ə/).  Our Sara is സാറ / सारा — /ˈsɑːrə/, "SAA-ra" — so the
  * engine is given "Sahra" for English only, while the page keeps the name it
  * has always shown (asked 2026-11-17).
+ *
+ * A sentence-final "you" is respelled the same way, for a measured reason: the
+ * voice reduces an unstressed pronoun to a short vowel (140 ms, 13.3 % of the
+ * sentence peak in the greeting), and `yoo` — the same sound, stressed — is
+ * 200 ms at 15.9 %, i.e. a fully articulated word.  Mid-sentence "you" is an
+ * ordinary unstressed pronoun and is left alone.
  */
 describe('how the name is said', () => {
   beforeEach(() => {
@@ -521,8 +527,19 @@ describe('how the name is said', () => {
     const speech = await import('./speech');
 
     expect(speech.spokenText('I am Sara. How may I help you?', 'en')).toBe(
-      'I am Sahra. How may I help you?',
+      'I am Sahra. How may I help yoo?',
     );
+    // Only at the end of a sentence: mid-sentence it is a normal pronoun.
+    expect(speech.spokenText('Can you turn off the lights?', 'en')).toBe(
+      'Can you turn off the lights?',
+    );
+    expect(speech.spokenText('Would you like the lights on or off?', 'en')).toBe(
+      'Would you like the lights on or off?',
+    );
+    // A question mark is not required, and a trailing quote still counts.
+    expect(speech.spokenText('The lights are for you.', 'en')).toBe('The lights are for yoo.');
+    expect(speech.spokenText('It is ready for you', 'en')).toBe('It is ready for yoo');
+    expect(speech.spokenText('For you?" she asked', 'en')).toBe('For yoo?" she asked');
     // Case is kept, and the possessive works with it.
     expect(speech.spokenText('SARA is here', 'en')).toBe('Sahra is here');
     expect(speech.spokenText("Sara's reply", 'en')).toBe("Sahra's reply");
@@ -558,7 +575,7 @@ describe('how the name is said', () => {
     await speech.speakText('I am Sara. How may I help you?', 'en');
 
     expect(speak).toHaveBeenCalledWith(
-      'I am Sahra. How may I help you?',
+      'I am Sahra. How may I help yoo?',
       'en',
       expect.any(Number),
       'indian',

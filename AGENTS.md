@@ -155,14 +155,20 @@ visitors cannot be used to press **Water** or change calibration.
   repeated the state word).  `messages.refused` was added to
   `shared/intents.json` in all three languages.  A test asserts the spoken
   argument is Malayalam for a Malayalam command.
-- **"Sara" is spoken "Sahra", in English only (2026-11-17).**  The English
-  phonemiser reads `Sara` as /ˈsɛrə/ ("SEH-ra", the American name); our Sara is
-  /ˈsɑːrə/ ("SAA-ra") as സാറ/सारा.  `ENGLISH_SAY` in `lib/speech.ts` rewrites it
-  for **speech only** (`spokenText`), leaving every on-screen "Sara" alone, and
-  the device-voice fallback gets the same spelling.  `Sahra` was measured with
-  `piper_phonemize` to give `s ˈ ɑː ɹ ə`; `Saara` gives a double r
-  (`s ˈ ɑː ɹ ɹ ə`) — do not "tidy" it to the obvious spelling without re-running
-  that check.
+- **Two words are said differently from how they are written, in English only
+  (2026-11-17).**  `ENGLISH_SAY` in `lib/speech.ts` rewrites them for **speech
+  only** (`spokenText`), leaving every on-screen word alone, and the
+  device-voice fallback gets the same spelling:
+  - **`Sara` → `Sahra`.**  The English phonemiser reads the name /ˈsɛrə/
+    ("SEH-ra", the American name); our Sara is /ˈsɑːrə/ ("SAA-ra") as
+    സാറ/सारा.  `Sahra` gives `s ˈ ɑː ɹ ə`; `Saara` doubles the r
+    (`s ˈ ɑː ɹ ɹ ə`) — do not "tidy" it without re-running `piper_phonemize`.
+  - **sentence-final `you` → `yoo`.**  An unstressed final pronoun is reduced to
+    a short vowel (greeting measured **140 ms, 13.3 %** of the sentence peak);
+    `yoo` is the same sound stressed (`j ˈ uː`, 200 ms, 15.9 %), so it is a
+    fully spoken word across a room.  `yuu` doubles the vowel (`j uː uː`) and
+    `youu` becomes "yow-oo" — measured, not guessed.  Only at a sentence end:
+    mid-sentence "you" is a normal pronoun and is left alone.
 - **Indian English is the default and it is stored server-side (2026-11-17).**
   Two English voices: `en_IN-spicor-medium` (NavGurukul, **AGPL-3.0**, neural,
   Indian — installed by `scripts/install_piper.sh`, git-ignored) and
