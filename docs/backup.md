@@ -80,7 +80,11 @@ cd village
 
 `./scripts/setup.sh` is only needed while the Python environment or
 `node_modules` are missing — both live outside git because they are re-installed,
-not restored. It creates them beside the checkout (`.venv`, `web/frontend/node_modules`).
+not restored. It creates them beside the checkout (`.venv`,
+`web/frontend/node_modules`) and installs both `web/backend/requirements.txt`
+(the API) and `requirements-waste.txt` (the classifier: `torch` is a ~200 MB
+download the first time). It needs `python3-venv`; the script says so if it is
+missing.
 
 That is the whole restore. Sign in with the admin account in `data/village.db`
 (the password is whatever was set in Setup — the default on a fresh database is

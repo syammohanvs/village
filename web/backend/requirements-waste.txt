@@ -1,0 +1,17 @@
+# The waste classifier's own dependencies.
+#
+# These are NOT in requirements.txt on purpose: that file is the API, and the
+# backend starts without this one — it simply cannot classify anything.  The
+# exhibit needs both, so `scripts/setup.sh` installs this too.
+#
+# `torch` is the reason this is a separate file: the CPU wheel is ~200 MB to
+# download and ~800 MB installed.  It comes from PyTorch's CPU index, because
+# the default wheel drags in ~2 GB of CUDA that this app never uses.
+#
+# Pinned to the versions this deployment was measured with (2026-11-17).
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.15.0
+transformers==5.22.2
+Pillow==13.0.0
+numpy==2.5.4

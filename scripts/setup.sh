@@ -58,7 +58,17 @@ or
 then re-run ./scripts/setup.sh"
 fi
 "$VENV/bin/pip" install -q --upgrade pip
+info "Backend packages"
 "$VENV/bin/pip" install -q -r web/backend/requirements.txt
+
+# The waste classifier's frameworks are separate on purpose: the API runs
+# without them, it simply cannot sort anything.  `torch` is a ~200 MB download
+# (the CPU wheel — the default one drags in ~2 GB of CUDA this app never uses).
+info "Waste classifier packages (torch, ~200 MB the first time)"
+"$VENV/bin/pip" install -q -r web/backend/requirements-waste.txt
+
+# pytest, so ./scripts/test_all.sh works on a fresh machine.
+"$VENV/bin/pip" install -q -r web/backend/requirements-dev.txt
 
 info "Frontend dependencies"
 if [ -f web/frontend/package-lock.json ]; then
