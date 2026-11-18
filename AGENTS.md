@@ -2034,6 +2034,33 @@ path.  **If a hosted vision model is wired in, it belongs behind
 `VILLAGE_VISION_*`, off by default, with the local answer as the fallback and the
 panel's privacy line saying the picture leaves the laptop.**
 
+**A hosted vision model was measured against the classifier on the same photos,
+and it is worse (2026-11-19).**  With a fresh key pasted into `.env`
+(`VILLAGE_VISION_*`, base `https://opencode.ai/inference/go/v1`,
+`deepseek-v4.1-flash`, own UA + a stable `x-opencode-session`), the venue's six
+frames came back **4/6** at **5–12 s** each: it got the **remote** and the
+**water pump** right — both of which the classifier missed — read the cardboard
+as `bread = Organic`, and answered nothing on one frame even at 700 tokens (a
+reasoning model, and the thinking can eat the budget).
+
+Scored head-to-head on **41 photos sampled from the 236-photo probe**, same 224
+crops at JPEG 0.92, same prompt:
+
+| | exact | item-action |
+| --- | ---: | ---: |
+| local ResNet50 | **70.7 %** | **85.4 %** |
+| deepseek-v4.1-flash | 43.9 % | 58.5 % |
+
+and on the 23 of those where the local model was under its 0.70 bar, local was
+still better (15 right against 12).  The reason is what the labels *are*: the
+probe's classes are **materials** (Glass, Metal, Thermocol, Plastic) while a
+vision model names **objects** — it beat the classifier on Metal (3/6 against
+0/6) and lost on Glass, Leather, Thermocol and Plastic.  **So a vision model must
+not be the live classifier, and a "second opinion" fallback is not justified by
+this measurement either.**  Its honest use is as a **labeller for training
+data** — it read the remote and the pump correctly, which is exactly the job the
+venue's own frames need — and that is a script, not a runtime path.
+
 **CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
 The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
 recorded here are the `u2net` background remover above and the browser MobileNet
