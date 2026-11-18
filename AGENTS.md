@@ -387,6 +387,29 @@ visitors cannot be used to press **Water** or change calibration.
   one calls `voiceInterpret` with the phrase (and never the microphone), that
   the catalogue opens at the top with a row per command, that the row's shown
   phrase is the phrase it sends, and that the wire names stay out of sight.
+- **A command that is already true is answered with the state, not sent
+  (2026-11-18).**  Asked for the pump's Auto/On/Off and checked against the
+  lights.  The rule is one function, `alreadyInState` in `VoicePanel.tsx`, and
+  it runs on a **fresh** frame only (connected, not stale, younger than 5 s):
+  - **lights** — `LIGHTS_ON` needs `mode === 'manual_on'`, `LIGHTS_OFF`
+    `manual_off`, `LIGHTS_AUTO` `auto`.  Auto + dark is **not** "already on":
+    that asks for them to be *held* on, so it reaches the controller.
+  - **pump** — `PUMP_AUTO` / `PUMP_ON` / `PUMP_OFF` read
+    `actuators.pump.mode`.  A spoken "pump on" is a **watering request**, so it
+    is already satisfied when the pump is pumping, soaking **or held on by the
+    switch** — and the reply is *"The pump is already on by hand."*, not the
+    catalogue's "a watering pulse is already running" (that sentence is wrong
+    for a manual switch).  **The exception:** `IRRIGATION_STOP` while
+    `mode === 'on'` is a real action and must reach the controller — a manual
+    On is stopped by "stop the pump".
+  - Each sentence is in the visitor's language: the catalogue's `already_text`
+    for the intents it knows, and `panel.alreadyLightsAuto` /
+    `panel.alreadyPumpAuto|On|Off` for the pump's own switch (which has no
+    intent, because only the card and "pump auto" reach it).
+  Measured in Simulation: switch On + "pump on" → *already on by hand*; switch
+  Off + "stop the pump" → *nothing to stop*; Auto + "pump auto" → *already in
+  automatic mode*; lights held on + "lights on" → *already on*; Auto + "lights
+  auto" → *already in automatic mode*.
 - **A refusal is shown and spoken in the visitor's language (2026-11-18).**
   A rejected command used to print the controller's own English sentence under a
   Malayalam heading — twice, because the same string was also the detail line

@@ -64,6 +64,7 @@ function kindOf(response: VoiceTranscribeResponse): string {
 /** True when the controller already reports the state the command asks for. */
 function alreadyInState(command: string, status: DeviceStatus | null): boolean {
   const lights = status?.actuators?.streetlights;
+  const pump = status?.actuators?.pump;
   const irrigation = status?.irrigation;
   switch (command) {
     // "Already off" has to mean the lamps are HELD off, not merely off because
@@ -76,10 +77,28 @@ function alreadyInState(command: string, status: DeviceStatus | null): boolean {
       return lights?.mode === 'manual_on';
     case 'LIGHTS_AUTO':
       return lights?.mode === 'auto';
+    // A watering request is also satisfied by the pump's own switch being On:
+    // the visitor said "pump on" and the pump is already running by hand, so
+    // answering "already on" is the truth (asked 2026-11-18).
     case 'IRRIGATION_REQUEST':
-      return irrigation?.state === 'pumping' || irrigation?.state === 'soaking';
+      return (
+        irrigation?.state === 'pumping' ||
+        irrigation?.state === 'soaking' ||
+        pump?.mode === 'on'
+      );
+    // …and "stop the pump" is a real action while the switch holds it on, so
+    // that combination must reach the controller.
     case 'IRRIGATION_STOP':
-      return irrigation?.state === 'idle';
+      return irrigation?.state === 'idle' && pump?.mode !== 'on';
+    // The pump's own switch (Watering card: Auto / On / Off).  "Pump auto" when
+    // the switch is already Auto must be answered with the state, not with a
+    // command the controller would carry out again (asked 2026-11-18).
+    case 'PUMP_ON':
+      return pump?.mode === 'on';
+    case 'PUMP_OFF':
+      return pump?.mode === 'off';
+    case 'PUMP_AUTO':
+      return pump?.mode === 'auto';
     default:
       return false;
   }
@@ -428,10 +447,26 @@ export function VoicePanel() {
     // "Already off" may only come from a fresh, connected frame.  A cached or
     // stale reading must never make Sara skip an action the user asked for.
     const frameFresh = connected && !stale && (ageMs == null || ageMs < 5000);
-    const already = response.already_text
-      || (command === 'LIGHTS_OFF' ? t('panel.alreadyOff')
-        : command === 'LIGHTS_ON' ? t('panel.alreadyOn')
-        : '');
+    // The catalogue carries the sentence for every intent it knows; the pump's
+    // own switch has no intent (only the card and "pump auto" reach it), so it
+    // has its words here.
+    const ALREADY_KEY: Record<string, Parameters<typeof t>[0]> = {
+      LIGHTS_ON: 'panel.alreadyOn',
+      LIGHTS_OFF: 'panel.alreadyOff',
+      LIGHTS_AUTO: 'panel.alreadyLightsAuto',
+      PUMP_ON: 'panel.alreadyPumpOn',
+      PUMP_OFF: 'panel.alreadyPumpOff',
+      PUMP_AUTO: 'panel.alreadyPumpAuto',
+    };
+    // The catalogue's sentence for a watering request talks about a *pulse*;
+    // when the pump is simply held on by hand that is the wrong claim.
+    const pumpHeldOn =
+      command === 'IRRIGATION_REQUEST' && villageStatus?.actuators?.pump?.mode === 'on'
+        ? t('panel.alreadyPumpOn')
+        : '';
+    const already = pumpHeldOn
+      || response.already_text
+      || (ALREADY_KEY[command] ? t(ALREADY_KEY[command]) : '');
     if (frameFresh && alreadyInState(command, villageStatus) && already) {
       setState('success');
       setMessage(already);

@@ -880,6 +880,26 @@ export const MESSAGES = {
   // A demo answer must never imply the physical model moved, so a translated
   // refusal keeps the same marker the simulator puts on its own sentence.
   'panel.simulatedPrefix': ['Simulated:', 'सिमुलेटेड:', 'സിമുലേറ്റഡ്:'],
+  'panel.alreadyLightsAuto': [
+    'The streetlights already follow the light sensor.',
+    'स्ट्रीट लाइट पहले से रोशनी सेंसर के अनुसार चल रही हैं।',
+    'തെരുവുവിളക്കുകൾ ഇപ്പോൾത്തന്നെ പ്രകാശ സെൻസർ അനുസരിച്ച് പ്രവർത്തിക്കുന്നു.',
+  ],
+  'panel.alreadyPumpAuto': [
+    'The pump is already in automatic mode — the readings decide.',
+    'पंप पहले से ऑटो मोड में है — रीडिंग ही तय करती है।',
+    'പമ്പ് ഇപ്പോൾത്തന്നെ ഓട്ടോ മോഡിലാണ് — വായനകളാണ് തീരുമാനിക്കുന്നത്.',
+  ],
+  'panel.alreadyPumpOn': [
+    'The pump is already on by hand.',
+    'पंप पहले से हाथ से चालू है।',
+    'പമ്പ് ഇപ്പോൾത്തന്നെ കൈകൊണ്ട് ഓണാണ്.',
+  ],
+  'panel.alreadyPumpOff': [
+    'The pump is already off.',
+    'पंप पहले से बंद है।',
+    'പമ്പ് ഇപ്പോൾത്തന്നെ ഓഫാണ്.',
+  ],
   'panel.refused': [
     'The controller received the command and refused it. Nothing changed.',
     'कंट्रोलर को आदेश मिला और उसने मना कर दिया। कुछ नहीं बदला।',

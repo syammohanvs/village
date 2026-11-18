@@ -440,6 +440,147 @@ describe('typed requests use the same parser', () => {
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 
+  it('answers "pump auto" with the mode it is already in, in the visitor’s language', async () => {
+    // Asked 2026-11-18: if the pump is already Auto, saying "pump auto" should
+    // say so rather than send a command the controller has to answer again.
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'auto' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'PUMP_AUTO',
+      command: 'PUMP_AUTO',
+      actuation: true,
+      transcript: 'pump auto',
+      already_text: 'The pump is already in automatic mode.',
+      pending_text: 'Putting the pump in automatic mode.',
+    });
+
+    const { user, panel } = await openPanel();
+    await user.click(within(panel).getByRole('button', { name: /മലയാളം/ }));
+    await user.type(within(panel).getByTestId('voice-text'), 'പമ്പ് ഓട്ടോ');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    // The catalogue's own sentence for the code it already had, in Malayalam.
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'The pump is already in automatic mode.',
+    );
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('answers "pump on" with the switch it is already in', async () => {
+    // Spoken "pump on" is a watering request (IRRIGATION_REQUEST); the pump can
+    // already be running because the switch holds it on.
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'on' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'IRRIGATION_START',
+      command: 'IRRIGATION_REQUEST',
+      actuation: true,
+      transcript: 'പമ്പ് ഓൺ ചെയ്യുക',
+      already_text: 'A watering pulse is already running.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'pump on');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    // Not the catalogue's "a watering pulse is already running" — the pump is
+    // on by hand, and that is what the visitor is told.
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'The pump is already on by hand.',
+    );
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('answers "stop the pump" when it is already stopped', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'off' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'IRRIGATION_STOP',
+      command: 'IRRIGATION_STOP',
+      actuation: true,
+      transcript: 'stop the pump',
+      already_text: 'No watering is running, so there is nothing to stop.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'stop the pump');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'No watering is running, so there is nothing to stop.',
+    );
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
+  it('still stops the pump when the switch is holding it on', async () => {
+    // The exception that must never be swallowed: a manual On is stopped by
+    // "stop the pump", so this is a real action.
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'on' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'IRRIGATION_STOP',
+      command: 'IRRIGATION_STOP',
+      actuation: true,
+      transcript: 'stop the pump',
+      already_text: 'No watering is running, so there is nothing to stop.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'stop the pump');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({
+      type: 'IRRIGATION_STOP',
+    });
+  });
+
+  it('still sends "pump auto" when the switch is on, not auto', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'on' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'PUMP_AUTO',
+      command: 'PUMP_AUTO',
+      actuation: true,
+      transcript: 'pump auto',
+      already_text: 'The pump is already in automatic mode.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'pump auto');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    await waitFor(() => expect(api.sendCommand).toHaveBeenCalled());
+    expect(vi.mocked(api.sendCommand).mock.calls.at(-1)![0]).toMatchObject({ type: 'PUMP_AUTO' });
+  });
+
+  it('answers "lights auto" with Auto when the lamps already follow the sensor', async () => {
+    vi.mocked(api.state).mockResolvedValue(makeState({ lightsMode: 'auto' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'LIGHTS_AUTO',
+      command: 'LIGHTS_AUTO',
+      actuation: true,
+      transcript: 'lights auto',
+      already_text: 'The streetlights already follow the light sensor.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'lights auto');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
+      'The streetlights already follow the light sensor.',
+    );
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
   it('still sends "lights on" while Auto happens to have them on', async () => {
     // Auto + dark: the lamps ARE on, but by the light sensor's decision.  Saying
     // "lights on" asks for them to be held on, so it must reach the controller
