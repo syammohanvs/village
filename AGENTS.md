@@ -240,6 +240,15 @@ sharing safe for the *village*, not for the account:
   answers not-ready (the microphone stays off), `waste/model-status` says not
   installed, and `voice/*` and `waste/classify` answer "this demo copy does not
   provide that" — which is what the hosted copy is for.
+  **The deployed thing is a Worker, not Pages** (`web/frontend/worker.js` +
+  `wrangler.jsonc`, `docs/deployment-cloudflare.md`): it proxies `/api/*` to
+  `VILLAGE_API_ORIGIN` and answers **503 `API_ORIGIN_MISSING`** when that is
+  unset — which is the *normal* state for a demo deployment. So the session
+  check treats **502/503/504 and that code** as "no backend" too; without it
+  the page sat on the sign-in error card with the gateway's refusal underneath.
+  Measured against a static server that answers 503 JSON on `/api/*` (the
+  Worker's exact behaviour) with `chromium --dump-dom`: cards drawn, note
+  present, no sign-in form.
 
 ## Voice (whisper + Sara)
 

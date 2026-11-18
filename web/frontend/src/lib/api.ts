@@ -642,9 +642,19 @@ export const api = {
       return answer as { authenticated: boolean; username: string | null; auth_enabled: boolean };
     } catch (error) {
       const code = error instanceof ApiError ? error.code : undefined;
-      if (code === 'NETWORK' || (error instanceof ApiError && error.status === 404)) {
-        return enterLocalDemo();
-      }
+      const status = error instanceof ApiError ? error.status : 0;
+      // `503 API_ORIGIN_MISSING` is this deployment's own Worker answering: it
+      // proxies /api/* to a backend whose address has not been configured.  No
+      // backend, so the built-in demo is the honest page (502/504 included:
+      // those are a gateway with nothing behind it).
+      const noBackend =
+        code === 'NETWORK' ||
+        code === 'API_ORIGIN_MISSING' ||
+        status === 404 ||
+        status === 502 ||
+        status === 503 ||
+        status === 504;
+      if (noBackend) return enterLocalDemo();
       throw error;
     }
   },

@@ -79,9 +79,18 @@ npx wrangler dev
 ```
 
 Without `VILLAGE_API_ORIGIN`, `/api/v1/*` answers **503**
-`API_ORIGIN_MISSING` and the dashboard correctly shows **Offline**. Sara still
-works, because her guide is local; the live narration says it cannot see the
-sensors.
+`API_ORIGIN_MISSING` — and the dashboard then runs **its own demonstration**
+(`web/frontend/src/lib/localVillage.ts`): the village cards, the watering, the
+tank, the lamps and the pump/lights switches, all made in the browser, locked to
+**Simulation** with the note *"This copy has no village service, so it runs on a
+built-in demonstration."* Nothing it shows is a measurement and nothing it does
+touches hardware. Voice and the waste classifier are the parts that need the
+backend, so there they read as not available.
+
+So the deployed URL is useful with **no** configuration at all: a link to show
+someone how the app behaves. Set `VILLAGE_API_ORIGIN` only when you want it to
+be the *real* village, and remember the backend must then be reachable from
+Cloudflare (see **Backend hosting** below).
 
 ## Backend hosting
 
@@ -114,6 +123,7 @@ and leave it unauthenticated.
 | Feature | Local (`./scripts/launch.sh`) | Cloudflare |
 | --- | --- | --- |
 | Dashboard UI | served by FastAPI | static assets in the Worker |
+| Village page (Simulation) | yes | **yes, built into the page** |
 | Live sensors / controls | yes | only with a reachable `VILLAGE_API_ORIGIN` |
 | Whisper voice recognition | local server | needs the backend |
 | Waste camera model | local `models/` | proxied from the backend |
