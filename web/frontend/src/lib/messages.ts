@@ -499,6 +499,7 @@ export const MESSAGES = {
   'waste.title.keepSeparate': ['Keep separate', 'अलग रखें', 'വേർതിരിച്ച് സൂക്ഷിക്കുക'],
   'waste.title.askSahayak': ['Ask the Gram Sahayak', 'ग्राम सहायक से पूछें', 'ഗ്രാം സഹായകിനോട് ചോദിക്കുക'],
   'waste.title.doNotHandle': ['Do not handle', 'छुएँ नहीं', 'തൊടരുത്'],
+  'waste.title.reuse': ['Keep it in use', 'इसे इस्तेमाल में रखें', 'ഇത് ഉപയോഗത്തിൽ സൂക്ഷിക്കുക'],
   'waste.title.keepForCollection': [
     'Keep separate for collection', 'संग्रह के लिए अलग रखें', 'ശേഖരണത്തിനായി വേർതിരിച്ച് സൂക്ഷിക്കുക',
   ],

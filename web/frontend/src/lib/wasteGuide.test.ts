@@ -189,8 +189,9 @@ describe('an item that is not waste yet', () => {
     expect(g.reason).toMatch(/use it for as long as possible/i);
     expect(g.reason).toMatch(/food, plastic or paper bins/i);
     expect(g.reason).toMatch(/Gram Sahayak/);
-    // The headline is the role, not a bin.
-    expect(g.title).toMatch(/Ask the Gram Sahayak/);
+    // The headline is "keep using it", not a bin and not "ask" -- the reason
+    // already ends with the Gram Sahayak.
+    expect(g.title).toMatch(/Keep it in use/);
   });
 
   it('reaches the same sentence from the button a reader presses', () => {

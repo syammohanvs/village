@@ -307,7 +307,7 @@ export function guideFor(
         ? 'waste.item.notInBins'
         : text === 'pencil' ? 'waste.item.pencil' : undefined,
       destination: 'support',
-      titleKey: 'waste.title.askSahayak',
+      titleKey: 'waste.title.reuse',
       reasonKey: 'waste.word.reuse',
       separate: true,
       support: true,
