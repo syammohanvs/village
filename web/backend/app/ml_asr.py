@@ -30,6 +30,10 @@ from typing import Any
 # A short sample of the words the village listens for.  This is only a priming
 # hint for the decoder; it measurably straightens the spelling ("വിലക്കുകൾ" →
 # "വിളക്കുകൾ"), which is the difference between a command and a shrug.
+# **Keep this short.**  A longer prompt that also named the mode commands was
+# measured on 2026-11-18 and made the output *worse* — the same four clips came
+# back in Persian and Tamil letters ("پام்பு ஓட்புச் செய்யுங்கள்.").  Six or
+# seven phrases prime the spelling; more of them pull the decoder off.
 PROMPT = (
     "വിളക്കുകൾ കത്തിക്കുക, വിളക്കുകൾ അണയ്ക്കുക, വിളക്കുകൾ ഓട്ടോ, "
     "പമ്പ് ഓഫ് ചെയ്യുക, നനയ്ക്കാൻ തുടങ്ങുക, മണ്ണിൽ ഈർപ്പം, ടാങ്കിൽ വെള്ളമുണ്ടോ."

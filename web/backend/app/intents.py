@@ -237,6 +237,25 @@ class IntentMatcher:
         is_question = self._question(transcript, tokens, language)
         is_request = self._request(tokens, language)
 
+        # A **misspelled state word** is tried by sound before anything else can
+        # claim the sentence.  This has to happen here, not at the end: the word
+        # "പമ്പ്" is also the watering cue, so "പമ്പ് ഓത്ടു" (pump auto, heard as
+        # "pump ottu") was being read as *start watering* before the sound pass
+        # ever ran — the "auto outranks the pump cue" rule needs an `auto` the
+        # word matcher can see, and a speech model spells it four ways
+        # (2026-11-18).  `_romanised_intent` needs exactly one device and one
+        # state, and refuses a question or a negation, so this cannot guess.
+        if (
+            language in {"ml", "hi"}
+            and not sounds_first
+            and not state_hits
+            and not negators
+            and not is_question
+        ):
+            roman = self._romanised_intent(tokens, language)
+            if roman is not None:
+                return roman
+
         # --- two states in one sentence are never a guess --------------------
         unique_states = {name for _, _, name in state_hits}
         # An explicit mode wins over a preposition and over the pump cue: "put
@@ -439,7 +458,14 @@ class IntentMatcher:
         # read must not be taken as "start", or a request to put a lamp out
         # could open the valve.
         watering = self.watering.get(language) or {}
-        if hits(roman_aliases(watering.get("cue"))):
+        if "auto" in states:
+            # An explicit mode outranks the pump cue here too: "പമ്പ്" is the
+            # watering cue as well as the pump's name, so without this
+            # "പംഭ് അട്ടോ" (pump auto, heard with a wrong consonant) became
+            # *two* states — auto and "start watering" — and was refused
+            # (2026-11-18).
+            pass
+        elif hits(roman_aliases(watering.get("cue"))):
             if hits(roman_aliases(watering.get("stop"))):
                 states.add("off")
                 devices.add("pump")

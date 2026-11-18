@@ -68,6 +68,15 @@ CANDRABINDU = 0x0D01
 
 SIGNS = {ANUSVARA: "n", VISARGA: "h", CANDRABINDU: "n"}
 
+# An anusvara (ം) is written the same way before any consonant but *sounds*
+# like the nasal of that consonant's class: "പമ്പ്" is "pamp", not "panp", and a
+# speech model writes "പംഭ്" for the same word — which romanised to "pnb" and
+# matched nothing (measured 2026-11-18, from the user's own recording).  The
+# classes: labial → m, velar → n (ങ്ങ is separate anyway), the rest → n.
+ANUSVARA_BEFORE = {
+    0x0D2A: "m", 0x0D2B: "m", 0x0D2C: "m", 0x0D2D: "m", 0x0D2E: "m",  # p ph b bh m
+}
+
 # The atomic chillu letters (Malayalam writes ള് as ൾ, final -n as ൻ, …).  A
 # modern text uses them, so a table without them silently drops the last letter
 # of exactly the words this file exists for.
@@ -112,7 +121,7 @@ def romanise(text: str) -> str:
     source = to_malayalam(text)
     out: list[str] = []
     pending_consonant = False
-    for char in source:
+    for index, char in enumerate(source):
         code = ord(char)
         if code in CONSONANTS:
             if pending_consonant:
@@ -135,8 +144,18 @@ def romanise(text: str) -> str:
             out.append(CHILLUS[code])
             pending_consonant = False
         elif code in SIGNS:
-            out.append(SIGNS[code])
-            pending_consonant = False
+            # The consonant before a sign still carries its inherent vowel:
+            # "പംമ്" is "pamm", not "pmm" — dropping that `a` made the word
+            # unrecognisable after the anusvara was read as the nasal it sounds
+            # like (2026-11-18).
+            if pending_consonant:
+                out.append("a")
+                pending_consonant = False
+            if code == ANUSVARA:
+                after = ord(source[index + 1]) if index + 1 < len(source) else 0
+                out.append(ANUSVARA_BEFORE.get(after, "n"))
+            else:
+                out.append(SIGNS[code])
         elif char.isascii():
             out.append(char)
             pending_consonant = False
@@ -178,6 +197,11 @@ def fold(word: str) -> str:
     return "".join(out)
 
 
+def _consonants(word: str) -> str:
+    """The word with its vowels removed, for comparing two short words."""
+    return "".join(char for char in word if char not in "aeiou")
+
+
 def distance(a: str, b: str) -> int:
     """Levenshtein distance, for words that are close but not identical."""
     if a == b:
@@ -210,6 +234,22 @@ def same_word(a: str, b: str) -> bool:
         return False
     if left == right:
         return True
+    # A **short** word may be one letter away and still be the same word: the
+    # Malayalam "ഓട്ടോ" (auto) came back as "അട്ടോ", "ഓെട്ടോ" and "ഓത്റോ" on
+    # different recordings of the same phrase, and "പമ്പ്" as "പംമ്" — one
+    # letter each time (2026-11-18, from the user's own voice).
+    #
+    # Three conditions, and each one was forced by a wrong answer when it was
+    # missing: four letters at most, one edit at most, and **the consonants must
+    # be the same or one must extend the other**.  Without the consonant check
+    # the question word "ano" matched "auto" ("ato") and every short word became
+    # a question.  With it, two-letter words are safe too ("on" and "off" have
+    # different consonants), which matters because a clipped "ഓട്ടോ" comes back
+    # as "ഓത്" ("ot").
+    if 2 <= len(left) <= 4 and 2 <= len(right) <= 4 and distance(left, right) <= 1:
+        a, b = _consonants(left), _consonants(right)
+        if a == b or a.startswith(b) or b.startswith(a):
+            return True
     # A long word may differ by one letter and still be the same word:
     # "vilakkunkal" (heard) and "vilakkukal" (expected) are one inserted `n`.
     # A short one may not -- that is exactly how "anakuka" (turn off) was once

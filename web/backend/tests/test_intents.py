@@ -607,3 +607,47 @@ def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:
     assert matcher.match("പമ്പ് ഓൺ ചെയ്യുക", "ml")["intent"] == "IRRIGATION_START"
     assert matcher.match("പമ്പ് ഓഫ് ചെയ്യുക", "ml")["intent"] == "IRRIGATION_STOP"
 
+
+# ---------------------------------------------------------------------------
+# The user's own Malayalam recordings (2026-11-18, taken from the app's event
+# log — these are the literal transcripts `whisper-small-malayalam` produced).
+#
+# "Pump auto" was the phrase that would not work.  The model spells the two
+# words differently on every recording: the pump as "പംമ്" / "പംഭ്" (the
+# anusvara before a labial sounds like `m`) and auto as "അട്ടോ" / "ഓെട്ടോ" /
+# "ഓത്ടു".  Both had to be reachable by sound.
+# ---------------------------------------------------------------------------
+def test_pump_auto_from_the_users_own_recordings(matcher: IntentMatcher) -> None:
+    for text in ("പംമ് അട്ടോ", "പംഭ് അട്ടോ", "പമ് ഓത്.", "പമ്പ് ഓട്ടോ ചെയ്യുക"):
+        assert matcher.match(text, "ml")["intent"] == "PUMP_AUTO", text
+    # Not covered, and deliberately not chased: a hurried "പമ്പ് ഓട്ടോ" can come
+    # back as one merged word ("പോട്ടു"), where the pump's final consonant has
+    # bled into the state, and "ഓട്ടോമാറ്റിക്" has several unhelpful spellings.
+    # The short two-word phrasing above is what the exhibit asks a visitor to
+    # say, and it works.
+
+
+def test_the_anusvara_sounds_like_the_letter_after_it() -> None:
+    from app.phonetics import romanise
+
+    # Both spellings are the same spoken word "pamp"; the anusvara before a
+    # labial is an `m`, and the consonant before a sign keeps its inherent
+    # vowel (a first version romanised "പംമ്" as "pmm" and matched nothing).
+    assert romanise("പംഭ്") == "pamb"
+    assert romanise("പംമ്") == "pamm"
+    assert romanise("പമ്പ്") == "pamp"
+
+
+def test_a_short_word_tolerates_one_letter_but_never_a_different_consonant() -> None:
+    from app.phonetics import same_word
+
+    # What a speech model actually produces for "ഓട്ടോ":
+    assert same_word("ato", "oto")
+    assert same_word("otu", "oto")
+    assert same_word("pam", "pamp")
+    # …and what must never be confused with it:
+    assert not same_word("ato", "ano")   # "ano" is the question word
+    assert not same_word("ato", "nto")   # "nto" is the question suffix
+    assert not same_word("on", "off")    # two letters, never tolerated
+    assert not same_word("eta", "oto")   # "how much" is not "auto"
+

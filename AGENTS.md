@@ -204,6 +204,30 @@ visitors cannot be used to press **Water** or change calibration.
   "ചെയ്യുക" ("to do") is inside the "ഓൺ ചെയ്യുക"/"ഓഫ് ചെയ്യുക" aliases and made
   one sentence three states at once.  **`no_repeat_ngram_size` corrupts this
   model's output** (replacement characters) — do not add it back.
+- **"Pump auto" in Malayalam — what it took (2026-11-18).**  Reported as the
+  one phrase that would not work, and the app's own event log had the literal
+  transcripts: `പംമ് അട്ടോ`, `പംഭ് അട്ടോ`, `പമ്പ് ഹോണാക്കുകാ`.  Three separate
+  faults, each measured:
+  1. **The anusvara (ം) was always romanised `n`**, so `പംഭ്` — the same word as
+     `പമ്പ്`, "pamp" — became `pnb` and matched nothing.  It now takes the nasal
+     of the *following* consonant's class (m before a labial), and a consonant
+     before a sign keeps its inherent vowel (`പംമ്` is `pamm`, not `pmm`).
+  2. **The pump cue claimed the sentence first.**  `പമ്പ്` is the watering cue as
+     well as the pump's name, so a state the word matcher could not read became
+     "start watering" before the sound pass ran.  The **by-sound pass now runs
+     before the cue** whenever no state word was matched structurally, and it
+     applies the same rule inside itself (`auto` outranks the cue).
+  3. **A short word had to tolerate one letter.**  The model writes auto as
+     `അട്ടോ` / `ഓെട്ടോ` / `ഓത്റോ` / `ഓത്`; `same_word` now allows one edit for
+     words of **2–4 letters**, but only when **the consonants are equal or one
+     extends the other** — without that check the question word `ആണോ` ("ano")
+     matched "auto" and every short word became a question, and without the
+     length limit "on" and "off" meet.  Both guards are pinned in
+     `test_a_short_word_tolerates_one_letter_but_never_a_different_consonant`.
+  After: four TTS recordings of "pump auto" (three phrasings) all answer
+  PUMP_AUTO through the real route.  **Not chased, deliberately:** a hurried
+  `പമ്പ് ഓട്ടോ` can merge into one word (`പോട്ടു`) with the pump's last
+  consonant inside it; no rule guesses at that, and the short phrasing works.
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
   Unicode offset) and romanised, so `വിളക്കുകൾ അണയ്ക്കുക` and
