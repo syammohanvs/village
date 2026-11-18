@@ -391,6 +391,16 @@ class IntentMatcher:
         action = sorted(unique_states)[0]
         command = command_for_device.get(action)
         if not command:
+            # The device was read and the state was read, but that device has no
+            # such action — "വെള്ളം നിർത്തുക" ("stop the water") names the water
+            # as the device and stopping as the state, while the thing to stop
+            # is the watering.  A phrase the catalogue lists is the better
+            # answer; otherwise the refusal stands.
+            fallback = self._phrase_fallback(
+                tokens, language, allow=not (is_question or negators)
+            )
+            if fallback:
+                return fallback
             return self._result("unsupported", language, "unknown", device=device, action=action)
 
         if self._unaccounted(tokens, language):
@@ -415,9 +425,9 @@ class IntentMatcher:
             return None
         g = self.grammar.get(language, {})
 
-        def hits(aliases: list[str]) -> bool:
+        def hits(aliases: list[str], *, suffix: bool = False) -> bool:
             return any(
-                same_word(word, alias)
+                same_word(word, alias, allow_suffix=suffix)
                 for word in roman
                 for alias in aliases
                 if alias
@@ -449,11 +459,39 @@ class IntentMatcher:
             for part in romanise(alias).split()
             if part
         }
+        device_sounds = {
+            fold(part)
+            for aliases in self.devices.values()
+            for alias in (aliases.get(language) or [])
+            if len(alias.split()) == 1
+            for part in romanise(alias).split()
+            if part
+        }
         verb_sounds = {
             fold(word)
             for word in romanise(" ".join(g.get("verbs") or [])).split()
             if fold(word) not in state_sounds
         }
+
+        def phrase_hit(aliases: list[str] | None) -> bool:
+            """A **multi-word** alias whose own words appear in order.
+
+            "വെള്ളം ഒഴിക്കുക" (pour water) is a phrase, and its verb half is
+            dropped from the word-by-word match because it is a verb.  Reading
+            it as a request needs its two words together, not the bare cue word
+            — otherwise a sentence whose *state* could not be read (a Hindi
+            "पंप बंद" heard while Malayalam is chosen) would be taken as
+            "start watering" (2026-11-18).
+            """
+            for alias in aliases or []:
+                parts = [part for part in romanise(alias).split() if part]
+                if len(parts) < 2:
+                    continue
+                for start in range(0, len(roman) - len(parts) + 1):
+                    window = roman[start:start + len(parts)]
+                    if all(same_word(a, b) for a, b in zip(window, parts)):
+                        return True
+            return False
 
         def roman_aliases(aliases: list[str] | None) -> list[str]:
             out: list[str] = []
@@ -464,15 +502,35 @@ class IntentMatcher:
                         out.append(part)
             return out
 
-        # A refusal or a question must never be turned into an action.
+        # A refusal or a question must never be turned into an action.  A
+        # **multi-word** guard is matched as the phrase it is, never by its
+        # parts: "चालू मत" ("do not turn on") split into characters made
+        # "चालू" — the word for ON — read as a correction marker, so every
+        # Hindi sentence containing it was refused before a device was read
+        # ("बालाइट चालू" measured 2026-11-18).
+        def guard_aliases(aliases: list[str] | None) -> list[str]:
+            out: list[str] = []
+            for alias in aliases or []:
+                out.append(alias)
+                parts = [part for part in romanise(alias).split() if part]
+                if len(parts) > 1:
+                    continue
+                for part in parts:
+                    sound = fold(part)
+                    if sound not in state_sounds and sound not in device_sounds:
+                        out.append(part)
+            return out
+
         for group in ("negations", "question_starts", "question_suffixes", "hypothetical",
                       "corrections"):
-            if hits(roman_aliases(g.get(group))):
+            if hits(guard_aliases(g.get(group))):
                 return None
 
         devices: set[str] = set()
         for name, aliases in self.devices.items():
-            if hits(roman_aliases(aliases.get(language))):
+            # `suffix=True`: a device may be heard with a syllable in front of
+            # it ("बालाइट" for "लाइट").  States never get this tolerance.
+            if hits(roman_aliases(aliases.get(language)), suffix=True):
                 devices.add(name)
         states: set[str] = set()
         for name, aliases in self.states.items():
@@ -505,7 +563,18 @@ class IntentMatcher:
             elif hits(roman_aliases(watering.get("stop"))):
                 states.add("off")
                 devices.add("pump")
-            elif hits(roman_aliases(watering.get("start"))):
+            elif not states and (
+                hits(roman_aliases(watering.get("start")))
+                or phrase_hit(watering.get("cue"))
+            ):
+                # A request to water is either a start word ("തുടങ്ങുക") or the
+                # cue phrase itself ("വെള്ളം ഒഴിക്കുക").  Requiring a start alias
+                # alone stopped working when the verb list and the alias began
+                # romanising their final vowel the same way, because the start
+                # aliases are verbs and verbs are dropped here (2026-11-18).
+                # A **bare** pump word is not enough: "പമ്പ്" is also the device
+                # name, and a sentence whose state could not be read must be
+                # refused rather than taken as "start" (the pump-off trap).
                 states.add("on")
                 devices.add("pump")
 

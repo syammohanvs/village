@@ -401,9 +401,13 @@ def test_an_unreadable_pump_state_never_starts_the_pump(matcher: IntentMatcher) 
     IRRIGATION_REQUEST through the sound-alike path — one wrong answer away from
     opening the valve on a request to close it.  Both halves must match.
     """
+    # The same sentence is now read correctly (Tamil letters, Malayalam
+    # chosen): "stop" is in the catalogue as the phrase it is.  What must never
+    # change is the direction - a request to close the valve is not a request
+    # to open it.
     result = matcher.match("பம்ப் ஆஃப்", "ml")
+    assert result.get("command") == "IRRIGATION_STOP"
     assert result.get("command") != "IRRIGATION_REQUEST"
-    assert result["status"] == "unknown"
 
 
 def test_sound_alike_matching_does_not_invent_commands(matcher: IntentMatcher) -> None:
@@ -592,6 +596,45 @@ def test_transcripts_from_the_malayalam_speech_model_are_understood(
     )
     for text, want in cases:
         assert matcher.match(text, "ml")["intent"] == want, text
+
+
+def test_a_hindi_sentence_heard_with_a_syllable_in_front_is_still_the_lights(
+    matcher: IntentMatcher,
+) -> None:
+    """`बालाइट चालू` — the model's own rendering of "लाइट चालू", verbatim.
+
+    Two faults met (2026-11-18, from the user): the word was heard with a
+    syllable in front of it ("palaita" for "laita"), which the device match now
+    tolerates; and `चालू` — the word for ON — is also half of the guard phrase
+    "चालू मत" ("do not turn on"), so splitting that phrase made every sentence
+    containing it look like a correction and the sound path refused before the
+    device was read.
+    """
+    assert matcher.match("बालाइट चालू.", "hi")["intent"] == "LIGHTS_ON"
+    assert matcher.match("लाइट चालू", "hi")["intent"] == "LIGHTS_ON"
+    assert matcher.match("लाइट चालू करो", "hi")["intent"] == "LIGHTS_ON"
+    # The guard it came from still works, as the phrase it is.
+    assert matcher.match("लाइट मत चालू करो", "hi")["intent"] == "NEGATED"
+    # A device may carry a leading syllable; a *state* may not, and "अट चालू"
+    # (the model losing most of "लाइट") is still refused rather than guessed.
+    assert matcher.match("अट चालू.", "hi")["status"] == "unknown"
+
+
+def test_a_water_phrase_with_no_state_word_is_the_watering_it_names(
+    matcher: IntentMatcher,
+) -> None:
+    """`വെള്ളം നിർത്തുക` is a catalogue phrase, and it names the water.
+
+    The structural path reads the device (water) and the state (stop), and then
+    finds that water has no stop command — so a phrase the catalogue *lists*
+    for stopping the watering was refused (measured 2026-11-18).  The listed
+    phrase now answers before the structural guess refuses.
+    """
+    assert matcher.match("വെള്ളം നിർത്തുക", "ml")["intent"] == "IRRIGATION_STOP"
+    assert matcher.match("വെള്ളം ഒഴിക്കുക", "ml")["intent"] == "IRRIGATION_START"
+    # …and a bare pump word is still not "start": a sentence whose state the
+    # chosen language cannot read must be refused, not turned into watering.
+    assert matcher.match("पंप बंद", "ml")["status"] == "unknown"
 
 
 def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:

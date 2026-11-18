@@ -157,8 +157,16 @@ def romanise(text: str) -> str:
             else:
                 out.append(SIGNS[code])
         elif char.isascii():
+            # A space ends the word, and the consonant before it keeps its
+            # inherent vowel — the same rule as at end-of-string.  This used to
+            # fall into the ASCII branch and drop it, so "लाइट" romanised to
+            # "laita" on its own and "lait" inside a sentence, and the Hindi
+            # "लाइट चालू" the model hears as "बालाइट चालू" could not be
+            # matched to the word that was said (2026-11-18).
+            if pending_consonant and char.isspace():
+                out.append("a")
+                pending_consonant = False
             out.append(char)
-            pending_consonant = False
         else:
             # A space or any other separator ends the word.
             if pending_consonant:
@@ -221,18 +229,34 @@ def distance(a: str, b: str) -> int:
     return previous[-1]
 
 
-def same_word(a: str, b: str) -> bool:
+def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     """Are these two renderings of one spoken word?
 
     Exact after folding, and only that.  A tolerance of one edit was measured
     and rejected on 2026-11-17: it turned "anakkukka" (turn off) into
     "nanaykkuka" (water) by the one letter the fold cannot see, and the exhibit
     would have started the pump on a request to put a lamp out.
+
+    `allow_suffix` is for **device names only**, and for one measured failure:
+    the Hindi model heard "लाइट" ("laita") and wrote "बालाइट" ("palaita") —
+    the same word with a syllable in front of it, which is two edits away and
+    matched nothing, so "लाइट चालू" was refused (2026-11-18).  A device word
+    with a syllable added or dropped at the *start* is still that device; a
+    state word is not treated this way, because "off"/"on" differ exactly there.
     """
     left, right = fold(a), fold(b)
     if not left or not right:
         return False
-    if left == right:
+
+    def bare(word: str) -> str:
+        # Hindi drops a word-final schwa ("लाइट" is said "lait", the letter
+        # carries an "a"), and the romaniser writes that "a" in one position and
+        # not another.  One trailing "a" therefore never separates two
+        # renderings of the same word — and the device names are mostly words of
+        # exactly that shape (2026-11-18).
+        return word[:-1] if len(word) > 3 and word.endswith("a") else word
+
+    if bare(left) == bare(right):
         return True
     # A **short** word may be one letter away and still be the same word: the
     # Malayalam "ഓട്ടോ" (auto) came back as "അട്ടോ", "ഓെട്ടോ" and "ഓത്റോ" on
@@ -269,4 +293,12 @@ def same_word(a: str, b: str) -> bool:
     # read as "nanakuka" (water).
     if min(len(left), len(right)) >= 9:
         return distance(left, right) <= 1
+    # A device name with a syllable in front of it (or missing from it):
+    # "palaita" ends with "laita".  The shorter word must be long enough to be
+    # a word rather than a syllable, and the extra part short enough to be a
+    # mishearing rather than a different word.
+    if allow_suffix:
+        shorter, longer = sorted((left, right), key=len)
+        if len(shorter) >= 4 and 0 < len(longer) - len(shorter) <= 3 and longer.endswith(shorter):
+            return True
     return False

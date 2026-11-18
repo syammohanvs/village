@@ -125,7 +125,7 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **499 firmware checks**, **135 backend tests** and
+The current tree passes **499 firmware checks**, **137 backend tests** and
 **423 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
@@ -388,6 +388,38 @@ sharing safe for the *village*, not for the account:
     runs the pump with the tank unknown — a voice command must not do that on
     its own.  The card's On switch is one press away, and a manual On is still
     stopped by a tank the controller *knows* is low.
+
+- **Hindi "लाइट चालू" was refused as a *foreign* utterance, and four faults
+  were behind it (2026-11-18, reported as "it told me it didn't understand").**
+  The log had `बालाइट चालू.` — the model's own rendering of "लाइट चालू":
+  1. **The romaniser dropped a word's final vowel at a space.** `ലാഇട` gave
+     "laita" on its own and "lait" inside a sentence (a space is ASCII, and the
+     ASCII branch cleared the pending consonant instead of flushing it), so a
+     word never matched the alias it had just failed to equal.  A space now ends
+     the word the way end-of-string did.
+  2. **A word-final "a" never separates two renderings** (`same_word`): Hindi
+     drops the schwa, the romaniser writes it in one position and not another.
+  3. **A device name tolerates a syllable in front of it** (`same_word(...,
+     allow_suffix=True)`, devices only — states never): "palaita" ↔ "laita".
+     This is what made `बालाइट` find the lights.
+  4. **A guard phrase is matched as the phrase it is, never by its parts.** The
+     Hindi corrections list holds "चालू मत" ("do not turn on"), and splitting it
+     handed the word `चालू` — the word for ON — to the correction check, so
+     **every** Hindi sentence containing "चालू" was refused before a device was
+     read.  `guard_aliases` keeps a multi-word guard whole.
+  Two related repairs came with it, both about not guessing:
+  **the pump cue is a request only through a start word or the cue *phrase*** —
+  a bare pump word is not enough, or a sentence whose state could not be read
+  would start the pump (a Hindi "पंप बंद" heard while Malayalam is chosen now
+  refuses instead); and **a catalogue phrase answers when the structural
+  device has no such action** — "വെള്ളം നിർത്തുക" (stop the water) reads as
+  device *water* + state *stop*, and water has no stop, so a listed phrase was
+  being refused.  `பம்ப் ஆஃப்` (Tamil, "pump off") now answers **IRRIGATION_STOP**
+  rather than THING-unknown — the test that guarded the direction was updated
+  to assert STOP and still never REQUEST.
+  **Still not chased:** `अट चालू` (the model lost most of "लाइट" — nothing left
+  to match), and the same weak-Hindi caveat the speech-model notes already
+  carry.
 
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
