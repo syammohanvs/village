@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -119,7 +120,7 @@ async def test_the_share_link_signs_in_a_simulation_only_visitor(tmp_path: Path)
     """
     settings = secured(tmp_path)
     async with client_for(settings) as (client, gateway, app):
-        key = app.state.sessions.magic_key()
+        key = app.state.share_key
         opened = await client.get(f"/api/v1/auth/magic?key={key}", follow_redirects=False)
         assert opened.status_code == 303
         # Simulation is where a visitor belongs, and the redirect says so.
@@ -191,7 +192,7 @@ async def test_a_bad_or_switched_off_share_link_is_a_refusal(tmp_path: Path) -> 
 
     switched_off = replace(secured(tmp_path), share_link_enabled=False)
     async with client_for(switched_off) as (client, _gateway, app):
-        key = app.state.sessions.magic_key()
+        key = app.state.share_key
         assert (await client.get(f"/api/v1/auth/magic?key={key}")).status_code == 404
 
 
@@ -217,3 +218,54 @@ async def test_the_operator_can_copy_the_share_link_from_setup(tmp_path: Path) -
         assert (await client.get(url, follow_redirects=False)).status_code == 303
         # ...and it is a guest, even though the account minted it.
         assert (await client.get("/api/v1/auth/session")).json()["guest"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_share_key_survives_a_restart_and_rotates_on_demand(
+    tmp_path: Path,
+) -> None:
+    """Two properties of the link, both measured.
+
+    A link that changed on every restart would 403 tomorrow for no visible
+    reason, so the key is stored rather than derived from the salted password
+    hash.  And handing out a key is the operator's call, so replacing it must
+    take one press and must really retire the old one.
+    """
+    settings = secured(tmp_path)
+    async with client_for(settings) as (_client, _gateway, app):
+        first = app.state.share_key
+        assert len(first) == 32
+
+    # A second process on the same database finds the same key.
+    async with client_for(settings) as (client, _gateway, app):
+        assert app.state.share_key == first
+        assert (await client.get(f"/api/v1/auth/magic?key={first}")).status_code == 303
+
+        assert (
+            await client.post(
+                "/api/v1/auth/login", json={"username": "examiner", "password": PASSWORD}
+            )
+        ).status_code == 200
+        rotated = (await client.post("/api/v1/auth/share-link")).json()
+        assert rotated["enabled"] is True
+        new_key = rotated["url"].split("key=", 1)[1]
+        assert new_key != first
+        # The copy someone was given yesterday is dead, and the new one works.
+        assert (await client.get(f"/api/v1/auth/magic?key={first}")).status_code == 403
+        assert (await client.get(f"/api/v1/auth/magic?key={new_key}")).status_code == 303
+
+    # ...and the new key is the one the next process starts with.
+    async with client_for(settings) as (_client, _gateway, app):
+        assert app.state.share_key == new_key
+
+
+@pytest.mark.asyncio
+async def test_the_share_key_is_not_a_setting_a_client_can_read(
+    tmp_path: Path,
+) -> None:
+    """It lives in the settings table only because that is the state that
+    survives a restart - not to be handed back over the settings API."""
+    async with client_for(make_settings(tmp_path)) as (client, _gateway, app):
+        body = (await client.get("/api/v1/settings")).json()
+        assert "share_key" not in body
+        assert app.state.share_key not in json.dumps(body)

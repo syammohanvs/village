@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,11 @@ POINTS = {"organic": 3, "plastic": 2, "paper": 1}
 MAX_EVENTS = 2000
 MAX_RECOGNITIONS = 1000
 MAX_SAMPLES = 2000
+
+# The share link's key lives in `settings` beside the rest of the state, but it
+# is not part of DEFAULT_SETTINGS: nothing may overwrite it through the settings
+# API, and `get_settings` takes it back out.
+SHARE_KEY_SETTING = "share_key"
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "language": "en",
@@ -369,6 +375,11 @@ class Database:
                 continue
         merged = dict(DEFAULT_SETTINGS)
         merged.update(stored)
+        # The share link's key is a credential, not a setting a client may read
+        # back: it is stored in this table only because that is the one place
+        # this app keeps state that must survive a restart and travel with the
+        # database.
+        merged.pop(SHARE_KEY_SETTING, None)
         return merged
 
     async def put_settings(self, values: dict[str, Any]) -> dict[str, Any]:
@@ -382,6 +393,39 @@ class Database:
             )
         await self.db.commit()
         return await self.get_settings()
+
+    # ------------------------------------------------------------------
+    async def share_key(self) -> str:
+        """The share link's key, created once and then fixed.
+
+        It is *stored* rather than derived because the sign-in hash is salted
+        afresh whenever the password is supplied in plain text — a link derived
+        from it would stop working on the next restart, which is a broken link
+        that reports a 403 for no visible reason. Kept here, it survives a
+        restart and travels with `village.db` to another laptop.
+        """
+        rows = await self.db.execute_fetchall(
+            "SELECT value FROM settings WHERE key = ?", (SHARE_KEY_SETTING,)
+        )
+        if rows:
+            try:
+                value = json.loads(rows[0]["value"])
+                if isinstance(value, str) and len(value) >= 16:
+                    return value
+            except json.JSONDecodeError:
+                pass
+        return await self.rotate_share_key()
+
+    async def rotate_share_key(self) -> str:
+        """A new key; every link handed out before this stops working."""
+        value = secrets.token_hex(16)
+        await self.db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (SHARE_KEY_SETTING, json.dumps(value)),
+        )
+        await self.db.commit()
+        return value
 
     # ------------------------------------------------------------------
     async def add_sensor_sample(self, mode: str, status: dict[str, Any]) -> None:

@@ -463,6 +463,11 @@ export const api = {
     return request('/auth/share-link', { mode: undefined });
   },
 
+  /** A new link; every copy handed out before this stops opening the app. */
+  newShareLink(): Promise<{ enabled: boolean; guest: string; url: string }> {
+    return request('/auth/share-link', { method: 'POST', body: {}, mode: undefined });
+  },
+
   login(username: string, password: string): Promise<{ authenticated: boolean; username: string }> {
     return request('/auth/login', {
       method: 'POST',

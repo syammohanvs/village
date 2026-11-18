@@ -97,15 +97,3 @@ class Sessions:
             return None
         return username if username in {self.username, self.guest} else None
 
-    # ------------------------------------------------------------------
-    def magic_key(self) -> str:
-        """The share link's key, derived from the same secret as the cookie.
-
-        Deliberately derived rather than stored: changing the password changes
-        the link, so an old link pasted into a chat cannot outlive the account
-        it was made for, and nothing new has to be kept on disk.
-        """
-        return hmac.new(self._secret, b"village-share-link", hashlib.sha256).hexdigest()[:32]
-
-    def check_magic(self, key: str | None) -> bool:
-        return bool(key) and hmac.compare_digest(key, self.magic_key())

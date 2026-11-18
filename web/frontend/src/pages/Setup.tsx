@@ -54,8 +54,33 @@ function ShareLinkCard() {
     () => api.shareLink(),
   );
   const [copied, setCopied] = useState(false);
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
   const field = useRef<HTMLInputElement | null>(null);
-  const url = link.data?.url ?? '';
+
+  // The card keeps its own copy of the URL so a rotated key shows immediately;
+  // the server's answer on load is what it starts with.
+  useEffect(() => {
+    if (link.data?.url) setUrl(link.data.url);
+  }, [link.data?.url]);
+
+  const makeNew = async () => {
+    if (
+      !window.confirm(
+        'Make a new link? Anyone holding the current one will not be able to open it any more.',
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const next = await api.newShareLink();
+      setUrl(next.url);
+      setCopied(false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const copy = async () => {
     if (!url) return;
@@ -106,10 +131,21 @@ function ShareLinkCard() {
           >
             {copied ? 'Copied' : 'Copy'}
           </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void makeNew()}
+            disabled={busy}
+            data-testid="share-link-new"
+          >
+            {busy ? 'Making…' : 'New link'}
+          </button>
         </div>
       )}
       <p className="hint">
-        Changing the password retires every link already handed out; this one is derived from it.
+        The link keeps working across restarts. <strong>New link</strong> stops the old one from
+        opening, for when a copy has gone further than you meant; anyone already inside stays until
+        they sign out or their session runs out.
       </p>
     </Card>
   );

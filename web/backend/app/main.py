@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import time
 import json
 import logging
@@ -157,6 +158,10 @@ async def lifespan(app: FastAPI):
 
     waste_resnet.configure(settings)
     await db.init()
+    if settings.share_link_enabled:
+        # Created once and then fixed (see `Database.share_key`): a link that
+        # changed on every restart would be a link that reports 403 tomorrow.
+        app.state.share_key = await db.share_key()
     await gateway.start()
 
     stop = asyncio.Event()
@@ -235,6 +240,9 @@ def create_app(
         hours=settings.session_hours,
     )
     app.state.sessions = sessions
+    # Filled by the lifespan when the share link is on; always present so a
+    # route never has to guess whether the attribute exists.
+    app.state.share_key = None
 
     # A frontend served from another origin (Cloudflare Pages, a tunnel) talks
     # to this backend cross-origin.  The allowed origins are listed in
@@ -423,21 +431,31 @@ def create_app(
         )
 
     @app.get("/api/v1/auth/magic")
-    async def auth_magic(key: str = Query("", max_length=128)):
+    async def auth_magic(request: Request, key: str = Query("", max_length=128)):
         """The share link: a cookie for a Simulation-only visit, then the app.
 
-        The key is derived from the account's own secret (`Sessions.magic_key`),
-        so there is nothing extra to store and changing the password retires
-        every link that was handed out.  This is a convenience gate for a demo,
-        not the account: see `GUEST_USERNAME` and the middleware above.
+        The key is kept in the database (`Database.share_key`) so that a restart
+        cannot break a link that was handed out, and Setup can rotate it on
+        demand.  This is a convenience gate for a demo, not the account: see
+        `GUEST_USERNAME` and the middleware above.
         """
-        if not settings.share_link_enabled:
+        expected = request.app.state.share_key if settings.share_link_enabled else None
+        if expected is None:
             raise HTTPException(status_code=404, detail="the share link is switched off")
-        if not sessions.check_magic(key):
+        if not key or not hmac.compare_digest(key, expected):
             raise HTTPException(status_code=403, detail="that share link is not valid")
         response = RedirectResponse(url="/?mode=demo", status_code=303)
         set_session_cookie(response, sessions.issue(as_guest=True))
         return response
+
+    def share_link_body(request: Request) -> dict[str, Any]:
+        base = str(request.base_url).rstrip("/")
+        key = request.app.state.share_key if settings.share_link_enabled else ""
+        return {
+            "enabled": settings.share_link_enabled,
+            "guest": GUEST_USERNAME,
+            "url": f"{base}/api/v1/auth/magic?key={key}" if key else "",
+        }
 
     @app.get("/api/v1/auth/share-link")
     async def auth_share_link(request: Request) -> dict[str, Any]:
@@ -446,12 +464,17 @@ def create_app(
         It lives behind the account on purpose: anybody who can read this can
         hand out a Simulation session, and that is the operator's call.
         """
-        base = str(request.base_url).rstrip("/")
-        return {
-            "enabled": settings.share_link_enabled,
-            "guest": GUEST_USERNAME,
-            "url": f"{base}/api/v1/auth/magic?key={sessions.magic_key()}",
-        }
+        return share_link_body(request)
+
+    @app.post("/api/v1/auth/share-link")
+    async def auth_share_link_new(
+        request: Request, db: Database = Depends(get_db)
+    ) -> dict[str, Any]:
+        """A new key: every copy handed out before this stops working."""
+        if not settings.share_link_enabled:
+            raise HTTPException(status_code=404, detail="the share link is switched off")
+        request.app.state.share_key = await db.rotate_share_key()
+        return share_link_body(request)
 
     # ------------------------------------------------------------------
     @app.get("/api/v1/system/health")

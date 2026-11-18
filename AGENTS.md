@@ -179,13 +179,17 @@ sharing safe for the *village*, not for the account:
   thing that issues the cookie). It sets a **guest** session and 303s to
   `/?mode=demo`, which `lib/demo.tsx` reads once and strips, so the first
   screen is Simulation even on a fresh browser. The key is
-  `Sessions.magic_key()` — HMAC of the session secret, 32 hex chars — so it is
-  **derived rather than stored**: there is no second secret to leak, and
-  changing the password retires every copy that was handed out.
-  `GET /api/v1/auth/share-link` returns it for **Setup → A link for students**
-  (behind the account: handing out a session is the operator's call), with a
-  Copy button. `VILLAGE_SHARE_LINK=0` removes the route (404) and the card says
-  so.
+  The key is **stored, not derived**, in the `settings` table
+  (`Database.share_key`, 32 hex chars) — and the reason is measured: with a
+  plain-text `VILLAGE_ADMIN_PASSWORD` the stored hash is re-salted on every
+  start, so a key derived from it would 403 tomorrow for no visible reason.
+  Stored, it survives a restart *and* travels with `village.db` to another
+  laptop. `get_settings` takes it back out, so it is not a setting a client can
+  read. `GET /api/v1/auth/share-link` returns the link for **Setup → A link for
+  students** (behind the account: handing out a session is the operator's
+  call), with Copy and **New link** — the latter is `POST` on the same route,
+  asks first, and really retires the old key (tested by opening both).
+  `VILLAGE_SHARE_LINK=0` removes the route (404) and the card says so.
 - **A guest is not the account, in three layers, and each was tested:**
   1. `KioskLayout` draws **Live and Test disabled** with the reason
      (`mode.guestOnly`) and `choose()` ignores them; `GuestUsesSimulation` in

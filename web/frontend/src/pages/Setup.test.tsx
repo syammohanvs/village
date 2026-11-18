@@ -28,6 +28,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       voiceIntents: vi.fn(),
       sendCommand: vi.fn(),
       shareLink: vi.fn(),
+      newShareLink: vi.fn(),
     },
   };
 });
@@ -111,6 +112,36 @@ describe('Setup', () => {
     await user.click(screen.getByTestId('share-link-copy'));
     expect(writeText).toHaveBeenCalledWith(url);
     expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('makes a new link only when asked, and the card shows the one that works', async () => {
+    // Handing out a dead link by accident is the failure this prevents: the
+    // press asks first, and declining changes nothing.
+    const user = userEvent.setup();
+    const original = 'http://127.0.0.1:8010/api/v1/auth/magic?key=0123456789abcdef0123456789abcdef';
+    const replacement =
+      'http://127.0.0.1:8010/api/v1/auth/magic?key=ffeeddccbbaa9988ffeeddccbbaa9988';
+    vi.mocked(api.newShareLink).mockResolvedValue({
+      enabled: true,
+      guest: 'guest',
+      url: replacement,
+    });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+
+    const field = await screen.findByTestId('share-link-url');
+    expect(field).toHaveValue(original);
+
+    await user.click(screen.getByTestId('share-link-new'));
+    expect(confirm).toHaveBeenCalled();
+    expect(api.newShareLink).not.toHaveBeenCalled();
+    expect(field).toHaveValue(original);
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByTestId('share-link-new'));
+    await waitFor(() => expect(field).toHaveValue(replacement));
+    expect(api.newShareLink).toHaveBeenCalledTimes(1);
+    confirm.mockRestore();
   });
 
   it('says so in words when the link is switched off', async () => {
