@@ -2061,6 +2061,27 @@ this measurement either.**  Its honest use is as a **labeller for training
 data** — it read the remote and the pump correctly, which is exactly the job the
 venue's own frames need — and that is a script, not a runtime path.
 
+**`scripts/waste/label_captures.py` proposes a label per take, and promotes
+nothing (2026-11-19).**  It groups the saved captures into takes (`--since`,
+`--gap` — a take is one item), asks the vision model to **name the object**,
+prints `class · object` for each take with a numbered contact sheet, and stops
+there.  The operator strikes out what is wrong and `promote_captures.py` files
+what is left.  That division is the measurement: naming an object is the vision
+model's strength, and the class is the part it gets wrong (43.9 % exact).
+- **Use it on a fresh session, not on the archive.**  The first run over the only
+  *real* venue session (18 Nov, `--since 2026-11-18T14:55`) found **7 takes**: a
+  pipe (Plastic), a glue bottle (Plastic), the cardboard piece — which the model
+  called `bread = Organic` while the operator says Paper — the remote
+  (`Ewaste`, right), a pen (Plastic), a pencil (`Organic`, wrong) and one it
+  could not answer.
+- **The 40 takes from 13–15 Nov in the same log are NOT venue items** — they are
+  the hand-held **evaluation set**: archive photos (high heels on a wooden floor,
+  a bag, a pamphlet, a plate of food) and composites with a **drawn arm and
+  hand**, pushed through `/waste/classify` by `hand_eval.py`, which is what saves
+  a crop for every frame it scores.  Promoting them would train on the test set.
+  A take that is only the bare red base is the other trap: the local model calls
+  it `Paper 0.95` and the vision model invents `Baseball` / `Red high heel`.
+
 **CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
 The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
 recorded here are the `u2net` background remover above and the browser MobileNet
