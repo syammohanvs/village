@@ -16,6 +16,13 @@ void writeConfigJson(JsonObject out, const DeviceConfig& c) {
   soil["samples"] = c.soil.samples;
   soil["max_age_ms"] = c.soil.max_age_ms;
   soil["calibrated"] = c.soil.calibrated;
+  // The flag decides which domain the two endpoints are stored in (false =
+  // the reading is inverted, i.e. the endpoints are 4095 - raw).  It was in
+  // the struct and in soilPercent but missing here, so it could never be set
+  // or read back and every calibration silently took the inverted branch
+  // (measured 2026-11-18: the first soil calibration on the board read 0 % in
+  // wet soil).
+  soil["rises_with_moisture"] = c.soil.rises_with_moisture;
 
   JsonObject res = out["reservoir"].to<JsonObject>();
   res["wet_threshold_mv"] = c.reservoir.wet_threshold_mv;
@@ -79,6 +86,8 @@ bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
   out.soil.samples = soil["samples"] | out.soil.samples;
   out.soil.max_age_ms = soil["max_age_ms"] | out.soil.max_age_ms;
   out.soil.calibrated = soil["calibrated"] | out.soil.calibrated;
+  out.soil.rises_with_moisture =
+      soil["rises_with_moisture"] | out.soil.rises_with_moisture;
 
   JsonObjectConst res = c["reservoir"].as<JsonObjectConst>();
   out.reservoir.wet_threshold_mv =

@@ -126,7 +126,7 @@ cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
 The current tree passes **499 firmware checks**, **137 backend tests** and
-**423 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+**425 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -1354,13 +1354,21 @@ says it is.
   page then reads **83 % in wet soil**, falling as it dries. Revision 27.
 - **`POST /api/v1/calibration/soil` has the same trap** — it stores the body's
   numbers verbatim, and it is the *page* that would have to invert.
-- **The fix, when the firmware is next built and OTA'd:** add the flag to
-  `config_json.cpp` (parse + serialise) **and** make `soilPercent` use the raw
-  reading with the sign of the pair, so the endpoints are the values the
-  controller reports and the checkbox means what it says. That change
-  invalidates today's pair (they are in the inverted domain), so it needs a
-  recalibration in the same sitting. Until then, do not "fix" the numbers in
-  Setup by hand.
+- **FIXED, firmware 0.2.8 (OTA'd 2026-11-18).**  The flag is now written and
+  read by `config_json.cpp`, so it survives NVS and appears in `/api/v1/config`
+  (verified live: `"rises_with_moisture": false` came back after the flash, and
+  the board reported `firmware 0.2.8` on a new `boot_id b-d4014bcd`).
+  **The mapping is deliberately unchanged** (`effective = 4095 - raw` unless the
+  flag is set): the mapping was self-consistent, and the trap was the *page*
+  asking for the stored domain.  `pages/Sensors.tsx` now shows and accepts the
+  **raw values the operator measures**, converting with the flag
+  (`lib/soilEndpoints.ts`, `shownRaw`/`storedRaw`), and the polarity checkbox is
+  gone — either wiring works because the mapping uses the sign of the pair.
+  So today's endpoints are still `2498 / 3325` on the board but the page shows
+  **1597 / 770**, and saving them again is a no-op.  Recalibration was not
+  needed, and the board still reads 70 % at raw 1013.
+  **Do not "fix" the stored numbers by hand**, and do not change `soilPercent`
+  without a recalibration: the stored pair is in the inverted domain.
 
 ## LDR calibration (this build)
 

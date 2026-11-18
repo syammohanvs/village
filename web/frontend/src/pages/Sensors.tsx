@@ -8,6 +8,7 @@ import { useVillage } from '../lib/village';
 import { Card, Chip, ErrorBlock, Notice } from '../components/ui';
 import { IconAlert, IconInfo, IconRefresh } from '../components/Icons';
 import type { DeviceConfig, DeviceConfigDocument } from '../types';
+import { shownRaw, storedRaw } from '../lib/soilEndpoints';
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -322,7 +323,7 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                 <p className="hint">
                   Put the probe in dry soil, note the raw value, then in wet soil and note the raw
                   value. Either polarity works: the firmware maps one endpoint to 0% and the other
-                  to 100% automatically.
+                  to 100% automatically, from the order of the two numbers.
                 </p>
                 <div className="field-grid">
                   <label className="field">
@@ -334,10 +335,10 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                       max={4095}
                       step={1}
                       id="soil-dry"
-                      value={draft.soil.dry_raw}
+                      value={shownRaw(draft.soil.dry_raw, draft)}
                       onChange={(event) =>
                         update((next) => {
-                          next.soil.dry_raw = asNumber(event.target.value);
+                          next.soil.dry_raw = storedRaw(asNumber(event.target.value), next);
                           next.soil.calibrated = false;
                         })
                       }
@@ -352,10 +353,10 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                       max={4095}
                       step={1}
                       id="soil-wet"
-                      value={draft.soil.wet_raw}
+                      value={shownRaw(draft.soil.wet_raw, draft)}
                       onChange={(event) =>
                         update((next) => {
-                          next.soil.wet_raw = asNumber(event.target.value);
+                          next.soil.wet_raw = storedRaw(asNumber(event.target.value), next);
                           next.soil.calibrated = false;
                         })
                       }
@@ -366,24 +367,6 @@ export function Sensors({ embedded = false }: { embedded?: boolean } = {}) {
                   The controller requires the endpoints to differ by at least {draft.soil.min_span_raw || 400}{' '}
                   raw counts.
                 </p>
-                <label className="check-row" style={{ marginTop: 10 }}>
-                  <input
-                    type="checkbox"
-                    checked={Boolean(draft.soil.rises_with_moisture)}
-                    onChange={(event) =>
-                      update((next) => {
-                        next.soil.rises_with_moisture = event.target.checked;
-                        next.soil.calibrated = false;
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>The reading rises with moisture.</strong> Tick this if the raw value goes
-                    up when the soil gets wetter (probe on the 3.3 V side). Leave it unticked for
-                    the pull-up wiring (resistor to 3.3 V, probe to GND), where the reading falls
-                    with moisture. Changing this clears the calibration.
-                  </span>
-                </label>
                 <label className="check-row" style={{ marginTop: 10 }}>
                   <input
                     type="checkbox"
