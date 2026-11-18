@@ -1370,6 +1370,26 @@ says it is.
   **Do not "fix" the stored numbers by hand**, and do not change `soilPercent`
   without a recalibration: the stored pair is in the inverted domain.
 
+### The two probes, as left on 2026-11-18
+
+Both are a divider with the **fixed resistor on the 3V3 side and the probe to
+GND**, so **wet = lower voltage** on both. Measured that evening:
+
+| probe | dry / out | wet / in | stored |
+| --- | --- | --- | --- |
+| rain water tank (GPIO 35, 15 kΩ) | **3145 mV** in air | **2760–2800 mV** in water | wet ≤ **2850**, dry ≥ **3000** (rev 24) |
+| soil (GPIO 34, 10 kΩ) | **1597** counts (1.29 V) | **770** counts (0.62 V) | **2498 / 3325** (rev 27), reads 70–83 % wet |
+
+The tank's margins are thin (only ~370 mV of swing) because this water conducts
+weakly — the probes read ~77 kΩ in it. **A larger series resistor widens the
+swing: 47 kΩ gives ~800 mV, 100 kΩ ~1.0 V. A smaller one narrows it** (an
+earlier note in this file had that backwards). The soil probe needs no change:
+~6.4 kΩ dry and ~2.3 kΩ wet against 10 kΩ is a healthy pair.
+
+The board was disconnected at the end of that session; the app then shows
+`connected false` and the kiosk **Offline** until it is back on the Windows
+hotspot, which `relay.sh watch` repairs by itself (30 s).
+
 ## LDR calibration (this build)
 
 The LM393 module was **replaced by a bare LDR and one pull-up resistor**
