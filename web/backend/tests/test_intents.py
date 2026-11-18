@@ -603,6 +603,10 @@ def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:
     Verb spellings are now dropped from the by-sound path.
     """
     assert matcher.match("വിളക്കുകൾ ഓത്ടോ ചെയുക.", "ml")["intent"] == "LIGHTS_AUTO"
+    # The same sentence with the model's other spelling of "auto": the doing
+    # word must not turn it into two states.
+    assert matcher.match("വിലക്കുകള്‍ ഓെട്ടു ചെയുക.", "ml")["intent"] == "LIGHTS_AUTO"
+    assert matcher.match("പമ്പ് ഒട്ടോ ചെയുക.", "ml")["intent"] == "PUMP_AUTO"
     # …and the phrases it belongs to still mean what they say.
     assert matcher.match("പമ്പ് ഓൺ ചെയ്യുക", "ml")["intent"] == "IRRIGATION_START"
     assert matcher.match("പമ്പ് ഓഫ് ചെയ്യുക", "ml")["intent"] == "IRRIGATION_STOP"
@@ -647,6 +651,26 @@ def test_automatic_is_one_mode_however_the_model_splits_it(
     # own it could be anything, and nothing may be guessed from a stray sound.
     assert matcher.match("പോട്ടു.", "ml")["kind"] != "command"
     assert matcher.match("അത് പോട്ടു.", "ml")["kind"] != "command"
+
+
+def test_pump_off_is_not_swallowed_by_the_pump_cue(matcher: IntentMatcher) -> None:
+    """Pump off, said with the model's own spelling of "off" — `പമ്പ് അഫ്`.
+
+    Two faults met here (measured 2026-11-18).  The sound path dropped every
+    verb, and `ഓഫ്` is listed as one ("ഓഫ് ചെയ്യുക"), so the only `off` it could
+    reach was in a script the word was not written in.  And once a state *was*
+    read, the pump cue — the word "pump" also means "start watering" —
+    overwrote it, so "pump off" started the pump.
+    """
+    for text in ("പമ്പ് അഫ്.", "പമ്പ് അഫ് ചെയ്യുക", "പമ്പ് ഓഫ്", "പമ്പ് ഓഫ് ചെയ്യുക"):
+        assert matcher.match(text, "ml")["intent"] == "IRRIGATION_STOP", text
+    # The same spelling on the lights is the lights' off.
+    assert matcher.match("വിളക്കുകൾ അഫ്", "ml")["intent"] == "LIGHTS_OFF"
+    # …and the cue still starts a watering request when no state is named.
+    assert matcher.match("പമ്പ് വെള്ളം ഒഴിക്കുക", "ml")["intent"] == "IRRIGATION_START"
+    assert matcher.match("വെള്ളം ഒഴിക്കുക", "ml")["intent"] == "IRRIGATION_START"
+    # "On" is still "on", not "off".
+    assert matcher.match("പമ്പ് ഓൺ", "ml")["intent"] == "IRRIGATION_START"
 
 
 def test_the_latest_unrecognised_recordings_are_understood(

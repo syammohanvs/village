@@ -124,7 +124,7 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **499 firmware checks**, **134 backend tests** and
+The current tree passes **499 firmware checks**, **135 backend tests** and
 **422 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
@@ -353,6 +353,16 @@ sharing safe for the *village*, not for the account:
   **Still not chased:** `പംപ്പോട്ടു` with no pump word at all (the pump's name
   and the mode fused), and Arabic/Tamil-script soup the model produces from
   near-silence, which the script guard is meant to refuse.
+- **"Pump off" had two faults of its own (2026-11-18, `പമ്പ് അഫ്`).**  First,
+  the sound path drops verb spellings so `ചെയ്യുക` cannot be read as a state —
+  but `ഓഫ്` is *also* listed as a verb ("ഓഫ് ചെയ്യുക"), so `off` was dropped
+  entirely and the model's `അഫ്` had nothing to match.  Now only a
+  **single-word** state alias rescues a verb (`ഓൺ`, `ഓഫ്`); the verb half of a
+  two-word alias stays dropped.  Second, once a state *was* read, the pump cue
+  overwrote it (`unique_states = {watering}`), so "pump off" started the pump:
+  the cue now fills in only when the sentence names no state.  Pinned by
+  `test_pump_off_is_not_swallowed_by_the_pump_cue`, including the four ways
+  the model writes `off` and the cue's own start-request.
 
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed

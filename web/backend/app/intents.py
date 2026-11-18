@@ -295,7 +295,12 @@ class IntentMatcher:
             if others:
                 return self._result("ambiguous", language, "ambiguous_generic")
             devices = ["pump"]
-            unique_states = {watering}
+            # The cue means *start* only when the sentence names no state.  It
+            # used to overwrite the state it found, so "പമ്പ് അഫ്" ("pump off",
+            # heard with the model's own spelling of "off") started watering
+            # instead of stopping it (measured 2026-11-18).
+            if not unique_states:
+                unique_states = {watering}
         elif len(devices) > 1:
             return self._result("ambiguous", language, "ambiguous_generic")
         device = devices[0] if devices else None
@@ -425,8 +430,29 @@ class IntentMatcher:
         # states at once (measured 2026-11-18).  Verb spellings are dropped
         # from the sound path; the whole alias is kept, and a one-word state
         # word ("ഓൺ") still matches on its own.
+        #
+        # …except a verb that is *also* a state word: Malayalam says "on" and
+        # "off" as verbs ("ഓൺ ചെയ്യുക"), so both appear in the verb list, and
+        # dropping them made the sound path unable to hear "off" at all — the
+        # recording "പമ്പ് അഫ്" answered AMBIGUOUS because the only `off` it
+        # could reach was in the script it was not written in (2026-11-18).
+        # Only a **single-word** state alias rescues a verb: "ഓൺ" and "ഓഫ്" are
+        # states a visitor says on their own.  The verb half of a two-word alias
+        # ("ഓൺ ചെയ്യുക") must stay dropped, or "ചെയ്യുക" - the word for doing -
+        # becomes both "on" and "off" and every sentence carrying it is
+        # ambiguous (the bug this guard was written for, 2026-11-18).
+        state_sounds = {
+            fold(part)
+            for aliases in self.states.values()
+            for alias in (aliases.get(language) or [])
+            if len(alias.split()) == 1
+            for part in romanise(alias).split()
+            if part
+        }
         verb_sounds = {
-            fold(word) for word in romanise(" ".join(g.get("verbs") or [])).split()
+            fold(word)
+            for word in romanise(" ".join(g.get("verbs") or [])).split()
+            if fold(word) not in state_sounds
         }
 
         def roman_aliases(aliases: list[str] | None) -> list[str]:
