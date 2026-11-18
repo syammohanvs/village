@@ -1997,6 +1997,43 @@ vision model is a different trade (1–3 s, a key, internet at the venue, the ph
 leaving the laptop) and it is the user's call; it would go behind
 `VILLAGE_VISION_*`, off by default, with the local answer as the fallback.
 
+**OpenCode Go's API is OpenAI-compatible, DeepSeek V4.1 Flash accepts images — and
+the key on this machine has expired (measured 2026-11-19).**  The user asked
+whether the app could sort waste with the key they use in OpenCode, so this was
+taken as far as the credential allows:
+
+- **Where it is:** `models.dev/api.json` lists `opencode-go` with
+  `api: https://opencode.ai/inference/go/v1`, npm `@ai-sdk/openai-compatible`,
+  env `OPENCODE_API_KEY`.  The console's own docs print the same base URL, and
+  `…/inference/go/openai/v1` answers identically.
+- **The model can see:** in the same metadata `deepseek-v4.1-flash` is
+  `attachment: true`, input `text + image`, $0.15 / $0.60 per 1M tokens, **0-day
+  retention**.  A 224-px crop is ~380 tokens, so a classification is a fraction
+  of a cent.
+- **The client gate is documented, not a mystery:** identify with your own user
+  agent and send a stable `x-opencode-session` per conversation.  Measured: a
+  `python-urllib` UA gets Cloudflare **403 `error code: 1010`**, and no session
+  header gets **400 `MissingSessionID`**.  With both, the request reaches auth.
+- **The blocker:** `~/.local/share/opencode/auth.json` holds one `sk-…` key for
+  both `opencode` and `opencode-go`, and every path — `/go/v1`, `/go/openai/v1`,
+  `/zen/v1` — answers **401 `api_key_expired`**.  So **no accuracy could be
+  measured**; a fresh key from `opencode.ai/console/account#api-keys` is what
+  unblocks it.
+- **A caveat worth stating before it is wired in:** the Go docs say the plan is
+  "designed for OpenCode and other coding agents that produce similar types of
+  requests", with traffic monitored for abuse.  Sending item photos is not
+  coding traffic, and that is the user's call to make, not a detail to discover
+  later.
+
+The same day's other attempts, all measured, all unusable: Kilo's free vision
+model `nvidia/nemotron-3.5-super-vl:free` answered **2/6** on the venue's frames
+at **8–42 s** per photo (a reasoning model that spends the budget thinking
+before naming anything), and Kilo's paid `deepseek/deepseek-v4-flash-vision-exp`
+answers **402 credits required**.  The local VLM note above closes the third
+path.  **If a hosted vision model is wired in, it belongs behind
+`VILLAGE_VISION_*`, off by default, with the local answer as the fallback and the
+panel's privacy line saying the picture leaves the laptop.**
+
 **CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
 The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
 recorded here are the `u2net` background remover above and the browser MobileNet
