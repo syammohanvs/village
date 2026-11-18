@@ -62,6 +62,8 @@ class IntentMatcher:
         self.device_commands = self.data.get("device_commands", {})
         self.messages = self.data.get("messages", {})
         self.watering = self.data.get("watering", {})
+        # device sounds per language, built once (see `_device_sounds`)
+        self._sounds: dict[str, dict[str, list[str]]] = {}
 
     # ------------------------------------------------------------------ text
     def normalize(self, text: str) -> str:
@@ -705,11 +707,56 @@ class IntentMatcher:
         )
 
     # ------------------------------------------------------------- providers
+    def _device_sounds(self, language: str) -> dict[str, list[str]]:
+        """Every device name as sounds: the alias as written, and romanised.
+
+        Built once per language and kept, because the device matcher asks for it
+        on every token of every sentence.
+        """
+        cached = self._sounds.get(language)
+        if cached is not None:
+            return cached
+        sounds: dict[str, list[str]] = {}
+        for name, aliases in self.devices.items():
+            out: list[str] = []
+            for alias in aliases.get(language) or []:
+                if not alias:
+                    continue
+                out.append(alias)
+                out.extend(part for part in romanise(alias).split() if part)
+            sounds[name] = out
+        self._sounds[language] = sounds
+        return sounds
+
     def _device_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:
         hits: list[tuple[int, int, str]] = []
         for name, aliases in self.devices.items():
             for start, n, _ in self._find(tokens, aliases.get(language)):
                 hits.append((start, n, name))
+        # A device is also read the way the sound pass reads it.  Malayalam puts
+        # the case ending on the noun — "വിളക്കുകളുടെ അവസ്ഥ" (the lights' state),
+        # "പംഭിന്റെ അവസ്ഥ" (the pump's), the model's own "പമ്പൾ" and the fused
+        # "മണ്നില്ലത്രാ" — and an exact-token match loses the whole command,
+        # which is what the user reported on 2026-11-18.  Only tokens no device
+        # has already claimed are looked at, and only the *spelling* tolerance of
+        # `same_word` applies (`allow_edit=False`): one edit on every device word
+        # of every sentence was too loose — "band" (Hindi for "off") matched the
+        # water alias "pani" through nesting consonants, and "light band karo"
+        # came back ambiguous.  A state word gets neither tolerance: "on" and
+        # "off" differ exactly at their endings.
+        claimed = {index for start, n, _ in hits for index in range(start, start + n)}
+        sounds = self._device_sounds(language)
+        for index, token in enumerate(tokens):
+            if index in claimed:
+                continue
+            roman = romanise(token)
+            for name, aliases in sounds.items():
+                if any(
+                    same_word(roman, alias, allow_suffix=True, allow_edit=False)
+                    for alias in aliases
+                ):
+                    hits.append((index, 1, name))
+                    break
         return sorted(hits)
 
     def _state_hits(self, tokens: list[str], language: str) -> list[tuple[int, int, str]]:
@@ -758,6 +805,14 @@ class IntentMatcher:
         covered: set[int] = set()
         for start, n, _ in self._find(tokens, known):
             covered.update(range(start, start + n))
+        # A device name counts as understood however it was read.  The device
+        # matcher already tolerates the case ending Malayalam puts on the noun
+        # and the model's own spellings ("വിളക്കുകള്" with ് rather than ൾ,
+        # "പമ്പൾ", "മണ്നില്ലത്രാ"), so asking the visitor to repeat a sentence
+        # whose device was read perfectly is the refusal reported on 2026-11-18.
+        # One definition: the same hits the command path uses.
+        for index, _n, _name in self._device_hits(tokens, language):
+            covered.add(index)
         # inflected English verbs count as understood
         for index, token in enumerate(tokens):
             if index in covered:

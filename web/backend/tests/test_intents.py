@@ -187,11 +187,17 @@ def test_a_state_word_with_no_device_asks_which_device(matcher: IntentMatcher) -
     fan") gets the same answer, which is the honest one: it names what can be
     switched.
     """
-    for text in ("Thanks on!", "Bounce on!", "Let off!", "turn on the fan", "on"):
+    for text in ("Thanks on!", "Bounce on!", "turn on the fan", "on"):
         result = matcher.match(text, "en")
         assert result["kind"] == "ambiguous", text
         assert "Which device" in result["message"], text
         assert result["command"] is None, text
+
+    # …one of the three now reads, and not by a rule written for it: the fold
+    # that makes voiced and unvoiced consonants the same letter (d→t, for the
+    # Indic languages) makes "led" — a lights alias — and "let" the same word,
+    # so "Let off!" is the lights' off.  Which is exactly what the child said.
+    assert matcher.match("Let off!", "en")["command"] == "LIGHTS_OFF"
 
     # …and the question it asks can be answered: a device with no state asks
     # for the state instead of repeating "say one clear command".
@@ -692,8 +698,16 @@ def test_a_water_phrase_with_no_state_word_is_the_watering_it_names(
     assert matcher.match("വെള്ളം നിർത്തുക", "ml")["intent"] == "IRRIGATION_STOP"
     assert matcher.match("വെള്ളം ഒഴിക്കുക", "ml")["intent"] == "IRRIGATION_START"
     # …and a bare pump word is still not "start": a sentence whose state the
-    # chosen language cannot read must be refused, not turned into watering.
-    assert matcher.match("पंप बंद", "ml")["status"] == "unknown"
+    # chosen language cannot read must never open the valve.  It is not read as
+    # *watering* — the device is recognised (a Devanagari "पंप" is the same
+    # pump), so the answer is the question "on, off, or automatic?" and nothing
+    # is sent (2026-11-18: the device matcher now reads spellings, so this is
+    # no longer "unsupported" — the guarantee that matters is unchanged).
+    refused = matcher.match("पंप बंद", "ml")
+    assert refused["command"] is None
+    assert refused["intent"] != "IRRIGATION_REQUEST"
+    # …asked in the language the page is set to.
+    assert "ഓണാക്കണോ" in (refused["message"] or "")
 
 
 def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:
@@ -860,6 +874,64 @@ def test_a_bracketed_sound_is_not_a_sentence(matcher: IntentMatcher) -> None:
     inside = matcher.match("[Music] lights on", "en")
     assert inside["kind"] != "no_speech"
     assert inside["command"] is None
+
+
+def test_a_device_may_carry_its_case_ending_but_a_short_word_may_not() -> None:
+    """The device tolerance, and the two traps that forced its limits.
+
+    Malayalam writes the case ending onto the noun and the model writes the
+    whole thing as one word: "വിളക്കുകുള്ളെ" for "വിളക്കുകൾ", and "മണ്ണിൽ" run
+    into "എത്ര" as "മണ്നില്ലത്രാ" (the user's own session, 2026-11-18).
+    """
+    from app.phonetics import same_word
+
+    assert same_word("vilakkukulle", "vilakku", allow_suffix=True, allow_edit=False)
+    assert same_word("mannillatra", "mannil", allow_suffix=True, allow_edit=False)
+    # …but only for a name of five letters or more.  On a short one the same
+    # tolerance is a trap: "thanks" starts with "tank", and "Thanks on!" would
+    # have been answered about the water instead of asking which device.
+    assert not same_word("thanks", "tank", allow_suffix=True, allow_edit=False)
+    # The structural device matcher also refuses the *one-letter* tolerance that
+    # the sound path needs: "band" (Hindi for "off") and "pani" (water) nest
+    # consonant for consonant, so "light band karo" came back ambiguous the
+    # moment devices were matched with it.
+    assert same_word("band", "pani")
+    assert not same_word("band", "pani", allow_edit=False)
+    # The sound path keeps what it needs: "പമ്പ്" heard as "പംമ്", and a device
+    # with a syllable in front of it.
+    assert same_word("pam", "pamp")
+    assert same_word("palaita", "laita", allow_suffix=True)
+
+
+def test_the_evening_sessions_malayalam_commands_are_understood(
+    matcher: IntentMatcher,
+) -> None:
+    """The literal transcripts from the user's own session, verbatim.
+
+    Nine of ten were refused on 2026-11-18 (18:04–18:07Z) and the reporter said
+    "some worked, some didn't".  Each failure is a different spelling of a word
+    this vocabulary already had: the case ending on the noun
+    ("വിളക്കുകുള്ളെ", "പംഭിന്റെ"), the model's "auto" as "ഓട്ടവു", the emphatic
+    "അവസ്ഥാ", and two words run together ("മണ്നില്ലത്രാ" is "മണ്ണിൽ"+"എത്ര").
+    """
+    cases = (
+        ("മണ്നില്ലത്രാ യരപ്പമുണ്ട്.", "SOIL_STATUS"),
+        ("മണ്നില് എത്രാ യർപ്പമുണ്ട്", "SOIL_STATUS"),
+        ("ഡാങ്കില് വേള്ളമുണ്ടോ", "WATER_STATUS"),
+        ("വിളക്കുകള് ഓട്ടവു.", "LIGHTS_AUTO"),
+        ("വിലക്കുകള് അനക്കുകാ.", "LIGHTS_OFF"),
+        ("വിളക്കുകുള്ളെ അവസ്ഥാ.", "LIGHTS_STATUS"),
+        ("പംഭിന്റെ അവസ്ഥാ.", "PUMP_STATUS"),
+        ("പമ്പൾ ഓട്ടോ", "PUMP_AUTO"),
+        ("ഗ്രാമത്തിന്റെ അവസ്ഥാ.", "VILLAGE_STATUS"),
+    )
+    for text, want in cases:
+        result = matcher.match(text, "ml")
+        assert result["intent"] == want, text
+        if want.endswith("_STATUS"):
+            assert result["command"] is None, text
+    # The one with nothing of this vocabulary in it is still refused.
+    assert matcher.match("ഗ്ഗാസാവ്യായ്യ്.", "ml")["kind"] == "unsupported"
 
 
 def test_the_anusvara_sounds_like_the_letter_after_it() -> None:

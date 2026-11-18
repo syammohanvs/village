@@ -229,7 +229,7 @@ def distance(a: str, b: str) -> int:
     return previous[-1]
 
 
-def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
+def same_word(a: str, b: str, *, allow_suffix: bool = False, allow_edit: bool = True) -> bool:
     """Are these two renderings of one spoken word?
 
     Exact after folding, and only that.  A tolerance of one edit was measured
@@ -243,6 +243,14 @@ def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     matched nothing, so "लाइट चालू" was refused (2026-11-18).  A device word
     with a syllable added or dropped at the *start* is still that device; a
     state word is not treated this way, because "off"/"on" differ exactly there.
+
+    `allow_edit=False` turns the one-letter tolerances off and keeps only the
+    spelling ones (fold equality and `allow_suffix`).  The **structural** device
+    matcher uses it: one edit is what the *sound* path needs, and applied to
+    every device word in every sentence it was too loose — "band" (Hindi for
+    "off") matched the water alias "pani", because their consonants nest
+    (2026-11-18).  A device is far more likely to be the same word with its case
+    ending than one letter out.
     """
     left, right = fold(a), fold(b)
     if not left or not right:
@@ -270,7 +278,7 @@ def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     # a question.  With it, two-letter words are safe too ("on" and "off" have
     # different consonants), which matters because a clipped "ഓട്ടോ" comes back
     # as "ഓത്" ("ot").
-    if 2 <= len(left) <= 4 and 2 <= len(right) <= 4 and distance(left, right) <= 1:
+    if allow_edit and 2 <= len(left) <= 4 and 2 <= len(right) <= 4 and distance(left, right) <= 1:
         a, b = _consonants(left), _consonants(right)
         if a == b or a.startswith(b) or b.startswith(a):
             return True
@@ -282,7 +290,8 @@ def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     # confuse - "anakuka" (turn off) and "nanakuka" (water) - differ at the
     # *first* letter, which is exactly where a slip changes the word.
     if (
-        min(len(left), len(right)) >= 5
+        allow_edit
+        and min(len(left), len(right)) >= 5
         and left[:3] == right[:3]
         and distance(left, right) <= 1
     ):
@@ -291,7 +300,7 @@ def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     # "vilakkunkal" (heard) and "vilakkukal" (expected) are one inserted `n`.
     # A short one may not -- that is exactly how "anakuka" (turn off) was once
     # read as "nanakuka" (water).
-    if min(len(left), len(right)) >= 9:
+    if allow_edit and min(len(left), len(right)) >= 9:
         return distance(left, right) <= 1
     # A device name with a syllable in front of it (or missing from it):
     # "palaita" ends with "laita".  The shorter word must be long enough to be
@@ -300,5 +309,21 @@ def same_word(a: str, b: str, *, allow_suffix: bool = False) -> bool:
     if allow_suffix:
         shorter, longer = sorted((left, right), key=len)
         if len(shorter) >= 4 and 0 < len(longer) - len(shorter) <= 3 and longer.endswith(shorter):
+            return True
+        # …and a syllable *after* it, which is the same failure on the other
+        # side and just as common in Malayalam, where the case ending belongs
+        # to the noun: the model wrote "വിളക്കുകുള്ളെ" for "വിളക്കുകൾ" and ran
+        # "മണ്ണിൽ" into "എത്ര" as "മണ്നില്ലത്രാ" (both from the user's own
+        # session, 2026-11-18).  A device name at the *start* of a word is still
+        # that device — but **only a name of five letters or more gets this**,
+        # because on a short one it is a trap: "thanks" starts with "tank".
+        # The tail may not be longer than the name itself, so a short word
+        # cannot swallow a long one, and this tolerance is for devices only — a
+        # state word ("on", "off") differs exactly at its ending.
+        if (
+            len(shorter) >= 5
+            and 0 < len(longer) - len(shorter) <= len(shorter)
+            and longer.startswith(shorter)
+        ):
             return True
     return False

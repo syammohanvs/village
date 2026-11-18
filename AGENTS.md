@@ -669,6 +669,43 @@ sharing safe for the *village*, not for the account:
     command") through `NON_SPEECH` in `intents.py`, instead of the catalogue
     sentence.  Only a *whole* transcript counts, so a marker inside a sentence
     leaves the words to the usual rules.
+- **"Some worked, some didn't" — the device matcher now reads spellings the way
+  the sound pass does (2026-11-18, reported, with the recordings).**  The user
+  gave ten Malayalam commands; four were refused and two more answered wrongly.
+  Every failure was a spelling of a word this vocabulary already had, so the fix
+  is in the *matcher*, not in new vocabulary:
+  - `_device_hits` gained a second pass over the tokens no exact alias claimed,
+    comparing `romanise(token)` against the device sounds with
+    `same_word(allow_suffix=True, allow_edit=False)`.  That covers the case
+    ending Malayalam puts on the noun — `വിളക്കുകുള്ളെ` (lights), `പംഭിന്റെ`
+    (pump), `മണ്നില്ലത്രാ` (soil + "how much" fused) — and the model's
+    `വിളക്കുകള്` (spelt with ്, not ൾ), which no alias list contained.
+  - **Two traps set the limits, and both were measured as wrong answers:**
+    the *prefix* tolerance is only for names of **5 folded letters or more**
+    ("thanks" starts with "tank", so "Thanks on!" was answered about the water),
+    and `allow_edit=False` keeps the one-letter tolerance **out of the
+    structural pass** ("band" — Hindi for off — and "pani" nest consonant for
+    consonant, which made "light band karo" ambiguous).  The sound path keeps
+    both, because that is what reads `പംമ്` and `ഓത്ടോ`.
+  - `_unaccounted` now counts a device the matcher found, so a sentence whose
+    device was read perfectly ("വിളക്കുകള് ഓട്ടവു") is not refused for the same
+    word the alias list spells differently — one definition, reused.
+  - Data, each quoted from a recording: `states.auto.ml` += `ഓട്ടവു`,
+    `ഓട്ടോവു`; `devices.pump.ml` += `പമ്പൾ`, `പമ്പിന്റെ`, `പംഭിന്റെ`;
+    `grammar.ml.status_words` += `അവസ്ഥാ` (the emphatic form — `അവസ്ഥ` was
+    already there but an exact-token match missed it); `VILLAGE_STATUS.phrases.ml`
+    += `ഗ്രാമത്തിന്റെ അവസ്ഥാ`.
+  - **Measured on the user's own 15 recordings** (`scripts/voice_replay.py`,
+    which is why the folder exists): **6 answered differently, all better**
+    (`മണ്നില്ലത്രാ…` → SOIL_STATUS, `വിളക്കുകുള്ളെ അവസ്ഥാ` → LIGHTS_STATUS,
+    `പംഭിന്റെ അവസ്ഥാ` → PUMP_STATUS, `പമ്പൾ ഓട്ടോ` → PUMP_AUTO,
+    `വിളക്കുകള് ഓട്ടവു` → LIGHTS_AUTO, `ഗ്രാമത്തിന്റെ അവസ്ഥാ` →
+    VILLAGE_STATUS) and **1 still unread** — `ഗ്ഗാസാവ്യായ്യ്`, which holds
+    nothing.  The other 8 were already right and stayed right.
+  - One accidental win, worth knowing because it is not a rule anyone wrote:
+    the voicing fold makes "led" (a lights alias) and "let" the same word, so the
+    child's `Let off!` is the lights' off.  It is pinned by a test with that
+    explanation beside it.
 - **The tank's answer says "enough", not "low level" (2026-11-18, reported).**
   Asked "Is water available?" in Simulation with the tank set to available, Sara
   answered *"There is water at the low level in the tank"* — a sentence that
