@@ -627,6 +627,48 @@ sharing safe for the *village*, not for the account:
   through `Blob.arrayBuffer` **or `FileReader`** — jsdom has no `arrayBuffer`,
   and the first version threw, which the panel's catch reported as "the service
   did not answer".
+- **Two words run together are split, and "pump" is the word the model gets
+  wrong (2026-11-18, from the evening session — one adult and two children).**
+  The app keeps **no audio**, only the transcript in the event log, so the
+  evidence used here is the transcript itself.  Nine of that session's twenty
+  recordings were answered "please ask me to control a supported device":
+  - **Merged words.** The Malayalam model wrote "വിളക്കുകൾ അണയ്ക്കുക" as one
+    word, four times: `വിളക്കുകളാണക്കുകാം`, `വിളക്കുകളാണക്കുകാ`,
+    `വിളക്കുകളാന്ക്കുകാം`, `വിലക്കുകളാണക്കുകാം` — device + verb in one token,
+    with the glide `യ` of അണയ്ക്കുക dropped twice.  `_romanised_intent` now
+    **splits a token that nothing reads whole** into two halves, and keeps the
+    split only when *this* vocabulary reads both: a device and a state (a
+    command), or two device names (`താങ്കില്വല്ലം` = "in the tank" + "water").
+    Two of the model's own spellings joined the data: `അണ്ക്കുക`/`അണ്ക്കൂ`
+    (`states.off.ml` — the dropped-vowel form) and `വല്ലം` (`devices.water.ml`).
+    All five now parse; `ഡ്രയാവ്.` and `ക്കാൽ ക്ക്കുകാം.` still refuse, because
+    they hold nothing to read.
+  - **"Pump" is short and every mishearing lands in one syllable.** Measured on
+    this laptop by reading the exhibit's own voices back through the running
+    whisper server and degrading them (pitch up, volume down, room noise):
+    54 English command clips score **42/54** on `ggml-base`, **43/54** with beam
+    search (`-bs 5`, +0.04 s) and **45/54** on `ggml-small` at **3.05 s** a
+    command.  So the model is not the fault, and it was left alone — including
+    **no English decoder prompt**, which would risk inventing a command out of a
+    cough.  What the Indian English voice produces for "Pump on!" is `Bum on!`
+    on base *and* small, and the children produced `Dumb on!` / `Bounce on!`, so
+    the spellings the exhibit has actually produced are now listed on the pump
+    (`bum`, `bump`, `dumb`, `thumb`, `pum`, `pomp`) and "Pump on!" reads in 5 of
+    6 variants.  `docs/operation.md` carries the table.
+  - **A half command is answered with its other half, not with "unsupported".**
+    A **state word with no device** now returns `clarify_device`
+    ("Which device? You can say the lights, the pump, or ask about the soil or
+    the water.") and a **device with no state** returns `clarify_state`
+    ("On, off, or automatic?") for a device that really has one — soil and water
+    are never offered a switch they have not got.  Nothing is sent in either
+    case, so "Thanks on!", "Let off!" and even "turn on the fan" get a sentence a
+    visitor can answer instead of a dead end.  `messages.clarify_device` lost the
+    word **bins** with this (the bins have had no reading since 2026-11-18).
+  - **A bracketed sound is not a sentence.** `[Coughing]`, `[Laughter]`,
+    `(coughing)` and `[Music]` now answer `no_speech` ("I did not hear a
+    command") through `NON_SPEECH` in `intents.py`, instead of the catalogue
+    sentence.  Only a *whole* transcript counts, so a marker inside a sentence
+    leaves the words to the usual rules.
 - **Malayalam speech: the model mangles the question word, so the device is
   what survives (2026-11-18).**  Measured with audio synthesised by Sara's own
   voice: `ggml-base` writes Malayalam **in Tamil script** (`താങ്കില വെള്ളമ്ണു`)

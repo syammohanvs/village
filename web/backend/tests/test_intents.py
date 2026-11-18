@@ -167,12 +167,68 @@ def test_an_unclear_device_asks_which_one(matcher: IntentMatcher) -> None:
 
 
 def test_unsupported_requests_do_nothing(matcher: IntentMatcher) -> None:
-    for text in ("make me a sandwich", "open the gate", "turn on the fan", "play music"):
+    for text in ("make me a sandwich", "open the gate", "play music"):
         result = matcher.match(text, "en")
         assert result["kind"] == "unsupported", text
         assert result["command"] is None, text
         assert "Gram Sahayak" in result["message"], text
         assert result["confidence"] == 0.0
+
+
+def test_a_state_word_with_no_device_asks_which_device(matcher: IntentMatcher) -> None:
+    """`Thanks on!` / `Bounce on!` — "pump on", after a speech model.
+
+    Three recordings from this exhibit's own log (2026-11-18, two children
+    speaking English) came back as "Thanks on!", "Bounce on!" and "Dumb on!",
+    and each was answered "please ask me to control a supported device" — a
+    sentence that names nothing and leaves the visitor nowhere to go.  A state
+    word with no device is *half* a command, so the panel now asks for the other
+    half and sends nothing.  A device asked for and not offered ("turn on the
+    fan") gets the same answer, which is the honest one: it names what can be
+    switched.
+    """
+    for text in ("Thanks on!", "Bounce on!", "Let off!", "turn on the fan", "on"):
+        result = matcher.match(text, "en")
+        assert result["kind"] == "ambiguous", text
+        assert "Which device" in result["message"], text
+        assert result["command"] is None, text
+
+    # …and the question it asks can be answered: a device with no state asks
+    # for the state instead of repeating "say one clear command".
+    for text in ("pump", "lights", "the streetlights"):
+        result = matcher.match(text, "en")
+        assert "On, off, or automatic" in (result["message"] or ""), text
+        assert result["command"] is None, text
+    # A device that only answers questions is never offered a switch it has not
+    # got — soil and water have no on/off.
+    for text in ("water", "soil", "moisture"):
+        result = matcher.match(text, "en")
+        assert "On, off, or automatic" not in (result["message"] or ""), text
+        assert result["command"] is None, text
+
+
+def test_the_word_pump_is_what_a_speech_model_gets_wrong(matcher: IntentMatcher) -> None:
+    """"Pump on" heard as "Bum on!" — the voice, not the child.
+
+    Measured on 2026-11-18 with the exhibit's own voices read back through the
+    running Whisper server: the **Indian English voice** saying "Pump on!" is
+    transcribed `Bum on!` by whisper-base *and* by whisper-small, and the two
+    children in the room that evening produced `Dumb on!` and `Bounce on!` for
+    the same two words.  So the model is not the fault — the word "pump" is
+    short, and every mishearing of it is one syllable ending in the same
+    consonant.  The spellings this exhibit has actually produced are listed on
+    the pump, and each is pinned here.
+    """
+    for text in ("Bum on!", "Bum on.", "Dumb on!", "Bump on!", "Thumb on!", "Pomp on!"):
+        result = matcher.match(text, "en")
+        assert result["command"] == "IRRIGATION_REQUEST", text
+    # The same spellings with "off" are a stop, and "pump off" stays a stop.
+    assert matcher.match("Dumb off!", "en")["command"] == "IRRIGATION_STOP"
+    # "don't" is still a refusal — a misheard device word does not outrank it.
+    assert matcher.match("Don't hold the bump.", "en")["kind"] == "negated"
+    # A sentence with words this build does not know is still refused whole,
+    # even when one of them sounded like the pump.
+    assert matcher.match("Get on the phone, the thumb.", "en")["command"] is None
 
 
 def test_no_speech_is_reported(matcher: IntentMatcher) -> None:
@@ -616,8 +672,11 @@ def test_a_hindi_sentence_heard_with_a_syllable_in_front_is_still_the_lights(
     # The guard it came from still works, as the phrase it is.
     assert matcher.match("लाइट मत चालू करो", "hi")["intent"] == "NEGATED"
     # A device may carry a leading syllable; a *state* may not, and "अट चालू"
-    # (the model losing most of "लाइट") is still refused rather than guessed.
-    assert matcher.match("अट चालू.", "hi")["status"] == "unknown"
+    # (the model losing most of "लाइट") is still refused rather than guessed —
+    # it is answered with "which device?", because the state word was read and
+    # the device was not (2026-11-18).
+    assert matcher.match("अट चालू.", "hi")["kind"] == "ambiguous"
+    assert matcher.match("अट चालू.", "hi")["command"] is None
 
 
 def test_a_water_phrase_with_no_state_word_is_the_watering_it_names(
@@ -749,6 +808,58 @@ def test_one_wrong_vowel_is_read_only_where_the_word_starts_the_same() -> None:
     # (water) differ at the first letter, which is where a slip changes the
     # word - the same trap that once turned "switch off" into "start watering".
     assert not same_word("anakuka", "nanakuka")
+
+
+def test_two_words_run_together_are_still_the_sentence(
+    matcher: IntentMatcher,
+) -> None:
+    """"Lights off" said in one breath — four recordings, verbatim.
+
+    These are the literal transcripts of ``whisper-small-malayalam`` on
+    2026-11-18 (from the app's event log, evening session): the visitor said
+    "വിളക്കുകൾ അണയ്ക്കുക" and the model returned the whole sentence as one
+    word, losing the glide `യ` of "അണയ്ക്കുക" at the same time.  The exhibit
+    answered "please ask me to control a supported device" to every one.
+
+    The split is not a guess: both halves have to be words this vocabulary
+    knows, and the sentence still has to come out with exactly one device and
+    one state.
+    """
+    for text in (
+        "വിളക്കുകളാണക്കുകാം.",
+        "വിളക്കുകളാണക്കുകാ.",
+        "വിളക്കുകളാന്ക്കുകാം.",
+        "വിലക്കുകളാണക്കുകാം.",
+    ):
+        result = matcher.match(text, "ml")
+        assert result["intent"] == "LIGHTS_OFF", text
+        assert result["command"] == "LIGHTS_OFF", text
+
+    # The same for a status sentence: "in the tank, water" as one word.
+    assert matcher.match("താങ്കില്വല്ലം", "ml")["intent"] == "WATER_STATUS"
+    # …and it does not invent a sentence out of a word it cannot divide.
+    assert matcher.match("ഡ്രയാവ്.", "ml")["kind"] == "unsupported"
+    assert matcher.match("ക്കാൽ ക്ക്കുകാം.", "ml")["kind"] == "unsupported"
+
+
+def test_a_bracketed_sound_is_not_a_sentence(matcher: IntentMatcher) -> None:
+    """`[Coughing]` in the room is not a request for a device.
+
+    whisper writes a bracketed marker when it is handed a cough, laughter or
+    music, and the exhibit answered each one "please ask me to control a
+    supported device" (2026-11-18).
+    """
+    for text in ("[Coughing]", "(coughing)", "[Laughter]", "[Music]", "[BLANK_AUDIO]"):
+        for language in ("en", "ml", "hi"):
+            result = matcher.match(text, language)
+            assert result["kind"] == "no_speech", (text, language)
+            assert result["command"] is None, (text, language)
+    # A marker *inside* a sentence is not silence — but it is also an
+    # unaccounted word, so the sentence is still refused rather than half-read
+    # (the rule that keeps "…and open the gate" from switching the lights).
+    inside = matcher.match("[Music] lights on", "en")
+    assert inside["kind"] != "no_speech"
+    assert inside["command"] is None
 
 
 def test_the_anusvara_sounds_like_the_letter_after_it() -> None:

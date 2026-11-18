@@ -382,6 +382,35 @@ whether it is answering). The model is chosen with `VILLAGE_WHISPER_MODEL` in
 | `ggml-large-v3-turbo.bin` | 1.6 GB | 18–25 s here | good | weak, and far too slow |
 | `ggml-large-v3.bin` | 3.1 GB | 25–90 s here | good | not usable on this CPU |
 
+### A child's voice, and the one word that breaks it (2026-11-18)
+
+Two children and one adult gave English commands at the exhibit and several came
+back "not understood".  The app keeps no audio — only the transcript in
+**What happened** — so the question was measured instead, with the exhibit's own
+voices read back through the running server and then degraded to stand in for a
+child across a room (pitch raised, volume dropped, room noise mixed in): 9
+command sentences × 2 voices × 3 degradations = **54 clips**, scored on how many
+the *parser* then read correctly.
+
+| setup | read correctly | a command takes |
+| --- | ---: | ---: |
+| `ggml-base.bin`, as shipped | **42 / 54** | 0.84 s |
+| the same with beam search (`-bs 5`) | 43 / 54 | 0.88 s |
+| `ggml-small.bin` | 45 / 54 | **3.05 s** |
+
+So a bigger model and a wider search buy almost nothing here, and `small` costs
+three seconds of a visitor's sentence. **The fault was one word.** The exhibit's
+own Indian English voice saying **"Pump on!"** is written `Bum on!` by
+whisper-base *and* by whisper-small, and `Turn on the pump` came back as
+`Don't hold the bump` / `Turn on the Pope`.  The children produced `Dumb on!`
+and `Bounce on!` for the same two words.
+
+That is why the fix is in the vocabulary and not in the model: the spellings the
+exhibit has actually produced are listed on the pump in `shared/intents.json`
+(`bum`, `bump`, `dumb`, `thumb`, `pum`, `pomp`), each pinned by a test that
+quotes it.  With them, "Pump on!" reads correctly in 5 of 6 variants — and the
+one that still fails is heard as "Come on.", which is left unread on purpose.
+
 ### Malayalam has its own speech model
 
 The multilingual `ggml-base` model cannot write Malayalam.  It hears the sentence

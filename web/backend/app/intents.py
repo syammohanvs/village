@@ -3,12 +3,22 @@ from __future__ import annotations
 from .phonetics import fold, romanise, same_word, script_of
 
 import json
+import re
 import unicodedata
 from pathlib import Path
 from typing import Any
 
 
 SILENT_MARKERS = {"[blank_audio]", "[silence]", "(silence)", "[music]", "[no speech]"}
+
+# A whole transcript that is one bracketed sound is not a sentence: whisper
+# writes "[Coughing]", "(coughing)", "[Laughter]" and "[Music]" when it is handed
+# a room rather than a request.  The visitor was told "please ask me to control
+# a supported device" for every cough in the room (measured 2026-11-18); the
+# honest answer to a sound is "I did not hear a command", which is what
+# `no_speech` says.  Only a *whole* transcript counts — a marker inside a
+# sentence ("[Music] lights on") leaves the words alone.
+NON_SPEECH = re.compile(r"^[\[\(][^\[\]\(\)]{1,40}[\]\)]$")
 
 # Words that carry no instruction and may be ignored when checking that every
 # content word was understood.  Only English uses that check (see _unaccounted).
@@ -182,7 +192,7 @@ class IntentMatcher:
         language = language if language in self.languages else "en"
         g = self.grammar.get(language, {})
         transcript = (text or "").strip()
-        if not transcript or transcript.lower() in SILENT_MARKERS:
+        if not transcript or transcript.lower() in SILENT_MARKERS or NON_SPEECH.match(transcript):
             return self._result("no_speech", language, "no_speech")
 
         tokens = self._tokens(transcript)
@@ -338,6 +348,16 @@ class IntentMatcher:
                 roman = self._romanised_intent(tokens, language)
                 if roman is not None:
                     return roman
+            # A state word with no device named is a question about *which*
+            # device, not an instruction.  Three recordings from this exhibit's
+            # own log are exactly this shape — "Thanks on!", "Bounce on!" and
+            # "Dumb on!" are what a child's "Pump on!" looks like after a
+            # speech model has been through it (2026-11-18) — and "please ask
+            # me to control a supported device" gave the visitor nowhere to go.
+            # Nothing is sent, and the reply names the two devices that can be
+            # switched.
+            if unique_states and not is_question and not negators:
+                return self._result("ambiguous", language, "clarify_device")
             return self._result("unsupported", language, "unknown")
 
         command_for_device = self.device_commands.get(device, {})
@@ -372,6 +392,16 @@ class IntentMatcher:
             fallback = self._phrase_fallback(tokens, language, allow=not (is_question or negators))
             if fallback:
                 return fallback
+            # A device was named and the state word was not.  "Which device?"
+            # would be answering the half of the sentence the visitor *did* say,
+            # so this asks the half that is missing — and only for a device that
+            # has a state to give: soil and water answer questions, they do not
+            # switch, and offering them "on, off or automatic" would invent a
+            # control.
+            if {"on", "off", "auto"} & set(command_for_device):
+                return self._result(
+                    "ambiguous", language, "clarify_state", device=device
+                )
             return self._result("ambiguous", language, "ambiguous_generic", device=device)
 
         if is_question and not is_request:
@@ -526,16 +556,82 @@ class IntentMatcher:
             if hits(guard_aliases(g.get(group))):
                 return None
 
+        # ------------------------------------------------------ merged words
+        # A visitor speaking quickly, or a speech model writing what it heard,
+        # can run two words together — and the words around them are gone.
+        # Every one of these came from this exhibit's own event log on
+        # 2026-11-18, and every one was answered "please ask me to control a
+        # supported device":
+        #
+        #   "വിളക്കുകളാണക്കുകാം"  = വിളക്കുകൾ (lights) + അണക്കുക (switch off)
+        #   "വിളക്കുകളാന്ക്കുകാം" = the same, with the glide `യ` dropped twice
+        #   "താങ്കില്വല്ലം"        = ടാങ്കിൽ (in the tank) + വല്ലം (water)
+        #
+        # So a token that nothing reads whole is split at every point into two
+        # halves, and the split is kept only when *this* vocabulary reads both
+        # halves: a device with a state (a command), or two device names (a
+        # status sentence).  Nothing else is invented, and the sentence still
+        # has to end up with exactly one device and one state.
+        device_aliases = {
+            name: [alias for alias in roman_aliases(aliases.get(language)) if alias]
+            for name, aliases in self.devices.items()
+        }
+        state_aliases = {
+            name: [alias for alias in roman_aliases(aliases.get(language)) if alias]
+            for name, aliases in self.states.items()
+        }
+        seen: dict[str, tuple[list[str], list[str]]] = {}
+
+        def names_for(word: str) -> tuple[list[str], list[str]]:
+            """Which device names and which states this one word could be.
+
+            `allow_suffix=True` is for device names only: a device may be heard
+            with a syllable in front of it ("बालाइट" for "लाइट").  States never
+            get that tolerance — "on" and "off" differ exactly there.
+            """
+            if word in seen:
+                return seen[word]
+            found_devices = [
+                name
+                for name, aliases in device_aliases.items()
+                if any(same_word(word, alias, allow_suffix=True) for alias in aliases)
+            ]
+            found_states = [
+                name
+                for name, aliases in state_aliases.items()
+                if any(same_word(word, alias) for alias in aliases)
+            ]
+            seen[word] = (found_devices, found_states)
+            return seen[word]
+
+        def split_in_two(word: str) -> list[str] | None:
+            if len(word) < 8:
+                return None
+            two_devices: list[str] | None = None
+            for cut in range(4, len(word) - 3):
+                left, right = word[:cut], word[cut:]
+                left_devices, left_states = names_for(left)
+                right_devices, right_states = names_for(right)
+                if not (left_devices or left_states) or not (right_devices or right_states):
+                    continue
+                if (left_devices and right_states) or (left_states and right_devices):
+                    return [left, right]
+                two_devices = two_devices or [left, right]
+            return two_devices
+
+        merged: list[str] = []
+        for word in roman:
+            found_devices, found_states = names_for(word)
+            pieces = None if (found_devices or found_states) else split_in_two(word)
+            merged.extend(pieces or [word])
+        roman = merged
+
         devices: set[str] = set()
-        for name, aliases in self.devices.items():
-            # `suffix=True`: a device may be heard with a syllable in front of
-            # it ("बालाइट" for "लाइट").  States never get this tolerance.
-            if hits(roman_aliases(aliases.get(language)), suffix=True):
-                devices.add(name)
         states: set[str] = set()
-        for name, aliases in self.states.items():
-            if hits(roman_aliases(aliases.get(language))):
-                states.add(name)
+        for word in roman:
+            found_devices, found_states = names_for(word)
+            devices.update(found_devices)
+            states.update(found_states)
 
         # Watering is its own vocabulary ("water the plants" / "stop watering").
         # Both halves are required here: a pump word whose state could not be
