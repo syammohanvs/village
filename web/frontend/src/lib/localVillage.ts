@@ -157,6 +157,8 @@ export class LocalVillage {
       solarCurrentMa: Math.round(current * 100) / 100,
       solarPowerMw: Math.round(Math.max(0, mv - 1830) * current * 100) / 100,
       lightMetric: Math.round(s.lightMetric),
+      windMillivolts: s.windMv,
+      windInstalled: s.windMv !== null,
       sourceKind: 'demo',
       sourceLabel: 'Demo copy (no controller)',
       lastError: 'No village service in this copy',
@@ -252,19 +254,55 @@ export class LocalVillage {
     }
   }
 
-  /** Setup's simulation lab: the sliders and the quick demonstrations. */
+  /**
+   * Setup's simulation lab, speaking the backend's own vocabulary.
+   *
+   * The keys are the ones `POST /demo/scenario` accepts (`soil_pct`,
+   * `reservoir`, `light`, `solar_light`, `wind_speed`, `pump_manual`,
+   * `lights_mode`, `light_metric`) - not invented ones.  The lab's four quick
+   * buttons use `reservoir: 'low'` and `light: 'dark'`, and the first version
+   * of this file only knew `tank`, so "Low water" and "Night" did nothing at
+   * all here (reported 2026-11-18).
+   */
   scenario(patch: Record<string, unknown>): StateEnvelope {
     this.advance();
     const s = this.state;
-    if (typeof patch.soil_pct === 'number') s.soilPct = Math.max(0, Math.min(100, patch.soil_pct));
-    if (patch.tank === 'available' || patch.tank === 'low') {
-      s.tank = patch.tank;
-      if (patch.tank === 'available') s.pumpedSeconds = 0;
+    if (typeof patch.soil_pct === 'number') {
+      s.soilPct = Math.max(0, Math.min(100, patch.soil_pct));
     }
+    const tank = patch.reservoir ?? patch.tank;
+    if (tank === 'available' || tank === 'low') {
+      s.tank = tank;
+      if (tank === 'available') s.pumpedSeconds = 0;
+      // A low tank stops a pulse that is running, exactly as the controller
+      // does - the same reason a manual On is the only thing a dry tank ends.
+      if (tank === 'low' && s.pumping) {
+        s.pumping = false;
+        s.soakLeft = SOAK_SECONDS;
+        this.note('IRRIGATION_STOPPED_LOW_WATER', 'The rain water tank is low, so watering stopped.');
+      }
+    }
+    if (patch.light === 'dark') s.lightMetric = 1820;
+    if (patch.light === 'bright') s.lightMetric = 2940;
     if (typeof patch.light_metric === 'number') s.lightMetric = patch.light_metric;
-    if (typeof patch.solar_light === 'number') s.lightMetric = patch.solar_light;
+    if (typeof patch.solar_light === 'number') {
+      // The lab's panel slider is 0..1 of full sun; the demo has one light
+      // source, so it moves the same metric the daylight does (the real
+      // simulator keeps them apart).
+      s.lightMetric = 300 + Math.max(0, Math.min(1, patch.solar_light)) * 3000;
+    }
+    if (typeof patch.wind_speed === 'number') {
+      const speed = Math.max(0, Math.min(1, patch.wind_speed));
+      // No turbine is wired on the exhibit board, so a speed only becomes a
+      // reading when the lab asks for one.
+      s.windMv = speed > 0 ? Math.round(speed * 3000) : null;
+    }
     if (patch.lights_mode === 'auto' || patch.lights_mode === 'manual_on' || patch.lights_mode === 'manual_off') {
       s.lights = patch.lights_mode;
+    }
+    if (patch.pump_manual === 'auto' || patch.pump_manual === 'on' || patch.pump_manual === 'off') {
+      s.pump = patch.pump_manual;
+      if (patch.pump_manual === 'off') s.pumping = false;
     }
     return this.frame('demo');
   }

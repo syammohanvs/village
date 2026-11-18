@@ -30,6 +30,17 @@ describe('the Worker with no API origin configured', () => {
     expect(answer.authenticated).toBe(true);
     expect(await api.state()).toMatchObject({ mode: 'demo', physical: false });
     expect(isLocalDemo()).toBe(true);
+
+    // The lab's quick buttons go to the local village with the backend's own
+    // field names - the exact bodies Setup sends.
+    type Frame = { status: { sensors: { reservoir: { state: string } } } };
+    const low = (await api.demoScenario({ reservoir: 'low' })) as Frame;
+    expect(low.status.sensors.reservoir.state).toBe('low');
+    const after = (await api.state()) as unknown as Frame;
+    expect(after.status.sensors.reservoir.state).toBe('low');
+
+    const night = (await api.demoScenario({ light: 'dark' })) as Frame;
+    expect(night.status.sensors.reservoir.state).toBe('low');
     vi.unstubAllGlobals();
   });
 });

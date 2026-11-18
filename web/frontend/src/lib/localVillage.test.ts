@@ -84,15 +84,36 @@ describe('the built-in demo village', () => {
     expect(village.frame('demo').status?.actuators?.streetlights?.mode).toBe('auto');
   });
 
-  it('takes the simulation lab’s knobs, and reset puts the world back', () => {
-    village.scenario({ soil_pct: 80, tank: 'low' });
-    const changed = village.frame('demo');
-    expect(changed.status?.sensors.soil?.percent).toBe(80);
-    expect(changed.status?.sensors.reservoir?.state).toBe('low');
+  it('takes the simulation lab’s own quick buttons, and reset puts the world back', () => {
+    // These are the exact bodies the lab sends (`POST /demo/scenario`): "Low
+    // water" is `reservoir: 'low'` and "Night" is `light: 'dark'`, and the
+    // first version of this file silently ignored both.
+    const low = village.scenario({ reservoir: 'low' });
+    expect(low.status?.sensors.reservoir?.state).toBe('low');
+    expect(low.status?.actuators.pump?.commanded).toBe(false);
+
+    const dry = village.scenario({ soil_pct: 80 });
+    expect(dry.status?.sensors.soil?.percent).toBe(80);
+
+    const night = village.scenario({ light: 'dark' });
+    expect(night.status?.sensors.light?.brightness).toBe('dark');
+    expect(night.status?.actuators.streetlights?.commanded).toBe(true);
+    const day = village.scenario({ light: 'bright' });
+    expect(day.status?.sensors.light?.brightness).toBe('bright');
+    expect(day.status?.actuators.streetlights?.commanded).toBe(false);
 
     const reset = village.reset();
     expect(reset.status?.sensors.soil?.percent).toBeCloseTo(27.6, 1);
     expect(reset.status?.sensors.reservoir?.state).toBe('available');
+  });
+
+  it('stops a pulse that is running when the tank is made low', () => {
+    // The controller stops on `IRRIGATION_STOPPED_LOW_WATER`; the demo does the
+    // same rather than emptying a tank it has just been told is empty.
+    expect(village.frame('demo').status?.actuators.pump?.commanded).toBe(true);
+    const low = village.scenario({ reservoir: 'low' });
+    expect(low.status?.actuators.pump?.commanded).toBe(false);
+    expect(low.status?.irrigation.state).toBe('idle');
   });
 
   it('lights a bin LED and refuses a category that is not a bin', () => {
