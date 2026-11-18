@@ -411,6 +411,42 @@ exhibit has actually produced are listed on the pump in `shared/intents.json`
 quotes it.  With them, "Pump on!" reads correctly in 5 of 6 variants — and the
 one that still fails is heard as "Come on.", which is left unread on purpose.
 
+### The last few recordings are kept, and they cannot fill the disk
+
+Until 2026-11-18 the app kept **nothing** it heard; a refused sentence left only
+its transcript, which is the one thing under suspicion. So the newest recordings
+are now written to **`data/voice-clips/`**, each with a `.json` beside it holding
+what it produced — language, engine, duration, transcript, intent and reason.
+
+It is bounded by **two** limits and prunes itself on every recording, so a
+season of visitors cannot fill the laptop:
+
+| setting | default | meaning |
+| --- | --- | --- |
+| `VILLAGE_VOICE_CLIPS` | **100** | how many recordings to keep; the oldest goes first |
+| `VILLAGE_VOICE_CLIP_BYTES` | **64 MB** | a hard ceiling on the whole folder |
+| `VILLAGE_VOICE_CLIP_DIR` | `data/voice-clips` | a blank value switches it off entirely |
+
+A 10-second recording is about 320 kB, so a hundred of them is about **32 MB** —
+the byte ceiling is headroom for a deployment that asks for more clips. A
+recording and its `.json` are deleted together, and the newest recording is
+never deleted to honour the ceiling (an empty folder would lose exactly the
+sentence just misheard).
+
+`./scripts/voice_replay.py` reads the folder and answers the question a voice fix
+is really about: **does the sentence the exhibit got wrong work now?** It re-runs
+each stored transcript through the parser and marks the answers that changed:
+
+```bash
+./scripts/voice_replay.py                 # every kept recording
+./scripts/voice_replay.py --fails-only    # only the ones it could not read
+./scripts/voice_replay.py --audio         # ask whisper again, e.g. after a model change
+```
+
+Turning it off is one line (`VILLAGE_VOICE_CLIPS=0`); the panel's own privacy
+line says the recordings are kept on this laptop, so a visitor is never told
+something that is not true.
+
 ### Malayalam has its own speech model
 
 The multilingual `ggml-base` model cannot write Malayalam.  It hears the sentence

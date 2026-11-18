@@ -84,7 +84,7 @@ const EN: VoiceCopy = {
   moreExamples: 'More commands',
   fewerExamples: 'Show fewer',
   simulation: 'Simulation — physical model is not controlled.',
-  privacy: 'Speech is recognised on this laptop; nothing leaves it.',
+  privacy: 'Speech is recognised on this laptop; nothing leaves it. The last few recordings are kept here so Sara can learn to hear you better.',
   states: {
     ready: 'Speech ready',
     simulation: 'Simulation',
@@ -135,7 +135,7 @@ const ML: VoiceCopy = {
   moreExamples: 'കൂടുതൽ നിർദ്ദേശങ്ങൾ',
   fewerExamples: 'ചുരുക്കുക',
   simulation: 'സിമുലേഷൻ — യഥാർത്ഥ മാതൃക നിയന്ത്രിക്കപ്പെടുന്നില്ല.',
-  privacy: 'സംസാരം ഈ ലാപ്ടോപ്പിൽ തന്നെ തിരിച്ചറിയുന്നു; പുറത്തേക്ക് ഒന്നും പോകുന്നില്ല.',
+  privacy: 'സംസാരം ഈ ലാപ്ടോപ്പിൽ തന്നെ തിരിച്ചറിയുന്നു; പുറത്തേക്ക് ഒന്നും പോകുന്നില്ല. കേൾവി മെച്ചപ്പെടുത്താൻ അവസാനത്തെ കുറച്ച് റെക്കോർഡിംഗുകൾ ഇവിടെ സൂക്ഷിക്കുന്നു.',
   states: {
     ready: 'സംസാരം തയ്യാർ',
     simulation: 'സിമുലേഷൻ',
@@ -184,7 +184,7 @@ const HI: VoiceCopy = {
   moreExamples: 'और निर्देश',
   fewerExamples: 'कम दिखाएँ',
   simulation: 'सिमुलेशन — असली मॉडल नियंत्रित नहीं हो रहा।',
-  privacy: 'आवाज़ इसी लैपटॉप पर पहचानी जाती है; बाहर कुछ नहीं जाता।',
+  privacy: 'आवाज़ इसी लैपटॉप पर पहचानी जाती है; बाहर कुछ नहीं जाता। सुनने की क्षमता सुधारने के लिए पिछली कुछ रिकॉर्डिंग यहीं रखी जाती हैं।',
   states: {
     ready: 'आवाज़ तैयार',
     simulation: 'सिमुलेशन',

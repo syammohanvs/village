@@ -98,6 +98,9 @@ def make_settings(tmp_path: Path) -> Settings:
         # rather than next to the repository's real samples.
         waste_capture_dir=tmp_path / "captures",
         waste_samples_dir=tmp_path / "samples",
+        # The last few voice recordings are written on every transcription, so
+        # the suite must never write into the exhibit's own `data/voice-clips`.
+        voice_clip_dir=tmp_path / "voice-clips",
     )
 
 

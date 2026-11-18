@@ -26,6 +26,19 @@ def _capture_dir(name: str, default: Path) -> Path | None:
     return Path(raw) if raw else None
 
 
+def _voice_clips_dir(root: Path) -> Path | None:
+    """Where the last few recordings go, resolved against the repository root.
+
+    A blank value switches the folder off (the same rule the waste crops use);
+    a relative value is read from the repository rather than from the shell's
+    working directory, because `launch.sh` can be called from anywhere.
+    """
+    folder = _capture_dir("VILLAGE_VOICE_CLIP_DIR", root / "data" / "voice-clips")
+    if folder is None:
+        return None
+    return folder if folder.is_absolute() else (root / folder).resolve()
+
+
 def _path(name: str, default: Path) -> Path:
     """A directory that must stay useful: unset or blank means the default."""
     raw = (os.getenv(name) or "").strip()
@@ -129,6 +142,13 @@ class Settings:
     sample_loop_enabled: bool
     voice_max_bytes: int
     voice_max_seconds: float
+    # The last few voice recordings, kept so a misheard sentence can be played
+    # back and re-run after a fix.  Bounded by BOTH a count and a total size and
+    # pruned on every save, so a venue season cannot fill the disk.  An explicit
+    # empty directory turns it off.
+    voice_clip_dir: Path | None
+    voice_clips: int
+    voice_clip_bytes: int
     piper_bin: Path
     piper_voices_dir: Path
     piper_cache_dir: Path
@@ -204,6 +224,9 @@ class Settings:
             sample_loop_enabled=_bool("VILLAGE_SAMPLE_LOOP", True),
             voice_max_bytes=_int("VILLAGE_VOICE_MAX_BYTES", 5 * 1024 * 1024),
             voice_max_seconds=_float("VILLAGE_VOICE_MAX_SECONDS", 12.0),
+            voice_clip_dir=_voice_clips_dir(root),
+            voice_clips=_int("VILLAGE_VOICE_CLIPS", 100),
+            voice_clip_bytes=_int("VILLAGE_VOICE_CLIP_BYTES", 64 * 1024 * 1024),
             piper_bin=Path(os.getenv("VILLAGE_PIPER_BIN", models / "piper" / "piper")),
             piper_voices_dir=Path(
                 os.getenv("VILLAGE_PIPER_VOICES", models / "piper" / "voices")

@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import COOKIE_NAME, GUEST_USERNAME, Sessions, verify_password
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
-from . import ml_asr, waste_resnet
+from . import ml_asr, voice_clips, waste_resnet
 from .device import (
     DeviceError,
     DeviceGateway,
@@ -50,7 +50,7 @@ from .protocol import (
 )
 from .simulator import SimulatorError
 from .tts import PiperTts, TtsError
-from .voice import VoiceError, WhisperClient, audio_assets
+from .voice import VoiceError, WhisperClient, audio_assets, wav_info
 
 log = logging.getLogger("village")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -156,6 +156,19 @@ async def lifespan(app: FastAPI):
         )
     else:
         log.info("sign-in is on for %r", settings.admin_user)
+
+    if voice_clips.enabled(settings):
+        # Said out loud, because a folder of visitors' voices is a fact an
+        # operator should know without reading `.env` — and because the policy
+        # is what keeps it from growing.
+        log.info(
+            "keep the last %d voice recordings in %s (at most %d MB, pruned on every save)",
+            settings.voice_clips,
+            settings.voice_clip_dir,
+            settings.voice_clip_bytes // (1024 * 1024),
+        )
+    else:
+        log.info("voice recordings are not kept (VILLAGE_VOICE_CLIPS=0 or no directory)")
 
     waste_resnet.configure(settings)
     await db.init()
@@ -1004,6 +1017,10 @@ def create_app(
             **readiness,
             "audio_assets": audio_assets(settings),
             "tts": request_tts.readiness(),
+            # What is on disk of the last few recordings, and the policy that
+            # keeps it bounded — one `curl /voice/readiness` answers both
+            # "is it keeping clips?" and "how much room do they take?".
+            "clips": voice_clips.status(settings),
             "languages": ["en", "ml", "hi"],
         }
 
@@ -1079,6 +1096,18 @@ def create_app(
         data = await audio.read(settings.voice_max_bytes + 1)
         if len(data) > settings.voice_max_bytes:
             raise HTTPException(status_code=413, detail="recording is too large")
+        # Keep the recording **before** it is transcribed, so a sentence the
+        # model cannot read at all is still on disk to be listened to and re-run
+        # (asked for 2026-11-18).  Bounded and pruned by `voice_clips`; a
+        # failure to save is swallowed there, because the answer matters more
+        # than the record.
+        clip = voice_clips.save(data, language=language, settings=settings)
+        try:
+            # `wav_info` is a module function, not a method of the client — the
+            # first version asked the client and every sidecar said null.
+            duration_s = wav_info(data)["duration_s"]
+        except Exception:  # noqa: BLE001 - a malformed clip is the answer's problem
+            duration_s = None
         # Malayalam first goes to its own model.  The multilingual whisper model
         # cannot write Malayalam — it spells the sounds in Tamil letters — so a
         # spoken sentence there was mostly lost (measured 2026-11-18).  Any
@@ -1099,11 +1128,29 @@ def create_app(
                 text = transcript["text"]
             except VoiceError as exc:
                 if exc.code == "NO_SPEECH":
-                    return matcher.match("", language)
+                    empty = matcher.match("", language)
+                    voice_clips.annotate(
+                        clip, language=language, engine=engine, text="", result=empty,
+                        duration_s=duration_s,
+                    )
+                    return empty
+                voice_clips.annotate(
+                    clip, language=language, engine=engine, text="",
+                    result={"intent": "UNKNOWN", "reason": exc.code}, duration_s=duration_s,
+                )
                 raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message}) from exc
         elif not text.strip():
-            return matcher.match("", language)
+            empty = matcher.match("", language)
+            voice_clips.annotate(
+                clip, language=language, engine=engine, text="", result=empty,
+                duration_s=duration_s,
+            )
+            return empty
         result = matcher.match(text, language)
+        voice_clips.annotate(
+            clip, language=language, engine=engine, text=text, result=result,
+            duration_s=duration_s,
+        )
         await db.add_event(
             "live" if not settings.device_is_simulator else "live",
             "voice",

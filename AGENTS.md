@@ -669,6 +669,31 @@ sharing safe for the *village*, not for the account:
     command") through `NON_SPEECH` in `intents.py`, instead of the catalogue
     sentence.  Only a *whole* transcript counts, so a marker inside a sentence
     leaves the words to the usual rules.
+- **The last few recordings are kept on disk, bounded twice, and a script
+  replays them (2026-11-18, asked for by the user).**  The evening's analysis
+  had to work from transcripts because the app kept **no audio** — so it now
+  keeps the newest ones in **`data/voice-clips/`** (`app/voice_clips.py`), each
+  with a `.json` sidecar (language, engine, duration, transcript, intent,
+  reason) written *after* the answer, with the audio saved **before** the model
+  is asked so a sentence the model cannot read at all is still there.
+  - **Two ceilings, pruned on every save**, because a count alone lets a big
+    clip fill the disk and a byte cap alone lets a thousand tiny ones: default
+    **100 clips** (`VILLAGE_VOICE_CLIPS`) **and 64 MB**
+    (`VILLAGE_VOICE_CLIP_BYTES`); `VILLAGE_VOICE_CLIP_DIR=` (blank) switches it
+    off.  A 10 s clip is ~320 kB, so 100 is ~32 MB.  The newest clip is never
+    deleted to honour the ceiling — an empty folder would lose the sentence just
+    misheard — and a clip goes with its sidecar, so the pair cannot drift.
+    `data/*` already ignores the folder, so no recording can reach git.
+  - **A failure to save never fails the request** (the pattern the waste crops
+    already use), and `GET /voice/readiness` reports `clips: {enabled, keep,
+    max_bytes, kept, bytes}` so `curl` answers "how much room do they take?".
+    The startup log says the policy in one line.
+  - **`scripts/voice_replay.py` is why the folder exists**: it re-runs each
+    stored transcript through the parser and marks what changed
+    (`--fails-only`, and `--audio` to ask whisper again after a model change).
+  - The panel's privacy sentence gained the fact in three languages ("the last
+    few recordings are kept here so Sara can learn to hear you better") — a
+    visitor is not told something that is not true.
 - **Malayalam speech: the model mangles the question word, so the device is
   what survives (2026-11-18).**  Measured with audio synthesised by Sara's own
   voice: `ggml-base` writes Malayalam **in Tamil script** (`താങ്കില വെള്ളമ്ണു`)
