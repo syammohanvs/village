@@ -124,8 +124,8 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **499 firmware checks**, **131 backend tests** and
-**420 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+The current tree passes **499 firmware checks**, **134 backend tests** and
+**422 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -317,9 +317,43 @@ sharing safe for the *village*, not for the account:
      length limit "on" and "off" meet.  Both guards are pinned in
      `test_a_short_word_tolerates_one_letter_but_never_a_different_consonant`.
   After: four TTS recordings of "pump auto" (three phrasings) all answer
-  PUMP_AUTO through the real route.  **Not chased, deliberately:** a hurried
-  `പമ്പ് ഓട്ടോ` can merge into one word (`പോട്ടു`) with the pump's last
-  consonant inside it; no rule guesses at that, and the short phrasing works.
+  PUMP_AUTO through the real route.  *(The merged `പോട്ടു` this paragraph used
+  to call un-chased is read as the mode now — see the next bullet — but only
+  when the sentence also names the pump.)*
+- **The model writes "automatic" in pieces, and the pieces were refused
+  (2026-11-18).**  The event log had six recordings of *pump auto* that all came
+  back UNKNOWN or AMBIGUOUS: `പമ്പ് ഓട്ടോ മാടിക്` (two words — the second was
+  unaccounted, so the whole sentence was refused), `പമ്പ് ഓട്ടുമാറ്റിക്` and
+  `പമ്പു ഓെട്ടുമാട്ടിക്` (one word, and no alias), and `പമ്പ് പോട്ടു`, where
+  the pump's last consonant has bled into the state.  Three fixes, each narrow
+  enough to say why:
+  1. **the spellings** — `മാടിക്` / `മാടിക്ക്` / `ഓട്ടുമാറ്റിക്` /
+     `ഓെട്ടുമാട്ടിക്` / `അട്ടോ` join `states.auto` (`shared/intents.json`), so
+     the second half of "auto-matic" is the same mode rather than an extra noun;
+  2. **`പോട്ടു` is the mode only after a pump word** (`_romanised_intent`): a
+     word that ends in the *sound* of "auto" (`fold(word)` ends `otu`/`oto`) is
+     read as `auto` when the sentence also names the pump, and nowhere else —
+     `പോട്ടു.` on its own is still refused.  This is the merged case the earlier
+     note called un-chased; it is chased now, with that guard;
+  3. **one edit after a shared start** (`same_word`): `കത്യകുകാ` ("katyakuka")
+     and `കത്തിക്കുക` ("kathikkuka") are one vowel apart, and the command was
+     lost.  The rule allows one edit when the two words are at least five long
+     **and their first three letters are equal** — which is exactly the guard
+     that keeps "anakuka" (turn off) and "nanakuka" (water) apart, the pair
+     whose confusion once started the pump on a request to put a lamp out.
+  Alongside them, from the same log: the pump with a case ending (`പംമ്പേ`) and
+  its misspellings (`പമ്വ്`, `പംപ്പ്`, `പംഭ്`); "soil" in the genitive with the
+  model's own word for moisture (`മണ്നിന്റെ ഏർപ്പം`); "switch on" said as one
+  word (`ഓണാക്കുക` / `ഹോണാക്കുകാ`, the standard `ഓൺ ആക്കുക` run together); and
+  the verb ending `ചെയുകാ` beside `ചെയുക`.  Every one is pinned by a test that
+  quotes the transcript verbatim (`test_the_latest_unrecognised_recordings_are_
+  understood`, `test_automatic_is_one_mode_however_the_model_splits_it`,
+  `test_one_wrong_vowel_is_read_only_where_the_word_starts_the_same`), and all
+  eight answer correctly through the real `POST /voice/interpret` route.
+  **Still not chased:** `പംപ്പോട്ടു` with no pump word at all (the pump's name
+  and the mode fused), and Arabic/Tamil-script soup the model produces from
+  near-silence, which the script guard is meant to refuse.
+
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed
   Unicode offset) and romanised, so `വിളക്കുകൾ അണയ്ക്കുക` and

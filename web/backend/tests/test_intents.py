@@ -620,11 +620,68 @@ def test_the_doing_word_is_not_a_state(matcher: IntentMatcher) -> None:
 def test_pump_auto_from_the_users_own_recordings(matcher: IntentMatcher) -> None:
     for text in ("പംമ് അട്ടോ", "പംഭ് അട്ടോ", "പമ് ഓത്.", "പമ്പ് ഓട്ടോ ചെയ്യുക"):
         assert matcher.match(text, "ml")["intent"] == "PUMP_AUTO", text
-    # Not covered, and deliberately not chased: a hurried "പമ്പ് ഓട്ടോ" can come
-    # back as one merged word ("പോട്ടു"), where the pump's final consonant has
-    # bled into the state, and "ഓട്ടോമാറ്റിക്" has several unhelpful spellings.
-    # The short two-word phrasing above is what the exhibit asks a visitor to
-    # say, and it works.
+
+
+def test_automatic_is_one_mode_however_the_model_splits_it(
+    matcher: IntentMatcher,
+) -> None:
+    """Every one of these is a recording of "pump auto" from this exhibit.
+
+    "Automatic" arrives as two words ("ഓട്ടോ മാടിക്"), as one
+    ("ഓട്ടുമാറ്റിക്", "ഓെട്ടുമാട്ടിക്"), with the pump's own consonant inside it
+    ("പോട്ടു"), and with the pump's name misspelt ("പമ്വ്").  All four were
+    refused before 2026-11-18: the unknown half of "automatic" made the whole
+    sentence unaccounted, and "പോട്ടു" matched nothing at all.
+    """
+    for text in (
+        "പമ്പ് ഓട്ടോ മാടിക്.",
+        "പമ്പ് ഓട്ടുമാറ്റിക്.",
+        "പമ്പു ഓെട്ടുമാട്ടിക്.",
+        "പമ്വ് ഓട്ടോ ചെയുക.",
+        "പമ്പ് പോട്ടു.",
+        "പമ്പ് ഓട്ടോ മാട്ടിക്.",
+    ):
+        assert matcher.match(text, "ml")["intent"] == "PUMP_AUTO", text
+
+    # The merged word is read as the mode **only after a pump word**.  On its
+    # own it could be anything, and nothing may be guessed from a stray sound.
+    assert matcher.match("പോട്ടു.", "ml")["kind"] != "command"
+    assert matcher.match("അത് പോട്ടു.", "ml")["kind"] != "command"
+
+
+def test_the_latest_unrecognised_recordings_are_understood(
+    matcher: IntentMatcher,
+) -> None:
+    """The three sentences that came back UNKNOWN on 2026-11-18, verbatim.
+
+    Each was in the app's own event log, which is why they are worth a test:
+    the model writes a case ending on the pump ("പംമ്പേ"), the genitive of
+    "soil" plus its own spelling of "moisture" ("മണ്നിന്റെ ഏർപ്പം"), and the
+    verb of "turn off" with the vowel in the wrong place
+    ("അനയ്ക്കുകാന്‍").
+    """
+    assert matcher.match("വിലക്കുകള്‍ അനയ്ക്കുകാന്‍", "ml")["intent"] == "LIGHTS_OFF"
+    assert matcher.match("വിളക്കുകള്‍ കത്യകുകാ", "ml")["intent"] == "LIGHTS_ON"
+    assert matcher.match("മണ്നിന്റെ ഏര്‍പ്പം?", "ml")["intent"] == "SOIL_STATUS"
+    assert matcher.match("പംമ്പേ അട്ടോ?", "ml")["intent"] == "PUMP_STATUS"
+    # "make it on" is said as one word, and it is still a request to water.
+    assert matcher.match("പമ്പ് ഹോണാക്കുകാ.", "ml")["intent"] == "IRRIGATION_START"
+    # The verb's ending was in the verb list but not this spelling of it.
+    assert matcher.match("പംപ്പു ഒപ്ര് ചെയുകാ", "ml")["intent"] == "IRRIGATION_STOP"
+
+
+def test_one_wrong_vowel_is_read_only_where_the_word_starts_the_same() -> None:
+    from app.phonetics import same_word
+
+    # "katyakuka" (heard) and "kathikkuka" (turn on) differ in one vowel in the
+    # middle; the word is still the same one.
+    assert same_word("katyakuka", "kathikkuka")
+    # "anakukan" (turn off) and "anakuka" (turn off) differ by one letter too.
+    assert same_word("anakukan", "anakuka")
+    # The pair this must never join: "anakuka" (turn off) and "nanakuka"
+    # (water) differ at the first letter, which is where a slip changes the
+    # word - the same trap that once turned "switch off" into "start watering".
+    assert not same_word("anakuka", "nanakuka")
 
 
 def test_the_anusvara_sounds_like_the_letter_after_it() -> None:

@@ -466,7 +466,17 @@ class IntentMatcher:
             # (2026-11-18).
             pass
         elif hits(roman_aliases(watering.get("cue"))):
-            if hits(roman_aliases(watering.get("stop"))):
+            # A hurried "പമ്പ് ഓട്ടോ" can come back as one word that has
+            # swallowed the pump's last letter: "പോട്ടു" (measured 2026-11-18).
+            # After a pump word, a word that *ends* with the sound of "auto" is
+            # the mode, not a request to water — and only there, so nothing
+            # else can be read as a mode.
+            if any(
+                fold(word).endswith(("otu", "oto")) and len(fold(word)) >= 4
+                for word in roman
+            ):
+                states.add("auto")
+            elif hits(roman_aliases(watering.get("stop"))):
                 states.add("off")
                 devices.add("pump")
             elif hits(roman_aliases(watering.get("start"))):

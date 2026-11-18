@@ -250,6 +250,19 @@ def same_word(a: str, b: str) -> bool:
         a, b = _consonants(left), _consonants(right)
         if a == b or a.startswith(b) or b.startswith(a):
             return True
+    # One edit is allowed **when the two words start the same**.  A speech
+    # model put the vowel of "കത്തിക്കുക" (turn on) in the wrong place:
+    # "കത്യകുകാ" romanises to "katyakuka" against "kathikkuka", one letter
+    # apart in the middle, and the command was refused (measured 2026-11-18).
+    # The start is what makes this safe: the one pair this file must never
+    # confuse - "anakuka" (turn off) and "nanakuka" (water) - differ at the
+    # *first* letter, which is exactly where a slip changes the word.
+    if (
+        min(len(left), len(right)) >= 5
+        and left[:3] == right[:3]
+        and distance(left, right) <= 1
+    ):
+        return True
     # A long word may differ by one letter and still be the same word:
     # "vilakkunkal" (heard) and "vilakkukal" (expected) are one inserted `n`.
     # A short one may not -- that is exactly how "anakuka" (turn off) was once
