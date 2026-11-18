@@ -1979,3 +1979,49 @@ describe('Sort Waste — choosing the camera', () => {
     );
   });
 });
+
+describe('Sort Waste — an item that is not waste yet', () => {
+  it('answers a pencil with the reuse sentence, lights no bin and says it', async () => {
+    // Reported 2026-11-19: a pencil is wood, graphite and clay, so it belongs
+    // in none of our three bins -- and the classifier reads it as Plastic 0.53
+    // or Organic 0.90, either of which would open a bin.  The reader says what
+    // it is instead, and Sara answers with the reuse sentence.
+    window.localStorage.setItem('village.demoMode', 'demo');
+    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: null }));
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    stubCamera();
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(screen.getByTestId('start-camera'));
+    fireEvent.click(await screen.findByTestId('not-in-bins'));
+
+    expect(await screen.findByTestId('waste-result')).toHaveTextContent(
+      /not one of our three bins/i,
+    );
+    const destination = screen.getByTestId('waste-destination');
+    expect(destination).toHaveTextContent(/use it for as long as possible/i);
+    expect(destination).toHaveTextContent(/gram sahayak/i);
+    // The reader's word is not a model answer, so nothing is recorded and no
+    // lamp is lit -- a pencil must never look like a plastic press.
+    expect(api.postRecognition).not.toHaveBeenCalled();
+    const leds = screen.getByTestId('bin-leds');
+    for (const bin of ['organic', 'plastic', 'paper']) {
+      expect(within(leds).getByTestId(`bin-led-${bin}`)).not.toHaveClass('is-on');
+    }
+    // ...and it is spoken, not only written: the card is not a poster.
+    await waitFor(
+      () => expect(spoken.some((line) => /not one of our three bins/i.test(line))).toBe(true),
+      { timeout: 4000 },
+    );
+  });
+});

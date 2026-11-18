@@ -145,6 +145,8 @@ export interface Disposal {
   separate: boolean;
   /** True when the answer is "ask the Gram Sahayak". */
   support: boolean;
+  /** True when the item is not waste yet — still useful, in no bin. */
+  reuse: boolean;
   tone: 'ok' | 'warn' | 'danger';
 }
 
@@ -173,10 +175,12 @@ function make(parts: {
   keepOutKey?: MessageKey;
   separate: boolean;
   support: boolean;
+  reuse?: boolean;
   tone: 'ok' | 'warn' | 'danger';
 }): Disposal {
   return {
     ...parts,
+    reuse: parts.reuse ?? false,
     title: translate('en', parts.titleKey),
     reason: translate('en', parts.reasonKey),
     keepOut: parts.keepOutKey ? translate('en', parts.keepOutKey) : undefined,
@@ -189,6 +193,19 @@ const SHARPS = ['syringe', 'needle', 'sharp', 'blade', 'scalpel'];
 const MEDICAL = ['medicine', 'medical', 'tablet', 'pill', 'cotton', 'bandage', 'mask'];
 const CHEMICAL = ['chemical', 'pesticide', 'solvent', 'paint', 'acid'];
 const BATTERY = ['battery', 'cell'];
+
+/**
+ * Items that are **not waste yet** — still useful, and in none of our bins.
+ *
+ * A pencil is the exhibit's own example, and the sentence for it is not "keep
+ * it separate": it is wood, graphite and clay (and may carry paint, a metal
+ * band and an eraser), so it belongs in no bin, and the honest advice is to
+ * keep using it and ask about disposal.  The classifier has no class for "a
+ * thing that is still useful", so it reads a pencil as Plastic 0.53 or Organic
+ * 0.90 — which is why this is also a button the operator can press, not only
+ * something the camera can name.
+ */
+const REUSE = ['pencil'];
 
 function has(text: string, words: string[]): boolean {
   return words.some((word) => text.includes(word));
@@ -281,6 +298,24 @@ export function guideFor(
       keepOutKey: 'waste.bin.paper.keepOut', separate: false, support: false, tone: 'ok' });
   }
 
+  // Not waste yet.  The manual choice passes "not in our bins" so the same
+  // sentence can be reached without the camera naming anything.
+  if (has(text, REUSE) || text === 'not in our bins') {
+    return make({
+      item: text === 'not in our bins' ? 'Not one of our three bins' : label,
+      itemKey: text === 'not in our bins'
+        ? 'waste.item.notInBins'
+        : text === 'pencil' ? 'waste.item.pencil' : undefined,
+      destination: 'support',
+      titleKey: 'waste.title.askSahayak',
+      reasonKey: 'waste.word.reuse',
+      separate: true,
+      support: true,
+      reuse: true,
+      tone: 'warn',
+    });
+  }
+
   // Glass and metal: a separate collection *only when one is configured*.
   if (text === 'glass' || text === 'metal') {
     const configured = text === 'glass' ? ROUTES.glass : ROUTES.metal;
@@ -322,13 +357,15 @@ export function guideFor(
  * fallback for a language with no translation yet, so a visitor never hears
  * nothing.
  */
-const SPOKEN: Record<string, Record<'organic' | 'plastic' | 'paper' | 'support' | 'separate', string>> = {
+const SPOKEN: Record<string, Record<'organic' | 'plastic' | 'paper' | 'support' | 'separate' | 'reuse', string>> = {
   en: {
     organic: 'Organic food waste. Put it in the organic bin.',
     plastic: 'Empty and clean plastic. Put it in the plastic bin.',
     paper: 'Clean paper. Put it in the paper and cardboard bin.',
     support: 'Keep this item separate. Contact Gram Sahayak.',
     separate: 'Keep this item separate for collection.',
+    reuse:
+      'This is not one of our three bins. Use it for as long as possible, then ask the Gram Sahayak how to dispose of it.',
   },
   ml: {
     organic: 'ആർഗാനിക് ഭക്ഷ്യമാലിന്യം. ഓർഗാനിക് ബിന്നിൽ ഇടുക.',
@@ -336,6 +373,8 @@ const SPOKEN: Record<string, Record<'organic' | 'plastic' | 'paper' | 'support' 
     paper: 'വൃത്തിയുള്ള പേപ്പർ. പേപ്പർ, കാർഡ്ബോർഡ് ബിന്നിൽ ഇടുക.',
     support: 'ഇത് വേർതിരിച്ച് സൂക്ഷിക്കുക. ഗ്രാം സഹായകിനെ ബന്ധപ്പെടുക.',
     separate: 'ഇത് ശേഖരണത്തിനായി വേർതിരിച്ച് സൂക്ഷിക്കുക.',
+    reuse:
+      'ഇത് ഞങ്ങളുടെ മൂന്ന് ബിന്നുകളിൽ ഒന്നല്ല. കഴിയുന്നത്ര കാലം ഉപയോഗിക്കുക. ശേഷം എങ്ങനെ വിനിയോഗിക്കാം എന്ന് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
   },
   hi: {
     organic: 'जैविक खाद्य कचरा। इसे जैविक बिन में डालें।',
@@ -343,6 +382,8 @@ const SPOKEN: Record<string, Record<'organic' | 'plastic' | 'paper' | 'support' 
     paper: 'साफ़ कागज़। इसे कागज़ और कार्डबोर्ड बिन में डालें।',
     support: 'इसे अलग रखें। ग्राम सहायक से संपर्क करें।',
     separate: 'इसे संग्रह के लिए अलग रखें।',
+    reuse:
+      'यह हमारे तीन बिन में से एक नहीं है। इसे जितने समय तक हो सके इस्तेमाल करें, फिर इसे कैसे निपटाना है ग्राम सहायक से पूछें।',
   },
 };
 
@@ -351,6 +392,7 @@ export function spokenFor(disposal: Disposal, language = 'en'): string {
   if (disposal.destination === 'organic') return lines.organic;
   if (disposal.destination === 'plastic') return lines.plastic;
   if (disposal.destination === 'paper') return lines.paper;
+  if (disposal.reuse) return lines.reuse;
   if (disposal.support) return lines.support;
   return lines.separate;
 }

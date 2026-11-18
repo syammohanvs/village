@@ -698,6 +698,22 @@ export function SortWaste() {
     }
   }, [stopCamera]);
 
+  /**
+   * A manual choice is an answer too.
+   *
+   * The reader's word replaces the model's, so nothing is recorded and no bin
+   * LED is lit -- but it is still spoken, in the language chosen in Setup, the
+   * same way a camera answer is.  Pressing "Not one of our three bins" for a
+   * pencil used to leave the visitor reading a card in silence.
+   */
+  const chooseManual = useCallback(
+    (disposal: Disposal) => {
+      setManualGuide(disposal);
+      void speakText(spokenFor(disposal, voiceLanguage), voiceLanguage, 0.95);
+    },
+    [voiceLanguage],
+  );
+
   const loadModel = useCallback(async () => {
     if (!installed || modelState === 'loading' || modelState === 'ready') return;
     setModelState('loading');
@@ -1439,7 +1455,7 @@ export function SortWaste() {
                   type="button"
                   className="btn btn--ghost"
                   data-testid="mixed-bag"
-                  onClick={() => setManualGuide(guideFor('mixed bag', { mixedBag: true }))}
+                  onClick={() => chooseManual(guideFor('mixed bag', { mixedBag: true }))}
                 >
                   {t('sort.mixedBag')}
                 </button>
@@ -1447,7 +1463,7 @@ export function SortWaste() {
                   type="button"
                   className="btn btn--ghost"
                   data-testid="sanitary-waste"
-                  onClick={() => setManualGuide(guideFor('sanitary pad'))}
+                  onClick={() => chooseManual(guideFor('sanitary pad'))}
                 >
                   {t('sort.sanitary')}
                 </button>
@@ -1455,9 +1471,23 @@ export function SortWaste() {
                   type="button"
                   className="btn btn--ghost"
                   data-testid="sharps"
-                  onClick={() => setManualGuide(guideFor('syringe'))}
+                  onClick={() => chooseManual(guideFor('syringe'))}
                 >
                   {t('sort.sharps')}
+                </button>
+                {/*
+                  Not waste yet: a pencil, a wooden ruler, a crayon.  The camera
+                  has no class for "still useful" — it reads a pencil as Plastic
+                  or Organic — so the reader says it instead of the model, and
+                  the answer is the reuse sentence rather than a bin.
+                */}
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  data-testid="not-in-bins"
+                  onClick={() => chooseManual(guideFor('not in our bins'))}
+                >
+                  {t('sort.notInBins')}
                 </button>
               </div>
             )}

@@ -488,6 +488,14 @@ export const MESSAGES = {
     'धातु के संग्रह के लिए इसे अलग रखें। यह हमारे तीन बिन में नहीं जाता।',
     'ലോഹ ശേഖരണത്തിനായി ഇത് വേർതിരിച്ച് സൂക്ഷിക്കുക. ഇത് ഞങ്ങളുടെ മൂന്ന് ബിന്നുകളിൽ ഇടുന്നില്ല.',
   ],
+  // Not waste yet: still useful, belongs in no bin.  A pencil is the exhibit's
+  // own example, so this sentence is written for any such item rather than
+  // for one material.
+  'waste.word.reuse': [
+    'Use it for as long as possible. It does not belong in our food, plastic or paper bins. Please contact the Gram Sahayak for disposal guidance.',
+    'इसे जितने समय तक हो सके इस्तेमाल करें। यह हमारे भोजन, प्लास्टिक या कागज़ के बिन में नहीं जाता। निपटाने का तरीका जानने के लिए ग्राम सहायक से संपर्क करें।',
+    'കഴിയുന്നത്ര കാലം ഉപയോഗിക്കുക. ഇത് ഞങ്ങളുടെ ഭക്ഷ്യ, പ്ലാസ്റ്റിക്, പേപ്പർ ബിന്നുകളിൽ ഉൾപ്പെടുന്നില്ല. എങ്ങനെ വിനിയോഗിക്കാം എന്ന് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  ],
   'waste.title.keepSeparate': ['Keep separate', 'अलग रखें', 'വേർതിരിച്ച് സൂക്ഷിക്കുക'],
   'waste.title.askSahayak': ['Ask the Gram Sahayak', 'ग्राम सहायक से पूछें', 'ഗ്രാം സഹായകിനോട് ചോദിക്കുക'],
   'waste.title.doNotHandle': ['Do not handle', 'छुएँ नहीं', 'തൊടരുത്'],
@@ -508,6 +516,10 @@ export const MESSAGES = {
   'waste.item.ewaste': ['Electronic waste', 'इलेक्ट्रॉनिक कचरा', 'ഇലക്ട്രോണിക് മാലിന്യം'],
   'waste.item.background': ['Not a waste item', 'कचरा नहीं है', 'മാലിന്യമല്ല'],
   'waste.item.mixedBag': ['Mixed bag / several items', 'मिला-जुला थैला / कई चीज़ें', 'കലർന്ന സഞ്ചി / പല വസ്തുക്കൾ'],
+  'waste.item.notInBins': [
+    'Not one of our three bins', 'हमारे तीन बिन में से नहीं', 'ഞങ്ങളുടെ മൂന്ന് ബിന്നുകളിൽ ഒന്നല്ല',
+  ],
+  'waste.item.pencil': ['Pencil', 'पेंसिल', 'പെൻസിൽ'],
   'waste.item.uncertain': ['Not a clear item', 'साफ़ चीज़ नहीं', 'വ്യക്തമായ വസ്തുവല്ല'],
   'waste.item.nothing': ['Nothing recognised', 'कुछ पहचाना नहीं गया', 'ഒന്നും തിരിച്ചറിഞ്ഞില്ല'],
 
@@ -613,6 +625,7 @@ export const MESSAGES = {
   'sort.mixedBag': ['Mixed bag / several items', 'मिला-जुला थैला / कई चीज़ें', 'കലർന്ന സഞ്ചി / പല വസ്തുക്കൾ'],
   'sort.sanitary': ['Sanitary waste', 'सैनिटरी कचरा', 'സാനിറ്ററി മാലിന്യം'],
   'sort.sharps': ['Sharp or medical', 'नुकीली या मेडिकल चीज़', 'കൂർത്തതോ മെഡിക്കലോ ആയ വസ്തു'],
+  'sort.notInBins': ['Not one of our three bins', 'हमारे तीन बिन में से नहीं', 'ഞങ്ങളുടെ മൂന്ന് ബിന്നുകളിൽ ഒന്നല്ല'],
   'sort.promptNoBrowser': [
     'This browser cannot open a camera in this tab, so Start Camera is disabled.',
     'यह ब्राउज़र इस टैब में कैमरा नहीं खोल सकता, इसलिए कैमरा चालू करें बंद है।',

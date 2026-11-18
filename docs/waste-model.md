@@ -182,6 +182,29 @@ The remaining misses on the waste photos are mostly the paper/foam and
 foam/plastic boundaries and brown cardboard against e-waste, which are
 genuinely close on a 224×224 photo.
 
+### A pencil belongs in none of the bins (2026-11-19)
+
+Asked at the venue, and the answer is not a bin. A pencil is wood, graphite and
+clay — and often paint, a metal band and an eraser — so it is not food waste, not
+plastic and not paper/cardboard. The classifier has no class for *"a thing that
+is still useful"*, and on the venue's own frame it read one as **Organic 0.90**
+(and, on an earlier press, Plastic 0.53). Either would have opened a bin.
+
+So the page answers with a **reuse** sentence instead, and offers it as a button
+(**Not one of our three bins**, beside *Sanitary waste* and *Sharp or medical*)
+because the camera cannot be the one to say it:
+
+> Use it for as long as possible. It does not belong in our food, plastic or
+> paper bins. Please contact the Gram Sahayak for disposal guidance.
+
+Sara says the same in English, Hindi and Malayalam. Nothing is recorded as a
+bin press, and no bin LED lights.
+
+**Do not add the pencil frame to `Paper` or `Organic`.** It would teach the
+model that a pencil is a bin item, which is exactly the mistake the button
+exists to prevent. If a future model names objects instead of materials,
+`guideFor('pencil')` already routes to the same answer.
+
 To rebuild it:
 
 ```bash

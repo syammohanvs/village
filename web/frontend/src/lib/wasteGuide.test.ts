@@ -175,3 +175,42 @@ describe('spokenFor speaks the chosen language', () => {
     expect(spokenFor(plastic, 'ta')).toMatch(/plastic bin/i);
   });
 });
+
+describe('an item that is not waste yet', () => {
+  it('answers a pencil with reuse, not a bin', () => {
+    // Wood, graphite and clay -- and the classifier reads it as Plastic 0.53
+    // or Organic 0.90.  Neither bin is right (asked 2026-11-19).
+    const g = guideFor('pencil');
+    expect(g.destination).toBe('support');
+    expect(g.separate).toBe(true);
+    expect(g.support).toBe(true);
+    expect(g.reuse).toBe(true);
+    expect(g.item).toBe('pencil');
+    expect(g.reason).toMatch(/use it for as long as possible/i);
+    expect(g.reason).toMatch(/food, plastic or paper bins/i);
+    expect(g.reason).toMatch(/Gram Sahayak/);
+    // The headline is the role, not a bin.
+    expect(g.title).toMatch(/Ask the Gram Sahayak/);
+  });
+
+  it('reaches the same sentence from the button a reader presses', () => {
+    const g = guideFor('not in our bins');
+    expect(g.itemKey).toBe('waste.item.notInBins');
+    expect(g.reuse).toBe(true);
+    expect(g.reason).toBe(guideFor('pencil').reason);
+  });
+
+  it('speaks the reuse sentence in all three languages', () => {
+    expect(spokenFor(guideFor('pencil'))).toMatch(/not one of our three bins/i);
+    expect(spokenFor(guideFor('pencil'), 'ml')).toMatch(/മൂന്ന് ബിന്നുകളിൽ ഒന്നല്ല/);
+    expect(spokenFor(guideFor('pencil'), 'hi')).toMatch(/तीन बिन में से एक नहीं/);
+    // A language with no line yet falls back to English, never to silence.
+    expect(spokenFor(guideFor('pencil'), 'ta')).toMatch(/not one of our three bins/i);
+  });
+
+  it('does not turn every other item into a reuse answer', () => {
+    for (const label of ['plastic', 'paper', 'organic', 'metal', 'ewaste']) {
+      expect(guideFor(label).reuse).toBe(false);
+    }
+  });
+});

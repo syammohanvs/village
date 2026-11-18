@@ -2081,6 +2081,50 @@ model's strength, and the class is the part it gets wrong (43.9 % exact).
   a crop for every frame it scores.  Promoting them would train on the test set.
   A take that is only the bare red base is the other trap: the local model calls
   it `Paper 0.95` and the vision model invents `Baseball` / `Red high heel`.
+- **The seven takes were then labelled by the operator and four promoted
+  (2026-11-19).**  The answers, which are the ground truth for that session:
+  **pipe = Metal** (it looked plastic), **glue bottle = Plastic**, the **cardboard
+  piece = Paper**, the **remote = Ewaste**, **pen = Plastic**, the **pencil is in
+  none of the three bins**, and the last take was an accidental frame — nothing
+  in it.  Promoted with `promote_captures.py`: the pipe into `Metal/` (its first
+  `waste-samples` photo), the glue bottle into `Plastic/`; the cardboard and the
+  remote were already there from the earlier confirmation.  **The pen frame was
+  deliberately NOT promoted** — the pen is a sliver of a frame that is otherwise
+  the **white sheet**, and teaching Plastic on a white plate is exactly the
+  failure the plate-colour measurement below records; it needs a take where the
+  pen fills the square.  The pencil is not promoted anywhere: it would teach the
+  model that a pencil is a bin item (see the pencil entry above).
+- **A retrain was not run, and the reason is the caches, not the photos.**  The
+  feature npz and the hand-held composite trees live under `/tmp/opencode`
+  (`waste-resnet50-v13/features.npz`, `hand-train`, `hand-test`) and they are
+  gone — `/tmp` is wiped between sessions.  Rebuilding them is the hour, and four
+  photos against a 24 k-image archive and a 953-photo probe will not move the
+  measurement (V12's own history is that adding photos of one object dilutes
+  another).  **Do it once there are 15–20 confirmed venue items**: rebuild the
+  caches, `train_handheld_head.py --extra-train data/waste-samples`, score the
+  236-photo probe, and ship only if it does not regress from 78.8 % item-action.
+
+**A pencil is answered with "use it for as long as possible", not a bin
+(2026-11-19).**  The operator said it plainly: a pencil is wood, graphite and
+clay (and often paint, a metal band and an eraser), so it belongs in none of the
+three bins — and the classifier has no class for *"still useful"*, reading the
+venue's own pencil as **Organic 0.90** (Plastic 0.53 on an earlier press), either
+of which opens a bin.  Two changes, in `wasteGuide.ts`:
+- `guideFor('pencil')` routes to a **new `reuse` answer** — `separate` +
+  `support`, no bin, and the sentence the user wrote: *"Use it for as long as
+  possible. It does not belong in our food, plastic or paper bins. Please contact
+  the Gram Sahayak for disposal guidance."*
+- the same answer is a **button beside Sanitary / Sharp** (`Not one of our three
+  bins`, `data-testid="not-in-bins"`), because no camera can say it. It is the
+  first manual choice that is **spoken**: `chooseManual` says the sentence in the
+  chosen language (the other three were silent, and a visitor reading a card in a
+  voice-first exhibit was the gap).  Nothing is recorded as a bin press and no
+  bin LED lights.
+`messages.ts` carries `waste.word.reuse`, `waste.item.notInBins`,
+`waste.item.pencil` and `sort.notInBins` in all three languages; `spokenFor` has
+a `reuse` line per language.  **Do not promote the pencil frame to Paper or
+Organic** — that teaches the model the mistake the button prevents.
+
 
 **CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
 The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
