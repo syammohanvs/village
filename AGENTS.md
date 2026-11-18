@@ -1983,4 +1983,35 @@ keeping under 2% is refused, both falling back to the plain crop.
 The confidence is **action-level**: `lib/wasteActions.ts` adds the seven
 recycler probabilities, so Ewaste 45% + Metal 35% is accepted as 80% recycling
 and named by the stronger material. A bin still has to win on its own. This is
-what stops a car-key fob split between Ewaste and Metal sitting on “not sure”.
+what stops a car-key fob split between Ewaste and Metal sitting on "not sure".
+
+**A local vision model is not an option on this machine (measured 2026-11-19).**
+The user asked whether one could replace the classifier. `SmolVLM-256M-Instruct`
+(0.5 GB, native in transformers 5.22, no custom code) loaded in **73 s** and then
+took **24 s per 224-px photo** on this CPU — no GPU, 8 cores, 9 GB free — and its
+answers on the venue's own frames were `Box.` / `Cord.` / `Rock.` / `Bowl.` /
+`Bolt.` / `Snowboard.` for a remote, a water pump, cardboard, tape, a solder spool
+and the remote again. A 2B-class model (moondream2, Qwen2.5-VL-3B) would be
+minutes per item. **Do not propose a local VLM for the exhibit again.** A *hosted*
+vision model is a different trade (1–3 s, a key, internet at the venue, the photo
+leaving the laptop) and it is the user's call; it would go behind
+`VILLAGE_VISION_*`, off by default, with the local answer as the fallback.
+
+**CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
+The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
+recorded here are the `u2net` background remover above and the browser MobileNet
+that ResNet50 replaced. Either it was tried in a session that did not write it
+down, or it is being remembered as one of those two — either way it counts as
+rejected, and the local options are exhausted until new evidence exists.
+
+**The focus plate's colour is not why it reads as Paper (measured 2026-11-19).**
+The operator set the background on a **white sheet**, placed the item on it, and
+it was still called Paper. Recolouring the plate on six of those saved captures:
+white → `Paper 0.57`, grey → `Paper 0.51`, red → `Paper 0.58` (one frame did move
+to `Ewaste 0.28` with grey). So the cue is the **clean, flat, bright field
+itself**, not its colour: the same remote on the red table reads `Plastic 0.45`,
+and the model's Paper class is largely "a flat rectangular thing centred on a
+plain background". Consequence for the venue: **do not use focus on a sheet** —
+the red base, with the item filling the square, is the better condition, and the
+`objectMask` white plate (which is why `focus.ts` warns that "a plain white
+224x224 square is Paper 0.69") should be left unused in front of the bins.
