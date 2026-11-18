@@ -2270,7 +2270,7 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .bin-led-dot--organic { color: #6cc596; }
 .bin-led-dot--plastic { color: #e05b67; }
-.bin-led-dot--paper { color: #e3b04b; }
+.bin-led-dot--paper { color: #4a90d9; }
 .bin-led-dot.is-on { background: currentColor; box-shadow: 0 0 10px currentColor; }
 .bin-led:has(.is-on) .bin-led-state { color: var(--cream); }
 

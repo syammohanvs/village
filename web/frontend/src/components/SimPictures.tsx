@@ -389,7 +389,7 @@ export function WasteBins({ active, label }: { active: string | null; label: str
   const bins = [
     { id: 'organic', colour: '#6cc596', x: 54 },
     { id: 'plastic', colour: '#e05b67', x: 72 },
-    { id: 'paper', colour: '#e3b04b', x: 90 },
+    { id: 'paper', colour: '#4a90d9', x: 90 },
   ];
   return (
     <svg

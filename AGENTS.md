@@ -1060,6 +1060,13 @@ or ultrasonic rangefinder, no distance, no fill percentage, no "bin full"
 alert.  A bin is something a person can see into; three LEDs (organic D21,
 plastic D22, paper D23) say which category the camera last recognised.
 
+- **The paper LED is blue now (2026-11-18).**  It was amber (`#e3b04b`, the
+  same hex as `--warn`); the board's paper bin now uses a blue LED, so both
+  the UI dot (`.bin-led-dot--paper`) and the `WasteBins` picture use
+  `#4a90d9`.  Organic stays green `#6cc596`, plastic red `#e05b67`.  The
+  `--warn` token is unchanged — that amber still means "warning", which is
+  why the paper bin was moved off it.
+
 - **The voice command went too (2026-11-18).** `BIN_STATUS` was the last thing
   claiming a bin reading could be asked for; it is gone from
   `shared/intents.json` (intent, `device_commands` and the `bins` aliases), from
