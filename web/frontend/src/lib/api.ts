@@ -1,3 +1,4 @@
+import { localVillage } from './localVillage';
 import type {
   AppSettings,
   CommandResponse,
@@ -106,6 +107,29 @@ export function takePendingShareKey(): string | null {
 
 let activeMode: Mode = 'live';
 
+/**
+ * There is no village service: show the built-in demo instead of an error.
+ *
+ * The page is then a look at the exhibit with invented readings, which is what
+ * a student opening the hosted copy needs.  It is announced (`Demo copy`) and
+ * locked to Simulation - an invented village must never pass for the board's.
+ */
+function enterLocalDemo() {
+  localMode = true;
+  setApiMode('demo');
+  try {
+    window.localStorage.setItem('village.demoMode', 'demo');
+  } catch {
+    /* storage can be unavailable in private modes */
+  }
+  return {
+    authenticated: true,
+    username: 'demo',
+    auth_enabled: true,
+    guest: true,
+  };
+}
+
 export function getApiBase(): string {
   return API_BASE;
 }
@@ -203,15 +227,101 @@ function describeError(status: number, body: unknown, statusText: string): { mes
   return { message: statusText || `Request failed with status ${status}` };
 }
 
+/**
+ * True once the page has decided there is no village service behind it.
+ *
+ * That is the hosted copy (Cloudflare Pages): a static bundle with no backend.
+ * The visitor page then runs on `localVillage` — a small simulation — and both
+ * the page and the app say so.  It is never true on the exhibit laptop, whose
+ * backend answers `/auth/session`.
+ */
+let localMode = false;
+
+export function isLocalDemo(): boolean {
+  return localMode;
+}
+
+/** What each endpoint answers when there is no backend. */
+function localRequest<T>(path: string, options: RequestOptions): T {
+  const method = options.method ?? 'GET';
+  const body = (options.body ?? {}) as Record<string, unknown>;
+  const mode = options.mode ?? activeMode;
+
+  if (method === 'GET') {
+    switch (path) {
+      case '/state':
+        return localVillage.frame(mode) as T;
+      case '/events':
+        return localVillage.eventsResponse() as T;
+      case '/settings':
+        return {
+          language: 'en',
+          tts_enabled: false,
+          waste_model_path: '',
+          camera_device_id: null,
+          waste_confidence: 0.62,
+          waste_stability_frames: 4,
+          waste_cooldown_ms: 8000,
+          updated_at: new Date().toISOString(),
+        } as T;
+      case '/profiles':
+        return { profiles: [] } as T;
+      case '/voice/intents':
+        return { languages: [], intents: [] } as T;
+      case '/voice/readiness':
+        return {
+          ready: false,
+          server_reachable: false,
+          whisper: {
+            ready: false,
+            message: 'This demo copy has no speech service.',
+          },
+        } as T;
+      case '/waste/model-status':
+        return { installed: false } as T;
+      case '/waste/resnet-status':
+        return { installed: false, model: 'not installed', classes: [] } as T;
+      default:
+        break;
+    }
+  } else {
+    switch (path) {
+      case '/commands':
+        return localVillage.command(
+          String(body.type ?? ''),
+          (body.parameters ?? {}) as Record<string, unknown>,
+          mode,
+        ) as T;
+      case '/demo/scenario':
+      case '/simulator/scenario':
+        return localVillage.scenario(body) as T;
+      case '/demo/reset':
+        return localVillage.reset() as T;
+      default:
+        break;
+    }
+  }
+
+  throw new ApiError(404, 'This demo copy does not provide that.', { code: 'DEMO_ONLY' });
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (localMode) return localRequest<T>(path, options);
   const mode = options.mode ?? activeMode;
   const url = withMode(`${API_BASE}${PREFIX}${path}`, mode);
-  // Cookies only travel cross-origin when asked for; same-origin never needs it.
-  const credentials: RequestCredentials = API_BASE ? 'include' : 'same-origin';
   const headers: Record<string, string> = { Accept: 'application/json' };
   // A hosted copy's session is a bearer token (see `TOKEN_STORAGE_KEY`).
   const token = getSessionToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  // Same origin: the cookie is the session.  Another origin with a token: no
+  // credentials at all, so no third-party cookie is asked for and none is
+  // refused.  Another origin without a token: ask for the cookie anyway - a
+  // deployment that trusts its origin may still make that work.
+  const credentials: RequestCredentials = API_BASE
+    ? token
+      ? 'omit'
+      : 'include'
+    : 'same-origin';
   let body: BodyInit | undefined;
 
   if (options.form) {
@@ -511,13 +621,32 @@ export const api = {
   },
 
   /** Who am I, and is the gate even on? */
-  session(): Promise<{
+  async session(): Promise<{
     authenticated: boolean;
     username: string | null;
     auth_enabled: boolean;
     guest?: boolean;
   }> {
-    return request('/auth/session', { mode: undefined });
+    try {
+      const answer = await request<{
+        authenticated?: boolean;
+        username?: string | null;
+        auth_enabled?: boolean;
+        guest?: boolean;
+      }>('/auth/session', { mode: undefined });
+      // A static host answers with its own index.html (or a 404 page) rather
+      // than a session; anything that is not an answer means no backend.
+      if (!answer || typeof answer.authenticated !== 'boolean') {
+        return enterLocalDemo();
+      }
+      return answer as { authenticated: boolean; username: string | null; auth_enabled: boolean };
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : undefined;
+      if (code === 'NETWORK' || (error instanceof ApiError && error.status === 404)) {
+        return enterLocalDemo();
+      }
+      throw error;
+    }
   },
 
   /**

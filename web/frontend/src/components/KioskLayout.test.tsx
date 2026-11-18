@@ -2,13 +2,15 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { api } from '../lib/api';
+import { api, isLocalDemo } from '../lib/api';
 import { makeState } from '../test/fixtures';
 
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();
   return {
     ...actual,
+    // The hosted copy turns this on after `/auth/session` finds no backend.
+    isLocalDemo: vi.fn(() => false),
     api: {
       ...actual.api,
       state: vi.fn(),
@@ -133,6 +135,26 @@ describe('the single-page exhibit', () => {
     await user.click(live);
     expect(screen.getByTestId('connection-pill')).toHaveTextContent('Simulation');
     expect(screen.queryByTestId('test-dialog')).not.toBeInTheDocument();
+  });
+
+  it('says out loud when there is no village service, and stays in Simulation', async () => {
+    // The hosted copy: a static bundle, no backend.  The cards must still run,
+    // and the invented readings must be labelled as such.
+    vi.mocked(isLocalDemo).mockReturnValue(true);
+    vi.mocked(api.session).mockResolvedValue({
+      authenticated: true,
+      username: 'demo',
+      auth_enabled: true,
+      guest: true,
+    });
+    await renderExhibit();
+
+    expect(await screen.findByTestId('mode-note')).toHaveTextContent(/built-in demonstration/i);
+    expect(screen.getByRole('radio', { name: 'Live' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Test' })).toBeDisabled();
+    // The cards themselves are drawn from the built-in village.
+    expect(screen.getByText('Watering')).toBeInTheDocument();
+    vi.mocked(isLocalDemo).mockReturnValue(false);
   });
 
   it('a link asking for Simulation opens in it, and leaves the address clean', async () => {

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { useT } from '../lib/i18n';
+import { isLocalDemo } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useDemo } from '../lib/demo';
 import { useVillage } from '../lib/village';
@@ -103,7 +104,9 @@ export function KioskLayout() {
             value={mode}
             onChange={choose}
             testUnavailable={testUnavailable}
-            lockedReason={guest ? t('mode.guestOnly') : null}
+            lockedReason={
+              guest ? (isLocalDemo() ? t('mode.demoCopy') : t('mode.guestOnly')) : null
+            }
           />
           {/* One line under the knob, and it is always about what the current
               stop means.  Signed "Simulation" in the pill alone left a visitor
@@ -113,7 +116,7 @@ export function KioskLayout() {
               the control that chose the state. */}
           {mode === 'simulation' ? (
             <p className="kiosk-note" data-testid="mode-note">
-              {t('mode.simulationNote')}
+              {isLocalDemo() ? t('mode.demoCopy') : t('mode.simulationNote')}
             </p>
           ) : testUnavailable ? (
             <p className="kiosk-note" data-testid="mode-note">

@@ -124,8 +124,8 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **499 firmware checks**, **126 backend tests** and
-**400 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+The current tree passes **499 firmware checks**, **131 backend tests** and
+**420 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -220,6 +220,26 @@ sharing safe for the *village*, not for the account:
 - **`?mode=demo` is a once-only instruction**, not a permanent one: it is
   removed from the address by `readStoredMode`, because a URL that keeps forcing
   Simulation would make the mode knob look broken on every visit.
+- **A copy with no backend at all runs the village itself** (`2026-11-18`,
+  `lib/localVillage.ts` + `lib/demoState.ts`). Cloudflare Pages serves the SPA
+  and nothing else, so `/api/v1/auth/session` there is a 404 page — and the
+  first version of this showed "The village service did not answer", i.e. a
+  broken exhibit. `api.session()` now treats **a 404, a network failure, or an
+  answer that is not a session** as *no backend*, and switches to the built-in
+  village: a small simulation that dries the soil, runs a pulse, drains the
+  tank, follows the daylight, lights a bin and answers the commands. It is
+  **never Live** — every frame is `demo`, `physical: false`,
+  `source.kind: 'demo'`, the mode switch is locked to Simulation with the
+  reason `mode.demoCopy`, and the note under the knob says the copy has no
+  village service. The exhibit laptop always has its backend, so nothing here
+  changes what it does; a page that lands in the demo can get out of it by
+  reloading once the backend answers. Measured with `chromium --dump-dom`
+  against `python3 -m http.server` over `web/dist`: cards drawn (soil 34 %,
+  Rain Water Tank, Streetlights), note present, no sign-in form.
+  **The models are the part that is honestly missing there**: `voiceReadiness`
+  answers not-ready (the microphone stays off), `waste/model-status` says not
+  installed, and `voice/*` and `waste/classify` answer "this demo copy does not
+  provide that" — which is what the hosted copy is for.
 
 ## Voice (whisper + Sara)
 

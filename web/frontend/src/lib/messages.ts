@@ -66,6 +66,11 @@ export const MESSAGES = {
     'टेस्ट मोड के लिए कंट्रोलर जोड़ें।',
     'ടെസ്റ്റ് മോഡിനായി കൺട്രോളർ ബന്ധിപ്പിക്കുക.',
   ],
+  'mode.demoCopy': [
+    'This copy has no village service, so it runs on a built-in demonstration.',
+    'इस प्रति में गाँव की सेवा नहीं है, इसलिए यह भीतर बना प्रदर्शन चलाती है।',
+    'ഈ പകർപ്പിൽ ഗ്രാമ സേവനമില്ല, അതിനാൽ ഇത് ഉള്ളിലെ ഒരു ഡെമോ ആണ് ചലിപ്പിക്കുന്നത്.',
+  ],
   'mode.guestOnly': [
     'A shared link uses Simulation only, so nobody at the other end can move the village.',
     'साझा लिंक केवल सिमुलेशन में चलता है, ताकि दूसरी तरफ कोई गाँव को न हिला सके।',

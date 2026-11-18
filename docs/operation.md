@@ -535,8 +535,18 @@ For the exhibit itself, run locally: `./scripts/launch.sh` serves everything on
 
 ### What the hosted copy can do (and what it cannot)
 
-The Cloudflare page is the dashboard only. It talks to whichever backend it is
-told about, and it keeps its session as a **token** rather than a cookie,
+**With no backend at all, it runs a demonstration.** Cloudflare Pages serves the
+dashboard only, so there is no controller to poll — and the page says so and
+shows the village anyway: a built-in simulation (soil drying, a pulse of water,
+the tank draining, the lamps following the daylight, a bin lighting) locked to
+**Simulation**, with the note *"This copy has no village service, so it runs on
+a built-in demonstration."* Nothing it shows is a measurement and nothing it
+does touches hardware. Speech and the waste classifier are the parts that
+genuinely need the models, so there they read as not installed and the
+microphone stays off.
+
+**With a backend, it is the real app.** The page talks to whichever backend it
+is told about, and it keeps its session as a **token** rather than a cookie,
 because a browser refuses a third-party cookie:
 
 1. Open `https://<your-site>.pages.dev/?api=https://<backend>` once. The
