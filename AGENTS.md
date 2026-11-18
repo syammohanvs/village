@@ -1335,6 +1335,33 @@ plastic D22, paper D23) say which category the camera last recognised.
 - A sensor that is deliberately **not fitted** is not a fault: the light fault
   line only appears when `light.sensor_fitted` is true.
 
+## Soil calibration: the endpoints are stored INVERTED (2026-11-18)
+
+The soil probe was calibrated for the first time on this board today, and the
+first save read **0 % in wet soil** — the mapping is not what the Setup page
+says it is.
+
+- **`rises_with_moisture` is never persisted.** The flag exists in the C++
+  struct (`uc/include/village/core/config.h`) and `soilPercent` honours it, but
+  it appears **nowhere in `uc/src/config_json.cpp`** — so the NVS/API config
+  never carries it, the Setup checkbox cannot set it, and `GET /config` never
+  returns it. Every reading takes the `!rises` branch: `effective = 4095 - raw`.
+- **So the two endpoints must be entered in that inverted domain**:
+  `dry_raw = 4095 - measured_dry`, `wet_raw = 4095 - measured_wet`. Entering the
+  measured values (as the hint tells you to) makes both ends clamp to 0 %.
+  Measured today on this wiring (pull-up to 3V3, probe to GND, 10 kΩ):
+  **dry 1597 (1.29 V), wet 770 (0.62 V)** → stored **2498 / 3325**, and the
+  page then reads **83 % in wet soil**, falling as it dries. Revision 27.
+- **`POST /api/v1/calibration/soil` has the same trap** — it stores the body's
+  numbers verbatim, and it is the *page* that would have to invert.
+- **The fix, when the firmware is next built and OTA'd:** add the flag to
+  `config_json.cpp` (parse + serialise) **and** make `soilPercent` use the raw
+  reading with the sign of the pair, so the endpoints are the values the
+  controller reports and the checkbox means what it says. That change
+  invalidates today's pair (they are in the inverted domain), so it needs a
+  recalibration in the same sitting. Until then, do not "fix" the numbers in
+  Setup by hand.
+
 ## LDR calibration (this build)
 
 The LM393 module was **replaced by a bare LDR and one pull-up resistor**
