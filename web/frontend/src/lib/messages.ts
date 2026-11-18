@@ -873,9 +873,9 @@ export const MESSAGES = {
     'ഈ ബോർഡിൽ തെരുവുവിളക്കുകൾ ഘടിപ്പിച്ചിട്ടില്ല.',
   ],
   'reason.PUMP_MANUAL_ACTIVE': [
-    'The pump is on the manual switch. Set it back to Auto to water by the rules.',
-    'पंप मैनुअल स्विच पर है। नियम से सिंचाई के लिए इसे ऑटो पर लौटाएँ।',
-    'പമ്പ് മാനുവൽ സ്വിച്ചിലാണ്. നിയമപ്രകാരം നനയ്ക്കാൻ അത് ഓട്ടോയിലേക്ക് തിരികെ വയ്ക്കുക.',
+    'The pump is switched off by hand, so it will not water. Set the switch to On or Auto on the Watering card.',
+    'पंप हाथ से बंद है, इसलिए वह पानी नहीं देगा। पानी वाले कार्ड पर स्विच को चालू या ऑटो पर करें।',
+    'പമ്പ് കൈകൊണ്ട് ഓഫാണ്, അതിനാൽ നനയ്ക്കില്ല. നനയ്ക്കൽ കാർഡിൽ സ്വിച്ച് ഓൺ അല്ലെങ്കിൽ ഓട്ടോയിലേക്ക് മാറ്റുക.',
   ],
   'reason.PUMP_MANUAL_WATER_LOW': [
     'The tank is at its minimum, so the pump stays off.',
@@ -904,6 +904,14 @@ export const MESSAGES = {
     'The pump is already on by hand.',
     'पंप पहले से हाथ से चालू है।',
     'പമ്പ് ഇപ്പോൾത്തന്നെ കൈകൊണ്ട് ഓണാണ്.',
+  ],
+  // A watering request while the switch is held Off.  The controller's own
+  // sentence mentions Auto alone, which is not what a visitor who asked to
+  // turn the pump ON needs to hear (reported 2026-11-18).
+  'panel.pumpOffNoWater': [
+    'The pump is switched off by hand, so it will not water. Set the switch to On or Auto on the Watering card.',
+    'पंप हाथ से बंद है, इसलिए वह पानी नहीं देगा। पानी वाले कार्ड पर स्विच को चालू या ऑटो पर करें।',
+    'പമ്പ് കൈകൊണ്ട് ഓഫാണ്, അതിനാൽ നനയ്ക്കില്ല. നനയ്ക്കൽ കാർഡിൽ സ്വിച്ച് ഓൺ അല്ലെങ്കിൽ ഓട്ടോയിലേക്ക് മാറ്റുക.',
   ],
   'panel.alreadyPumpOff': [
     'The pump is already off.',

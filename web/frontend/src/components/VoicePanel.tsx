@@ -447,6 +447,25 @@ export function VoicePanel() {
     // "Already off" may only come from a fresh, connected frame.  A cached or
     // stale reading must never make Sara skip an action the user asked for.
     const frameFresh = connected && !stale && (ageMs == null || ageMs < 5000);
+
+    // A watering request cannot run while the pump's switch is held Off, and
+    // the controller answers it by talking about Auto — advice a visitor who
+    // asked to turn the pump ON cannot use (reported 2026-11-18).  With a fresh
+    // frame the panel knows the switch, so it says what the switch is and which
+    // two controls would change it, and sends nothing a refusal would only
+    // repeat.  Deliberately **not** sent as On: speech must not override an
+    // operator's switch on a pump whose tank reading may be unknown.
+    if (
+      command === 'IRRIGATION_REQUEST' &&
+      frameFresh &&
+      villageStatus?.actuators?.pump?.mode === 'off'
+    ) {
+      setState('rejected');
+      const reply = t('panel.pumpOffNoWater');
+      setMessage(reply);
+      void speak(reply, intent, lang);
+      return;
+    }
     // The catalogue carries the sentence for every intent it knows; the pump's
     // own switch has no intent (only the card and "pump auto" reach it), so it
     // has its words here.

@@ -125,7 +125,7 @@ cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
 The current tree passes **499 firmware checks**, **135 backend tests** and
-**422 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+**423 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -363,6 +363,23 @@ sharing safe for the *village*, not for the account:
   the cue now fills in only when the sentence names no state.  Pinned by
   `test_pump_off_is_not_swallowed_by_the_pump_cue`, including the four ways
   the model writes `off` and the cue's own start-request.
+- **"Turn the pump on" was answered with advice about Auto (2026-11-18,
+  reported).**  The sequence was *pump on* (switch On) → *stop the pump* (which
+  by rule **releases the switch to Off**) → *pump on* again, and the controller
+  refuses a watering request while the switch is not Auto, in an operator's
+  words: "Set it back to Auto to water by the rules".  Two decisions:
+  - **the refusal is correct, the sentence was not.**  A visitor who asked to
+    turn the pump *on* needs On named as well — `panel.pumpOffNoWater`
+    ("The pump is switched off by hand, so it will not water. Set the switch to
+    On or Auto on the Watering card."), used from a **fresh** frame without
+    sending a request a refusal would only repeat, and `reason.
+    PUMP_MANUAL_ACTIVE` carries the same three sentences for the stale-frame
+    path where the controller answers.
+  - **it deliberately does not send `PUMP_ON` for you.**  The switch is the
+    operator's, and this board has **no tank probe fitted**, so a manual On
+    runs the pump with the tank unknown — a voice command must not do that on
+    its own.  The card's On switch is one press away, and a manual On is still
+    stopped by a tank the controller *knows* is low.
 
 - **A transcript in a sister script is understood** (`web/backend/app/
   phonetics.py`): Tamil letters are shifted into the Malayalam block (a fixed

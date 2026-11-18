@@ -493,6 +493,35 @@ describe('typed requests use the same parser', () => {
     expect(api.sendCommand).not.toHaveBeenCalled();
   });
 
+  it('says the switch is off when "pump on" cannot water, instead of talking about Auto', async () => {
+    // The sequence that produced this: "pump on" (switch On), "stop the pump"
+    // (which releases the switch to Off), then "pump on" again.  The controller
+    // refuses a watering request while the switch is Off, and its sentence names
+    // Auto only — no use to somebody who asked to turn the pump ON.  A fresh
+    // frame means the panel can say what the switch is, in the visitor's
+    // language, and send nothing (reported 2026-11-18).
+    vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'off' }));
+    vi.mocked(api.voiceInterpret).mockResolvedValue({
+      status: 'ok',
+      kind: 'command',
+      intent: 'IRRIGATION_START',
+      command: 'IRRIGATION_REQUEST',
+      actuation: true,
+      transcript: 'പമ്പ് ഓനാക്കുക',
+      already_text: 'A watering pulse is already running.',
+    } as never);
+
+    const { user, panel } = await openPanel();
+    await user.type(within(panel).getByTestId('voice-text'), 'പമ്പ് ഓണാക്കുക');
+    await user.click(within(panel).getByTestId('voice-send'));
+
+    const reply = await within(panel).findByTestId('voice-reply-text');
+    expect(reply).toHaveTextContent(/switched off by hand/i);
+    // Both switches are named, because On is the one the visitor asked for.
+    expect(reply).toHaveTextContent(/On or Auto/);
+    expect(api.sendCommand).not.toHaveBeenCalled();
+  });
+
   it('answers "stop the pump" when it is already stopped', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ pumpMode: 'off' }));
     vi.mocked(api.voiceInterpret).mockResolvedValue({
