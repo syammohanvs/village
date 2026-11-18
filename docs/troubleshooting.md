@@ -14,8 +14,10 @@ calibration, pump gate, Whisper, waste model and optional reply audio.
 
 ## The sign-in form will not let me in
 
-- The default is `admin` / `village`. If that is refused, check `.env`:
-  `VILLAGE_ADMIN_USER`, and either `VILLAGE_ADMIN_PASSWORD` or
+- This exhibit's account is `mahi$haru` / `village` (a fresh install defaults to
+  `admin` / `village`). If it is refused, check `.env`:
+  `VILLAGE_ADMIN_USER` (single-quoted if it contains `$`), and either
+  `VILLAGE_ADMIN_PASSWORD` or
   `VILLAGE_ADMIN_PASSWORD_HASH`. The backend reads `.env` once at start, so a
   change needs a restart (`./scripts/stop.sh && ./scripts/launch.sh`).
 - Five wrong attempts from the same address pause the form for a minute

@@ -86,9 +86,8 @@ not restored. It creates them beside the checkout (`.venv`,
 download the first time). It needs `python3-venv`; the script says so if it is
 missing.
 
-That is the whole restore. Sign in with the admin account in `data/village.db`
-(the password is whatever was set in Setup — the default on a fresh database is
-`admin` / `village`).
+That is the whole restore. Sign in with the account in `.env` — `mahi$haru` /
+`village` on this exhibit, `admin` / `village` on a fresh database.
 
 Two things are machine-specific and may need a look:
 

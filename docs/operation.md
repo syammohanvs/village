@@ -37,11 +37,14 @@ The dashboard is behind one password. It is there for the case the exhibit
 actually has: a screen left open in a room of visitors, where somebody can
 otherwise press the pump's **On** switch or walk into **Setup** and change the calibration.
 
-- **Default account** — username `admin`, password `village`. Both are set in
+- **Account** — this exhibit signs in as **`mahi$haru`** with password
+  `village` (a fresh install defaults to `admin` / `village`). Both are set in
   `.env`:
 
   ```bash
-  VILLAGE_ADMIN_USER=admin
+  # Single quotes on purpose: a name with a '$' in it is otherwise read as a
+  # variable by both the shell and python-dotenv, leaving "mahi" on its own.
+  VILLAGE_ADMIN_USER='mahi$haru'
   VILLAGE_ADMIN_PASSWORD=choose-something-you-can-type-on-the-day
   VILLAGE_SESSION_HOURS=12
   ```

@@ -70,16 +70,17 @@ curl -s http://127.0.0.1:8010/api/v1/system/health | python3 -m json.tool
 
 - `status: ok` **and `voice.ready: true`**. A `false` with
   `server_reachable: true` is the whisper binary without its model — step 3.
-- Sign in at :8010 with **`admin` / `village`** (the committed database's
-  account) and open **Talk to Sara**: she should speak, and
+- Sign in at :8010 with **`mahi$haru` / `village`** (this exhibit's account,
+  set in `.env`; a fresh clone of the repository carries the name) and open
+  **Talk to Sara**: she should speak, and
   `/api/v1/voice/readiness` reports `Piper is ready for en, hi, ml` with
   `english_voices: [sara, indian]`.
 - **Sort waste** with a real item, or `POST /api/v1/waste/classify` with a photo
   from `data/waste-samples/` — a clear plastic item answers `Plastic ≈ 0.92`.
 
 Measured 2026-11-17 by cloning into a clean directory and starting it on **:8099**
-(so the original kept :8010): health ok, `admin`/`village` sign-in from the
-committed database, a 143 KB RIFF from `/voice/speak`, and the classifier
+(so the original kept :8010): health ok, sign-in from the committed database, a
+143 KB RIFF from `/voice/speak`, and the classifier
 answering `Plastic 0.924`. That is the standard this setup is held to.
 
 **6. What is per-machine, and repairs itself**
@@ -133,10 +134,17 @@ backend serves it from disk.
 One account in front of every screen, so a laptop left open in a room of
 visitors cannot be used to press **Water** or change calibration.
 
-- `admin` / `village` by default, set in `.env` as `VILLAGE_ADMIN_USER`,
-  `VILLAGE_ADMIN_PASSWORD` (or `VILLAGE_ADMIN_PASSWORD_HASH`, a `pbkdf2$…`
-  value — it is used as given, never re-hashed), and `VILLAGE_SESSION_HOURS`
-  (12).  `VILLAGE_AUTH_ENABLED=false` switches the gate off for a bench
+- **`mahi$haru` / `village`** on this exhibit (asked for 2026-11-18; a fresh
+  install defaults to `admin` / `village`). Set in `.env` as
+  `VILLAGE_ADMIN_USER`, `VILLAGE_ADMIN_PASSWORD` (or
+  `VILLAGE_ADMIN_PASSWORD_HASH`, a `pbkdf2$…` value — it is used as given,
+  never re-hashed), and `VILLAGE_SESSION_HOURS` (12).  **A name containing `$`
+  must be single-quoted in `.env`** (`VILLAGE_ADMIN_USER='mahi$haru'`): both
+  `set -a; . ./.env` and `python-dotenv` would otherwise read `$haru` as a
+  variable and the account would arrive as `mahi` — the two readers were
+  checked after the change, and the running server logs the name it uses.
+  The login form's `username` comes from that setting, so nothing else had to
+  change.  `VILLAGE_AUTH_ENABLED=false` switches the gate off for a bench
   session; the start-up log warns that every screen is open, and it also warns
   while the built-in default password is still in use.
 - Backend: `web/backend/app/auth.py` — PBKDF2-HMAC-SHA256 with a salt, and a
