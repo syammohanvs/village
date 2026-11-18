@@ -106,7 +106,7 @@ describe('Lia live narration', () => {
     );
     const text = items.map((item) => item.text).join(' ');
     expect(text).toContain('The soil is dry (28%)');
-    expect(text).toContain('There is water at the low level');
+    expect(text).toContain('There is enough water in the tank');
     expect(text).toContain('The street lights are off');
     expect(text).toContain('The pump is off');
     // Bins have indicator LEDs and no level sensing, so Sara has no fill to read.

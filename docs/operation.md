@@ -537,7 +537,7 @@ then says what the village did about it:
 | Row | Control | What it means |
 | --- | --- | --- |
 | Watering | **Soil moisture indication**, Dry → Wet | The simulated probe. It is an indication, not a measured amount of water in the soil. The chip beside the card name is the **pump**: running or off. |
-| Rain Water Tank | **Water available** / **Low water** | Two wires in the tank can say one thing: water at the low level, or not. There is no percentage and no litre count. |
+| Rain Water Tank | **Water available** / **Low water** | Two wires in the tank can say one thing: whether the water reaches the low level, or not. **Available** is answered as "there is enough water in the tank" — enough to water with, not full, and never a percentage or a litre count. |
 | Lights | **Outside light**, Dark → Bright | The room's light. **Outside: Dark** and **Streetlights: On** are shown separately, because they are different facts. |
 | Solar | **Light on solar panel**, Low → Strong | The panel's own light. Volts, the current through the 330 Ω resistor and power are one circuit: **mW = V × mA**. |
 | Wind | **Windmill speed**, Still → Fast | Voltage only. Power is not measured, and nothing claims it is. |

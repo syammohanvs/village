@@ -153,7 +153,9 @@ handle the pump, mains power or dirty waste alone.
 
 - connection: live, stale (with its age) or offline;
 - soil: the calibrated percentage and state, or "not calibrated";
-- tank: water at the low level, low, or "not calibrated";
+- tank: enough water, low water, or "not calibrated" — the sentence is the answer
+  to "is there water?", because two wires in the tank can only say whether the
+  water reaches the low level;
 - lamps: on or off, or "the light sensor is not fitted";
 - pump: running or off, and whether the manual switch is holding it;
 - the last message or two recorded by the village.

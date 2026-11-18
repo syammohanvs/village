@@ -212,9 +212,9 @@ export const MESSAGES = {
     'പരിശോധനയിൽ നിന്ന് ഉപയോഗിക്കാവുന്ന വായനയില്ല',
   ],
   'tank.hint': [
-    'Two wires in the tank: the whole choice the real detector can make is water at the low level, or not. No percentage and no litres.',
-    'टैंक में दो तारें: असली जाँच बस इतना बता सकती है कि पानी कम स्तर पर है या नहीं। कोई प्रतिशत नहीं, कोई लीटर नहीं।',
-    'ടാങ്കിൽ രണ്ട് കമ്പികൾ: യഥാർത്ഥ സെൻസറിന് പറയാനാകുന്നത് വെള്ളം താഴ്ന്ന നിലയിലാണോ ഇല്ലയോ എന്ന് മാത്രം. ശതമാനവുമില്ല, ലിറ്ററുമില്ല.',
+    'Two wires in the tank: the whole choice the real detector can make is whether the water reaches the low level, or not. No percentage and no litres.',
+    'टैंक में दो तारें: असली जाँच बस इतना बता सकती है कि पानी कम स्तर तक पहुँचता है या नहीं। कोई प्रतिशत नहीं, कोई लीटर नहीं।',
+    'ടാങ്കിൽ രണ്ട് കമ്പികൾ: യഥാർത്ഥ സെൻസറിന് പറയാനാകുന്നത് വെള്ളം താഴ്ന്ന നില വരെ എത്തുന്നുണ്ടോ എന്ന് മാത്രം. ശതമാനവുമില്ല, ലിറ്ററുമില്ല.',
   ],
   'tank.waterAvailable': ['Water available', 'पानी उपलब्ध', 'വെള്ളം ലഭ്യം'],
   'tank.waterLow': ['Low water', 'पानी कम', 'വെള്ളം കുറവ്'],

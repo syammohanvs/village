@@ -669,6 +669,17 @@ sharing safe for the *village*, not for the account:
     command") through `NON_SPEECH` in `intents.py`, instead of the catalogue
     sentence.  Only a *whole* transcript counts, so a marker inside a sentence
     leaves the words to the usual rules.
+- **The tank's answer says "enough", not "low level" (2026-11-18, reported).**
+  Asked "Is water available?" in Simulation with the tank set to available, Sara
+  answered *"There is water at the low level in the tank"* — a sentence that
+  reads as *the water is low* when it is the opposite.  `tankAvailable` is now
+  **"There is enough water in the tank"** (ml `ടാങ്കിൽ ആവശ്യത്തിന്
+  വെള്ളമുണ്ട്.`, hi `टंकी में पर्याप्त पानी है।`) in `lib/lia.ts`, which is what
+  both the voice panel and the live narration read.  Two facts keep it honest and
+  are why "full" is not claimed and no percentage is offered: the probe sits at
+  a **low level**, so "available" means *water above that level* — enough for the
+  pump to run — and the two wires cannot say anything more.  The Rain Water Tank
+  picture's hint and `docs/operation.md` say the same in their own words.
 - **The last few recordings are kept on disk, bounded twice, and a script
   replays them (2026-11-18, asked for by the user).**  The evening's analysis
   had to work from transcripts because the app kept **no audio** — so it now

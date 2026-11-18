@@ -185,7 +185,7 @@ describe('Lia guide', () => {
 
     await user.click(screen.getByTestId('lia-quick-events'));
     expect(screen.getByText(/The soil is dry \(28%\)/)).toBeInTheDocument();
-    expect(screen.getByText(/There is water at the low level/)).toBeInTheDocument();
+    expect(screen.getByText(/There is enough water in the tank/)).toBeInTheDocument();
     expect(screen.queryByText(/litre|liter/i)).not.toBeInTheDocument();
   });
 

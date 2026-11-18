@@ -1092,7 +1092,7 @@ describe('the panel in plain words', () => {
     await user.click(within(panel).getByTestId('voice-send'));
 
     expect(await within(panel).findByTestId('voice-reply-text')).toHaveTextContent(
-      'There is water at the low level in the tank.',
+      'There is enough water in the tank.',
     );
   });
 
