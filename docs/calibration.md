@@ -66,6 +66,18 @@ Thresholds chosen from those readings: **wet ≤ 2300 mV**, **dry ≥ 2800 mV**.
 The gap is a deliberate dead band; the controller reports *Unavailable* rather
 than guessing when a reading sits between them.
 
+**Re-measured on 2026-11-18 in this exhibit's own water**: in water
+**2760–2800 mV**, out of water (air) **3145 mV** — only ~370 mV apart, because
+this water conducts weakly (the probes read ~77 kΩ in it, against ~300 kΩ or
+more in air). The fitted thresholds are therefore **wet ≤ 2850 mV, dry ≥ 3000
+mV**, with 50–90 mV of margin above the wet reading and 145 mV below the air
+one.
+
+**If that margin ever proves too thin, change the series resistor, not the
+thresholds.** With the probe resistance comparable to the resistor, a *larger*
+fixed resistor widens the gap: 15 kΩ (fitted) gives ~385 mV of swing, 47 kΩ
+~800 mV, 100 kΩ ~1.0 V. A smaller one narrows it.
+
 1. With the probes **dry in air**, note the millivolt reading.
 2. With the probes **in water at the real spacing**, note the millivolt
    reading.
