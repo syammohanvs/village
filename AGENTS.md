@@ -2094,15 +2094,41 @@ model's strength, and the class is the part it gets wrong (43.9 % exact).
   failure the plate-colour measurement below records; it needs a take where the
   pen fills the square.  The pencil is not promoted anywhere: it would teach the
   model that a pencil is a bin item (see the pencil entry above).
-- **A retrain was not run, and the reason is the caches, not the photos.**  The
-  feature npz and the hand-held composite trees live under `/tmp/opencode`
-  (`waste-resnet50-v13/features.npz`, `hand-train`, `hand-test`) and they are
-  gone — `/tmp` is wiped between sessions.  Rebuilding them is the hour, and four
-  photos against a 24 k-image archive and a 953-photo probe will not move the
-  measurement (V12's own history is that adding photos of one object dilutes
-  another).  **Do it once there are 15–20 confirmed venue items**: rebuild the
-  caches, `train_handheld_head.py --extra-train data/waste-samples`, score the
-  236-photo probe, and ship only if it does not regress from 78.8 % item-action.
+- **The retrain was run, and the two new photos made it WORSE — so the shipped
+  model is unchanged (measured 2026-11-19).**  *Correction to what this entry
+  first said:* the caches are **not** in `/tmp`.  They live in
+  **`~/.cache/waste-train/`** (`v14/features.npz` — the 24 082-view archive
+  features, `hand-train/` + `hand-test/` composites, and per-run
+  `hand-features.npz` / `extra-features.npz`), so the whole retrain is about
+  **five minutes**, not an hour; the earlier note was written from a `find` that
+  only looked in `/tmp` and at shallow depth.
+  `train_handheld_head.py --extra-train data/waste-samples --epochs 20
+  --stage2-epochs 15` into `v19`, against the shipped **v18**:
+
+  | | val exact | val item | hand exact | hand item | **probe exact** | **probe item** |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | **v18 (shipped)** | 89.4 | 93.5 | **51.9** | **72.9** | **74.7** | **82.6** |
+  | v19 (+ pipe, glue) | 89.1 | 92.7 | **52.7** | 72.1 | **73.0** | **79.7** |
+
+  **v19 was rejected and nothing was exported**: the venue probe fell 1.7 points
+  exact and 2.9 points item-action, and the hand-set only gained 0.8 exact while
+  losing 0.8 item.  That is the documented behaviour (adding photos of one object
+  dilutes another) reproduced at the smallest possible scale — **two photos are
+  enough to move the real-world probe down 3 points**, which is why a handful of
+  items is not worth a release.  `models/waste-resnet50/model.pt` is still v18
+  (95 MB, 15 Nov).  Keep the promoted photos: the *dataset* is right, it is the
+  *pipeline* that is saturated.
+  **Do it again at 15–20 confirmed venue items**, and judge it by the probe line
+  above, not by the training accuracy.
+- **The probe figure to quote is v18's: 74.7 % exact / 82.6 % item-action on
+  241 photos**, val 89.4 / 93.5, hand-held 51.9 / 72.9.  (The "71.0 / 78.8 on
+  236 photos" quoted elsewhere in this file is the v13-era model and is old.)
+  **Metal is the weak class**: on a 6-photo sample of the probe it answered
+  **0/6**, and on the hand-held test it is the model's most frequent *wrong*
+  guess (26 times).  Until today `data/waste-samples/Metal/` held no photos at
+  all, so a dozen metal items at the bins (pipes, spoons, tins, keys, pins) are
+  the highest-value photos the exhibit could add.
+
 
 **A pencil is answered with "use it for as long as possible", not a bin
 (2026-11-19).**  The operator said it plainly: a pencil is wood, graphite and

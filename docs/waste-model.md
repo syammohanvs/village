@@ -253,6 +253,15 @@ The backend reads the model folder per request, so a new model is picked up on
 the next camera start; no restart is needed. Reload the page if it was already
 open.
 
+**A handful of photos can make it worse — measured 2026-11-19.** Two confirmed
+venue photos (a metal pipe and a glue bottle) were added to `waste-samples` and
+the head retrained in five minutes. The venue probe went **74.7 % → 73.0 %
+exact** and **82.6 % → 79.7 % item-action**, so that build was rejected and the
+previous model stayed. Twenty photos of one object and two are the same problem
+in different sizes: the pipeline is saturated, and the probe — not the training
+accuracy — is the judge. Add items in a batch, and keep the build only if the
+probe line does not fall.
+
 ### When one category is confused with another
 
 A wrong answer is a **data gap**, not a threshold to lower. The pipeline has
