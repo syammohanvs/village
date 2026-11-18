@@ -533,6 +533,34 @@ browser; the login screen also has a "Connect to a backend" box for it.
 For the exhibit itself, run locally: `./scripts/launch.sh` serves everything on
 `:8010`.
 
+### What the hosted copy can do (and what it cannot)
+
+The Cloudflare page is the dashboard only. It talks to whichever backend it is
+told about, and it keeps its session as a **token** rather than a cookie,
+because a browser refuses a third-party cookie:
+
+1. Open `https://<your-site>.pages.dev/?api=https://<backend>` once. The
+   address is remembered (`localStorage.village.apiBase`) and taken out of the
+   URL; after that the site opens straight onto the backend.
+2. Sign in with the account as usual. The backend answers with a signed token
+   as well as the cookie, and the hosted page keeps the token.
+3. Setup → **A link for students** now offers the hosted link
+   `https://<your-site>.pages.dev/?api=https://<backend>&share=<key>`; that is
+   the one to hand out. It exchanges the key for a guest token in one request,
+   so no cookie (and no redirect off the page) is involved. The guest is still
+   Simulation-only, and the backend still refuses a live command from it.
+
+CORS: `https://*.pages.dev` is allowed by default; a custom domain goes in
+`VILLAGE_CORS_ORIGINS`. The backend must be reachable **from the visitor's
+browser**: an https page will not call `http://` on anything but the same
+machine (loopback), so share an https address for anyone else.
+
+Speech recognition, the spoken replies and the waste classifier all run on the
+backend, not in the page, so the hosted copy gets them whenever the backend is
+the laptop that has the models. A backend without them is not broken: the
+readiness line says what is missing, the microphone stays off and the waste
+page says the model is not installed — the rest of the app keeps working.
+
 ### The share link (students, no password)
 
 Setup shows **A link for students** — one URL. Opening it signs the visitor in

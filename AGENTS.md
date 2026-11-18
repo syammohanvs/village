@@ -170,11 +170,22 @@ sharing safe for the *village*, not for the account:
   aimed elsewhere by `VITE_API_BASE_URL` (baked in at build time, set in the
   Pages environment) or once at runtime with `?api=https://…`, which is
   remembered in `localStorage.village.apiBase` and taken out of the address.
-  Cross-origin requests send `credentials: 'include'`, the backend's CORS
-  origins come from **`VILLAGE_CORS_ORIGINS`** (comma-separated, default
-  localhost dev), and when one of them is `https://…` the session cookie is
-  `SameSite=None; Secure` — a cookie, so credentials are on and `*` is refused.
-  The CSP's `connect-src` carries the same origins.
+  **A hosted page is a different origin, and there the session is a bearer
+  token, not a cookie**: browsers refuse a third-party cookie, so `/auth/login`
+  and `POST /auth/magic` return the same signed token the cookie carries, the
+  page keeps it in `localStorage.village.sessionToken`, and `request()` sends
+  `Authorization: Bearer`. `session_token(request)` in `main.py` reads either.
+  **`?share=<key>`** is the hosted copy's visit link: `takePendingShareKey()` in
+  `lib/session.tsx` exchanges it in one request (before asking who it is, so the
+  page never flashes the sign-in form) and puts the page in Simulation.
+  CORS: `connect` goes from `https://*.pages.dev` by default (a `*` entry is an
+  origin *pattern* via `allow_origin_regex`), exact origins from
+  **`VILLAGE_CORS_ORIGINS`**. The CORS middleware is registered **last** so it
+  is outermost — a preflight must be answered before the session check, and a
+  401 must carry the CORS headers or the browser says "failed to fetch" instead
+  of "sign in". The cookie's `SameSite`/`Secure` is decided from the **request's
+  own scheme**, not from the CORS list: an https origin in that list must not
+  turn the local http cookie into a `Secure` one the browser drops.
 - **The link itself** (`GET /api/v1/auth/magic?key=…`, public because it is the
   thing that issues the cookie). It sets a **guest** session and 303s to
   `/?mode=demo`, which `lib/demo.tsx` reads once and strips, so the first
@@ -190,6 +201,10 @@ sharing safe for the *village*, not for the account:
   call), with Copy and **New link** — the latter is `POST` on the same route,
   asks first, and really retires the old key (tested by opening both).
   `VILLAGE_SHARE_LINK=0` removes the route (404) and the card says so.
+  **Served from the hosted copy, the card offers a different link**:
+  `shareLinkFor()` (`lib/shareLink.ts`) composes
+  `https://<site>/?api=<backend>&share=<key>`, because the direct link would
+  leave the hosted site and its cookie would be refused. Same key, same guest.
 - **A guest is not the account, in three layers, and each was tested:**
   1. `KioskLayout` draws **Live and Test disabled** with the reason
      (`mode.guestOnly`) and `choose()` ignores them; `GuestUsesSimulation` in

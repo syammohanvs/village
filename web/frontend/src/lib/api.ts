@@ -53,6 +53,57 @@ function readApiBase(): string {
 const API_BASE = readApiBase();
 const PREFIX = '/api/v1';
 
+// The signed session, for a page that is not on the backend's origin.
+//
+// Same origin, the cookie is the session and this is never written.  On the
+// hosted copy (Cloudflare Pages) the browser refuses a third-party cookie, so
+// the sign-in and the share link hand back the same signed token and it lives
+// here instead.  It is not a password: changing the password re-signs every
+// session, which retires it.
+const TOKEN_STORAGE_KEY = 'village.sessionToken';
+
+export function setSessionToken(token: string | null): void {
+  try {
+    if (token) window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    else window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {
+    /* storage can be unavailable in private modes */
+  }
+}
+
+export function getSessionToken(): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `?share=<key>` is how a hosted copy opens a visit link.
+ *
+ * It is read (and taken out of the address) at sign-in time rather than at
+ * import time, because the exchange is one request and the page needs to be
+ * mounted to show the result.  `?api=` is handled with the base URL above.
+ */
+export function takePendingShareKey(): string | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get('share');
+    if (!key) return null;
+    params.delete('share');
+    const query = params.toString();
+    window.history.replaceState(
+      {},
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+    );
+    return key;
+  } catch {
+    return null;
+  }
+}
+
 let activeMode: Mode = 'live';
 
 export function getApiBase(): string {
@@ -65,6 +116,17 @@ export function setApiMode(mode: Mode): void {
 
 export function getApiMode(): Mode {
   return activeMode;
+}
+
+/**
+ * The share link, as the backend describes it: the direct one (its own origin)
+ * and the key, which a hosted page composes its own link from.
+ */
+export interface ShareLink {
+  enabled: boolean;
+  guest: string;
+  key?: string;
+  url: string;
 }
 
 export class ApiError extends Error {
@@ -147,6 +209,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // Cookies only travel cross-origin when asked for; same-origin never needs it.
   const credentials: RequestCredentials = API_BASE ? 'include' : 'same-origin';
   const headers: Record<string, string> = { Accept: 'application/json' };
+  // A hosted copy's session is a bearer token (see `TOKEN_STORAGE_KEY`).
+  const token = getSessionToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   let body: BodyInit | undefined;
 
   if (options.form) {
@@ -459,25 +524,54 @@ export const api = {
    * The link an operator hands to a student: opening it signs in as a
    * Simulation-only visitor, with no password.  Reading it needs the account.
    */
-  shareLink(): Promise<{ enabled: boolean; guest: string; url: string }> {
+  shareLink(): Promise<ShareLink> {
     return request('/auth/share-link', { mode: undefined });
   },
 
   /** A new link; every copy handed out before this stops opening the app. */
-  newShareLink(): Promise<{ enabled: boolean; guest: string; url: string }> {
+  newShareLink(): Promise<ShareLink> {
     return request('/auth/share-link', { method: 'POST', body: {}, mode: undefined });
   },
 
-  login(username: string, password: string): Promise<{ authenticated: boolean; username: string }> {
-    return request('/auth/login', {
+  async login(
+    username: string,
+    password: string,
+  ): Promise<{ authenticated: boolean; username: string; token?: string }> {
+    const answer = await request<{
+      authenticated: boolean;
+      username: string;
+      token?: string;
+    }>('/auth/login', {
       method: 'POST',
       body: { username, password },
       mode: undefined,
     });
+    // Kept for a page on another origin, where the cookie will be refused.
+    if (answer.token) setSessionToken(answer.token);
+    return answer;
   },
 
-  logout(): Promise<unknown> {
-    return request('/auth/logout', { method: 'POST', body: {}, mode: undefined });
+  /**
+   * Exchange a share key for a guest session.  This is the hosted copy's half
+   * of `/auth/magic`: the redirect form would navigate off the hosted page.
+   */
+  async shareLogin(key: string): Promise<{ authenticated: boolean; guest?: boolean; token?: string }> {
+    const answer = await request<{
+      authenticated: boolean;
+      username: string;
+      guest?: boolean;
+      token?: string;
+    }>('/auth/magic', { method: 'POST', body: { key }, mode: undefined });
+    if (answer.token) setSessionToken(answer.token);
+    return answer;
+  },
+
+  async logout(): Promise<unknown> {
+    try {
+      return await request('/auth/logout', { method: 'POST', body: {}, mode: undefined });
+    } finally {
+      setSessionToken(null);
+    }
   },
 };
 

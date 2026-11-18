@@ -6,6 +6,7 @@ import time
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -249,25 +250,46 @@ def create_app(
     # VILLAGE_CORS_ORIGINS (comma-separated); localhost is always allowed so
     # the normal dev case needs no configuration.  Credentials are on, because
     # the session is a cookie.
-    cors_origins = [
+    # A frontend served from another origin (Cloudflare Pages, a public host)
+    # talks to this backend cross-origin.  `https://*.pages.dev` is in the
+    # default list because that is the hosted copy this repository builds to:
+    # without it the deployed page cannot read a single card.  Anything with a
+    # `*` becomes an origin *pattern*; exact origins stay exact.
+    raw_origins = [
         origin.strip()
         for origin in os.getenv(
             "VILLAGE_CORS_ORIGINS",
-            "http://localhost:5173,http://127.0.0.1:5173",
+            "http://localhost:5173,http://127.0.0.1:5173,https://*.pages.dev",
         ).split(",")
         if origin.strip()
     ]
-    # A bare "*" is not allowed with credentials (the spec forbids it and the
-    # browser refuses).  Treat it as "any origin, no cookies" — which is useless
-    # for the session cookie, so a cross-origin deployment should list its origin.
-    allow_credentials = "*" not in cors_origins
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=allow_credentials,
-        allow_methods=["*"],
-        allow_headers=["*"],
+    cors_origins = [origin for origin in raw_origins if "*" not in origin]
+    patterns = [origin for origin in raw_origins if "*" in origin]
+    allow_origin_regex = (
+        "^(" + "|".join(re.escape(p).replace(r"\*", ".*") for p in patterns) + ")$"
+        if patterns
+        else None
     )
+    # A bare "*" is not allowed with credentials (the spec forbids it and the
+    # browser refuses), so it means "any origin, no cookies".  The session is a
+    # cookie *or* a bearer token; the token is what a cross-origin page uses.
+    allow_credentials = "*" not in raw_origins
+
+    def session_token(request: Request) -> str | None:
+        """The session, from `Authorization: Bearer` or from the cookie.
+
+        The cookie is the normal case (the exhibit and the backend's own copy of
+        the page are one origin).  A page served from Cloudflare Pages is a
+        *different* origin, where a third-party cookie is refused by the browser
+        - so there the sign-in and the share link both hand back the same signed
+        token in the body, and the page sends it as a bearer.
+        """
+        header = request.headers.get("authorization") or ""
+        if header[:7].lower() == "bearer ":
+            token = header[7:].strip()
+            if token:
+                return token
+        return request.cookies.get(COOKIE_NAME)
 
     # A handful of failures per address, then a minute's pause.  Not an
     # authentication system's lockout -- just enough that guessing by hand is
@@ -314,10 +336,14 @@ def create_app(
         """
         if not settings.auth_enabled:
             return await call_next(request)
+        if request.method == "OPTIONS":
+            # A preflight carries no credentials by definition; the request it
+            # asks about is checked when it is actually made.
+            return await call_next(request)
         path = request.url.path
         if not path.startswith("/api/") or path in PUBLIC_PATHS:
             return await call_next(request)
-        user = sessions.read(request.cookies.get(COOKIE_NAME))
+        user = sessions.read(session_token(request))
         if user is None:
             return JSONResponse({"detail": "sign in to continue"}, status_code=401)
         if user == GUEST_USERNAME:
@@ -329,6 +355,19 @@ def create_app(
                     status_code=403,
                 )
         return await call_next(request)
+
+    # Registered after the two middlewares above on purpose: Starlette applies
+    # them inside-out, so this one is outermost.  A preflight is then answered
+    # before the session check, and a 401 still carries the CORS headers -
+    # without which the browser reports "failed to fetch" instead of "sign in".
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_origin_regex=allow_origin_regex,
+        allow_credentials=allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -378,21 +417,17 @@ def create_app(
 
         login_failures.pop(address, None)
         token = sessions.issue()
-        response = JSONResponse({"authenticated": True, "username": settings.admin_user})
-        # SameSite=Lax is right for the normal same-origin case.  A page served
-        # from Cloudflare Pages talks to this backend cross-origin, and the
-        # cookie then needs SameSite=None; Secure — which means the backend must
-        # be reached over HTTPS (a Cloudflare Tunnel gives exactly that).
-        cross_site = any(origin.startswith("https://") for origin in cors_origins)
-        response.set_cookie(
-            COOKIE_NAME,
-            token,
-            max_age=sessions.ttl,
-            httponly=True,
-            samesite="none" if cross_site else "lax",
-            secure=cross_site,
-            path="/",
+        response = JSONResponse(
+            {
+                "authenticated": True,
+                "username": settings.admin_user,
+                # The same signed token the cookie carries.  A page on another
+                # origin cannot rely on the cookie, so it keeps this and sends
+                # `Authorization: Bearer`.  Same secret, same expiry.
+                "token": token,
+            }
         )
+        set_session_cookie(request, response, token)
         return response
 
     @app.post("/api/v1/auth/logout")
@@ -403,7 +438,7 @@ def create_app(
 
     @app.get("/api/v1/auth/session")
     async def auth_session(request: Request) -> dict[str, Any]:
-        user = sessions.read(request.cookies.get(COOKIE_NAME))
+        user = sessions.read(session_token(request))
         return {
             "authenticated": user is not None,
             "username": user,
@@ -414,19 +449,21 @@ def create_app(
         }
 
     # ------------------------------------------------------------------
-    def set_session_cookie(response: Response, token: str) -> None:
-        # SameSite=Lax is right for the normal same-origin case.  A page served
-        # from Cloudflare Pages talks to this backend cross-origin, and the
-        # cookie then needs SameSite=None; Secure - which means the backend
-        # must be reached over HTTPS (a Cloudflare Tunnel gives exactly that).
-        cross_site = any(origin.startswith("https://") for origin in cors_origins)
+    def set_session_cookie(request: Request, response: Response, token: str) -> None:
+        """The cookie, for a page this backend serves itself.
+
+        Decided from the request rather than from the CORS list: an https origin
+        in that list (the hosted copy) must not turn the *local* http cookie
+        into a `Secure` one, which the browser would simply drop.
+        """
+        secure = request.url.scheme == "https"
         response.set_cookie(
             COOKIE_NAME,
             token,
             max_age=sessions.ttl,
             httponly=True,
-            samesite="none" if cross_site else "lax",
-            secure=cross_site,
+            samesite="none" if secure else "lax",
+            secure=secure,
             path="/",
         )
 
@@ -445,7 +482,34 @@ def create_app(
         if not key or not hmac.compare_digest(key, expected):
             raise HTTPException(status_code=403, detail="that share link is not valid")
         response = RedirectResponse(url="/?mode=demo", status_code=303)
-        set_session_cookie(response, sessions.issue(as_guest=True))
+        set_session_cookie(request, response, sessions.issue(as_guest=True))
+        return response
+
+    @app.post("/api/v1/auth/magic")
+    async def auth_magic_token(request: Request, body: dict[str, Any] | None = None):
+        """The same exchange for a page on another origin.
+
+        A share link handed to someone using the Cloudflare-hosted copy cannot
+        use the redirect: that would navigate them off the hosted page.  This
+        answers with the signed token instead, which the page sends as a
+        bearer - no third-party cookie involved.
+        """
+        key = str((body or {}).get("key") or "").strip()
+        expected = request.app.state.share_key if settings.share_link_enabled else None
+        if expected is None:
+            raise HTTPException(status_code=404, detail="the share link is switched off")
+        if not key or not hmac.compare_digest(key, expected):
+            raise HTTPException(status_code=403, detail="that share link is not valid")
+        token = sessions.issue(as_guest=True)
+        response = JSONResponse(
+            {
+                "authenticated": True,
+                "username": GUEST_USERNAME,
+                "guest": True,
+                "token": token,
+            }
+        )
+        set_session_cookie(request, response, token)
         return response
 
     def share_link_body(request: Request) -> dict[str, Any]:
@@ -454,6 +518,10 @@ def create_app(
         return {
             "enabled": settings.share_link_enabled,
             "guest": GUEST_USERNAME,
+            # `key` as well as `url`: a page served from another origin builds
+            # its own link (`?api=…&share=…`) from it and cannot use the direct
+            # one, which belongs to this origin.
+            "key": key,
             "url": f"{base}/api/v1/auth/magic?key={key}" if key else "",
         }
 
@@ -525,10 +593,7 @@ def create_app(
     ):
         if body.type not in ALLOWED_COMMANDS:
             raise HTTPException(status_code=422, detail=f"unsupported command type: {body.type}")
-        if (
-            sessions.read(request.cookies.get(COOKIE_NAME)) == GUEST_USERNAME
-            and body.mode != "demo"
-        ):
+        if sessions.read(session_token(request)) == GUEST_USERNAME and body.mode != "demo":
             # The share link is Simulation-only.  The page already locks Live
             # and Test, but a page is not the place to enforce this.
             raise HTTPException(status_code=403, detail="a shared link can only use Simulation")

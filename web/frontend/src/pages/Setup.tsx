@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { api, ApiError, errorMessage } from '../lib/api';
+import { api, ApiError, errorMessage, getApiBase } from '../lib/api';
+import { shareLinkFor } from '../lib/shareLink';
+import type { ShareLink } from '../lib/api';
 import { useCommands } from '../lib/commands';
 import { useDemo } from '../lib/demo';
 import { cx, formatDateTime, formatUptime, titleCase } from '../lib/format';
@@ -49,20 +51,27 @@ function clone<T>(value: T): T {
  * a hand on it.
  */
 function ShareLinkCard() {
-  const link = useApi<{ enabled: boolean; guest: string; url: string }>(
-    ['share-link'],
-    () => api.shareLink(),
-  );
+  const link = useApi<ShareLink>(['share-link'], () => api.shareLink());
   const [copied, setCopied] = useState(false);
-  const [url, setUrl] = useState('');
+  const [answer, setAnswer] = useState<{ url: string; key: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const field = useRef<HTMLInputElement | null>(null);
 
-  // The card keeps its own copy of the URL so a rotated key shows immediately;
+  // The card keeps its own copy of the answer so a rotated key shows immediately;
   // the server's answer on load is what it starts with.
   useEffect(() => {
-    if (link.data?.url) setUrl(link.data.url);
-  }, [link.data?.url]);
+    if (link.data?.url) setAnswer({ url: link.data.url, key: link.data.key ?? '' });
+  }, [link.data?.url, link.data?.key]);
+
+  // Served from the backend, the direct link is the one to hand out.  Served
+  // from the hosted copy (Cloudflare Pages), that link would leave this site and
+  // the browser would refuse the backend's cookie, so the link has to carry the
+  // backend's address and the visit key instead.
+  const hosted =
+    typeof window === 'undefined'
+      ? null
+      : shareLinkFor(window.location.origin, getApiBase(), answer?.key ?? '');
+  const url = hosted ?? answer?.url ?? '';
 
   const makeNew = async () => {
     if (
@@ -75,7 +84,7 @@ function ShareLinkCard() {
     setBusy(true);
     try {
       const next = await api.newShareLink();
-      setUrl(next.url);
+      setAnswer({ url: next.url, key: next.key ?? '' });
       setCopied(false);
     } finally {
       setBusy(false);
@@ -112,6 +121,13 @@ function ShareLinkCard() {
           Set <code>VILLAGE_SHARE_LINK=1</code> in <code>.env</code> and restart to offer it again.
         </Notice>
       )}
+      {hosted ? (
+        <p className="hint">
+          This link opens the copy hosted here and points it at this backend{' '}
+          <code>{getApiBase()}</code>. The page exchanges the key for a guest session, so it does
+          not need the backend's cookie.
+        </p>
+      ) : null}
       {url && (
         <div className="share-link-row">
           <input

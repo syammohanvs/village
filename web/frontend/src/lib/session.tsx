@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api } from './api';
+import { api, takePendingShareKey } from './api';
 import type { ReactNode } from 'react';
 
 /**
@@ -40,6 +40,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState('checking');
     setError('');
     try {
+      // A hosted copy opens a visit link as `?share=<key>`: exchange it for a
+      // guest token before asking who we are, so the answer is "in" and the
+      // page never flashes the sign-in form at somebody who arrived with a link.
+      const share = takePendingShareKey();
+      if (share) {
+        try {
+          const granted = await api.shareLogin(share);
+          if (granted.guest) {
+            // A visit is Simulation only, exactly like the redirect form.
+            window.localStorage.setItem('village.demoMode', 'demo');
+          }
+        } catch {
+          // A key that no longer works leaves the visitor at the sign-in form,
+          // which is the honest result: no session was created.
+        }
+      }
       const answer = await api.session();
       if (answer && answer.auth_enabled === false) {
         setState('in');

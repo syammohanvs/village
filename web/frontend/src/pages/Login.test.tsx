@@ -21,6 +21,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       session: vi.fn(),
       login: vi.fn(),
       logout: vi.fn(),
+      shareLogin: vi.fn(),
     },
   };
 });
@@ -161,6 +162,49 @@ describe('the sign-in gate', () => {
 
     // The cookie expired while the page was open: any 401 raises this event.
     window.dispatchEvent(new Event('village:unauthorised'));
+
+    expect(await screen.findByTestId('login-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('connection-pill')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The hosted copy's half of the share link.
+ *
+ * A page on Cloudflare Pages cannot use the redirect form (`/auth/magic?key=`)
+ * - that would navigate off the hosted page - so it opens `?share=<key>` and
+ * exchanges it for a guest token before asking who it is.
+ */
+describe('a visit link on a hosted copy', () => {
+  it('exchanges the key and lands in the village, in Simulation', async () => {
+    window.history.pushState({}, '', '/?share=abc123');
+    vi.mocked(api.shareLogin).mockResolvedValue({ authenticated: true, guest: true });
+    vi.mocked(api.session).mockResolvedValue({
+      authenticated: true,
+      username: 'guest',
+      auth_enabled: true,
+      guest: true,
+    });
+    render(<App />);
+
+    expect(await screen.findByTestId('connection-pill')).toBeInTheDocument();
+    expect(api.shareLogin).toHaveBeenCalledWith('abc123');
+    // The key is taken out of the address, exactly like `?mode=demo`.
+    expect(window.location.search).toBe('');
+    await waitFor(() =>
+      expect(window.localStorage.getItem('village.demoMode')).toBe('demo'),
+    );
+  });
+
+  it('leaves a stale key at the sign-in form rather than opening anything', async () => {
+    window.history.pushState({}, '', '/?share=expired');
+    vi.mocked(api.shareLogin).mockRejectedValue(new ApiError(403, 'that share link is not valid'));
+    vi.mocked(api.session).mockResolvedValue({
+      authenticated: false,
+      username: null,
+      auth_enabled: true,
+    });
+    render(<App />);
 
     expect(await screen.findByTestId('login-form')).toBeInTheDocument();
     expect(screen.queryByTestId('connection-pill')).not.toBeInTheDocument();

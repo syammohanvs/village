@@ -48,7 +48,12 @@ async def test_the_api_needs_a_session_and_the_login_form_is_open(tmp_path: Path
             "/api/v1/auth/login", json={"username": "examiner", "password": PASSWORD}
         )
         assert ok.status_code == 200
-        assert ok.json() == {"authenticated": True, "username": "examiner"}
+        body = ok.json()
+        assert body["authenticated"] is True
+        assert body["username"] == "examiner"
+        # The same signed token the cookie carries, so a page on another origin
+        # can keep it and send a bearer instead of relying on a cookie.
+        assert len(body["token"]) > 20
 
         # The cookie the login set is enough from here on.
         assert (await client.get("/api/v1/state?mode=live")).status_code == 200
@@ -269,3 +274,118 @@ async def test_the_share_key_is_not_a_setting_a_client_can_read(
         body = (await client.get("/api/v1/settings")).json()
         assert "share_key" not in body
         assert app.state.share_key not in json.dumps(body)
+
+
+@pytest.mark.asyncio
+async def test_a_cross_origin_page_signs_in_with_the_token_not_the_cookie(
+    tmp_path: Path,
+) -> None:
+    """What the Cloudflare-hosted copy of the page must be able to do.
+
+    There the browser will not keep this backend's cookie (a third-party one),
+    so the token in the body is the session.  Both halves are measured: the
+    bearer alone works without a cookie, and a guest bearer is still confined to
+    Simulation.
+    """
+    async with client_for(secured(tmp_path)) as (client, _gateway, app):
+        # No cookie jar at all from here on: this is what a browser on another
+        # origin is effectively doing.
+        token = (
+            await client.post(
+                "/api/v1/auth/login", json={"username": "examiner", "password": PASSWORD}
+            )
+        ).json()["token"]
+        bearer = {"Authorization": f"Bearer {token}"}
+        client.cookies.clear()
+
+        assert (await client.get("/api/v1/state?mode=live")).status_code == 401
+        assert (
+            await client.get("/api/v1/state?mode=live", headers=bearer)
+        ).status_code == 200
+        assert (await client.get("/api/v1/auth/session", headers=bearer)).json()[
+            "authenticated"
+        ] is True
+
+        # The share exchange as JSON, which is how the hosted page opens a link.
+        guest = await client.post(
+            "/api/v1/auth/magic", json={"key": app.state.share_key}
+        )
+        assert guest.status_code == 200
+        guest_body = guest.json()
+        assert guest_body["guest"] is True
+        assert guest_body["username"] == "guest"
+        guest_bearer = {"Authorization": f"Bearer {guest_body['token']}"}
+        client.cookies.clear()
+
+        assert (
+            await client.get("/api/v1/state?mode=demo", headers=guest_bearer)
+        ).status_code == 200
+        assert (
+            await client.post(
+                "/api/v1/commands",
+                headers=guest_bearer,
+                json={
+                    "mode": "demo",
+                    "type": "LIGHTS_ON",
+                    "parameters": {},
+                    "request_id": "bearer-guest-demo-1",
+                    "source": "browser",
+                },
+            )
+        ).status_code == 200
+        assert (
+            await client.post(
+                "/api/v1/commands",
+                headers=guest_bearer,
+                json={
+                    "mode": "live",
+                    "type": "LIGHTS_ON",
+                    "parameters": {},
+                    "request_id": "bearer-guest-live-1",
+                    "source": "browser",
+                },
+            )
+        ).status_code == 403
+        assert (
+            await client.request(
+                "PUT", "/api/v1/settings", headers=guest_bearer, json={"language": "ml"}
+            )
+        ).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_a_pages_dev_origin_is_allowed_to_read_the_api(tmp_path: Path) -> None:
+    """The hosted copy is served from `*.pages.dev`, and a CORS refusal there is
+    a page of empty cards with no explanation.  The preflight is answered, and
+    an ordinary origin is still refused."""
+    async with client_for(make_settings(tmp_path)) as (client, _gateway, _app):
+        hosted = await client.options(
+            "/api/v1/state",
+            headers={
+                "Origin": "https://village-demo.pages.dev",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+        assert hosted.status_code == 200
+        assert hosted.headers["access-control-allow-origin"] == "https://village-demo.pages.dev"
+
+        elsewhere = await client.options(
+            "/api/v1/state",
+            headers={
+                "Origin": "https://not-ours.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        assert "access-control-allow-origin" not in elsewhere.headers
+
+
+@pytest.mark.asyncio
+async def test_the_share_link_body_names_its_key_for_a_hosted_page(tmp_path: Path) -> None:
+    async with client_for(secured(tmp_path)) as (client, _gateway, app):
+        await client.post(
+            "/api/v1/auth/login", json={"username": "examiner", "password": PASSWORD}
+        )
+        body = (await client.get("/api/v1/auth/share-link")).json()
+        assert body["key"] == app.state.share_key
+        assert body["key"] in body["url"]
