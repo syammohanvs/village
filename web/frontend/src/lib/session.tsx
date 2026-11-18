@@ -19,6 +19,8 @@ export type SessionState = 'checking' | 'in' | 'out' | 'error';
 export interface SessionValue {
   state: SessionState;
   username: string | null;
+  /** Signed in through the share link: a visit, limited to Simulation. */
+  guest: boolean;
   error: string;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -30,6 +32,7 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SessionState>('checking');
   const [username, setUsername] = useState<string | null>(null);
+  const [guest, setGuest] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
 
@@ -41,11 +44,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (answer && answer.auth_enabled === false) {
         setState('in');
         setUsername(null);
+        setGuest(false);
         return;
       }
       if (answer && answer.authenticated) {
         setState('in');
         setUsername(answer.username ?? null);
+        setGuest(answer.guest === true);
         return;
       }
       setState('out');
@@ -65,6 +70,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const onUnauthorised = () => {
       setState('out');
       setUsername(null);
+      setGuest(false);
     };
     window.addEventListener('village:unauthorised', onUnauthorised);
     return () => window.removeEventListener('village:unauthorised', onUnauthorised);
@@ -73,6 +79,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (user: string, password: string) => {
     const answer = await api.login(user, password);
     setUsername(answer.username ?? user);
+    setGuest(false);
     setState('in');
   }, []);
 
@@ -81,13 +88,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await api.logout();
     } finally {
       setUsername(null);
+      setGuest(false);
       setState('out');
     }
   }, []);
 
   const value = useMemo<SessionValue>(
-    () => ({ state, username, error, signIn, signOut, retry: () => setAttempt((n) => n + 1) }),
-    [state, username, error, signIn, signOut],
+    () => ({
+      state,
+      username,
+      guest,
+      error,
+      signIn,
+      signOut,
+      retry: () => setAttempt((n) => n + 1),
+    }),
+    [state, username, guest, error, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

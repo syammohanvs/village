@@ -24,11 +24,18 @@ export function ModeSwitch({
   value,
   onChange,
   testUnavailable,
+  lockedReason = null,
 }: {
   value: VillageMode;
   onChange: (next: VillageMode) => void;
   /** Why Test cannot be chosen right now, or null when it can. */
   testUnavailable: string | null;
+  /**
+   * Set when this visit may only use Simulation — a share link.  Live and Test
+   * are then drawn disabled with the reason, because a visit that could reach
+   * these would be a hand on the village rather than a look at it.
+   */
+  lockedReason?: string | null;
 }) {
   const group = useId();
   const t = useT();
@@ -44,7 +51,10 @@ export function ModeSwitch({
     >
       <span className="mode-thumb" aria-hidden="true" />
       {STOPS.map((stop) => {
-        const disabled = stop.id === 'test' && testUnavailable !== null;
+        const locked = lockedReason !== null && stop.id !== 'simulation';
+        const disabled =
+          locked || (stop.id === 'test' && testUnavailable !== null);
+        const reason = locked ? lockedReason : stop.id === 'test' ? testUnavailable : null;
         return (
           <button
             key={stop.id}
@@ -54,7 +64,7 @@ export function ModeSwitch({
             aria-checked={value === stop.id}
             aria-label={t(stop.label)}
             disabled={disabled}
-            title={disabled ? testUnavailable : t(stop.title)}
+            title={disabled ? (reason ?? t(stop.title)) : t(stop.title)}
             className={cx('mode-stop', value === stop.id && 'is-on')}
             data-testid={`mode-${stop.id}`}
             onClick={() => onChange(stop.id)}

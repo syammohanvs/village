@@ -585,6 +585,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 }
 .setting-row:last-child { border-bottom: 0; }
 .setting-row--compact { padding: 6px 0; }
+/* The share link: a long URL and its one button, so the URL gets the room. */
+.share-link-row { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+.share-link-row .input { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; }
+.share-link-row .btn { flex: 0 0 auto; white-space: nowrap; }
 .setting-name { color: var(--cream); font-weight: 500; }
 
 /* ------------------------------------------------------------------ explainer */

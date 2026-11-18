@@ -13,6 +13,26 @@ import { setApiMode } from './api';
 export const DEMO_STORAGE_KEY = 'village.demoMode';
 
 function readStoredMode(): Mode {
+  // `?mode=demo` is how the share link lands a visitor: the server redirects
+  // there after signing them in, so the first screen is Simulation even on a
+  // browser that has never been here.  It is read once and then taken out of
+  // the address, exactly like the language and camera choices.
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const asked = params.get('mode');
+    if (asked === 'demo' || asked === 'live') {
+      params.delete('mode');
+      const query = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`,
+      );
+      return asked;
+    }
+  } catch {
+    /* no URL, no localStorage: live is the honest default */
+  }
   try {
     const stored = window.localStorage.getItem(DEMO_STORAGE_KEY);
     if (stored === 'demo' || stored === 'live') return stored;

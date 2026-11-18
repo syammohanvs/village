@@ -102,6 +102,57 @@ describe('the single-page exhibit', () => {
     expect(screen.getByTestId('connection-pill')).toHaveTextContent('Live');
   });
 
+  it('a shared link opens in Simulation with Live and Test locked', async () => {
+    // The link signs in as the guest, and the guest is a look at the village:
+    // whatever this browser remembered, it may not open in Live.
+    window.localStorage.setItem('village.demoMode', 'live');
+    vi.mocked(api.session).mockResolvedValue({
+      authenticated: true,
+      username: 'guest',
+      auth_enabled: true,
+      guest: true,
+    });
+    const user = userEvent.setup();
+    await renderExhibit();
+
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Simulation' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
+    );
+    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Simulation');
+
+    const live = screen.getByRole('radio', { name: 'Live' });
+    const test = screen.getByRole('radio', { name: 'Test' });
+    expect(live).toBeDisabled();
+    expect(test).toBeDisabled();
+    expect(live).toHaveAttribute('title', expect.stringMatching(/shared link/i));
+
+    // Pressing one does nothing at all — the page is not merely painted over.
+    await user.click(live);
+    expect(screen.getByTestId('connection-pill')).toHaveTextContent('Simulation');
+    expect(screen.queryByTestId('test-dialog')).not.toBeInTheDocument();
+  });
+
+  it('a link asking for Simulation opens in it, and leaves the address clean', async () => {
+    // This is what `/api/v1/auth/magic` redirects to.  The mode is read once
+    // and taken out of the URL so a refresh does not re-apply it.
+    window.history.pushState({}, '', '/?mode=demo');
+    await renderExhibit();
+
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Simulation' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
+    );
+    expect(window.localStorage.getItem('village.demoMode')).toBe('demo');
+    expect(window.location.search).toBe('');
+    // An ordinary visit still has every stop.
+    expect(screen.getByRole('radio', { name: 'Live' })).toBeEnabled();
+  });
+
   it('refuses Test while the controller is away, and says why', async () => {
     const user = userEvent.setup();
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));

@@ -27,6 +27,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       events: vi.fn(),
       voiceIntents: vi.fn(),
       sendCommand: vi.fn(),
+      shareLink: vi.fn(),
     },
   };
 });
@@ -58,6 +59,11 @@ beforeEach(() => {
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.wasteModelStatus).mockResolvedValue({ installed: true });
   vi.mocked(api.deviceConfig).mockResolvedValue(makeConfigDocument());
+  vi.mocked(api.shareLink).mockResolvedValue({
+    enabled: true,
+    guest: 'guest',
+    url: 'http://127.0.0.1:8010/api/v1/auth/magic?key=0123456789abcdef0123456789abcdef',
+  });
   vi.mocked(api.sendCommand).mockResolvedValue({
     confirmed: true,
     physical: true,
@@ -81,6 +87,38 @@ describe('Setup', () => {
     expect(screen.getByRole('heading', { name: 'Voice & Camera' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Advanced' })).toBeInTheDocument();
     expect(await screen.findByText(/Where the village controller lives/i)).toBeInTheDocument();
+  });
+
+  it('offers the share link an operator hands to a student', async () => {
+    // The link is the one thing on this page that leaves the laptop: opening it
+    // signs a visitor in as the guest, whose page is Simulation-only.  So the
+    // card has to show the real URL and make copying it one press.
+    // `userEvent.setup()` installs its own clipboard stub, so the spy has to
+    // be placed after it or the press is recorded against the wrong object.
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<App />);
+
+    const field = await screen.findByTestId('share-link-url');
+    const url = 'http://127.0.0.1:8010/api/v1/auth/magic?key=0123456789abcdef0123456789abcdef';
+    expect(field).toHaveValue(url);
+    expect(screen.getByText(/Live and Test stay locked/i)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('share-link-copy'));
+    expect(writeText).toHaveBeenCalledWith(url);
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('says so in words when the link is switched off', async () => {
+    vi.mocked(api.shareLink).mockResolvedValue({ enabled: false, guest: 'guest', url: '' });
+    render(<App />);
+
+    expect(await screen.findByText(/The share link is switched off/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('share-link-url')).not.toBeInTheDocument();
   });
 
   it('keeps a local draft, validates it, and only saves a valid revision', async () => {

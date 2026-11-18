@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { KioskLayout } from './components/KioskLayout';
 import { Layout } from './components/Layout';
@@ -5,8 +6,8 @@ import { WasteDialog } from './components/WasteDialog';
 import { Gate } from './components/Gate';
 import { VoicePanel } from './components/VoicePanel';
 import { CommandsProvider } from './lib/commands';
-import { DemoProvider } from './lib/demo';
-import { SessionProvider } from './lib/session';
+import { DemoProvider, useDemo } from './lib/demo';
+import { SessionProvider, useSession } from './lib/session';
 import { VillageProvider } from './lib/village';
 import { VoiceUiProvider } from './lib/voiceUi';
 import { AboutHelp } from './pages/AboutHelp';
@@ -45,11 +46,30 @@ function WasteScreen() {
   );
 }
 
+/**
+ * A visit through the share link is Simulation-only.
+ *
+ * The mode switch already disables Live and Test, and the backend refuses a
+ * live command from that cookie; this closes the last door - a guest whose
+ * browser had `live` remembered would otherwise *open* in Live.  It is a
+ * component rather than a line in `DemoProvider` so that provider stays usable
+ * without a session (the console shell's own tests do exactly that).
+ */
+function GuestUsesSimulation() {
+  const { guest } = useSession();
+  const { mode, setMode } = useDemo();
+  useEffect(() => {
+    if (guest && mode !== 'demo') setMode('demo');
+  }, [guest, mode, setMode]);
+  return null;
+}
+
 export default function App() {
   return (
     <SessionProvider>
       <Gate>
     <DemoProvider>
+      <GuestUsesSimulation />
       <VillageProvider>
         <CommandsProvider>
           <VoiceUiProvider>

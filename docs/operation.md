@@ -516,3 +516,38 @@ analogue input cannot measure both.
 
 The model **buildings** are static display models. The bins have indicator LEDs
 only: nothing measures how full a bin is.
+
+## Sharing the app (Cloudflare Pages)
+
+Pushing to GitHub builds the dashboard on Cloudflare Pages — that build is the
+**SPA only** (`web/dist`).  It has no backend, no whisper, no Piper, no camera
+and no waste classifier, so on its own it cannot listen or control anything.
+
+To share it with another student, point the shared build at a running backend:
+set **`VITE_API_BASE_URL`** in the Cloudflare Pages environment variables to
+the backend's public URL (a Cloudflare Tunnel over `http://127.0.0.1:8010` is
+the least invasive way to get one) and redeploy.  On the first visit the student
+opens the link once with `?api=https://…` and the choice is remembered in the
+browser; the login screen also has a "Connect to a backend" box for it.
+
+For the exhibit itself, run locally: `./scripts/launch.sh` serves everything on
+`:8010`.
+
+### The share link (students, no password)
+
+Setup shows **A link for students** — one URL. Opening it signs the visitor in
+as `guest` and lands them in **Simulation**, so nothing they press moves the
+pump, the lights or the calibration:
+
+- **Live and Test are locked** for that visit. The server enforces it too: the
+  guest cookie is refused any live command, and any write other than the
+  visitor page (commands in Simulation, the simulation knobs, Sara, the waste
+  classifier) is a `403`. Setup, calibration and the bench panel are readable
+  but never writable.
+- **The link is derived from the password**, so changing
+  `VILLAGE_ADMIN_PASSWORD` (or the hash) retires every copy that was handed
+  out, and there is no second secret to keep.
+- **`VILLAGE_SHARE_LINK=0`** switches the route off entirely; the Setup card
+  then says so instead of offering a link.
+- The guest session lasts `VILLAGE_SESSION_HOURS` like any other, and
+  **Sign out** in the header ends it.

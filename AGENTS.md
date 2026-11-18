@@ -124,8 +124,8 @@ cd web/backend && /home/ubuntu/.venvs/aivillage/bin/python -m pytest -q tests
 cd web/frontend && npm run typecheck && npx vitest run && npm run build
 ```
 
-The current tree passes **499 firmware checks**, **106 backend tests** and
-**366 frontend tests**. Always rebuild `web/dist` after frontend edits; the
+The current tree passes **499 firmware checks**, **126 backend tests** and
+**400 frontend tests**. Always rebuild `web/dist` after frontend edits; the
 backend serves it from disk.
 
 ## Signing in (the dashboard gate, 2026-11-17)
@@ -157,6 +157,50 @@ visitors cannot be used to press **Water** or change calibration.
   "Waiting for the first frame" is on screen).  An assertion made before that
   passes or fails by timing — which is exactly how the first version of this
   work went red.
+
+## The share link — a visitor without a password (2026-11-18)
+
+Students were to be shown the exhibit from their own machines, and the Cloudflare
+Pages build has no backend (it serves `web/dist` only), so a shared build talks to
+a backend that is not on its own origin. Two halves, and the second is what makes
+sharing safe for the *village*, not for the account:
+
+- **Where the API lives** (`web/frontend/src/lib/api.ts`). `API_BASE` is `''` by
+  default — the exhibit's normal case, one laptop one port. A shared build is
+  aimed elsewhere by `VITE_API_BASE_URL` (baked in at build time, set in the
+  Pages environment) or once at runtime with `?api=https://…`, which is
+  remembered in `localStorage.village.apiBase` and taken out of the address.
+  Cross-origin requests send `credentials: 'include'`, the backend's CORS
+  origins come from **`VILLAGE_CORS_ORIGINS`** (comma-separated, default
+  localhost dev), and when one of them is `https://…` the session cookie is
+  `SameSite=None; Secure` — a cookie, so credentials are on and `*` is refused.
+  The CSP's `connect-src` carries the same origins.
+- **The link itself** (`GET /api/v1/auth/magic?key=…`, public because it is the
+  thing that issues the cookie). It sets a **guest** session and 303s to
+  `/?mode=demo`, which `lib/demo.tsx` reads once and strips, so the first
+  screen is Simulation even on a fresh browser. The key is
+  `Sessions.magic_key()` — HMAC of the session secret, 32 hex chars — so it is
+  **derived rather than stored**: there is no second secret to leak, and
+  changing the password retires every copy that was handed out.
+  `GET /api/v1/auth/share-link` returns it for **Setup → A link for students**
+  (behind the account: handing out a session is the operator's call), with a
+  Copy button. `VILLAGE_SHARE_LINK=0` removes the route (404) and the card says
+  so.
+- **A guest is not the account, in three layers, and each was tested:**
+  1. `KioskLayout` draws **Live and Test disabled** with the reason
+     (`mode.guestOnly`) and `choose()` ignores them; `GuestUsesSimulation` in
+     `App.tsx` forces `demo` even when the browser remembered `live`.
+  2. `POST /commands` refuses `mode: "live"` from the guest cookie with a 403
+     naming Simulation. A page is not the place to enforce this.
+  3. The middleware's `GUEST_POST_PATHS` allowlist: reads are fine, writes only
+     for the visitor page (commands, `/demo/*`, `/simulator/scenario`, the waste
+     classifier, Sara, sign-out). Calibration, settings, device config,
+     profiles, waste corrections and the bench panel are readable but never
+     writable. `tests/test_auth.py` drives all three: a demo command 200, a live
+     command 403, and five operator writes 403.
+- **`?mode=demo` is a once-only instruction**, not a permanent one: it is
+  removed from the address by `readStoredMode`, because a URL that keeps forcing
+  Simulation would make the mode knob look broken on every visit.
 
 ## Voice (whisper + Sara)
 

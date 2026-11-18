@@ -115,6 +115,10 @@ class Settings:
     # so out loud instead of leaving a default to be discovered.
     admin_password_default: bool
     session_hours: int
+    # The share link: a visit link that signs in as "guest" and can only use
+    # Simulation.  On by default because the exhibit is shared with students;
+    # `VILLAGE_SHARE_LINK=0` takes it away.
+    share_link_enabled: bool
     db_path: Path
     dist_dir: Path
     frontend_dir: Path
@@ -189,6 +193,7 @@ class Settings:
                 os.getenv("VILLAGE_ADMIN_PASSWORD") or os.getenv("VILLAGE_ADMIN_PASSWORD_HASH")
             ),
             session_hours=_int("VILLAGE_SESSION_HOURS", 12),
+            share_link_enabled=_bool("VILLAGE_SHARE_LINK", True),
             db_path=Path(os.getenv("VILLAGE_DB_PATH", root / "data" / "village.db")),
             dist_dir=dist,
             frontend_dir=frontend,

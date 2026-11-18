@@ -17,9 +17,47 @@ import type {
   WasteRecognitionResult,
 } from '../types';
 
+// Where the backend lives.  By default the page talks to the same origin that
+// served it (the exhibit's normal case: one laptop, one port).  A deployment
+// that only serves the built SPA (Cloudflare Pages) can be aimed at a backend
+// by setting VITE_API_BASE_URL at build time, or at runtime with `?api=https://…`
+// once — the choice is remembered in localStorage (`village.apiBase`).  That is
+// what lets a shared build point at a tunneled village without a rebuild.
+const API_BASE_STORAGE_KEY = 'village.apiBase';
+
+function readApiBase(): string {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('api');
+    if (fromQuery) {
+      const cleaned = fromQuery.replace(/\/$/, '');
+      window.localStorage.setItem(API_BASE_STORAGE_KEY, cleaned);
+      // Keep the URL clean so a refresh does not re-apply it.
+      params.delete('api');
+      const next = `${window.location.pathname}${
+        params.toString() ? '?' + params.toString() : ''
+      }${window.location.hash}`;
+      window.history.replaceState({}, '', next);
+      return cleaned;
+    }
+  } catch {
+    /* ignore — the page may be rendered in an environment without a URL */
+  }
+  const fromEnv = (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL;
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const fromStorage = window.localStorage.getItem(API_BASE_STORAGE_KEY);
+  if (fromStorage) return fromStorage.replace(/\/$/, '');
+  return '';
+}
+
+const API_BASE = readApiBase();
 const PREFIX = '/api/v1';
 
 let activeMode: Mode = 'live';
+
+export function getApiBase(): string {
+  return API_BASE;
+}
 
 export function setApiMode(mode: Mode): void {
   activeMode = mode;
@@ -105,7 +143,9 @@ function describeError(status: number, body: unknown, statusText: string): { mes
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const mode = options.mode ?? activeMode;
-  const url = withMode(`${PREFIX}${path}`, mode);
+  const url = withMode(`${API_BASE}${PREFIX}${path}`, mode);
+  // Cookies only travel cross-origin when asked for; same-origin never needs it.
+  const credentials: RequestCredentials = API_BASE ? 'include' : 'same-origin';
   const headers: Record<string, string> = { Accept: 'application/json' };
   let body: BodyInit | undefined;
 
@@ -123,6 +163,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers,
       body,
       signal: options.signal,
+      credentials,
     });
   } catch (cause) {
     if (cause instanceof DOMException && cause.name === 'AbortError') throw cause;
@@ -405,8 +446,21 @@ export const api = {
   },
 
   /** Who am I, and is the gate even on? */
-  session(): Promise<{ authenticated: boolean; username: string | null; auth_enabled: boolean }> {
+  session(): Promise<{
+    authenticated: boolean;
+    username: string | null;
+    auth_enabled: boolean;
+    guest?: boolean;
+  }> {
     return request('/auth/session', { mode: undefined });
+  },
+
+  /**
+   * The link an operator hands to a student: opening it signs in as a
+   * Simulation-only visitor, with no password.  Reading it needs the account.
+   */
+  shareLink(): Promise<{ enabled: boolean; guest: string; url: string }> {
+    return request('/auth/share-link', { mode: undefined });
   },
 
   login(username: string, password: string): Promise<{ authenticated: boolean; username: string }> {

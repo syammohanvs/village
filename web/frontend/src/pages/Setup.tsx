@@ -39,6 +39,82 @@ function clone<T>(value: T): T {
 }
 
 
+/**
+ * The link an operator hands to a student.
+ *
+ * It is behind the account (`/auth/share-link` needs the cookie), because
+ * handing out a session is the operator's call.  The link itself signs in as
+ * the *guest*, whose page is locked to Simulation and whose cookie the backend
+ * refuses for anything else - so what is shared is a look at the village, not
+ * a hand on it.
+ */
+function ShareLinkCard() {
+  const link = useApi<{ enabled: boolean; guest: string; url: string }>(
+    ['share-link'],
+    () => api.shareLink(),
+  );
+  const [copied, setCopied] = useState(false);
+  const field = useRef<HTMLInputElement | null>(null);
+  const url = link.data?.url ?? '';
+
+  const copy = async () => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // A browser without the clipboard API (or without permission): select
+      // the text so the operator can copy it with the keyboard.
+      field.current?.select();
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <Card kicker="Share" title="A link for students">
+      <p className="hint">
+        Opening this link signs a visitor in without a password and lands them in Simulation. Live
+        and Test stay locked for them, so nobody at the other end can move the pump, the lights or
+        the calibration.
+      </p>
+      {link.error ? (
+        <Notice tone="warn" title="The link could not be built">
+          Sign in with the account and reload this page.
+        </Notice>
+      ) : null}
+      {link.data && !link.data.enabled && (
+        <Notice tone="warn" title="The share link is switched off">
+          Set <code>VILLAGE_SHARE_LINK=1</code> in <code>.env</code> and restart to offer it again.
+        </Notice>
+      )}
+      {url && (
+        <div className="share-link-row">
+          <input
+            ref={field}
+            className="input"
+            readOnly
+            value={url}
+            onFocus={(event) => event.currentTarget.select()}
+            data-testid="share-link-url"
+            aria-label="Share link"
+          />
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void copy()}
+            data-testid="share-link-copy"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      )}
+      <p className="hint">
+        Changing the password retires every link already handed out; this one is derived from it.
+      </p>
+    </Card>
+  );
+}
+
 function checklistItems(document: SetupChecklist | null) {
   return document?.items ?? document?.checks ?? [];
 }
@@ -598,6 +674,8 @@ function Preferences() {
           a cloud service.
         </p>
       </Card>
+
+      <ShareLinkCard />
     </div>
   );
 }

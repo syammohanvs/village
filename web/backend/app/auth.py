@@ -27,6 +27,11 @@ import time
 PBKDF2_ROUNDS = 120_000
 COOKIE_NAME = "village_session"
 
+# The name a share-link session is signed as.  It is not an account: it is the
+# one session that exists so a student can look at the village in Simulation
+# without a password, and it is refused anywhere that touches the controller.
+GUEST_USERNAME = "guest"
+
 
 def hash_password(password: str, *, salt: bytes | None = None) -> str:
     """`pbkdf2$rounds$salt$digest` — self-describing, so the rounds can change."""
@@ -53,17 +58,27 @@ def verify_password(password: str, stored: str) -> bool:
 class Sessions:
     """Issue and read the session cookie for one account."""
 
-    def __init__(self, username: str, password_hash: str, *, hours: int = 12) -> None:
+    def __init__(
+        self,
+        username: str,
+        password_hash: str,
+        *,
+        hours: int = 12,
+        guest: str = GUEST_USERNAME,
+    ) -> None:
         self.username = username
+        self.guest = guest
         self._secret = hashlib.sha256(f"village-session:{password_hash}".encode("utf-8")).digest()
         self.ttl = max(1, hours) * 3600
 
     def _sign(self, payload: str) -> str:
         return hmac.new(self._secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
 
-    def issue(self, *, now: float | None = None) -> str:
+    def issue(self, *, now: float | None = None, as_guest: bool = False) -> str:
+        """A signed cookie.  `as_guest` signs it for the share link instead."""
+        name = self.guest if as_guest else self.username
         expires = int((now if now is not None else time.time()) + self.ttl)
-        payload = f"{self.username}|{expires}"
+        payload = f"{name}|{expires}"
         token = f"{payload}|{self._sign(payload)}"
         return base64.urlsafe_b64encode(token.encode("utf-8")).decode("ascii")
 
@@ -80,4 +95,17 @@ class Sessions:
             return None
         if int(expires) <= int(now if now is not None else time.time()):
             return None
-        return username if username == self.username else None
+        return username if username in {self.username, self.guest} else None
+
+    # ------------------------------------------------------------------
+    def magic_key(self) -> str:
+        """The share link's key, derived from the same secret as the cookie.
+
+        Deliberately derived rather than stored: changing the password changes
+        the link, so an old link pasted into a chat cannot outlive the account
+        it was made for, and nothing new has to be kept on disk.
+        """
+        return hmac.new(self._secret, b"village-share-link", hashlib.sha256).hexdigest()[:32]
+
+    def check_magic(self, key: str | None) -> bool:
+        return bool(key) and hmac.compare_digest(key, self.magic_key())

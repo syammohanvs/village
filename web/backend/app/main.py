@@ -4,6 +4,7 @@ import asyncio
 import time
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,10 +12,10 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .auth import COOKIE_NAME, Sessions, verify_password
+from .auth import COOKIE_NAME, GUEST_USERNAME, Sessions, verify_password
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
 from . import ml_asr, waste_resnet
@@ -235,10 +236,27 @@ def create_app(
     )
     app.state.sessions = sessions
 
+    # A frontend served from another origin (Cloudflare Pages, a tunnel) talks
+    # to this backend cross-origin.  The allowed origins are listed in
+    # VILLAGE_CORS_ORIGINS (comma-separated); localhost is always allowed so
+    # the normal dev case needs no configuration.  Credentials are on, because
+    # the session is a cookie.
+    cors_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "VILLAGE_CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173",
+        ).split(",")
+        if origin.strip()
+    ]
+    # A bare "*" is not allowed with credentials (the spec forbids it and the
+    # browser refuses).  Treat it as "any origin, no cookies" — which is useless
+    # for the session cookie, so a cross-origin deployment should list its origin.
+    allow_credentials = "*" not in cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_credentials=False,
+        allow_origins=cors_origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -254,6 +272,27 @@ def create_app(
         "/api/v1/auth/login",
         "/api/v1/auth/session",
         "/api/v1/system/health",
+        # The share link.  Opening it is the whole point, so it cannot sit
+        # behind the cookie it is about to issue.
+        "/api/v1/auth/magic",
+    }
+
+    # What a share-link visitor may do besides read.  Everything here is the
+    # visitor page: a command (Simulation only - checked in the route), the two
+    # simulation knobs, the waste classifier and Sara.  Anything else is an
+    # operator action and is refused, so a student holding the link cannot
+    # calibrate a probe, save settings or run the bench panel.
+    GUEST_POST_PATHS = {
+        "/api/v1/commands",
+        "/api/v1/demo/scenario",
+        "/api/v1/demo/reset",
+        "/api/v1/simulator/scenario",
+        "/api/v1/waste/classify",
+        "/api/v1/waste/recognition",
+        "/api/v1/voice/speak",
+        "/api/v1/voice/interpret",
+        "/api/v1/voice/transcribe",
+        "/api/v1/auth/logout",
     }
 
     @app.middleware("http")
@@ -270,8 +309,17 @@ def create_app(
         path = request.url.path
         if not path.startswith("/api/") or path in PUBLIC_PATHS:
             return await call_next(request)
-        if sessions.read(request.cookies.get(COOKIE_NAME)) is None:
+        user = sessions.read(request.cookies.get(COOKIE_NAME))
+        if user is None:
             return JSONResponse({"detail": "sign in to continue"}, status_code=401)
+        if user == GUEST_USERNAME:
+            # The share link is a look, not a hand.  Reads are fine; writes are
+            # limited to the visitor page and to Simulation.
+            if request.method not in {"GET", "HEAD", "OPTIONS"} and path not in GUEST_POST_PATHS:
+                return JSONResponse(
+                    {"detail": "a shared link can only use the visitor page in Simulation"},
+                    status_code=403,
+                )
         return await call_next(request)
 
     @app.middleware("http")
@@ -281,11 +329,12 @@ def create_app(
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(self), microphone=(self)"
+        connect_sources = " ".join(["'self'"] + cors_origins)
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
             "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; "
-            "frame-ancestors 'none'"
+            "style-src 'self' 'unsafe-inline'; connect-src " + connect_sources + "; "
+            "font-src 'self' data:; frame-ancestors 'none'"
         )
         # The SPA shell must never be cached: it names the hashed bundle, so a
         # cached copy keeps serving the previous build after a rebuild.  The
@@ -322,12 +371,18 @@ def create_app(
         login_failures.pop(address, None)
         token = sessions.issue()
         response = JSONResponse({"authenticated": True, "username": settings.admin_user})
+        # SameSite=Lax is right for the normal same-origin case.  A page served
+        # from Cloudflare Pages talks to this backend cross-origin, and the
+        # cookie then needs SameSite=None; Secure — which means the backend must
+        # be reached over HTTPS (a Cloudflare Tunnel gives exactly that).
+        cross_site = any(origin.startswith("https://") for origin in cors_origins)
         response.set_cookie(
             COOKIE_NAME,
             token,
             max_age=sessions.ttl,
             httponly=True,
-            samesite="lax",
+            samesite="none" if cross_site else "lax",
+            secure=cross_site,
             path="/",
         )
         return response
@@ -345,6 +400,57 @@ def create_app(
             "authenticated": user is not None,
             "username": user,
             "auth_enabled": settings.auth_enabled,
+            # A share-link visit.  The page locks Live and Test for it, and the
+            # server refuses a live command from the same cookie.
+            "guest": user == GUEST_USERNAME,
+        }
+
+    # ------------------------------------------------------------------
+    def set_session_cookie(response: Response, token: str) -> None:
+        # SameSite=Lax is right for the normal same-origin case.  A page served
+        # from Cloudflare Pages talks to this backend cross-origin, and the
+        # cookie then needs SameSite=None; Secure - which means the backend
+        # must be reached over HTTPS (a Cloudflare Tunnel gives exactly that).
+        cross_site = any(origin.startswith("https://") for origin in cors_origins)
+        response.set_cookie(
+            COOKIE_NAME,
+            token,
+            max_age=sessions.ttl,
+            httponly=True,
+            samesite="none" if cross_site else "lax",
+            secure=cross_site,
+            path="/",
+        )
+
+    @app.get("/api/v1/auth/magic")
+    async def auth_magic(key: str = Query("", max_length=128)):
+        """The share link: a cookie for a Simulation-only visit, then the app.
+
+        The key is derived from the account's own secret (`Sessions.magic_key`),
+        so there is nothing extra to store and changing the password retires
+        every link that was handed out.  This is a convenience gate for a demo,
+        not the account: see `GUEST_USERNAME` and the middleware above.
+        """
+        if not settings.share_link_enabled:
+            raise HTTPException(status_code=404, detail="the share link is switched off")
+        if not sessions.check_magic(key):
+            raise HTTPException(status_code=403, detail="that share link is not valid")
+        response = RedirectResponse(url="/?mode=demo", status_code=303)
+        set_session_cookie(response, sessions.issue(as_guest=True))
+        return response
+
+    @app.get("/api/v1/auth/share-link")
+    async def auth_share_link(request: Request) -> dict[str, Any]:
+        """The link itself, for the operator to copy out of Setup.
+
+        It lives behind the account on purpose: anybody who can read this can
+        hand out a Simulation session, and that is the operator's call.
+        """
+        base = str(request.base_url).rstrip("/")
+        return {
+            "enabled": settings.share_link_enabled,
+            "guest": GUEST_USERNAME,
+            "url": f"{base}/api/v1/auth/magic?key={sessions.magic_key()}",
         }
 
     # ------------------------------------------------------------------
@@ -390,11 +496,19 @@ def create_app(
     @app.post("/api/v1/commands")
     async def command(
         body: CommandRequest,
+        request: Request,
         gateway: DeviceGateway = Depends(get_gateway),
         db: Database = Depends(get_db),
     ):
         if body.type not in ALLOWED_COMMANDS:
             raise HTTPException(status_code=422, detail=f"unsupported command type: {body.type}")
+        if (
+            sessions.read(request.cookies.get(COOKIE_NAME)) == GUEST_USERNAME
+            and body.mode != "demo"
+        ):
+            # The share link is Simulation-only.  The page already locks Live
+            # and Test, but a page is not the place to enforce this.
+            raise HTTPException(status_code=403, detail="a shared link can only use Simulation")
         if body.type == "TEST_MODE":
             body.parameters["on"] = bool(body.parameters.get("on"))
         if body.type == "TEST_OUTPUT":

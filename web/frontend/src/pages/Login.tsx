@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Emblem } from '../components/Emblem';
 import { errorMessage } from '../lib/api';
+import { getApiBase } from '../lib/api';
 import { useSession } from '../lib/session';
 
 /**
@@ -19,6 +20,8 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [show, setShow] = useState(false);
+  const [showBackend, setShowBackend] = useState(false);
+  const [backendUrl, setBackendUrl] = useState(getApiBase());
   const userField = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -99,6 +102,50 @@ export default function Login() {
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+        <div className="login-backend">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => setShowBackend((value) => !value)}
+            data-testid="login-backend-toggle"
+          >
+            Connect to a backend
+          </button>
+          {showBackend && (
+            <div className="login-backend-form">
+              <label className="field">
+                <span>Backend URL</span>
+                <input
+                  className="input"
+                  value={backendUrl}
+                  onChange={(event) => setBackendUrl(event.target.value)}
+                  placeholder="https://your-village.example.com"
+                  autoComplete="off"
+                  data-testid="login-backend-url"
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn--primary"
+                data-testid="login-backend-save"
+                onClick={() => {
+                  const cleaned = backendUrl.trim().replace(/\/$/, '');
+                  if (cleaned) window.localStorage.setItem('village.apiBase', cleaned);
+                  else window.localStorage.removeItem('village.apiBase');
+                  window.location.reload();
+                }}
+              >
+                Save and reload
+              </button>
+              <p className="hint">
+                The built app talks to the same address that served it.  If the
+                village backend lives elsewhere (a Cloudflare Tunnel, another
+                laptop), paste its URL here once and it is remembered.  Build-time
+                deployments can set <code>VITE_API_BASE_URL</code> instead.
+              </p>
+            </div>
+          )}
+        </div>
       </form>
     </div>
   );

@@ -32,7 +32,7 @@ export function KioskLayout() {
   const { demo, setMode: setDemoMode } = useDemo();
   const { connected } = useVillage();
   const t = useT();
-  const { username, signOut } = useSession();
+  const { username, guest, signOut } = useSession();
   const [testOpen, setTestOpen] = useState(false);
   const [warning, setWarning] = useState('');
 
@@ -47,6 +47,9 @@ export function KioskLayout() {
   const mode: VillageMode = testOpen ? 'test' : demo ? 'simulation' : 'live';
 
   const choose = (next: VillageMode) => {
+    // A share link is a look, not a hand: the stops are drawn disabled, and
+    // this keeps a stray programmatic call from doing what the control will not.
+    if (guest && next !== 'simulation') return;
     if (next === 'test') {
       if (testUnavailable !== null) return;
       setWarning('');
@@ -96,7 +99,12 @@ export function KioskLayout() {
         </div>
 
         <div className="kiosk-modes">
-          <ModeSwitch value={mode} onChange={choose} testUnavailable={testUnavailable} />
+          <ModeSwitch
+            value={mode}
+            onChange={choose}
+            testUnavailable={testUnavailable}
+            lockedReason={guest ? t('mode.guestOnly') : null}
+          />
           {/* One line under the knob, and it is always about what the current
               stop means.  Signed "Simulation" in the pill alone left a visitor
               to work out that the model does not respond; a judge reading
