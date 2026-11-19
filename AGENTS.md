@@ -1718,6 +1718,15 @@ idempotent commands, demo vs live), and the Windows-hotspot + relay path that
 makes it reachable from WSL. Also the OTA procedure, failure modes and what is
 verified vs pending.
 
+**`docs/web-app.md` is the web-stack brief (2026-11-20)** — the process map
+(one FastAPI process serving API + SPA + models, SQLite, the local whisper/Piper
+servers), the pinned backend and frontend dependencies, settings and `.env`
+loading, the lifecycle and the 10 s sampler, the route map and the guest
+allowlist, the command/ack contract and idempotency, the live/demo split, the
+database tables and caps, auth and the share link, the frontend providers and
+the `api.ts` boundary, i18n, the two shells, build/run commands, the Cloudflare
+Worker deployment, the gates and the invariants.
+
 **`docs/voice-languages.md` is the language brief (2026-11-20)** — speech in
 (which model hears which language, prompts, fallbacks, the measurements), the
 grammar that understands it, speech out (Piper voices, the English
