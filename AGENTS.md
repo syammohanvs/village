@@ -2183,6 +2183,38 @@ of which opens a bin.  Two changes, in `wasteGuide.ts`:
 a `reuse` line per language.  **Do not promote the pencil frame to Paper or
 Organic** — that teaches the model the mistake the button prevents.
 
+**A pencil pressed at the booth WAS teaching it that a pencil is plastic, and
+the label was the classifier's own guess (2026-11-19, found by auditing the first
+session's crops).**  Every named press files its crop under the class the *name*
+gave (`POST /waste/teach` — one line per press in `data/waste-knowledge/`).  The
+page only files when `decision.source === 'vision'` **and** a `classId` exists —
+but the pencil/eraser branch set `source: 'vision'` and inherited `classId` from
+the **local** classifier's top class, so *"red pencil with a blue eraser"*
+(locally Plastic 0.72) was filed **as Plastic**, once per press.  `classId` is
+null in that branch now, with two tests: the decision carries no class, and the
+page files nothing for such an item.  **Audited and corrected:** the session's
+23 crops split **18 kept / 5 moved to `data/waste-rejected/`** (that folder is
+outside the training tree on purpose — a subdirectory of `waste-knowledge/`
+would be read as a class) — four pencil/eraser frames labelled Plastic and one
+photograph of a **chair** (filed Textile), which was not an item on the base at
+all.  The kept crops are 224×224 crops of the base, which is exactly the
+condition the archive-trained model has never seen.
+
+**"Has ResNet50 learned?" — no, and it cannot learn by itself (2026-11-19).**
+`learn()` only *files* a crop; the weights change only when a person runs
+`scripts/waste/train_handheld_head.py --extra-train data/waste-knowledge` and
+`export_resnet50.py`.  `models/waste-resnet50/model.pt` is still the **v18**
+checkpoint (15 Nov).  Measured now, before any retrain: over the 18 kept booth
+crops the served model agrees with the name on **14/18** — its misses are
+**three Paper** (two cardboard boxes, one small white sheet) and **one Metal**
+(a ball bearing), every one of them read as Plastic at 0.38–0.56.  So the
+offline fallback is already usable on the booth's own base and is **worst on
+exactly the classes the probe said** (Paper-shaped things on a plain field, and
+Metal).  Do not retrain on 18 photos: the two-photo run measured earlier moved
+the probe *down* (74.7 % → 73.0 %).  Gather ~15–20 confirmed crops **per class**
+first, keep a held-out slice of booth photos as the judge, and quote that number
+rather than training accuracy.
+
 
 **The page now decides from both models, and a conflict refuses the bin
 (2026-11-19, from the review).**  Three faults were named: e-waste was grouped
