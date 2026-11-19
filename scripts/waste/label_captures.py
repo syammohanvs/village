@@ -23,15 +23,15 @@ is naming the object, which it does well.
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import re
 import sys
 import time
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
+
+import vision
 
 from PIL import Image, ImageDraw
 
@@ -47,13 +47,6 @@ PROMPT = (
     "Cardboard, newspaper or a paper bag is Paper. "
     "Answer in exactly this form: <object> = <word>"
 )
-
-
-def settings() -> dict[str, str]:
-    """`VILLAGE_VISION_*` from the app's own `.env`."""
-    text = (ROOT / ".env").read_text()
-    return {m.group(1): m.group(2).strip().strip("'\"")
-            for m in re.finditer(r"^([A-Z0-9_]+)=(.*)$", text, re.M)}
 
 
 def jpeg(path: Path, size: int = 224) -> bytes:
@@ -99,37 +92,14 @@ def takes(since: str, gap: float, limit: int) -> list[tuple[str, Path]]:
     return out[-limit:] if limit else out
 
 
-def ask(key: str, base: str, model: str, path: Path) -> tuple[str, str, bool]:
-    url = "data:image/jpeg;base64," + base64.b64encode(jpeg(path)).decode()
-    payload = json.dumps({
-        "model": model,
-        "temperature": 0,
-        "max_tokens": 1200,
-        "messages": [{"role": "user", "content": [
-            {"type": "text", "text": PROMPT},
-            {"type": "image_url", "image_url": {"url": url}},
-        ]}],
-    }).encode()
-    request = urllib.request.Request(
-        base.rstrip("/") + "/chat/completions", data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + key,
-            "User-Agent": "village-waste-classifier/1.0",
-            "x-opencode-session": "village-waste-classifier-session",
-        },
-    )
+def ask(path: Path, which: str | None = None, model: str | None = None) -> tuple[str, str, bool]:
+    """(object phrase, class, answered) for one take, from the configured provider."""
     for attempt in range(3):
-        try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                body = json.load(response)
+        text = vision.ask_object(jpeg(path), PROMPT, which=which, model=model)
+        if text:
             break
-        except Exception:  # noqa: BLE001 - a labeller must not crash a session
-            if attempt == 2:
-                return "", "?", False
-            time.sleep(3)
-    text = (body["choices"][0]["message"].get("content") or "").strip()
-    if not text:
+        time.sleep(3)  # a labeller must not crash a session over one photo
+    else:
         return "", "?", False
     phrase = text.split("=")[0].strip(" .*`")
     for cls in CLASSES:
@@ -145,14 +115,21 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=40, help="most recent takes to label")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--sheet", default="/tmp/opencode/takes-labelled.png")
+    ap.add_argument("--provider", default="", help="opencode | cloudflare (default: .env)")
+    ap.add_argument("--model", default="", help="override the model id")
     args = ap.parse_args()
 
-    conf = settings()
-    key = conf.get("VILLAGE_VISION_API_KEY", "")
-    if not key:
-        raise SystemExit("VILLAGE_VISION_API_KEY is not in .env")
-    base = conf.get("VILLAGE_VISION_BASE_URL") or "https://opencode.ai/inference/go/v1"
-    model = conf.get("VILLAGE_VISION_MODEL") or "deepseek-v4.1-flash"
+    conf = vision.settings()
+    which = vision.provider(conf)
+    model = args.model or vision.model_name(conf, which)
+    if args.provider:
+        which = args.provider
+    if not which:
+        raise SystemExit(
+            "no vision provider configured: set VILLAGE_VISION_PROVIDER and a key "
+            "in .env (VILLAGE_VISION_API_KEY, or VILLAGE_CF_ACCOUNT_ID + VILLAGE_CF_API_TOKEN)"
+        )
+    print(f"provider: {which} · model: {model}")
 
     found = takes(args.since, args.gap, args.limit)
     if not found:
@@ -161,7 +138,7 @@ def main() -> int:
     rows = []
     started = time.time()
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        labels = [pool.submit(ask, key, base, model, path) for _, path in found]
+        labels = [pool.submit(ask, path, which, model) for _, path in found]
         for (stamp, path), label in zip(found, labels):
             phrase, cls, answered = label.result()
             rows.append({"at": stamp, "file": path.name, "vision": cls,
