@@ -24,6 +24,21 @@ TEST(waste_indicator_lights_only_a_known_category) {
   CHECK(!paper);
 }
 
+TEST(waste_indicator_defaults_to_eight_seconds_and_then_goes_out) {
+  // The lamp is for a person to read: it stays lit for 8 s and the timer ends
+  // it.  The app sends no duration for the default case, so this is the number
+  // a visitor actually gets.
+  WasteConfig cfg;
+  CHECK(cfg.indicate_ms == 8000);
+  WasteIndicator w;
+  w.configure(cfg);
+  CHECK(w.indicate(WasteCategory::Organic, 0, 1000));
+  CHECK(w.read(1000).remaining_ms == 8000);
+  CHECK(w.read(1000 + 7999).active);   // still on one millisecond before eight
+  w.tick(1000 + 8000);
+  CHECK(!w.read(1000 + 8000).active);  // and out at eight, by itself
+}
+
 TEST(waste_indicator_ignores_unknown_categories) {
   WasteConfig cfg;
   WasteIndicator w;

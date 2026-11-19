@@ -104,13 +104,18 @@ The page also never claims more than it can see: no bin fullness, no
    *name* decided and there is a class to file. See §7: this saves a photograph,
    it does not change the model.
 
-**The bin LEDs: one at a time, bounded, and now clearable.** One category LED is
-lit for `INDICATE_WASTE`'s `duration_ms` (8 s, capped by the board's
-`indicate_ms`), and the board's own timer switches it off. `CLEAR_WASTE` (firmware
-0.2.9, `WasteIndicator::clear`) is the explicit early clear the page sends when a
-new check starts; a non-bin answer sends no lamp command at all. The timer is
-untouched — clearing is simply the same state, sooner. **The clear is new
-behaviour and has only been exercised on the simulator** (see §15).
+**The bin LEDs: one at a time, lit for eight seconds, then auto-off.** A bin
+answer sends `INDICATE_WASTE` with `duration_ms = WASTE_LAMP_MS` (**8000**, a named
+constant in the backend), and the **board's own timer** is what ends it — long
+enough for a visitor to look at the lamp and then at the bin. The firmware treats
+its stored `waste.indicate_ms` (8000 by default) as the ceiling for that request,
+so the two numbers are the same unless that setting was changed on the board.
+`CLEAR_WASTE` (firmware 0.2.9, `WasteIndicator::clear`) is the explicit *early*
+clear the page sends when a **new check starts sooner than that**, so the previous
+item's lamp cannot sit above the new answer; a non-bin answer sends no lamp
+command at all. Clearing is the same state the timer produces, only sooner — the
+timer itself is untouched. **The clear is new behaviour and has only been
+exercised on the simulator** (see §15).
 
 `checkSeq` is the request identity: a result belonging to an older press is
 dropped rather than overwriting a newer answer.

@@ -1819,7 +1819,19 @@ reason it was needed, and one that is new hardware:
   fixed, the operator's already-verified LED selection recorded, and a §15 table
   of what is verified vs what is new.
 
-Gates this pass: **508 firmware checks / 0 failed**, **188 backend**, **440
+**The lamp's eight seconds is a rule now, not an accident (2026-11-19, after
+"it should be on for 8 s so the person gets time to see").** It already was
+8 s — the firmware's `WasteConfig::indicate_ms` default and its ceiling are both
+8000 — but nothing said so or tested it end to end. Now: `WASTE_LAMP_MS = 8000`
+in the backend is what `INDICATE_WASTE` sends, `test_a_bin_lamp_stays_lit_for_
+eight_seconds_and_then_goes_out_itself` moves the simulator's clock and asserts
+it is **still lit at 7 s and out at 8 s, by the board's own timer**, and the
+firmware has `waste_indicator_defaults_to_eight_seconds_and_then_goes_out`
+(on at 7999, off at 8000). `CLEAR_WASTE` remains the *early* clear for a check
+that starts sooner; it does not shorten the normal window. Live proof: a demo
+recognition answered `remaining_ms: 7979` immediately after the command.
+
+Gates this pass: **513 firmware checks / 0 failed**, **189 backend**, **440
 frontend**, `npm run build`, app restarted on :8010 serving the new bundle. The
 simulator answers the clear with `WASTE_INDICATOR_CLEARED`; Live without a board
 answers `cleared: false` honestly. Two demo-mode records (one command, one event)

@@ -535,9 +535,9 @@ export function SortWaste() {
       // Only a bin decision may ask the board for a lamp.  Everything else is
       // recorded honestly: 'medical' for the special-care refusal, 'other' for
       // a referral or an uncertain answer.  Neither sends INDICATE_WASTE, so no
-      // lamp is lit for them — and the board's own timer clears the previous
-      // one within its `indicate_ms` (8 s), because the firmware has no clear
-      // command (see docs/waste-approach.md §6).
+      // lamp is lit for them — the previous lamp was already put out at the top
+      // of this check (CLEAR_WASTE), and the board's own timer is the fallback
+      // if that clear could not be delivered (see docs/waste-approach.md §2).
       if (acceptingRef.current) return;
       acceptingRef.current = true;
       try {

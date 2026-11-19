@@ -522,6 +522,52 @@ async def test_a_special_care_refusal_is_recorded_as_medical(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_a_bin_lamp_stays_lit_for_eight_seconds_and_then_goes_out_itself(tmp_path):
+    """The lamp is for a person to see, then it puts itself out.
+
+    The app asks for `WASTE_LAMP_MS` and the board's own timer is what ends it —
+    the clear command is only for a check that starts sooner than that.  The
+    simulator is advanced explicitly here so the whole 8 s is asserted, not just
+    the request.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live", "category": "paper", "confidence": 0.9,
+                "request_id": "lamp-eight-seconds",
+            },
+        )
+        assert response.status_code == 200
+        assert real.calls[-1]["type"] == "INDICATE_WASTE"
+        assert real.calls[-1]["parameters"]["duration_ms"] == 8000
+
+        state = (await client.get("/api/v1/state?mode=live")).json()
+        lit = state["status"]["actuators"]["waste_indicator"]
+        assert lit["active"] is True
+        assert lit["category"] == "paper"
+        assert lit["remaining_ms"] > 7000
+
+        # Seven seconds later it is still readable; at eight it has gone out.
+        # The gateway polls at most once a second, so the clock is moved *and*
+        # the controller is read again — otherwise this would assert on a cached
+        # snapshot and prove nothing about the timer.
+        real._sim.advance(7000)
+        await gateway.poll_once()
+        still = (await client.get("/api/v1/state?mode=live")).json()["status"]["actuators"]["waste_indicator"]
+        assert still["active"] is True
+        assert still["remaining_ms"] < 1100
+
+        real._sim.advance(1200)
+        await gateway.poll_once()
+        gone = (await client.get("/api/v1/state?mode=live")).json()["status"]["actuators"]["waste_indicator"]
+        assert gone["active"] is False
+        assert gone["remaining_ms"] == 0
+
+
+@pytest.mark.asyncio
 async def test_clearing_the_bin_indicator_is_acknowledged_and_turns_the_lamp_off(tmp_path):
     """A new check starts by putting the previous item's lamp out.
 

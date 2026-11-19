@@ -58,6 +58,13 @@ log = logging.getLogger("village")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 BIN_IDS = ("organic", "plastic", "paper")
+# How long a bin indicator stays lit.  Long enough for a visitor to look at the
+# lamp and then at the bin, and short enough that the next person's answer is not
+# read against it.  The board's own timer switches it off; `CLEAR_WASTE` only
+# matters when the next check starts sooner than this.  The firmware treats its
+# `waste.indicate_ms` (8000 by default) as the ceiling for a request, so the two
+# numbers are the same unless that stored setting was changed.
+WASTE_LAMP_MS = 8000
 
 
 def _now() -> str:
@@ -997,7 +1004,7 @@ def create_app(
             indication = await gateway.send_command(
                 mode=body.mode,
                 command_type="INDICATE_WASTE",
-                parameters={"category": category, "duration_ms": 8000},
+                parameters={"category": category, "duration_ms": WASTE_LAMP_MS},
                 request_id=body.request_id,
                 source="camera",
             )
