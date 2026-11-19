@@ -1709,6 +1709,14 @@ work.  When true, no inversion is applied.
 If the soil reading is backwards, flip the checkbox in Setup → Sensors &
 Calibration.  The calibration endpoints themselves are preserved.
 
+**`docs/esp32-and-wifi.md` is the hardware/wire brief (2026-11-20)** — the
+board and pin map, what the firmware loop does (sensor periods, controllers,
+command history, safety gates), the five-endpoint HTTP API with its ack
+contract, how a browser press becomes a pin (backend polling, staleness,
+idempotent commands, demo vs live), and the Windows-hotspot + relay path that
+makes it reachable from WSL. Also the OTA procedure, failure modes and what is
+verified vs pending.
+
 **`docs/voice-languages.md` is the language brief (2026-11-20)** — speech in
 (which model hears which language, prompts, fallbacks, the measurements), the
 grammar that understands it, speech out (Piper voices, the English
