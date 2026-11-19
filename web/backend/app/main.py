@@ -20,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import COOKIE_NAME, GUEST_USERNAME, Sessions, verify_password
 from .config import Settings
 from .db import Database, DEFAULT_SETTINGS, POINTS
-from . import ml_asr, voice_clips, waste_resnet
+from . import ml_asr, vision, voice_clips, waste_resnet
 from .device import (
     DeviceError,
     DeviceGateway,
@@ -331,6 +331,7 @@ def create_app(
         "/api/v1/demo/reset",
         "/api/v1/simulator/scenario",
         "/api/v1/waste/classify",
+        "/api/v1/waste/identify",
         "/api/v1/waste/recognition",
         "/api/v1/voice/speak",
         "/api/v1/voice/interpret",
@@ -763,7 +764,7 @@ def create_app(
 
     @app.get("/api/v1/waste/resnet-status")
     async def waste_resnet_status():
-        return {**waste_resnet.status(), "captures": waste_resnet.captures()}
+        return {**waste_resnet.status(), "captures": waste_resnet.captures(), "vision": vision.status()}
 
     @app.get("/api/v1/waste/captures")
     async def waste_captures():
@@ -794,6 +795,21 @@ def create_app(
         # `file` is the crop that was just kept, so the page can point a
         # correction at it instead of guessing which frame it meant.
         return {"model": "resnet50", "predictions": predictions, "file": waste_resnet.last_capture()}
+
+    @app.post("/api/v1/waste/identify")
+    async def waste_identify(body: WasteClassifyRequest):
+        """Name the object in the same crop, with a hosted vision model.
+
+        The classifier answers with a *material*; a visitor asks what the thing
+        is.  This is that second answer, and it is deliberately only a name: the
+        bin stays the local classifier's decision, because measured on the venue
+        probe a vision model is 53.7 % exact against its 70.7 %.
+
+        Always 200.  When no provider is configured, or the model fails, `object`
+        is null and the page shows the classifier alone — the behaviour before
+        this existed.
+        """
+        return await asyncio.to_thread(vision.identify, body.image)
 
     @app.post("/api/v1/waste/correction")
     async def waste_correction(body: WasteCorrectionRequest):

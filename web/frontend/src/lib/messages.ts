@@ -667,6 +667,27 @@ export const MESSAGES = {
   'sort.kickerBin': ['Suggested bin', 'सुझाया बिन', 'നിർദ്ദേശിച്ച ബിൻ'],
   'sort.titleRemove': ['Remove the item', 'चीज़ हटाएँ', 'വസ്തു എടുത്തുമാറ്റുക'],
   'sort.titleWaiting': ['Waiting for an item', 'चीज़ का इंतज़ार', 'വസ്തുവിനായി കാത്തിരിക്കുന്നു'],
+  // A press is not instant, and a card that sits still reads as a frozen page.
+  'sort.titleReading': ['Reading the item…', 'चीज़ पढ़ रहे हैं…', 'വസ്തു വായിക്കുന്നു…'],
+  'sort.titleNaming': ['Naming the item…', 'चीज़ का नाम देख रहे हैं…', 'വസ്തുവിന്റെ പേര് നോക്കുന്നു…'],
+  'sort.reading': [
+    'Hold the item still — I am reading three frames.',
+    'चीज़ को स्थिर रखें — तीन फ़्रेम पढ़ रहे हैं।',
+    'വസ്തു അനങ്ങാതെ പിടിക്കുക — മൂന്ന് ഫ്രെയിം വായിക്കുന്നു.',
+  ],
+  'sort.naming': [
+    'Asking the camera what this is…',
+    'कैमरे से पूछ रहे हैं कि यह क्या है…',
+    'ഇത് എന്താണെന്ന് ക്യാമറയോട് ചോദിക്കുന്നു…',
+  ],
+  // The object is named before the category, so a visitor can check the answer.
+  'sort.sees': ['I see: {object}', 'मुझे यह दिखता है: {object}', 'എനിക്ക് ഇത് കാണുന്നു: {object}'],
+  'sort.classifierSays': [
+    'My classifier says: {category}',
+    'मेरा क्लासिफायर कहता है: {category}',
+    'എന്റെ ക്ലാസിഫയർ പറയുന്നത്: {category}',
+  ],
+  'sort.saysObject': ['This is {object}.', 'यह {object} है।', 'ഇത് {object} ആണ്.'],
   'sort.putInBin': [
     'Put it in the {bin} bin', '{bin} बिन में डालें', '{bin} ബിന്നിൽ ഇടുക',
   ],

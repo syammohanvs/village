@@ -262,6 +262,31 @@ in different sizes: the pipeline is saturated, and the probe — not the trainin
 accuracy — is the judge. Add items in a batch, and keep the build only if the
 probe line does not fall.
 
+### The card names the object before the category (2026-11-19)
+
+A visitor asks *what is this* before *where does it go*, and a wrong answer is
+easier to spot in that order.  So the result card says:
+
+> **I see: clear plastic lid**
+> My classifier says: **Plastic** — Empty and rinse it, then put it in the
+> plastic bin.
+
+**The name comes from a hosted vision model and the category stays local.**  The
+one that made this necessary: a plastic cap photographed in a hand was classified
+**Ewaste 0.40** — and the same crop sent to `llama-3.2-11b-vision` came back
+**"Clear plastic lid"** in 1.4 s.  A vision model must not choose the bin
+(53.7 % exact on the venue probe against the local model's 74.7 %), but it is
+what lets a visitor see the disagreement instead of being told a confident wrong
+answer.
+
+While the press runs, the card says what it is doing — *Reading the item…* for
+the three frames, then *Naming the item…* while the model is asked — so a second
+of waiting never looks like a frozen page.  With no key configured the card is
+exactly what it was before: category only.
+
+The provider is configured in `.env`; the token lives in **`.env.secrets`** (git
+ignored), because GitHub refuses a Cloudflare token even in a private repository.
+
 ### When one category is confused with another
 
 A wrong answer is a **data gap**, not a threshold to lower. The pipeline has

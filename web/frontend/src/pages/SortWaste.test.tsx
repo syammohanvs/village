@@ -18,6 +18,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       wasteModelStatus: vi.fn(),
       wasteResnetStatus: vi.fn(),
       wasteClassify: vi.fn(),
+      wasteIdentify: vi.fn(),
       postRecognition: vi.fn(),
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
@@ -2024,4 +2025,166 @@ describe('Sort Waste — an item that is not waste yet', () => {
       { timeout: 4000 },
     );
   });
+});
+
+
+/**
+ * A canvas with a picture in it.
+ *
+ * The press crops the middle of the video through a canvas, and the page reads
+ * pixels back to decide whether anything is being shown, so jsdom needs
+ * `getImageData` as well as `drawImage` — without it the press throws before any
+ * request is made.  Returns a restore function.
+ */
+function stubCanvasWithPicture(): () => void {
+  const original = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = (function () {
+    return {
+      drawImage() {},
+      clearRect() {},
+      putImageData() {},
+      fillRect() {},
+      createImageData: (width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+        width,
+        height,
+      }),
+      getImageData: (_x: number, _y: number, width: number, height: number) => {
+        const data = new Uint8ClampedArray(width * height * 4);
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = 40;
+          data[i + 1] = 40;
+          data[i + 2] = 40;
+          data[i + 3] = 255;
+        }
+        for (let y = 40; y < 80; y += 1) {
+          for (let x = 50; x < 110; x += 1) {
+            const i = (y * width + x) * 4;
+            data[i] = 220;
+            data[i + 1] = 220;
+            data[i + 2] = 215;
+          }
+        }
+        return { data, width, height };
+      },
+    };
+  }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  return () => {
+    HTMLCanvasElement.prototype.getContext = original;
+  };
+}
+
+describe('Sort Waste — the object is named before the category', () => {
+  it('says what it sees, then what the classifier says, and speaks the object first', async () => {
+    // Reported 2026-11-19: a plastic cap was classified Ewaste 0.40 with no
+    // sign of what the camera thought it was.  The hosted model named the same
+    // crop "clear plastic lid", so the card must say that FIRST — a visitor
+    // checks an answer in that order, and a wrong name is visible instead of
+    // being hidden inside a confident category.
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true },
+    });
+    vi.mocked(api.wasteIdentify).mockResolvedValue({
+      object: 'clear plastic lid',
+      provider: 'cloudflare',
+      model: '@cf/meta/llama-3.2-11b-vision-instruct',
+      ms: 900,
+    });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 12, category: 'plastic', confidence: 0.95 },
+    });
+    predictionState.current = predictionsFor('Plastic', 0.95);
+    stubCamera();
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    const restore = stubCanvasWithPicture();
+    try {
+      render(<App />);
+      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(screen.getByTestId('start-camera'));
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      const sees = await screen.findByTestId('waste-sees', {}, { timeout: 8000 });
+      expect(sees).toHaveTextContent(/I see: clear plastic lid/i);
+      const says = screen.getByTestId('waste-result');
+      expect(says).toHaveTextContent(/My classifier says: Plastic/i);
+      // The name comes first in the card, not only in the sentence.
+      expect(sees.compareDocumentPosition(says) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      // ...and the same crop is what the namer was asked about.
+      expect(api.wasteIdentify).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/jpeg/));
+
+      await waitFor(
+        () => expect(spoken.some((line) => /^This is clear plastic lid\./.test(line))).toBe(true),
+        { timeout: 5000 },
+      );
+      expect(spoken.some((line) => /plastic bin/i.test(line))).toBe(true);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('says it is naming the item, so a slow answer does not look frozen', async () => {
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
+    let answer: (value: unknown) => void = () => undefined;
+    vi.mocked(api.wasteIdentify).mockImplementation(
+      () => new Promise((resolve) => { answer = resolve; }) as never,
+    );
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.postRecognition).mockResolvedValue({
+      ok: true,
+      category: 'plastic',
+      recognition: { id: 13, category: 'plastic', confidence: 0.95 },
+    });
+    predictionState.current = predictionsFor('Plastic', 0.95);
+    stubCamera();
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    const restore = stubCanvasWithPicture();
+    try {
+      render(<App />);
+      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(screen.getByTestId('start-camera'));
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      await screen.findByTestId('waste-working', {}, { timeout: 8000 });
+      // The press reads three frames first, then asks for the name: the line
+      // says which of the two it is doing, so a pause never looks like a freeze.
+      await waitFor(
+        () => expect(screen.getByTestId('waste-working')).toHaveTextContent(
+          /Asking the camera what this is/i,
+        ),
+        { timeout: 8000 },
+      );
+
+      await act(async () => {
+        answer({ object: 'clear plastic lid', provider: 'cloudflare', model: 'llama', ms: 900 });
+      });
+    } finally {
+      restore();
+    }
+  }, 25000);
 });

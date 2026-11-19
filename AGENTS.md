@@ -2181,6 +2181,43 @@ a `reuse` line per language.  **Do not promote the pencil frame to Paper or
 Organic** — that teaches the model the mistake the button prevents.
 
 
+**The card names the object first, and says what it is doing while it waits
+(2026-11-19).**  Reported at the bins: a **plastic cap read as Ewaste 0.40** with
+nothing on screen saying what the camera thought it was.  The same crop sent to
+Cloudflare's `llama-3.2-11b-vision` answered **"Clear plastic lid"** in 1.4 s, so
+the result card now reads:
+
+> **I see: clear plastic lid**  ·  My classifier says: **Plastic** · *Empty and
+> rinse it, then put it in the plastic bin.*
+
+- **The name never chooses the bin.**  `/api/v1/waste/identify` is a name only;
+  the category is still the local classifier's, because on the venue probe a
+  vision model scored 53.7 % exact against its 74.7 %.  The spoken sentence reads
+  the name first ("This is clear plastic lid. Empty and clean plastic. Put it in
+  the plastic bin.") — the visitor hears what it is before where it goes.
+- **Wait for the name, but not forever.**  The page asks about the *same crop*
+  the classifier saw (kept in `lastCropRef`) and waits at most
+  **`VISION_WAIT_MS` = 4 s**; Workers AI answers in ~1 s, OpenCode Go in 5–12.
+  A late answer still fills the card, but is not spoken again.
+- **A press now says what it is doing** — *Reading the item…* for the three
+  frames, *Naming the item…* while the model is asked (`data-testid="waste-working"`),
+  because the reporter's second sentence was "user would be confused whether u r
+  working".
+- **Between model, provider and the four Workers AI vision models** measured on
+  the six confirmed items (object naming, expected word): DeepSeek 4/6 at 6.7 s,
+  llava-1.5-7b 3/6 at 1.1 s, llama-4-scout 3/6 at 7.2 s, **llama-3.2-11b-vision
+  3/6 at 0.9 s**.  All of them miss the pipe (foam roller / rolled paper) and call
+  the cardboard "bread" — four independent models agreeing points at the 224 crop,
+  not the model.  Resolution is not the fix: the same probe photos at 448 scored
+  **worse** (41.5 / 63.4 against 53.7 / 75.6 at 224).
+- **`.env.secrets` exists now, and it is load-bearing.**  GitHub's push
+  protection refuses a Cloudflare token (`cfut_…`) even in this private repo, so
+  the token lives in a git-ignored `.env.secrets`, which `Settings.load()` reads
+  **after** `.env` with `override=True` (and `scripts/waste/vision.py` reads the
+  same pair).  `.env` keeps the field empty and every other setting; a new laptop
+  pastes one line into `.env.secrets`.  **Do not put the token back in `.env`** —
+  the push will be rejected.
+
 **CLIP / SigLIP zero-shot was tried before and rejected — do not re-propose it.**
 The user says so explicitly (2026-11-19). It is *not* in this file: the AI paths
 recorded here are the `u2net` background remover above and the browser MobileNet

@@ -112,6 +112,15 @@ const PRESS_CROP_SHARE = 0.7;
 const PRESS_FRAMES = 3;
 const PRESS_FRAME_GAP_MS = 250;
 
+/**
+ * How long the page waits for the hosted model's name before it answers.
+ *
+ * Workers AI answers in about a second; OpenCode Go takes five to twelve.  A
+ * visitor is not made to wait longer than this for a name — the category is
+ * already decided, and the name fills in behind the card if it arrives late.
+ */
+const VISION_WAIT_MS = 4000;
+
 
 function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
   if (!ref.current) ref.current = document.createElement('canvas');
@@ -283,6 +292,11 @@ export function SortWaste() {
   // A press reads three frames now, so it takes about a second.  The button
   // says so instead of looking like it did nothing.
   const [reading, setReading] = useState(false);
+  // The hosted model's name for the object in front of the camera.  It is a
+  // name only: the bin is the classifier's decision (see vision.py).
+  const [objectName, setObjectName] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+  const lastCropRef = useRef<string | null>(null);
   // The camera's own shape, so the frame shows the WHOLE picture.  A fixed 4:3
   // box with `object-fit: cover` silently hid the left and right edges of a
   // 16:9 camera, so an item could be in shot and not on screen -- and the read
@@ -302,6 +316,9 @@ export function SortWaste() {
   const [focusNote, setFocusNote] = useState('');
 
   const installed = modelInstalled(modelStatus.data);
+  // Whether a hosted model can name the object.  False on a deployment with no
+  // key: the card then says only what the classifier knows, exactly as before.
+  const visionReady = Boolean(modelStatus.data?.vision?.ready);
   // Three different facts: the browser can open a camera, the model status is
   // known, and the model is installed.  Collapsing them into one boolean is
   // what produced "the camera can still be used" next to a disabled button.
@@ -739,6 +756,9 @@ export function SortWaste() {
           // no better than 0.92 while being several times larger.  A frame is
           // a few kilobytes either way.
           const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          // The same crop is what the namer is asked about, so the two answers
+          // describe one picture rather than two frames a moment apart.
+          lastCropRef.current = dataUrl;
           const result = await api.wasteClassify(dataUrl);
           // Remember which crop this was: a correction must point at the frame
           // the model judged, not at whatever the camera looks at next.
@@ -860,6 +880,40 @@ export function SortWaste() {
     setReferralLabel(material);
     setHazardousLabel(hazardous);
 
+    // What the object *is*, from the hosted model, when one is configured.  It
+    // is asked about the very crop the classifier saw, in parallel with the
+    // record, and the visitor hears it **before** the category -- the order a
+    // person checks an answer in, and the reason it exists: on 2026-11-19 this
+    // same crop was called Ewaste by the classifier and "clear plastic lid" by
+    // the namer.
+    //
+    // The name never moves the item out of a bin or into one.  The category is
+    // still the local classifier's, because on the venue probe a vision model
+    // scored 53.7% exact against its 70.7%.
+    const crop = lastCropRef.current;
+    let named: string | null = null;
+    if (crop && visionReady) {
+      setNaming(true);
+      const asked = api
+        .wasteIdentify(crop)
+        .then((answer) => answer.object)
+        .catch(() => null);
+      named = await Promise.race([
+        asked,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
+      ]);
+      // A late answer still names the card, as long as the camera is still on
+      // the same crop.  It is not spoken again -- the visitor has been answered.
+      const mine = crop;
+      void asked.then((late) => {
+        if (late && lastCropRef.current === mine) setObjectName(late);
+      });
+      setNaming(false);
+      setObjectName(named);
+    } else {
+      setObjectName(null);
+    }
+
     // Sara speaks from what was just decided, not from the reply.  Waiting for
     // the recording held her sentence for as long as the round trip took --
     // measured at 19-21 s with the controller switched off, because the record
@@ -872,7 +926,10 @@ export function SortWaste() {
     // a Hindi voice reading English was worse than English text in an English
     // voice; `spokenFor()` is now translated, so the sentence and the voice agree
     // again (reported from the venue 2026-11-16: Malayalam set, English spoken).
-    void speakText(spoken, voiceLanguage, 0.95);
+    // A named object is read first, in the page's own sentence, so a visitor
+    // hears "This is a clear plastic lid." before the category.
+    const says = named ? `${t('sort.saysObject', { object: named })} ` : '';
+    void speakText(says + spoken, voiceLanguage, 0.95);
 
     try {
       const result = await api.postRecognition({
@@ -899,11 +956,12 @@ export function SortWaste() {
       setRecognitionError(errorMessage(cause));
     } finally {
       acceptingRef.current = false;
+      setNaming(false);
       // The camera deliberately stays on.  The stabilizer waits for the item to
       // be removed and then re-arms, so the next item is classified without
       // pressing Start Camera again.
     }
-  }, []);
+  }, [t, visionReady, voiceLanguage]);
 
   /**
    * Classify once, on demand.
@@ -925,6 +983,7 @@ export function SortWaste() {
     setReading(true);
     setFrameWarning('');
     setRecognition(null);
+    setObjectName(null);
     setReferralLabel(null);
     setHazardousLabel(null);
     setCorrection('');
@@ -1542,9 +1601,21 @@ export function SortWaste() {
                   ? t('waste.title.askSahayak')
                   : removing
                     ? t('sort.titleRemove')
-                    : t('sort.titleWaiting')
+                    : naming
+                      ? t('sort.titleNaming')
+                      : reading
+                        ? t('sort.titleReading')
+                        : t('sort.titleWaiting')
             }
           >
+            {(reading || naming) && (
+              // The press takes a moment: three frames, the classifier, and --
+              // when one is configured -- the hosted model's name.  Saying so is
+              // the difference between "it is working" and "it has frozen".
+              <p className="hint" data-testid="waste-working">
+                {naming ? t('sort.naming') : t('sort.reading')}
+              </p>
+            )}
             {manualGuide ? (
               <>
                 {/*
@@ -1573,8 +1644,20 @@ export function SortWaste() {
               </>
             ) : recognition ? (
               <>
-                <p className="result-big" data-testid="waste-result">
-                  {shownCategory}
+                {/*
+                  The object first, the category second.  A visitor checks an
+                  answer in that order, and a wrong name is visible instead of
+                  being hidden inside a confident category -- the classifier
+                  called a plastic cap "Ewaste", the namer "clear plastic lid".
+                  With no hosted model configured this is exactly the old card.
+                */}
+                {objectName && (
+                  <p className="result-big" data-testid="waste-sees">
+                    {t('sort.sees', { object: objectName })}
+                  </p>
+                )}
+                <p className={objectName ? 'result-sub' : 'result-big'} data-testid="waste-result">
+                  {objectName ? t('sort.classifierSays', { category: shownCategory ?? '' }) : shownCategory}
                 </p>
                 <p className="result-sub" data-testid="waste-destination">
                   {disposal ? (

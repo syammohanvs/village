@@ -492,11 +492,19 @@ export const api = {
     return request<ModelStatus>('/waste/model-status', { mode: undefined });
   },
 
-  wasteResnetStatus(): Promise<{ installed: boolean; model: string; classes: string[] }> {
-    return request<{ installed: boolean; model: string; classes: string[] }>(
-      '/waste/resnet-status',
-      { mode: undefined },
-    );
+  wasteResnetStatus(): Promise<{
+    installed: boolean;
+    model: string;
+    classes: string[];
+    /** The hosted model that names the object, when one is configured. */
+    vision?: { provider: string | null; model: string | null; ready: boolean };
+  }> {
+    return request<{
+      installed: boolean;
+      model: string;
+      classes: string[];
+      vision?: { provider: string | null; model: string | null; ready: boolean };
+    }>('/waste/resnet-status', { mode: undefined });
   },
 
   wasteClassify(image: string): Promise<{
@@ -510,6 +518,31 @@ export const api = {
       predictions: { className: string; probability: number }[];
       file?: string | null;
     }>('/waste/classify', { method: 'POST', body: { image }, mode: undefined });
+  },
+
+  /**
+   * Ask the hosted vision model what the object in this crop is.
+   *
+   * It answers a *name* ("clear plastic lid"), never a bin: measured on the
+   * venue probe a vision model is 53.7% exact against the local classifier's
+   * 70.7%, so the category stays a local decision.  `object` is null when no
+   * provider is configured or the answer was unusable, and the page then says
+   * nothing about it.
+   */
+  wasteIdentify(image: string): Promise<{
+    object: string | null;
+    provider: string | null;
+    model: string | null;
+    ms: number;
+    reason?: string;
+  }> {
+    return request<{
+      object: string | null;
+      provider: string | null;
+      model: string | null;
+      ms: number;
+      reason?: string;
+    }>('/waste/identify', { method: 'POST', body: { image }, mode: undefined });
   },
 
   /**
