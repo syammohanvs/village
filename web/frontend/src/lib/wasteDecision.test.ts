@@ -27,10 +27,11 @@ describe('ordinary bin decisions', () => {
     expect(decision.needsOperator).toBe(false);
   });
 
-  it('refuses a bin under its bar, and says why', () => {
+  it('refuses a bin under its bar when nothing corroborates it', () => {
+    // No material word in the name, so only one model is speaking.
     const decision = decide({
       predictions: dist('Plastic', 0.55),
-      itemLabel: 'plastic bottle',
+      itemLabel: 'white bottle',
       visionConfigured: true,
       ...BARS,
     });
@@ -38,6 +39,47 @@ describe('ordinary bin decisions', () => {
     expect(decision.routeId).toBe('separate.unknown');
     expect(decision.allowLamp).toBe(false);
     expect(decision.reasonId).toBe('belowBar');
+  });
+
+  it('accepts a bin the name agrees with — the business card', () => {
+    // The visitor's own item, 2026-11-19: Paper under 0.70 while the namer said
+    // "White paper with red and black text".  One model alone needs 0.70; two
+    // agreeing need 0.50, and this is the case that made the rule.
+    const decision = decide({
+      predictions: dist('Paper', 0.61),
+      itemLabel: 'White paper with red and black text',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('accepted');
+    expect(decision.routeId).toBe('bin.paper');
+    expect(decision.bin).toBe('paper');
+    expect(decision.reasonId).toBe('corroborated');
+    expect(decision.allowLamp).toBe(true);
+    expect(decision.classConfidence).toBeCloseTo(0.61);
+  });
+
+  it('will not accept a corroborated bin from almost nothing', () => {
+    const decision = decide({
+      predictions: dist('Paper', 0.45),
+      itemLabel: 'white paper card',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('uncertain');
+    expect(decision.allowLamp).toBe(false);
+  });
+
+  it('still refuses the bin when the name states another material', () => {
+    // Corroboration must not become "any name will do".
+    const decision = decide({
+      predictions: dist('Paper', 0.6),
+      itemLabel: 'plastic card',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('conflict');
+    expect(decision.allowLamp).toBe(false);
   });
 
   it('never names a material for an empty frame', () => {
@@ -351,6 +393,15 @@ describe('an object in the name outranks the material it is made of', () => {
     expect(decision.status).toBe('conflict');
     expect(decision.routeId).toBe('separate.unknown');
     expect(decision.allowLamp).toBe(false);
+  });
+
+  it('treats a business card as paper, and a bare card as no claim', () => {
+    // The namer often answers "business card" without the word paper; that is
+    // the exhibit's own sample class.  "card" alone stays unsaid because a
+    // credit card is electronic.
+    expect(materialClaimOf('A business card')).toBe('bin.paper');
+    expect(materialClaimOf('visiting card')).toBe('bin.paper');
+    expect(materialClaimOf('a card')).toBeNull();
   });
 
   it('still reads a name with no object as the material it states', () => {

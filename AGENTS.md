@@ -2266,6 +2266,24 @@ an abstention, so **B ships nowhere**; **C** changes nothing on the probe and is
 shipped only because it fixes the exhibit's own case, with a floor
 (`CORROBORATION_FLOOR` 0.30), materials only, never a bin.
 
+**A bin needs 70 % from one model and 50 % from two (2026-11-19, the business
+card).**  A visitor checked a business card: the namer said *"White paper with
+red and black text"*, the local model's own top class was **Paper** — and the
+page still said *"keep this item separate and ask"*, because a bin
+needed 0.70 from the classifier alone.  `CORROBORATED_BIN_FLOOR = 0.5`: when the
+name states **this bin's** material, the bin is accepted from 0.50, the lamp may
+light, and the decision is recorded as `corroborated`.  It is not a blanket
+lowering — a name that states another material is still a conflict (checked
+before), and with no name the bar stays 0.70.  Measured on the page's own path
+(224 crop, q0.92, 241 probe photos, `evidence_experiment.py`): classifier alone
+opens **76** bins with **6** wrong and abstains on **110**; both models open
+**88** with **7** wrong and abstain on **91** — twelve more items answered for
+one more wrong bin, so the false-bin *rate* does not move (7.9 % → 8.0 %).  The
+one added wrong bin is a photo of oranges **in cardboard boxes** labelled
+Thermocol, which a person would also call paper.  **The two headline accuracy
+figures are not interchangeable:** 74.7 % / 82.6 % is the unresized path
+(`evaluate_pipeline.py`), 72.2 % / 80.5 % is the 224 crop the page sends.
+
 **The named model is ResNet50, and the record says so.**  The recognition row used
 to be written as `model: "teachable-machine"` long after the browser MobileNet
 was removed; the page, `api.ts` and the backend's default now say `resnet50`.

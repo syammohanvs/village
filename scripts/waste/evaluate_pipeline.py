@@ -75,14 +75,22 @@ def main() -> int:
     n = len(rows)
     exact = sum(1 for truth, said, _ in rows if truth == said)
     same_action = sum(1 for truth, said, _ in rows if action(truth) == action(said))
-    false_bin = [r for r in rows if r[1] in BINS and action(r[0]) != action(r[1])]
+    opened = [r for r in rows if decide(r[1], r[2]).startswith("bin:")]
+    false_bin = [r for r in opened if action(r[0]) != action(r[1])]
+    would_be_false = [r for r in rows if r[1] in BINS and action(r[0]) != action(r[1])]
     abstain = [r for r in rows if decide(r[1], r[2]) == "abstain"]
 
     print(f"{n} probe photos")
     print(f"  exact class       {exact}/{n} = {100 * exact / n:.1f}%")
     print(f"  item action       {same_action}/{n} = {100 * same_action / n:.1f}%")
-    print(f"  false bin         {len(false_bin)}")
+    print(f"  bins opened       {len(opened)}  (wrong {len(false_bin)})")
     print(f"  abstained         {len(abstain)}")
+    print()
+    print(f"  A bin class was the top guess for a different material on")
+    print(f"  {len(would_be_false)} photos — but only an *opened* bin is a false bin, because")
+    print(f"  everything under the bar abstains.  This script has no names, so it")
+    print(f"  scores the classifier-only policy; the two-model numbers are in")
+    print(f"  evidence_experiment.py.""")
 
     print("\nper class (truth -> how often it was said):")
     for truth in CLASSES:
@@ -95,7 +103,7 @@ def main() -> int:
         print(f"  {truth:10} {hits:3}/{len(of):<3} = {100 * hits / len(of):5.1f}%   {detail}")
 
     if false_bin:
-        print("\nfalse bins (a bin opened for another material):")
+        print("\nfalse bins (a bin that was actually opened for another material):")
         for truth, said, p in false_bin[:12]:
             print(f"  {truth:10} -> {said:10} {p:.2f}")
 

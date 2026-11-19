@@ -931,15 +931,35 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('refuses a bin under the bar', async () => {
-    const restore = await press({ predictions: plasticAt(0.55), object: 'plastic bottle' });
+  it('refuses a bin under the bar when the name does not back it up', async () => {
+    const restore = await press({ predictions: plasticAt(0.55), object: 'white bottle' });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       const action = screen.getByTestId('waste-action');
       expect(action).toHaveTextContent(/keep this item separate/i);
       expect(screen.getByTestId('waste-result')).toHaveTextContent(/not certain/i);
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('opens the bin when the name agrees — the business card', async () => {
+    // Reported 2026-11-19: "White paper with red and black text" and the local
+    // model on Paper, but under 0.70, so the page asked a person about a card.
+    const restore = await press({
+      predictions: predictionsFor('Paper', 0.61),
+      object: 'White paper with red and black text',
+    });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/paper/i),
+        { timeout: 8000 },
+      );
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/paper & cardboard bin/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Paper/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'paper' });
     } finally {
       restore();
     }

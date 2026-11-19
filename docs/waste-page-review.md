@@ -92,7 +92,8 @@ Order matters, and it is the safety argument:
 | 1 | background / unknown class | **nothing to sort**, nothing recorded |
 | 2 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" |
 | 3 | the name states a different *object or material* than the chosen route (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic, plastic lid vs Ewaste) | **conflict** — no bin |
-| 4 | a bin under **70 %** on its own class | **uncertain** — no bin, "keep separate and ask" |
+| 4 | a bin under **70 %** on its own class, name silent or disagreeing | **uncertain** — no bin, "keep separate and ask" |
+| 4b | a bin under 70 % but at/over **50 %**, *corroborated by the name* | **accepted** — the lamp may light, recorded as `corroborated` |
 | 5 | a bin at/over 70 %, identification present | **accepted** — the lamp may light |
 | 6 | a material at/over **50 %** | its own collection route (e-waste ≠ metal ≠ glass), no lamp |
 | 6b | a material under 50 % but at/over **30 %**, *corroborated by the name* | its own collection route, no lamp, recorded as `corroborated` |
@@ -130,20 +131,44 @@ Workers AI account is spent, `VILLAGE_VISION_API_KEY` (DeepSeek on OpenCode Go,
 
 ## 7. Measured behaviour — the numbers to judge this by
 
-`scripts/waste/evaluate_pipeline.py`, 241 held-out probe photos, the served
-checkpoint:
+`scripts/waste/evaluate_pipeline.py` and `scripts/waste/evidence_experiment.py`,
+241 held-out probe photos, the served checkpoint. Two paths are quoted because
+they answer different questions: the page sends a **224 crop at q0.92**, and the
+classifier's own accuracy is measured on the unresized photograph.
+
+Classifier only (no name), on the page's path:
 
 | | value |
-| --- | --- |
-| exact class | **74.7 %** (180/241) |
-| item action | **82.6 %** (199/241) |
-| **abstentions** (page would say "not sure") | **92** (38 %) |
-| **false bins** (a bin for another material) | **25** (10 %) |
+| --- | ---: |
+| exact class | **72.2 %** (174/241) |
+| right handling route | 47.7 % |
+| bins opened | 76 |
+| of those, **wrong bin** | **6** (7.9 %) |
+| abstentions | 110 |
+
+Both models, as shipped (the page's actual policy):
+
+| | value |
+| --- | ---: |
+| exact class | 72.2 % (the name never changes the class) |
+| right handling route | **54.4 %** (+16) |
+| bins opened | **88** (+12) |
+| of those, **wrong bin** | **7** (8.0 %) |
+| abstentions | **91** (−19) |
+
+So the second model buys **twelve more items answered** and costs **one** wrong
+bin — the false-bin *rate* does not move (7.9 % → 8.0 %). The one wrong bin is a
+photograph of oranges **in cardboard boxes** whose class label is Thermocol; a
+person would call it paper too.
+
+On the unresized path the same checkpoint scores **74.7 % exact / 82.6 % item
+action**, opens **86** bins with **7** wrong, and abstains on 92 — the difference
+is the crop the page really sends, not a different model.
 
 Per class: Plastic 85.0 %, Paper 84.7 %, Ewaste 82.5 %, Leather 80.0 %,
 Thermocol 55.6 %, Glass 53.8 %, **Metal 17.6 %** (Metal is read as Ewaste 10
-times, Paper 1, Thermocol 1). False bins include Glass→Plastic at 0.82 and 0.80,
-Ewaste→Paper 0.73, Leather→Paper 0.71, Metal→Paper 0.65, Metal→Plastic 0.58.
+times, Paper 1, Thermocol 1). The wrong bins above 0.70 include Glass→Plastic at
+0.82/0.80, Ewaste→Paper 0.73, Leather→Paper 0.71, Metal→Paper 0.65.
 
 **No accuracy has been improved in this round.** Metal did not move: the metal
 pipe added to `data/waste-samples` is one training photo, and the probe is
@@ -182,6 +207,12 @@ through the running server:
 | --- | --- | --- | --- | --- |
 | item A | Ewaste **37.6 %** | “Remote control made of plastic” | not sure | e-waste collection |
 | item B | Ewaste **45.6 %** | “White plastic remote control” | not sure | e-waste collection |
+| business card | Paper **under 70 %** | “White paper with red and black text” | not sure | paper bin |
+
+The card is the case that added the corroborated-bin rule (§5, row 4b): Paper was
+the classifier's own top class, the name said paper, and the page still asked a
+person — because one model alone has to reach 70 % before a lamp is lit. Two
+models agreeing reach it at 50 %, and the measurement above is the argument.
 
 Both are **referrals, not bins**: no lamp is lit, and the record stores the
 classifier's own 0.38/0.46 — never a number inflated by the name.

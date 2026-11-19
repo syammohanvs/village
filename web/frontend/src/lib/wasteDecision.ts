@@ -89,6 +89,24 @@ export interface Decision {
 export const MATERIAL_BAR = 0.5;
 
 /**
+ * The bar a **bin** must clear when the name states the same material.
+ *
+ * One model alone needs 0.70 before a physical lamp is lit.  Two models that
+ * agree on what the item is made of need less, and the number is measured
+ * rather than chosen: on the 241-photo probe the corroborated route gains **12
+ * correct bins and costs one** (`scripts/waste/evidence_experiment.py`), and that
+ * one is a photograph of oranges **in cardboard boxes** whose class label is
+ * Thermocol — a human would say paper too.  The exhibit's own case is the
+ * business card a visitor checked on 2026-11-19: Paper at 0.5–0.7, named "white
+ * paper with red and black text", which used to be refused.
+ *
+ * It is not a blanket lowering of the bar: the floor is still 0.50, the name
+ * must state **this bin's** material (or a different one refuses earlier as a
+ * conflict), and with no name at all the bar stays 0.70.
+ */
+export const CORROBORATED_BIN_FLOOR = 0.5;
+
+/**
  * How sure the classifier must be for the *name* to corroborate a material.
  *
  * Below this the picture has not really chosen, and a name alone is how a wall
@@ -155,6 +173,11 @@ const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
   },
   // Still useful after its working life, and in none of the three bins.
   { route: 'separate.unknown', words: ['pencil', 'crayon', 'eraser'] },
+  // A business card is paper by definition, and it is what the exhibit's own
+  // Paper samples are.  Only the two-word name is here: the bare word "card"
+  // could be a credit card, which is electronic, and an object route would send
+  // that to the paper bin.
+  { route: 'bin.paper', words: ['business card', 'visiting card'] },
 ];
 
 /**
@@ -330,6 +353,20 @@ export function decide(input: DecisionInput): Decision {
 
   if (bin) {
     if (confidence < input.binBar) {
+      // 4b. The picture is not sure enough on its own — but if the name states
+      // the same material, two models agree and the bin is accepted.  Measured,
+      // and still a floor: see CORROBORATED_BIN_FLOOR.
+      if (claim === `bin.${bin}` && confidence >= CORROBORATED_BIN_FLOOR) {
+        return {
+          ...empty,
+          ...common,
+          status: 'accepted',
+          routeId: `bin.${bin}`,
+          bin,
+          reasonId: 'corroborated',
+          allowLamp: true,
+        };
+      }
       return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'belowBar' };
     }
     // 4/5. A bin needs the local answer *and*, when a namer is configured, an
