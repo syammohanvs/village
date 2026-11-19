@@ -217,6 +217,63 @@ models agreeing reach it at 50 %, and the measurement above is the argument.
 Both are **referrals, not bins**: no lamp is lit, and the record stores the
 classifier's own 0.38/0.46 — never a number inflated by the name.
 
+## 7b. The venue condition — the model has never seen it
+
+Every number above is measured on **archive photographs**: objects on desks, in
+hands, in rooms. The exhibit is different — one item placed on a **fixed base**
+(a coloured sheet), read by a webcam from above. That is a different
+distribution, and nothing in the training data or the probe looks like it.
+
+`scripts/waste/make_venue_set.py` manufactures the condition (cut-out object on
+a sheet, under a lamp, with a contact shadow, no hand) so the gap can be
+measured before there are real photographs of it. 227 held-out objects:
+
+| | archive probe | venue probe (item on a sheet) |
+| --- | ---: | ---: |
+| exact class (v18, served) | 72.2 % | **44.9 %** |
+| item action | 83.0 % | **61.7 %** |
+| median confidence | 0.66 | **0.46** |
+| frames under 0.70 | 126 / 241 | **187 / 227** |
+| top confusions | Metal→Ewaste, Glass→Plastic | **Plastic→Metal, Paper→Background, Ewaste→Metal** |
+
+**A retrain on the manufactured condition was measured and rejected.** v20 put
+the venue composites into the second training stage (with the hand-held ones
+kept):
+
+| | archive | venue |
+| --- | ---: | ---: |
+| v18 (shipped) | 72.2 / 83.0 | 44.9 / 61.7 |
+| v20 | 69.3 / 80.5 | 48.5 / **58.6** |
+
+Exact class gains 3.6 points at the venue and item action *loses* 3.1 — the
+project's own rule is that the probe line decides, so **v20 was not shipped**
+(`models/waste-resnet50/model.pt` is still v18). Synthetic sheets are not the
+real base; the fix is real photographs of it.
+
+**Should the vision model decide the bin instead?** Asked directly, and measured
+on 100 venue frames against the class the object actually is:
+
+| | value |
+| --- | ---: |
+| local ResNet50 exact | **45.0 %** |
+| namer stated a material | 71 / 100 |
+| … and was right | **39.4 %** |
+| … local was right on those same 71 | **50.7 %** |
+| on the 47 disagreements: local right / namer right / neither | **16 / 8 / 23** |
+
+So inverting the rule — "trust the name for the bin" — would make it **worse**,
+not better. The name is good at naming an object (it said "clear plastic bag"
+and it was right) and bad at the material question, because it calls the plastic
+casing of an e-waste item "plastic". When the two disagree the honest answer is
+still *"ask"*; the real fix is a classifier that has seen the base.
+
+**Capture square.** Widened from a 12 % pad to **20 %** (10 % margin each side)
+on 2026-11-19, at the operator's request — a business card is all corner, and a
+fixed base means the margin is plain base rather than a hand. Measured on the
+venue probe, against the 12 % square: 20 % costs **0** exact and **2.7** points
+of item action; 30 % costs 5.3 and 5.3. So 20 % ships, and it can grow once the
+model is retrained on the real base.
+
 ## 8. Guidance below the page (restored)
 
 A collapsed **"Other waste or unsure where it goes?"** section carries, in all

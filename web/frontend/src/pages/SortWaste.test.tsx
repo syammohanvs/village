@@ -398,10 +398,10 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
       fireEvent.loadedMetadata(video as HTMLVideoElement);
 
       const guide = await screen.findByTestId('crop-guide');
-      // 0.7 of the short side: 70% tall, and 39.38% wide on a 16:9 camera.
-      // (jsdom prints "70%" for "70.00%", so compare the numbers.)
-      expect(parseFloat(guide.style.height)).toBeCloseTo(70, 2);
-      expect(parseFloat(guide.style.width)).toBeCloseTo(39.38, 2);
+      // 0.8 of the short side: 80% tall, and 45% wide on a 16:9 camera.
+      // (jsdom prints "80%" for "80.00%", so compare the numbers.)
+      expect(parseFloat(guide.style.height)).toBeCloseTo(80, 2);
+      expect(parseFloat(guide.style.width)).toBeCloseTo(45, 2);
       // The frame is the camera's shape, so nothing is cropped out of view.
       const frame = (video as HTMLVideoElement).closest('.camera-frame') as HTMLElement;
       expect(frame.getAttribute('style') ?? '').toContain('aspect-ratio');

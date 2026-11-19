@@ -56,7 +56,10 @@ const CROP_SIZE = 224;
  *     Textile 0.70 inside ten seconds.  Three readings a quarter of a second
  *     apart, averaged, are one reading of the same held-up object.
  */
-const PRESS_CROP_SHARE = 0.7;
+// The fallback square, used only when the frame has no plain backdrop.  Slightly
+// wider than it was (0.70): with the fixed base this is a rare path, and the
+// item is the thing that must not be clipped.
+const PRESS_CROP_SHARE = 0.8;
 const PRESS_FRAMES = 3;
 const PRESS_FRAME_GAP_MS = 250;
 

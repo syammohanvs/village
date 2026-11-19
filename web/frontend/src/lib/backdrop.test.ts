@@ -103,3 +103,19 @@ describe('finding the object on the sheet', () => {
     expect(close.box!.width).toBeGreaterThanOrEqual(120);
   });
 });
+
+describe('the crop margin on a fixed base', () => {
+  it('leaves a margin around the item, now that the base is fixed', () => {
+    // Raised from 12 % to 20 % on 2026-11-19: the item is placed on a sheet, so
+    // the area around it is plain base — and a tight square was clipping the
+    // corners of flat items (a business card is all corner).  30 % was measured
+    // to cost more accuracy than it was worth.
+    const data = frame(160, 120, RED, { x: 55, y: 35, w: 50, h: 50, colour: [225, 225, 220] });
+    const box = backdropBox(data, 160, 120).box!;
+    expect(box.width).toBeGreaterThanOrEqual(Math.round(50 * 1.25));
+    expect(box.x).toBeLessThanOrEqual(55 - 6);
+    expect(box.y).toBeLessThanOrEqual(35 - 6);
+    expect(box.x + box.width).toBeGreaterThanOrEqual(105 + 6);
+    expect(box.y + box.height).toBeGreaterThanOrEqual(85 + 6);
+  });
+});

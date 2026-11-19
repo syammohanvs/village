@@ -26,10 +26,22 @@ const TOLERANCE = 48;
 const MIN_SHARE = 0.02;
 /** Above it the "backdrop" is not plain, or the item fills the frame. */
 const MAX_SHARE = 0.85;
-/** The crop grows by this much, so a rim of the object is never cut off. */
-const PAD = 0.12;
+/**
+ * The crop grows by this much past the object, so a rim of it is never cut off.
+ *
+ * Raised from 0.12 to 0.20 on 2026-11-19: the exhibit puts the item on a
+ * **fixed** base rather than holding it up, so the extra area around the item is
+ * plain base rather than somebody's hand or a wall, and a tighter square was
+ * clipping the corners of flat things (a business card is all corner).
+ *
+ * 0.20 and not more, measured on the venue-condition probe: 0.20 costs nothing
+ * in exact class and 2.7 points of item action against 0.12, while 0.30 costs
+ * 5.3 and 5.3 (the item fills less of the 224 square the model was trained on).
+ * Retraining on the real base is what should let this grow again.
+ */
+const PAD = 0.2;
 /** The crop is never smaller than this share of the short side. */
-const MIN_SIDE_SHARE = 0.45;
+const MIN_SIDE_SHARE = 0.6;
 /** Width of the border band the backdrop colour is read from. */
 const EDGE = 3;
 

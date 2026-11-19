@@ -2284,6 +2284,44 @@ Thermocol, which a person would also call paper.  **The two headline accuracy
 figures are not interchangeable:** 74.7 % / 82.6 % is the unresized path
 (`evaluate_pipeline.py`), 72.2 % / 80.5 % is the 224 crop the page sends.
 
+**The classifier has never seen the exhibit's own condition (2026-11-19, the
+operator's point).**  Every accuracy figure this file quotes is measured on
+**archive photographs** — objects on desks, in hands, in rooms — while the booth
+puts **one item on a fixed coloured base** and reads a webcam from above.
+`scripts/waste/make_venue_set.py` manufactures that condition (cut-out object on
+a red/green/white sheet, lamp, contact shadow, **no hand** — the operator
+confirmed the item is placed, not held) so the gap is measurable before there
+are real photographs of it.  227 held-out objects: v18 scores **72.2 % exact /
+83.0 % item on the archive probe but 44.9 / 61.7 on the venue probe**, median
+confidence **0.46**, and **187 of 227** frames under the 0.70 bin bar.  The
+confusions are new ones: Plastic→Metal, Paper→Background, Ewaste→Metal.  That is
+why a business card came back at 0.5–0.6 and a white remote at 0.37–0.46.
+
+**Retraining on the manufactured condition was measured and REJECTED.**  v20
+(stage 2 = venue composites + the hand-held ones) scores **69.3 / 80.5 archive
+and 48.5 / 58.6 venue** against v18's 72.2 / 83.0 and 44.9 / 61.7 — exact class
+gains 3.6 at the venue and item action *loses* 3.1, so by the project's own rule
+the probe line decides and **v20 is not shipped** (`models/waste-resnet50/model.pt`
+is still v18).  Synthetic sheets are not the real base.  **The next step is real
+photographs**: ~40 per bin class plus a few of each other material, taken with
+the booth's own webcam and base, then `train_handheld_head.py --extra-train` with
+a held-out slice of those photos as the judge.
+
+**"Trust the vision model instead" was measured, and it is wrong.**  On 100 venue
+frames the local model is exact **45.0 %**, the namer states a material on 71 of
+them and is right **39.4 %** (local is right on 50.7 % of those same 71), and on
+the **47 disagreements** the local model is right **16** times, the namer **8**,
+and neither **23**.  Inverting the rule would make the bins worse.  The namer is
+good at *naming* an object and bad at the *material* question — it calls the
+plastic casing of an e-waste item "plastic" — which is why a conflict still
+answers "ask the Gram Sahayak" rather than choosing a side.
+
+**The capture square is 20 % larger than the object (2026-11-19).**  `PAD` went
+0.12 → 0.20 (10 % margin each side) because the base is fixed and a business card
+is all corner.  Measured against the 12 % square on the venue probe: **0** exact
+and **−2.7** item action; 30 % would cost 5.3 and 5.3, so 0.20 is what ships and
+it can grow again once the model is retrained on the real base.
+
 **The named model is ResNet50, and the record says so.**  The recognition row used
 to be written as `model: "teachable-machine"` long after the browser MobileNet
 was removed; the page, `api.ts` and the backend's default now say `resnet50`.
