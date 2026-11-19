@@ -1258,6 +1258,13 @@ export function SortWaste() {
               <p className="hint">
                 {t('sort.safetyNote')}
               </p>
+              {visionReady && (
+                // A hosted model means the crop leaves the laptop.  Saying it
+                // only when one is configured keeps the note true either way.
+                <p className="hint" data-testid="waste-vision-note">
+                  {t('sort.visionNote')}
+                </p>
+              )}
             </div>
           </details>
         </div>

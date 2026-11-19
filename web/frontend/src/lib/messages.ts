@@ -807,6 +807,13 @@ export const MESSAGES = {
     'ക്യാമറ മാലിന്യം തിരിച്ചറിയുന്നു; ആളുകളെ തിരിച്ചറിയുന്നില്ല, ഭാരം അളക്കുന്നില്ല, ബിന്നിൽ എന്തെങ്കിലും ഇട്ടുവെന്ന് തെളിയിക്കുന്നുമില്ല. ബിന്നുകളിൽ സൂചന LED-കൾ മാത്രമാണ്; അതിനാൽ ബിൻ എത്ര നിറഞ്ഞുവെന്ന് ഇവിടെ അളക്കുന്നില്ല.',
   ],
 
+  // Said only when a hosted model is configured: the crop leaves the laptop.
+  'sort.visionNote': [
+    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. Nothing else is sent, and the bin is still decided on this laptop.',
+    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। इसके अलावा कुछ नहीं भेजा जाता, और बिन का फ़ैसला अब भी इसी लैपटॉप पर होता है।',
+    'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. മറ്റൊന്നും അയക്കുന്നില്ല; ബിൻ തീരുമാനം ഇപ്പോഴും ഈ ലാപ്ടോപ്പിൽ തന്നെയാണ്.',
+  ],
+
   // ------------------------------------------------------------- Sara's panel ---
   'panel.noSpeech': [
     'No speech was detected. Press Start Speaking again and speak clearly.',
