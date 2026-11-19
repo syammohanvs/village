@@ -444,21 +444,10 @@ export function decide(input: DecisionInput): Decision {
     if (confidence < input.binBar) {
       return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'belowBar' };
     }
-    // A bin needs the local answer *and*, when a namer is configured, an
-    // identification that did not fail.  A configured-but-unavailable namer is
-    // degraded mode: a person confirms before anything is lit.
-    if (input.visionConfigured && !input.itemLabel) {
-      return {
-        ...empty,
-        ...common,
-        status: 'uncertain',
-        routeId: `bin.${bin}`,
-        bin,
-        reasonId: 'identificationMissing',
-        needsOperator: true,
-        allowLamp: false,
-      };
-    }
+    // No name means the hosted model could not answer — the internet is down,
+    // or it timed out.  That is exactly what the offline model has been
+    // learning the booth's own items for, so its reading stands (the operator's
+    // instruction, 2026-11-19).  The card still says the name was unavailable.
     return {
       ...empty,
       ...common,

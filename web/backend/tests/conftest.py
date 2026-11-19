@@ -97,6 +97,9 @@ def make_settings(tmp_path: Path) -> Settings:
         # A venue correction writes into this tree, so keep it inside tmp_path
         # rather than next to the repository's real samples.
         waste_capture_dir=tmp_path / "captures",
+        # Learning from the booth is on in production; in the suite each test
+        # gets its own folder so nothing lands in the repository's data/.
+        waste_knowledge_dir=tmp_path / "knowledge",
         # The capture log is a training aid and is off by default; these tests are
         # about that log, so they turn it on.  One test below checks the default.
         waste_save_crops=True,

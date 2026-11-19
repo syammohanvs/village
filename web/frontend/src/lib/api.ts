@@ -546,6 +546,25 @@ export const api = {
   },
 
   /**
+   * File this crop under the class the hosted model named.
+   *
+   * The booth's offline model is the fallback for a lost connection, so every
+   * named item is a training photo the venue did not have before.  Best effort:
+   * the page ignores the answer, and a failure must never fail the press.
+   */
+  wasteTeach(
+    image: string,
+    label: string,
+    said = '',
+    model = '',
+  ): Promise<{ saved: boolean; file?: string; label?: string; reason?: string }> {
+    return request<{ saved: boolean; file?: string; label?: string; reason?: string }>(
+      '/waste/teach',
+      { method: 'POST', body: { image, label, said, model }, mode: undefined },
+    );
+  },
+
+  /**
    * Tell the backend what the item really was.  The crop is copied into the
    * training tree, so a mistake at the venue becomes a training photo.
    */

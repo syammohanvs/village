@@ -2284,6 +2284,34 @@ Thermocol, which a person would also call paper.  **The two headline accuracy
 figures are not interchangeable:** 74.7 % / 82.6 % is the unresized path
 (`evaluate_pipeline.py`), 72.2 % / 80.5 % is the 224 crop the page sends.
 
+**The local model stays, and learns from the name (2026-11-19, the operator's
+correction to the removal).**  Between one message and the next the operator
+asked for ResNet50 to be removed and then put back, with a better reason: *"let
+it be there.  Let it learn from cloud model.  All images we show on the fixed
+background tell it is this item and classified like this so that if in exhibition
+hall internet goes we have a reliable fall back with known objects."*  So:
+
+- **The name decides the visible answer**, exactly as above; the local model runs
+  on every press **in the background** (one `/waste/classify`, parallel with the
+  name) and is not shown on the visitor card.
+- **Every named press teaches it**: `POST /api/v1/waste/teach` files the crop
+  under the class the name gave, into **`data/waste-knowledge/<Class>/`** with an
+  `index.jsonl` line (label, the model's own words, which model).  It is a
+  separate tree from `data/waste-samples/` on purpose — those are human-verified
+  corrections, these are machine-named, and a trainer can weight or exclude them.
+  Bounded by `VILLAGE_WASTE_KNOWLEDGE_KEEP` (6000, oldest first) and switched by
+  `VILLAGE_WASTE_LEARN` (default **on**); the tree is git-ignored like the crop
+  log, so the trained checkpoint travels and the photos need not.
+- **With no name — the internet is down — the local model answers** on its own
+  bars (0.70 bin / 0.50 material).  That is the fallback this was put back for;
+  the card still says the name was unavailable.
+- **Retraining is a script, not a runtime path**: when enough booth crops have
+  accumulated, `train_handheld_head.py --extra-train data/waste-knowledge` (into a
+  new version dir), then `export_resnet50.py`.  Judge it on a held-out slice of
+  *booth* photos, not on the archive probe.
+- The page's disclosure now says the crop is kept on the laptop to teach the
+  offline model (en/hi/ml), and `sort.visionNote` says the same.
+
 **The item name decides the category; the classifier is the fallback
 (2026-11-19, the operator's instruction after four of their own items).**  The
 operator saw the hosted namer get *every* item right (a clear plastic bag, a

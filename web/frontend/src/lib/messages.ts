@@ -902,9 +902,9 @@ export const MESSAGES = {
     'ചിത്രത്തിന്റെ നടുഭാഗം ഉപയോഗിക്കുന്നു — ചതുരത്തിനുള്ളിൽ ഒരു വസ്തു വയ്ക്കുക.',
   ],
   'sort.disclosure': [
-    'When you press Check the item, a cropped picture is sent to our configured cloud AI service for identification. Waste classification runs on this laptop.',
-    '“चीज़ जाँचें” दबाने पर एक कटी हुई तस्वीर पहचान के लिए हमारी क्लाउड AI सेवा को भेजी जाती है। कचरे का वर्गीकरण इसी लैपटॉप पर होता है।',
-    '“വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു വെട്ടിയ ചിത്രം തിരിച്ചറിയലിനായി ഞങ്ങളുടെ ക്ലൗഡ് AI സേവനത്തിന് അയക്കുന്നു. മാലിന്യ വർഗ്ഗീകരണം ഈ ലാപ്ടോപ്പിൽ തന്നെ നടക്കുന്നു.',
+    'When you press Check the item, a cropped picture is sent to our cloud AI service to name the item, and a copy is kept on this laptop so the offline model can learn the items shown here. Nothing else leaves this laptop.',
+    '“चीज़ जाँचें” दबाने पर एक कटी हुई तस्वीर चीज़ का नाम जानने के लिए हमारी क्लाउड AI सेवा को भेजी जाती है, और एक प्रति इसी लैपटॉप पर रखी जाती है ताकि ऑफ़लाइन मॉडल यहाँ दिखाई गई चीज़ें सीख सके। इसके अलावा कुछ बाहर नहीं जाता।',
+    '“വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു വെട്ടിയ ചിത്രം വസ്തുവിന്റെ പേര് അറിയാൻ ഞങ്ങളുടെ ക്ലൗഡ് AI സേവനത്തിന് അയക്കുന്നു, ഒരു പകർപ്പ് ഈ ലാപ്ടോപ്പിൽ സൂക്ഷിക്കുന്നു — ഓഫ്‌ലൈൻ മോഡലിന് ഇവിടെ കാണിക്കുന്ന വസ്തുക്കൾ പഠിക്കാൻ. അതല്ലാതെ മറ്റൊന്നും പുറത്തുപോകുന്നില്ല.',
   ],
   'sort.guideTitle': [
     'Other waste or unsure where it goes?',
@@ -999,8 +999,8 @@ export const MESSAGES = {
 
   // Said only when a hosted model is configured: the crop leaves the laptop.
   'sort.visionNote': [
-    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. Nothing else is sent, and the waste category is decided from that name.',
-    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। इसके अलावा कुछ नहीं भेजा जाता, और कचरे की श्रेणी उसी नाम से तय होती है।',
+    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. The category is decided from that name, and the crop is kept here to teach the offline model.',
+    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। श्रेणी उसी नाम से तय होती है, और ऑफ़लाइन मॉडल को सिखाने के लिए तस्वीर यहीं रखी जाती है।',
     'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. മറ്റൊന്നും അയക്കുന്നില്ല; ബിൻ തീരുമാനം ഇപ്പോഴും ഈ ലാപ്ടോപ്പിൽ തന്നെയാണ്.',
   ],
 

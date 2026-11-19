@@ -115,6 +115,9 @@ class Settings:
     waste_capture_dir: Path | None
     waste_capture_keep: int
     waste_save_crops: bool
+    waste_learn: bool
+    waste_knowledge_dir: Path
+    waste_knowledge_keep: int
     # Where a corrected crop is filed, one folder per class.  This is the tree
     # `train_handheld_head.py --extra-train` reads, so a venue mistake becomes a
     # training photo with one press.
@@ -213,6 +216,14 @@ class Settings:
             # unless an operator turns it on.  A visitor's frames are not
             # silently retained by default.
             waste_save_crops=_bool("VILLAGE_WASTE_SAVE_CROPS", False),
+            # Learning from the booth: every press whose item the hosted model
+            # named is filed under that class, so the offline model learns the
+            # venue's own objects on the fixed base.  Separate from
+            # `waste-samples` (which is human-verified) on purpose.
+            waste_learn=_bool("VILLAGE_WASTE_LEARN", True),
+            waste_knowledge_dir=_path("VILLAGE_WASTE_KNOWLEDGE_DIR",
+                                      root / "data" / "waste-knowledge"),
+            waste_knowledge_keep=_int("VILLAGE_WASTE_KNOWLEDGE_KEEP", 6000),
             waste_samples_dir=_path("VILLAGE_WASTE_SAMPLES_DIR",
                                     root / "data" / "waste-samples"),
             auth_enabled=_bool("VILLAGE_AUTH_ENABLED", True),

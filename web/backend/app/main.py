@@ -47,6 +47,7 @@ from .protocol import (
     LoginRequest,
     WasteClassifyRequest,
     WasteCorrectionRequest,
+    WasteTeachRequest,
 )
 from .simulator import SimulatorError
 from .tts import PiperTts, TtsError
@@ -821,6 +822,24 @@ def create_app(
         """
         try:
             return await asyncio.to_thread(waste_resnet.label_capture, body.file, body.actual)
+        except waste_resnet.WasteModelError as exc:
+            raise HTTPException(
+                status_code=exc.status,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+
+    @app.post("/api/v1/waste/teach")
+    async def waste_teach(body: WasteTeachRequest):
+        """File a crop under the class the hosted model named.
+
+        The booth's offline model is the fallback for a lost internet connection,
+        so every named item is a training photo the venue did not have before.
+        Best effort: a failure never fails the press.
+        """
+        try:
+            return await asyncio.to_thread(
+                waste_resnet.learn, body.image, body.label, body.said, body.model
+            )
         except waste_resnet.WasteModelError as exc:
             raise HTTPException(
                 status_code=exc.status,

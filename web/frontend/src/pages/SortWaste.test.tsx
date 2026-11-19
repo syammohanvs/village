@@ -18,6 +18,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       wasteResnetStatus: vi.fn(),
       wasteClassify: vi.fn(),
       wasteIdentify: vi.fn(),
+      wasteTeach: vi.fn(),
       postRecognition: vi.fn(),
       voiceReadiness: vi.fn(),
       voiceIntents: vi.fn(),
@@ -172,6 +173,11 @@ beforeEach(() => {
     model: 'resnet50',
     predictions: predictionState.current,
   }));
+  vi.mocked(api.wasteTeach).mockResolvedValue({
+    saved: true,
+    file: 'Plastic/booth-1.jpg',
+    label: 'Plastic',
+  });
   predictionState.current = DEFAULT_PREDICTIONS;
 });
 
@@ -225,9 +231,9 @@ describe('Sort Waste', () => {
 });
 
 describe('Sort Waste — the camera waits for the model', () => {
-  it('opens the camera only when the naming service is ready', async () => {
-    // The page has one model now.  Without it there is nothing to ask, so the
-    // Start button stays off rather than opening a camera that cannot answer.
+  it('opens the camera without a naming service, but offers no check', async () => {
+    // The preview is a real capability; the check is not, because there is no
+    // model to ask.  The page says so instead of guessing.
     vi.mocked(api.state).mockResolvedValue(makeState());
     vi.mocked(api.events).mockResolvedValue({ events: [] });
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
@@ -237,12 +243,19 @@ describe('Sort Waste — the camera waits for the model', () => {
       installed: false,
       model: 'resnet50',
       classes: [],
-      vision: { provider: 'cloudflare', model: 'llama', ready: false },
+      vision: { provider: null, model: null, ready: false },
+    });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
+        enumerateDevices: vi.fn().mockResolvedValue([]),
+      },
     });
     render(<App />);
 
     const start = await screen.findByTestId('start-camera');
-    expect(start).toBeDisabled();
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
     expect(await screen.findByText(/No item-naming service is configured/i)).toBeInTheDocument();
   }, 15000);
 });
@@ -848,14 +861,31 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('asks a person when the namer is configured but did not answer', async () => {
+  it('falls back to the offline model when the namer does not answer', async () => {
+    // The internet went, or the model timed out.  The local model has been
+    // learning the booth's own items for exactly this, so it answers — and the
+    // card says the name was unavailable rather than pretending otherwise.
     const restore = await press({ predictions: plasticAt(0.95), object: null });
     try {
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
+        { timeout: 8000 },
+      );
       expect(within(screen.getByTestId('waste-identify')).getByTestId('waste-sees')).toHaveTextContent(
         /identification unavailable/i,
       );
-      // With no name there is nothing to decide from, so the page asks.
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('asks a person when neither model can name it', async () => {
+    // No name and a local reading under its bar: nothing to act on.
+    const restore = await press({ predictions: plasticAt(0.55), object: null });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i);
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
@@ -964,6 +994,23 @@ describe('Sort Waste — two models, one decision', () => {
     expect(api.postRecognition).not.toHaveBeenCalled();
   }, 25000);
 
+  it('teaches the offline model the item the name gave', async () => {
+    // Every named press is a training photo for the fallback model: the crop,
+    // under the class the name implied.  Fire-and-forget, so the press is never
+    // held up by it.
+    vi.mocked(api.wasteTeach).mockResolvedValue({ saved: true, file: 'Plastic/booth-1.jpg', label: 'Plastic' });
+    const restore = await press({ predictions: plasticAt(0.4), object: 'clear plastic bag' });
+    try {
+      await waitFor(() => expect(api.wasteTeach).toHaveBeenCalled(), { timeout: 8000 });
+      const [image, label, said] = vi.mocked(api.wasteTeach).mock.calls[0];
+      expect(String(image)).toMatch(/^data:image\/jpeg/);
+      expect(label).toBe('Plastic');
+      expect(said).toBe('clear plastic bag');
+    } finally {
+      restore();
+    }
+  }, 25000);
+
   it('shows the crop it analysed, and says so when it fell back to the centre', async () => {
     const restore = await press({ predictions: plasticAt(0.96), object: 'clear plastic lid' });
     try {
@@ -987,18 +1034,19 @@ describe('Sort Waste — two models, one decision', () => {
         }) as never,
     });
     try {
+      // The cap passed with no name, so the offline model answered.
       await waitFor(
-        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i),
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
         { timeout: 12000 },
       );
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
 
       await act(async () => {
         release?.({ object: 'orange pencil', provider: 'cloudflare', model: 'llama', ms: 9000 });
       });
       // The late answer must not change the action or the record.
-      expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i);
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i);
       expect(vi.mocked(api.postRecognition).mock.calls).toHaveLength(1);
     } finally {
       restore();

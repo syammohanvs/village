@@ -198,6 +198,22 @@ class WasteCorrectionRequest(BaseModel):
     actual: str = Field(min_length=1, max_length=20)
 
 
+class WasteTeachRequest(BaseModel):
+    """A crop the hosted model named, filed so the offline model can learn it.
+
+    `label` is the class the name was mapped to (one of the eleven), `said` the
+    model's own words and `model` which one answered — kept in the log so a
+    later session can tell a machine-named crop from a human correction.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str = Field(min_length=32, max_length=3_000_000)
+    label: str = Field(min_length=1, max_length=20)
+    said: str = Field(default="", max_length=200)
+    model: str = Field(default="", max_length=80)
+
+
 class WasteClassifyRequest(BaseModel):
     """A 224x224 frame (data URL or bare base64) to classify with ResNet50."""
 

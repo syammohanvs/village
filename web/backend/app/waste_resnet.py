@@ -331,6 +331,91 @@ def predict(image: Any) -> list[dict[str, Any]]:
     ]
 
 
+def learn(image_b64: str, label: str, said: str = "", model: str = "") -> dict[str, Any]:
+    """Keep this crop as training data for the class the hosted model named.
+
+    The booth has one model that reads objects well (the hosted one) and one
+    that has never seen the booth's own base (ResNet50).  Every press names the
+    item, so the named crop is filed under that class and the offline model can
+    learn the venue's own objects, light and background.  If the internet goes,
+    that model is the fallback.
+
+    It is deliberately a *separate* tree from `waste-samples`: those are
+    human-verified corrections, these are machine-named, and a future trainer
+    can weight or exclude them without guessing which is which.
+    """
+    wanted = (label or "").strip()
+    canonical = next((c for c in CLASSES if c.lower() == wanted.lower()), None)
+    if canonical is None:
+        raise WasteModelError(
+            422,
+            "BAD_LABEL",
+            "label must be one of the eleven classes the model knows",
+        )
+
+    settings = _settings()
+    if settings is not None and not getattr(settings, "waste_learn", False):
+        return {"saved": False, "reason": "learning is switched off"}
+
+    try:
+        raw = base64.b64decode(image_b64.split(",")[-1], validate=False)
+        from PIL import Image
+
+        Image.open(io.BytesIO(raw)).convert("RGB")  # refuses junk before anything is written
+    except Exception as exc:  # noqa: BLE001 - a bad crop must not fail the press
+        raise WasteModelError(422, "BAD_IMAGE", f"the image could not be read: {exc}") from exc
+    if len(raw) > 3 * 1024 * 1024:
+        raise WasteModelError(413, "IMAGE_TOO_LARGE", "the crop is larger than 3 MB")
+
+    folder = (settings.waste_knowledge_dir if settings else None) or (
+        Path(__file__).resolve().parents[3] / "data" / "waste-knowledge"
+    )
+    keep = getattr(settings, "waste_knowledge_keep", 6000) if settings else 6000
+    try:
+        target = Path(folder) / canonical
+        target.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+        name = f"booth-{stamp}-{canonical.lower()}"
+        path = target / f"{name}.jpg"
+        suffix = 1
+        with _capture_lock:
+            while path.exists():
+                path = target / f"{name}-{suffix}.jpg"
+                suffix += 1
+            path.write_bytes(raw)
+            line = {
+                "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "file": f"{canonical}/{path.name}",
+                "label": canonical,
+                "said": (said or "")[:200],
+                "model": (model or "")[:80],
+            }
+            with (Path(folder) / "index.jsonl").open("a", encoding="utf-8") as log:
+                log.write(json.dumps(line) + "\n")
+            _prune_knowledge(Path(folder), int(keep))
+    except WasteModelError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - never fail a press over a training copy
+        return {"saved": False, "reason": str(exc)[:200]}
+
+    return {"saved": True, "file": f"{canonical}/{path.name}", "label": canonical}
+
+
+def _prune_knowledge(folder: Path, keep: int) -> None:
+    """Bound the tree: oldest first, and never the crop just written."""
+    if keep <= 0:
+        return
+    files = sorted(
+        (p for p in folder.glob("*/*.jpg") if p.is_file()),
+        key=lambda p: p.stat().st_mtime,
+    )
+    for old in files[:-keep]:
+        try:
+            old.unlink()
+        except OSError:
+            continue
+
+
 def classify(image_b64: str) -> list[dict[str, Any]]:
     """Return every class with its probability, highest first.
 

@@ -97,19 +97,31 @@ describe('the item name decides, and the classifier is the fallback', () => {
   });
 });
 
-describe('a configured-but-silent namer is degraded mode', () => {
-  it('does not light a bin when the namer was asked and did not answer', () => {
+describe('a silent namer falls back to the offline model', () => {
+  it('answers from the classifier when the hosted model did not answer', () => {
+    // The internet is down, or the name timed out.  That is what the offline
+    // model has been learning the booth's own items for, so its reading stands.
     const decision = decide({
       predictions: dist('Plastic', 0.95),
       itemLabel: null,
       visionConfigured: true,
       ...BARS,
     });
-    expect(decision.status).toBe('uncertain');
-    expect(decision.reasonId).toBe('identificationMissing');
     expect(decision.routeId).toBe('bin.plastic');
+    expect(decision.allowLamp).toBe(true);
+    expect(decision.source).toBe('local');
+  });
+
+  it('still asks when the offline model is under its bar too', () => {
+    const decision = decide({
+      predictions: dist('Plastic', 0.55),
+      itemLabel: null,
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('uncertain');
+    expect(decision.reasonId).toBe('belowBar');
     expect(decision.allowLamp).toBe(false);
-    expect(decision.needsOperator).toBe(true);
   });
 });
 

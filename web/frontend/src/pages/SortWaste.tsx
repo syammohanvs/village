@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '../lib/api';
+import type { Prediction } from '../lib/wasteStabilizer';
 import { useApi } from '../lib/useApi';
 import { BinLeds } from '../components/BinLeds';
 import { Card, Notice } from '../components/ui';
@@ -367,6 +368,10 @@ export function SortWaste() {
     });
 
     let naming: Promise<string | null> = Promise.resolve(null);
+    // The offline model runs in the background on every press.  It is not the
+    // answer any more, but it must keep seeing the booth's own objects: it is
+    // what answers if the internet goes, and every press teaches it (below).
+    let local: Promise<Prediction[]> = Promise.resolve([]);
     let asked = false;
     try {
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
@@ -407,6 +412,18 @@ export function SortWaste() {
             const image = lastCropRef.current;
             naming = api.wasteIdentify(image).then((answer) => answer.object).catch(() => null);
           }
+          if (lastCropRef.current) {
+            const image = lastCropRef.current;
+            local = api
+              .wasteClassify(image)
+              .then((answer) =>
+                answer.predictions.map((row) => ({
+                  label: row.className,
+                  confidence: row.probability,
+                })),
+              )
+              .catch(() => [] as Prediction[]);
+          }
         }
       };
 
@@ -422,10 +439,11 @@ export function SortWaste() {
             new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
           ])
         : null;
+      const predictions = await local;
       if (seq !== checkSeq.current) return;
 
       const decision = decide({
-        predictions: [],
+        predictions,
         itemLabel,
         visionConfigured: visionReady,
         binBar: BIN_CONFIDENCE,
@@ -440,6 +458,16 @@ export function SortWaste() {
         cropMode,
         error: '',
       });
+
+      // Teach the offline model in the background: this crop, under the class
+      // the hosted model named.  Fire-and-forget — a training copy must never
+      // delay or fail a press.
+      if (lastCropRef.current && decision.source === 'vision' && decision.classId) {
+        const label = decision.classId.charAt(0).toUpperCase() + decision.classId.slice(1);
+        void api
+          .wasteTeach(lastCropRef.current, label, itemLabel ?? '', modelStatus.data?.vision?.model ?? '')
+          .catch(() => undefined);
+      }
 
       // Sara says the whole answer once, in the language it began in: what the
       // item is, what it is made of, and where it goes.

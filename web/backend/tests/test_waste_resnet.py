@@ -2,6 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import base64
+import io
+
+
+def _crop() -> str:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (200, 210, 220)).save(buffer, format="JPEG")
+    return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+CROP = _crop()
+
 import pytest
 
 from app import waste_resnet
@@ -210,3 +224,74 @@ def test_crops_are_not_kept_unless_an_operator_asks(tmp_path: Path) -> None:
 
     assert kept is not None
     assert kept.is_file()
+
+
+def test_a_named_crop_is_filed_under_the_class_the_name_gave(tmp_path: Path) -> None:
+    """Every named press teaches the offline model: the crop, its class, the name.
+
+    The tree is separate from `waste-samples` (human-verified) so a later
+    trainer can tell a machine-named crop from a correction.
+    """
+    settings = make_settings(tmp_path)
+    original = waste_resnet._settings
+    waste_resnet._settings = lambda: settings  # type: ignore[assignment]
+    try:
+        first = waste_resnet.learn(CROP, "Plastic", "clear plastic bag", "llama")
+        second = waste_resnet.learn(CROP, "plastic", "plastic lid", "llama")
+    finally:
+        waste_resnet._settings = original  # type: ignore[assignment]
+
+    assert first["saved"] is True
+    assert first["label"] == "Plastic"
+    folder = settings.waste_knowledge_dir / "Plastic"
+    assert folder.is_dir()
+    assert len(list(folder.glob("*.jpg"))) == 2
+    lines = (settings.waste_knowledge_dir / "index.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 2
+    import json as _json
+
+    assert _json.loads(lines[0])["label"] == "Plastic"
+    assert _json.loads(lines[0])["said"] == "clear plastic bag"
+    # Two presses in one second are two pictures, not one overwritten.
+    assert first["file"] != second["file"]
+
+
+def test_learning_can_be_switched_off_and_bad_labels_are_refused(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    settings = replace(make_settings(tmp_path), waste_learn=False)
+    original = waste_resnet._settings
+    waste_resnet._settings = lambda: settings  # type: ignore[assignment]
+    try:
+        answer = waste_resnet.learn(CROP, "Plastic", "bag", "llama")
+        assert answer["saved"] is False
+        assert not settings.waste_knowledge_dir.exists()
+
+        import pytest
+
+        with pytest.raises(waste_resnet.WasteModelError):
+            waste_resnet.learn(CROP, "not-a-class", "x", "llama")
+    finally:
+        waste_resnet._settings = original  # type: ignore[assignment]
+
+
+@pytest.mark.asyncio
+async def test_the_teach_route_files_the_crop_and_names_the_label(tmp_path: Path) -> None:
+    """The page's teaching call, over HTTP: the route it actually uses."""
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, _gateway, _app):
+        response = await client.post(
+            "/api/v1/waste/teach",
+            json={"image": CROP, "label": "Paper", "said": "white paper card", "model": "llama"},
+        )
+        refused = await client.post(
+            "/api/v1/waste/teach",
+            json={"image": CROP, "label": "unicorn"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["saved"] is True
+    assert body["label"] == "Paper"
+    assert (settings.waste_knowledge_dir / body["file"]).is_file()
+    assert refused.status_code == 422
