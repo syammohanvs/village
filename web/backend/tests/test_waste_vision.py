@@ -195,3 +195,23 @@ def test_deepseek_is_the_last_resort_when_every_cloudflare_account_is_spent(
     assert seen == ["cloudflare", "cloudflare", "opencode"]
     # The page is told how many chances there are, not a guess.
     assert vision.status()["chain"] == 3
+
+
+def test_any_lead_in_is_stripped_to_the_name() -> None:
+    """The models phrase the lead-in differently every time.
+
+    Measured 2026-11-19: `llama-3.2-11b-vision` answered "object in this image is
+    a clear plastic lid" — the old list of prefixes did not include it, so that
+    whole sentence was shown to the visitor and spoken by Sara.
+    """
+    assert vision._clean("object in this image is a clear plastic lid") == "clear plastic lid"
+    assert vision._clean("The single object in this photo is a clear plastic lid.") == "clear plastic lid"
+    assert (
+        vision._clean("The object in this image appears to be a piece of black plastic with metal attached.")
+        == "piece of black plastic with metal attached"
+    )
+    assert vision._clean("It is a white plastic remote control") == "white plastic remote control"
+    # A name that already is a name is untouched.
+    assert vision._clean("Clear plastic lid") == "Clear plastic lid"
+    # ...and silence stays silent.
+    assert vision._clean("nothing") is None

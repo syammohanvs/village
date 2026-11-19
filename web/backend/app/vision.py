@@ -181,18 +181,19 @@ def _clean(text: str) -> str | None:
     if lowered.startswith(("i can", "i cannot", "i'm sorry", "sorry")):
         return None
     # Some models answer the question instead of naming the object ("the single
-    # object in this photo is a clear plastic lid").  The name is what follows.
-    for prefix in (
-        "the single object in this photo is ",
-        "single object in this photo is ",
-        "the object in this photo is ",
-        "the object is ",
-        "this is ",
-        "it is ",
-    ):
-        if lowered.startswith(prefix):
-            name = name[len(prefix):]
-            break
+    # object in this photo is a clear plastic lid"), and they phrase the lead-in
+    # differently every time — "object in this image is", "the item appears to
+    # be", "this looks like".  Rather than list them all, take what follows the
+    # first copula when the words before it are about the picture, not the thing.
+    for marker in (" is ", " appears to be ", " looks like ", " seems to be "):
+        if marker in lowered:
+            lead = lowered[: lowered.index(marker)]
+            if any(word in lead for word in (
+                "object", "item", "image", "photo", "picture", "this", "it",
+            )):
+                name = name[lowered.index(marker) + len(marker):]
+                lowered = name.lower()
+                break
     for article in ("a ", "an ", "the "):
         if lowered.startswith(article):
             name = name[len(article):]
