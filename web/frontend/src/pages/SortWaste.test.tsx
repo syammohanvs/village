@@ -1011,6 +1011,24 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
+  it('files nothing for an item the name placed in none of the bins', async () => {
+    // A pencil is wood, graphite and clay: the name said so, and it is not one of
+    // the eleven classes the offline model can be taught.  The classifier's own
+    // guess must not be written back as if the name had named it — that taught
+    // ResNet50 "a pencil is plastic" once per press.
+    vi.mocked(api.wasteTeach).mockClear();
+    const restore = await press({ predictions: plasticAt(0.72), object: 'red pencil with a blue eraser' });
+    try {
+      await screen.findByTestId('waste-waiting', {}, { timeout: 8000 }).catch(() => undefined);
+      await waitFor(() => expect(screen.getByTestId('waste-sees')).toHaveTextContent(/red pencil/i), {
+        timeout: 8000,
+      });
+      expect(api.wasteTeach).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  }, 25000);
+
   it('shows the crop it analysed, and says so when it fell back to the centre', async () => {
     const restore = await press({ predictions: plasticAt(0.96), object: 'clear plastic lid' });
     try {

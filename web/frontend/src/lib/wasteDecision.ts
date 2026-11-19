@@ -402,12 +402,23 @@ export function decide(input: DecisionInput): Decision {
   // A pencil (or crayon) is in none of the three bins, however sure the picture
   // is about the material — that rule is the operator's, and it is text, not a
   // fourth class.
+  //
+  // `classId` is cleared on purpose.  The name did decide, but it decided "none
+  // of our bins", which is not one of the eleven classes the offline model can
+  // be taught — and the page files a crop as training data only when
+  // `source === 'vision'` AND there is a class.  Inheriting `common.classId`
+  // here meant the classifier's own guess was written back as if the name had
+  // named it: a pencil pressed as "Plastic 0.7" taught ResNet50 that a pencil is
+  // plastic, over and over, which is the one mistake the pencil rule exists to
+  // prevent.
   if (claim === 'separate.unknown') {
     return {
       ...empty,
       ...common,
       status: 'uncertain',
       routeId: 'separate.unknown',
+      classId: null,
+      classConfidence: 0,
       source: 'vision',
       reasonId: 'named',
       allowLamp: false,

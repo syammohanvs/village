@@ -54,6 +54,10 @@ describe('the item name decides, and the classifier is the fallback', () => {
     expect(decision.routeId).toBe('separate.unknown');
     expect(decision.allowLamp).toBe(false);
     expect(decision.source).toBe('vision');
+    // Nothing to teach: the name said "none of our bins", so the classifier's
+    // own guess must not be filed as training data under a name-derived label.
+    expect(decision.classId).toBeNull();
+    expect(decision.localClassId).toBe('Paper');
   });
 
   it('keeps a special-care cue before everything else', () => {
