@@ -157,7 +157,12 @@ beforeEach(() => {
   vi.mocked(api.settings).mockResolvedValue(makeSettings());
   vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
   vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-  vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: false, model: 'resnet50', classes: [] });
+  vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+    installed: false,
+    model: 'resnet50',
+    classes: [],
+    vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true },
+  });
   vi.mocked(api.wasteCorrect).mockResolvedValue({
     file: 'capture.jpg',
     actual: 'Plastic',
@@ -172,12 +177,16 @@ beforeEach(() => {
 
 describe('Sort Waste', () => {
   it('says the model is missing and offers the preview without guessing', async () => {
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: false,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: null, model: null, ready: false },
+    });
     render(<App />);
 
     expect(await screen.findByText(/Recognition model is missing/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Start the camera for a preview. Recognition needs the model./i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/No item-naming service is configured/i)).toBeInTheDocument();
 
     // Preview is a real capability, so the button is enabled and the page says
     // plainly that no bin will be suggested.  Claiming preview while disabling
@@ -195,7 +204,12 @@ describe('Sort Waste', () => {
   });
 
   it('enables the camera when the model is installed and hides tuning under details', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     render(<App />);
 
     // Released only once the classifier is ready: pressing it into a
@@ -208,115 +222,28 @@ describe('Sort Waste', () => {
     expect(screen.getByText(/does not identify people/i)).toBeInTheDocument();
   });
 
-  it('ranks what the model reported and calls predict without the flipped flag', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'plastic',
-      recognition: { id: 7, category: 'plastic', confidence: 0.95 },
-    });
-    const stopTrack = vi.fn();
-    const stream = { getTracks: () => [{ stop: stopTrack }] };
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue(stream),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // A press is the only trigger now: no watcher decides for itself what is
-    // "being shown".
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
-    // predict(image, flipped) returns every class; passing a count mirrored the
-    // frame and made '3' look like a page size.
-    expect(vi.mocked(api.wasteClassify).mock.calls.length).toBeGreaterThan(0);
-
-    // The list is ranked, not left in metadata order (which starts at Organic).
-    await waitFor(() => {
-      const rows = Array.from(document.querySelectorAll('.prediction-list li'));
-      expect(rows).toHaveLength(3);
-      expect(rows[0].textContent).toContain('Plastic');
-      expect(rows[1].textContent).toContain('Paper');
-    });
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
-      category: 'plastic',
-      confidence: 0.95,
-    });
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Plastic');
-
-    // The camera stays on after a confirmed item, so the next item is one press
-    // away and needs no Start Camera.
-    expect(stopTrack).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
-    expect(screen.queryByTestId('waste-camera-stopped')).not.toBeInTheDocument();
-  }, 15000);
-
 });
 
 describe('Sort Waste — the camera waits for the model', () => {
-  it('keeps Start Camera disabled until the classifier is ready', async () => {
-    // Asked for at the venue: if the page is still preparing, the button must
-    // not offer to open the camera.  The model is loaded when the page opens,
-    // and the button is released the moment it can answer.
-    // This describe sits outside the shared one, so it carries its own mocks.
+  it('opens the camera only when the naming service is ready', async () => {
+    // The page has one model now.  Without it there is nothing to ask, so the
+    // Start button stays off rather than opening a camera that cannot answer.
     vi.mocked(api.state).mockResolvedValue(makeState());
     vi.mocked(api.events).mockResolvedValue({ events: [] });
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
     vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
     vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-
-    let resolveLoad: ((value: { installed: boolean; model: string; classes: string[] }) => void) | null = null;
-    const loading = new Promise<{ installed: boolean; model: string; classes: string[] }>((resolve) => {
-      resolveLoad = resolve;
-    });
-    let calls = 0;
-    vi.mocked(api.wasteResnetStatus).mockImplementation(() => {
-      calls += 1;
-      // First call is the page's status query; the second is the model load,
-      // which is held open so the intermediate state is real rather than a race.
-      if (calls === 1) {
-        return Promise.resolve({ installed: true, model: 'resnet50', classes: [] });
-      }
-      return loading;
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: false,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: false },
     });
     render(<App />);
 
-    expect(await screen.findByText(/Preparing the model/i)).toBeInTheDocument();
-    const start = screen.getByTestId('start-camera');
+    const start = await screen.findByTestId('start-camera');
     expect(start).toBeDisabled();
-
-    await act(async () => {
-      resolveLoad?.({ installed: true, model: 'resnet50', classes: [] });
-    });
-    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-    expect(start).toHaveTextContent(/start camera/i);
+    expect(await screen.findByText(/No item-naming service is configured/i)).toBeInTheDocument();
   }, 15000);
 });
 
@@ -327,7 +254,12 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     vi.mocked(api.settings).mockResolvedValue(makeSettings({ waste_confidence: 0.5 }));
     vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
     vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     vi.mocked(api.postRecognition).mockClear();
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
@@ -412,16 +344,18 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     }
   }, 20000);
 
-  it('reads three frames and makes one decision when they agree', async () => {
-    // The venue's brown paper cover was Thermocol 0.91, then Thermocol 0.60,
-    // then Textile 0.70 within ten seconds.  A press is now a short video: three
-    // looks a quarter of a second apart, averaged into one reading.
+  it('reads one frame and makes one decision', async () => {
+    // The local classifier needed three frames to settle.  It is gone: a press
+    // takes one picture, the hosted model names it once, and the page records
+    // one recognition.
     stubCamera();
+    vi.mocked(api.wasteIdentify).mockResolvedValue({
+      object: 'clear plastic bag',
+      provider: 'cloudflare',
+      model: 'llama',
+      ms: 900,
+    });
     const original = stubCanvas();
-    vi.mocked(api.wasteClassify)
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.9) }))
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.92) }))
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.88) }));
     try {
       render(<App />);
       const start = await screen.findByTestId('start-camera');
@@ -429,19 +363,14 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
       fireEvent.click(start);
       fireEvent.click(await screen.findByTestId('classify-now'));
 
-      await waitFor(() => expect(vi.mocked(api.wasteClassify).mock.calls.length).toBe(3), {
-        timeout: 10000,
-      });
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), {
-        timeout: 10000,
-      });
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), { timeout: 10000 });
+      expect(vi.mocked(api.wasteIdentify).mock.calls).toHaveLength(1);
       const body = vi.mocked(api.postRecognition).mock.calls[0][0];
-      expect(JSON.stringify(body)).toMatch(/paper/i);
+      expect(body).toMatchObject({ category: 'plastic' });
     } finally {
       HTMLCanvasElement.prototype.getContext = original;
     }
   }, 30000);
-
 });
 
 describe('Sort Waste — nothing is classified unless it is asked for', () => {
@@ -449,10 +378,13 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     // Malayalam is set in Setup, so the answer must be Malayalam -- the page used
     // to hardcode English here whatever the setting said (reported 2026-11-16).
     window.localStorage.setItem('village.voiceLanguage', 'ml');
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: false,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
     vi.mocked(api.postRecognition).mockResolvedValue({
       ok: true,
       category: 'plastic',
@@ -471,7 +403,12 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
       configurable: true,
       get: () => 2,
     });
-    predictionState.current = predictionsFor('Plastic', 0.95);
+    vi.mocked(api.wasteIdentify).mockResolvedValue({
+      object: 'clear plastic bag',
+      provider: 'cloudflare',
+      model: 'llama',
+      ms: 900,
+    });
 
     render(<App />);
     const startButton = await screen.findByTestId('start-camera');
@@ -500,7 +437,12 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     });
     // The model is installed, so the ONLY reason left for the button being off
     // is the board being unreachable.
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
     render(<App />);
 
@@ -523,7 +465,12 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
       get: () => 2,
     });
     window.localStorage.setItem('village.demoMode', 'demo');
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
     render(<App />);
 
@@ -552,7 +499,12 @@ describe('Sort Waste — the three bin lamps, in simulation', () => {
     window.localStorage.setItem('village.demoMode', 'demo');
     window.history.pushState({}, '', '/waste');
     vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: 'plastic' }));
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
     stubCamera();
     render(<App />);
@@ -572,7 +524,12 @@ describe('Sort Waste — the three bin lamps, in simulation', () => {
     window.localStorage.setItem('village.demoMode', 'demo');
     window.history.pushState({}, '', '/waste');
     vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: null }));
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
     stubCamera();
     render(<App />);
@@ -625,7 +582,12 @@ describe('Sort Waste — choosing the camera', () => {
     vi.mocked(api.state).mockResolvedValue(makeState());
     vi.mocked(api.events).mockResolvedValue({ events: [] });
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
   });
 
   it('lists every camera and remembers the one chosen', async () => {
@@ -886,53 +848,32 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('will not light a bin when the namer is configured but did not answer', async () => {
+  it('asks a person when the namer is configured but did not answer', async () => {
     const restore = await press({ predictions: plasticAt(0.95), object: null });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
-      const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/identification unavailable/i);
-      expect(action).toHaveTextContent(/ask the gram sahayak/i);
       expect(within(screen.getByTestId('waste-identify')).getByTestId('waste-sees')).toHaveTextContent(
         /identification unavailable/i,
       );
-      // The category is still reported honestly…
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
-      // …but nothing physical happens.
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      // With no name there is nothing to decide from, so the page asks.
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i);
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
       restore();
     }
   }, 25000);
-
-  it('keeps the documented local-only policy when no namer is configured', async () => {
-    const restore = await press({ predictions: plasticAt(0.95), vision: false });
-    try {
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
-      const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/plastic bin/i);
-      expect(api.wasteIdentify).not.toHaveBeenCalled();
-      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
-    } finally {
-      restore();
-    }
+  it('offers no check at all when no naming service is configured', async () => {
+    // There is no local classifier any more, so a deployment with no key can
+    // open the camera but cannot answer — and it says so instead of guessing.
+    stubCamera();
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: false, model: 'resnet50', classes: [] });
+    render(<App />);
+    const start = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(start);
+    expect(await screen.findByTestId('classify-now')).toBeDisabled();
+    expect(api.wasteIdentify).not.toHaveBeenCalled();
   }, 25000);
-
-  it('says nothing to sort for the background class, and records nothing', async () => {
-    const restore = await press({ predictions: predictionsFor('Background', 0.93), object: null });
-    try {
-      await waitFor(
-        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/nothing to sort/i),
-        { timeout: 8000 },
-      );
-      expect(api.postRecognition).not.toHaveBeenCalled();
-    } finally {
-      restore();
-    }
-  }, 25000);
-
   it('refuses a bin under the bar when the name does not back it up', async () => {
     const restore = await press({ predictions: plasticAt(0.55), object: 'white bottle' });
     try {
@@ -961,8 +902,6 @@ describe('Sort Waste — two models, one decision', () => {
       );
       expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
       expect(screen.getByText(/from the item name/i)).toBeInTheDocument();
-      fireEvent.click(screen.getByText(/^model details$/i));
-      expect(screen.getByTestId('waste-local-reading')).toHaveTextContent(/paper/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
     } finally {
@@ -1049,7 +988,7 @@ describe('Sort Waste — two models, one decision', () => {
     });
     try {
       await waitFor(
-        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/identification unavailable/i),
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i),
         { timeout: 12000 },
       );
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
@@ -1058,9 +997,8 @@ describe('Sort Waste — two models, one decision', () => {
       await act(async () => {
         release?.({ object: 'orange pencil', provider: 'cloudflare', model: 'llama', ms: 9000 });
       });
-      // The late answer must not change the action, the category or the record.
-      expect(screen.getByTestId('waste-action')).toHaveTextContent(/identification unavailable/i);
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
+      // The late answer must not change the action or the record.
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/keep this item separate/i);
       expect(vi.mocked(api.postRecognition).mock.calls).toHaveLength(1);
     } finally {
       restore();

@@ -794,8 +794,8 @@ export const MESSAGES = {
   'sort.checkingModel': ['Checking the recognition model…', 'पहचान का मॉडल जाँचा जा रहा है…', 'തിരിച്ചറിയൽ മോഡൽ പരിശോധിക്കുന്നു…'],
   'sort.modelMissing': ['Recognition model is missing', 'पहचान का मॉडल नहीं मिला', 'തിരിച്ചറിയൽ മോഡൽ ഇല്ല'],
   'sort.modelMissingBody': [
-    'No waste model is installed, so the camera will not guess. The preview is still available. A presenter can install it from Setup → Voice & Camera.',
-    'कोई कचरा मॉडल नहीं लगा है, इसलिए कैमरा अंदाज़ा नहीं लगाएगा। झलक फिर भी उपलब्ध है। प्रस्तुतकर्ता इसे सेटअप → आवाज़ और कैमरा से लगा सकते हैं।',
+    'No item-naming service is configured, so the camera will not guess. The preview is still available. A presenter can add a key in Setup → Voice & Camera.',
+    'कोई नाम बताने वाली सेवा सेट नहीं है, इसलिए कैमरा अंदाज़ा नहीं लगाएगा। झलक फिर भी उपलब्ध है। प्रस्तुतकर्ता सेटअप → आवाज़ और कैमरा में कुंजी जोड़ सकते हैं।',
     'മാലിന്യ മോഡൽ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല, അതിനാൽ ക്യാമറ ഊഹിക്കില്ല. കാഴ്ച ലഭ്യമാണ്. അവതാരകന് സെറ്റപ്പ് → ശബ്ദവും ക്യാമറയും എന്നതിൽ നിന്ന് ഇൻസ്റ്റാൾ ചെയ്യാം.',
   ],
   'sort.modelCouldNotLoad': ['The model could not be loaded', 'मॉडल लोड नहीं हो सका', 'മോഡൽ ലോഡ് ചെയ്യാനായില്ല'],
@@ -999,8 +999,8 @@ export const MESSAGES = {
 
   // Said only when a hosted model is configured: the crop leaves the laptop.
   'sort.visionNote': [
-    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. Nothing else is sent, and the bin is still decided on this laptop.',
-    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। इसके अलावा कुछ नहीं भेजा जाता, और बिन का फ़ैसला अब भी इसी लैपटॉप पर होता है।',
+    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. Nothing else is sent, and the waste category is decided from that name.',
+    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। इसके अलावा कुछ नहीं भेजा जाता, और कचरे की श्रेणी उसी नाम से तय होती है।',
     'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. മറ്റൊന്നും അയക്കുന്നില്ല; ബിൻ തീരുമാനം ഇപ്പോഴും ഈ ലാപ്ടോപ്പിൽ തന്നെയാണ്.',
   ],
 

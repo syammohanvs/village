@@ -53,6 +53,7 @@ export type ReasonId =
   | 'identificationMissing'
   | 'corroborated'
   | 'named'
+  | 'unnamed'
   | 'unsupported';
 
 export interface DecisionInput {
@@ -348,15 +349,13 @@ export function decide(input: DecisionInput): Decision {
     allowLamp: false,
     needsOperator: false,
   };
-  if (!top) return empty;
-
-  const classId = top.label.trim().toLowerCase();
-  const confidence = Math.min(1, top.confidence);
+  const classId = top ? top.label.trim().toLowerCase() : null;
+  const confidence = top ? Math.min(1, top.confidence) : 0;
   const common = {
     classId,
     classConfidence: confidence,
     source: 'local' as const,
-    localClassId: top.label,
+    localClassId: top?.label ?? null,
     localConfidence: confidence,
     runnerUpId: second?.label ?? null,
     runnerUpConfidence: second ? Math.min(1, second.confidence) : 0,
@@ -415,12 +414,27 @@ export function decide(input: DecisionInput): Decision {
     };
   }
 
-  if (classId === 'background' || classId === 'unknown' || classId === 'none') {
+  // Nothing to read: no name and no classifier reading (the page no longer runs
+  // the local model).  That is not "nothing to sort" — it is "I could not
+  // tell", which asks a person.
+  if (!top) {
+    return {
+      ...empty,
+      ...common,
+      status: 'uncertain',
+      routeId: 'separate.unknown',
+      reasonId: 'unnamed',
+      needsOperator: true,
+    };
+  }
+
+  const localClass = classId as string;
+  if (localClass === 'background' || localClass === 'unknown' || localClass === 'none') {
     return { ...empty, ...common, status: 'nothing', reasonId: 'ok' };
   }
 
-  const bin = BIN_OF[classId] ?? null;
-  const materialRoute = ROUTE_OF_MATERIAL[classId] ?? null;
+  const bin = BIN_OF[localClass] ?? null;
+  const materialRoute = ROUTE_OF_MATERIAL[localClass] ?? null;
   if (!bin && !materialRoute) {
     // A class this build does not know: never guess, never light anything.
     return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'unsupported' };

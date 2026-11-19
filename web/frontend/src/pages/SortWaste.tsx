@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '../lib/api';
 import { useApi } from '../lib/useApi';
-import { averageFrames, createWasteStabilizer, type Prediction } from '../lib/wasteStabilizer';
 import { BinLeds } from '../components/BinLeds';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconStop } from '../components/Icons';
@@ -24,44 +23,10 @@ import { useDemo } from '../lib/demo';
 import { useVillage } from '../lib/village';
 import type { WasteRecognitionResult } from '../types';
 
-interface Classifier {
-  // The second argument is `flipped`, not a result count: predict() returns
-  // every class in metadata order.  Passing a number here mirrored the frame.
-  predict(
-    input: HTMLVideoElement | HTMLCanvasElement,
-    flipped?: boolean,
-  ): Promise<{ className: string; probability: number }[]>;
-}
-
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 120;
 const CROP_SIZE = 224;
-/**
- * How much of the frame a press reads, and how many times.
- *
- * A press used to read the middle 80% of the picture, once.  Both halves were
- * measured on the venue's own captures and on the hand-held set:
- *
- *   - **0.7, not 0.8.**  On the 528 hand-held composites a tighter crop is worth
- *     a lot (61.1% exact / 75.9% item action at 0.7 against 56.8 / 71.6 at 0.8),
- *     because the ring a looser crop keeps is the room, the curtain and the edge
- *     of a face.  The brown paper cover that was reported as "textile" is the
- *     case in point: cropped to 0.7 of the frame it reads Paper 0.76, and the
- *     second frame of the same cover reads Paper 0.83 instead of Thermocol.
- *     Honest cost: close-up product photographs lose about six points (65.9 to
- *     59.3 exact on the real-world probe) because the crop starts cutting the
- *     object itself.  At the venue the object is held, not filling the frame.
- *   - **three frames, not one.**  66% of the captured bursts disagree with
- *     themselves, and one brown cover was Thermocol 0.91, Thermocol 0.60 and
- *     Textile 0.70 inside ten seconds.  Three readings a quarter of a second
- *     apart, averaged, are one reading of the same held-up object.
- */
-// The fallback square, used only when the frame has no plain backdrop.  Slightly
-// wider than it was (0.70): with the fixed base this is a rare path, and the
-// item is the thing that must not be clipped.
 const PRESS_CROP_SHARE = 0.8;
-const PRESS_FRAMES = 3;
-const PRESS_FRAME_GAP_MS = 250;
 
 /**
  * How long the page waits for the hosted model's name before it answers.
@@ -84,8 +49,6 @@ function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number,
   if (canvas.height !== height) canvas.height = height;
   return canvas;
 }
-
-type ModelState = 'idle' | 'loading' | 'ready' | 'error';
 
 /**
  * The two things a result screen always offers.
@@ -114,14 +77,8 @@ function CardActions({ onScanAnother, support }: { onScanAnother: () => void; su
   );
 }
 
-function modelInstalled(status: { installed?: boolean; available?: boolean; present?: boolean } | null): boolean {
-  return Boolean(status?.installed ?? status?.available ?? status?.present);
-}
-
-
 export function SortWaste() {
   const t = useT();
-  const settings = useApi(['settings'], () => api.settings(), {});
   const modelStatus = useApi(['waste-resnet'], () => api.wasteResnetStatus(), {});
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -132,9 +89,6 @@ export function SortWaste() {
   const [deviceId, setDeviceId] = useState<string>(() => readStoredCamera());
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
-  const [modelState, setModelState] = useState<ModelState>('idle');
-  const [modelError, setModelError] = useState('');
-  const [predictions, setPredictions] = useState<Prediction[]>([]);
   // The loop runs on an interval, and `accept` is a callback whose identity must
   // not change per frame, so it read a stale empty list -- which is why every
   // recorded event said `top: []`.  A ref is the frame's guesses as of now.
@@ -168,8 +122,6 @@ export function SortWaste() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const classifierRef = useRef<Classifier | null>(null);
-  const stabilizerRef = useRef(createWasteStabilizer());
   const busyRef = useRef(false);
   const acceptingRef = useRef(false);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -191,10 +143,11 @@ export function SortWaste() {
   const captureFileRef = useRef<string | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
 
-  const installed = modelInstalled(modelStatus.data);
-  // Whether a hosted model can name the object.  False on a deployment with no
-  // key: the card then says only what the classifier knows, exactly as before.
-  const visionReady = Boolean(modelStatus.data?.vision?.ready);
+  // The page has ONE model now: the hosted vision model that names the item.
+  // The local ResNet50 was removed on 2026-11-19 (the operator's call): on the
+  // booth's own base it was wrong and unsure, and the name decides anyway.
+  const installed = Boolean(modelStatus.data?.vision?.ready);
+  const visionReady = installed;
   // Three different facts: the browser can open a camera, the model status is
   // known, and the model is installed.  Collapsing them into one boolean is
   // what produced "the camera can still be used" next to a disabled button.
@@ -203,19 +156,7 @@ export function SortWaste() {
     Boolean(navigator.mediaDevices) &&
     typeof navigator.mediaDevices.getUserMedia === 'function';
   const modelKnown = !modelStatus.loading && !modelStatus.error;
-  const confidence = settings.data?.waste_confidence ?? 0.50;
-  const stabilityFrames = settings.data?.waste_stability_frames ?? 2;
-  const cooldownMs = settings.data?.waste_cooldown_ms ?? 3000;
 
-  useEffect(() => {
-    stabilizerRef.current = createWasteStabilizer({
-      threshold: confidence,
-      consecutiveFrames: stabilityFrames,
-      // A press is always deliberate, so the cooldown only has to stop a
-      // double-tap from recording the same item twice.
-      cooldownMs,
-    });
-  }, [confidence, stabilityFrames, cooldownMs]);
 
   useEffect(() => {
     return () => {
@@ -229,9 +170,7 @@ export function SortWaste() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
-    setPredictions([]);
     setFrameWarning('');
-    stabilizerRef.current.reset();
   }, []);
 
   // One place paints "What it is reading", so no path can return without
@@ -251,51 +190,6 @@ export function SortWaste() {
   );
 
 
-  const loadModel = useCallback(async () => {
-    if (!installed || modelState === 'loading' || modelState === 'ready') return;
-    setModelState('loading');
-    setModelError('');
-    try {
-      const status = await api.wasteResnetStatus();
-      if (!status.installed) {
-        throw new Error('the ResNet50 model is not installed on the backend');
-      }
-      // The classifier is now a thin adapter: the frame is sent to the
-      // backend, which runs ResNet50 on the laptop's CPU.
-      classifierRef.current = {
-        async predict(input) {
-          const canvas = document.createElement('canvas');
-          canvas.width = CROP_SIZE;
-          canvas.height = CROP_SIZE;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('this browser cannot read a canvas');
-          ctx.drawImage(input, 0, 0, CROP_SIZE, CROP_SIZE);
-          // Quality is an accuracy knob, not just a payload one.  Measured on
-          // the same three sets through this exact path: 0.92 scores 50.0 /
-          // 70.1 / 87.7% exact against 44.9 / 68.9 / 85.9% at 0.85, and 1.0 is
-          // no better than 0.92 while being several times larger.  A frame is
-          // a few kilobytes either way.
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-          // The same crop is what the namer is asked about, so the two answers
-          // describe one picture rather than two frames a moment apart.
-          lastCropRef.current = dataUrl;
-          const result = await api.wasteClassify(dataUrl);
-          // Remember which crop this was: a correction must point at the frame
-          // the model judged, not at whatever the camera looks at next.
-          if (result.file) captureFileRef.current = result.file;
-          return result.predictions;
-        },
-      };
-      setModelState('ready');
-      stabilizerRef.current.reset();
-    } catch (cause) {
-      classifierRef.current = null;
-      setModelState('error');
-      setModelError(
-        `The ResNet50 model could not be loaded. ${errorMessage(cause)} A presenter can check the backend.`,
-      );
-    }
-  }, [installed, modelState]);
 
   /**
    * List the cameras without opening one.
@@ -375,7 +269,6 @@ export function SortWaste() {
         setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       setDevices(list.filter((device) => device.kind === 'videoinput'));
-      if (installed) void loadModel();
     } catch (cause) {
       setCameraError(cameraErrorMessage(cause));
       // So the picker offers the other cameras after a failure.
@@ -457,14 +350,12 @@ export function SortWaste() {
    */
   const runCheck = useCallback(async () => {
     const video = videoRef.current;
-    const classifier = classifierRef.current;
-    if (!video || !classifier || busyRef.current || video.readyState < 2) return;
+    if (!video || busyRef.current || video.readyState < 2) return;
     const seq = ++checkSeq.current;
     busyRef.current = true;
     setReading(true);
     setAlert('');
     setRecognition(null);
-    setPredictions([]);
     setCheck({
       phase: 'identifying',
       identify: visionReady ? 'checking' : 'idle',
@@ -488,7 +379,7 @@ export function SortWaste() {
       let cropMode: 'backdrop' | 'centre' = 'centre';
 
       /** One look at the item: find it on the sheet, crop it, read it. */
-      const readOnce = async (): Promise<Prediction[]> => {
+      const readOnce = async (): Promise<void> => {
         analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         const found = backdropBox(frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
@@ -517,24 +408,12 @@ export function SortWaste() {
             naming = api.wasteIdentify(image).then((answer) => answer.object).catch(() => null);
           }
         }
-        const raw = await classifier.predict(crop);
-        return raw.map((row) => ({ label: row.className, confidence: row.probability }));
       };
 
-      // Three frames 250 ms apart, averaged: one reading of the video rather
-      // than one still.  They are related observations, not three independent
-      // confirmations — the bar below is what decides, not the count.
-      const shots: Prediction[][] = [];
-      for (let shot = 0; shot < PRESS_FRAMES; shot += 1) {
-        if (shot > 0) {
-          await new Promise((resolve) => setTimeout(resolve, PRESS_FRAME_GAP_MS));
-          if (video.readyState < 2) break;
-        }
-        shots.push(await readOnce());
-        if (seq !== checkSeq.current) return;
-      }
-
-      const averaged = averageFrames(shots);
+      // One frame is enough now: the hosted model names what it sees, and the
+      // local classifier that needed three frames to settle is gone.
+      await readOnce();
+      if (seq !== checkSeq.current) return;
       // Overlapped with the frames, capped so a slow cloud model cannot hold
       // the answer hostage.
       const itemLabel = visionReady
@@ -546,7 +425,7 @@ export function SortWaste() {
       if (seq !== checkSeq.current) return;
 
       const decision = decide({
-        predictions: averaged,
+        predictions: [],
         itemLabel,
         visionConfigured: visionReady,
         binBar: BIN_CONFIDENCE,
@@ -561,7 +440,6 @@ export function SortWaste() {
         cropMode,
         error: '',
       });
-      setPredictions(averaged.slice(0, 3));
 
       // Sara says the whole answer once, in the language it began in: what the
       // item is, what it is made of, and where it goes.
@@ -575,12 +453,12 @@ export function SortWaste() {
       try {
         const result = await api.postRecognition({
           category: decision.allowLamp && decision.bin ? decision.bin : 'other',
-          confidence: decision.classConfidence,
+          // There is no local model any more, so there is no probability to
+          // report.  The category and the material are the decision.
+          confidence: 0,
           model: 'resnet50',
           material: decision.classId ?? 'unknown',
-          top: averaged
-            .slice(0, 3)
-            .map((row) => ({ className: row.label, probability: row.confidence })),
+          top: [],
         });
         if (seq !== checkSeq.current) return;
         setRecognition(result);
@@ -603,11 +481,6 @@ export function SortWaste() {
   // so the start button can stay disabled until the pipeline can actually
   // answer.  Pressing it into a half-ready page is what made "it is learning the
   // room" look like a fault.
-  useEffect(() => {
-    if (!installed) return;
-    if (modelState !== 'idle') return;
-    void loadModel();
-  }, [installed, modelState, loadModel]);
 
   // The box is captioned "What it is reading" and sits on screen the whole time
   // the camera is on, but it was only painted while a read was in flight -- so
@@ -643,7 +516,6 @@ export function SortWaste() {
       error: '',
     });
     setRecognition(null);
-    setPredictions([]);
     captureFileRef.current = null;
   }, []);
 
@@ -725,24 +597,19 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void startCamera()}
-                disabled={
-                  boardOffline || !cameraSupported || (installed && modelState !== 'ready')
-                }
+                disabled={boardOffline || !cameraSupported}
                 title={
                   boardOffline
                     ? t('sort.titleOffline')
                     : !cameraSupported
-                    ? t('sort.titleNoBrowser')
-                    : installed && modelState !== 'ready'
-                      ? t('sort.titleLoading')
+                      ? t('sort.titleNoBrowser')
                       : installed
                         ? t('sort.titleOpen')
                         : t('sort.titlePreviewOnly')
                 }
                 data-testid="start-camera"
               >
-                <IconCamera size={18} />{' '}
-                {installed && modelState !== 'ready' ? t('sort.preparingModel') : t('sort.startCamera')}
+                <IconCamera size={18} /> {t('sort.startCamera')}
               </button>
             )}
             {cameraOn && (
@@ -750,11 +617,11 @@ export function SortWaste() {
                 type="button"
                 className="btn btn--primary btn--large"
                 onClick={() => void runCheck()}
-                disabled={!installed || modelState !== 'ready' || reading}
+                disabled={!installed || reading}
                 title={
-                  installed && modelState === 'ready'
-                    ? 'Classify whatever is in the middle of the picture right now.'
-                    : 'The classifier is still loading.'
+                  installed
+                    ? 'Name whatever is on the base right now.'
+                    : 'The item-naming model is not available.'
                 }
                 data-testid="classify-now"
               >
@@ -916,33 +783,6 @@ export function SortWaste() {
                 <p className="hint">
                   {t('sort.sourceVision')}: {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
                 </p>
-                <p className="hint">{t('sort.sourceLocal')}: resnet50</p>
-                {check.decision?.source === 'vision' && check.decision.localClassId && (
-                  <p className="hint" data-testid="waste-local-reading">
-                    {t('sort.localReading', {
-                      category: check.decision.localClassId,
-                      percent: Math.round(check.decision.localConfidence * 100),
-                    })}
-                  </p>
-                )}
-                {check.decision && (
-                  <p className="hint">
-                    {check.decision.routeId} · {Math.round(check.decision.classConfidence * 100)}% ·{' '}
-                    {check.decision.reasonId}
-                  </p>
-                )}
-                {predictions.length === 0 ? (
-                  <p className="hint">No predictions yet.</p>
-                ) : (
-                  <ul className="prediction-list">
-                    {predictions.map((row) => (
-                      <li key={row.label}>
-                        <span>{row.label}</span>
-                        <span>{Math.round(row.confidence * 100)}%</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
             </details>
 
@@ -1034,10 +874,6 @@ export function SortWaste() {
             <Notice tone="warn" title={t('sort.modelMissing')}>
               {t('sort.modelMissingBody')}
             </Notice>
-          ) : modelError ? (
-            <Notice tone="bad" title={t('sort.modelCouldNotLoad')}>
-              {modelError}
-            </Notice>
           ) : null}
 
 
@@ -1045,9 +881,10 @@ export function SortWaste() {
             <summary>{t('sort.howItWorks')}</summary>
             <div className="advanced-body">
               <p>
-                A label must clear the confidence threshold for several consecutive frames before it
-                is accepted. The camera then stops itself, so one bottle is not counted on every
-                frame and the next item gets a fresh session when the Gram Sahayak starts it again.
+                One picture is taken when you press <strong>Check the item</strong>, and a hosted
+                vision model names what it sees. The waste category comes from that name — if the
+                name says plastic, the item is plastic — and the three demonstration bins light
+                their own lamp. Nothing is read until you press.
               </p>
               <p className="hint">
                 {t('sort.safetyNote')}
