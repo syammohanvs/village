@@ -479,10 +479,19 @@ was exercised; the physical path was not.
 
 ## Verified on the physical pump (2026-11-10)
 
-The pump driver is a **2N7000** on **D19** (pin map `1.5.0-30pin`): 220 Ω in
-series with the gate, 10 kΩ gate to ground, 1N4007 with its band to +5 V across
-the motor, source to the common ground. Measured: D19 3.30 V, gate 3.27 V,
-Vds 1.3 V at 157 mA, and the pump runs from the **5 V 2 A bank**.
+> **Correction (2026-11-20): the installed pump switch is a 2N2222 NPN, not the
+> 2N7000 named below.** GPIO 19 → **82 Ω** → base, emitter → common ground,
+> collector → pump negative, pump + → separate 5 V, 1N4007 across the pump with
+> its cathode to pump +. The 2N7000 with a 220 Ω gate resistor and 10 kΩ
+> pull-down was the **bench driver of that date**, kept here as the measurement
+> record; it is not fitted to the exhibit. The pump, supply and firmware
+> behaviour measured below are unchanged.
+
+At the time of this test the bench driver on **D19** (pin map `1.5.0-30pin`)
+was a **2N7000**: 220 Ω in series with the gate, 10 kΩ gate to ground, 1N4007
+with its band to +5 V across the motor, source to the common ground. Measured:
+D19 3.30 V, gate 3.27 V, Vds 1.3 V at 157 mA, and the pump runs from the
+**5 V 2 A bank**.
 
 An end-to-end watering was run from the app on 2026-11-10:
 

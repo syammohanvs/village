@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Start with the **Setup** checklist in the dashboard. It checks the controller,
-calibration, pump gate, Whisper, waste model and optional reply audio.
+calibration, the pump switch, Whisper, waste model and optional reply audio.
 
 ## The dashboard does not open
 
@@ -114,16 +114,19 @@ That is electrical, not the controller — the reason line would say otherwise.
 Measure, in this order:
 
 1. **D19 to GND** with the pump requested: **3.3 V**? If it stays at 0 V the
-   request never reached the driver (check the reason line first).
-2. **Gate to source**: should be about the same 3.3 V. Much less means a
-   pulled-off gate wire or the 10 kΩ in the wrong row.
+   request never reached the switch (check the reason line first).
+2. **Base to emitter** through the fitted **82 Ω**: about 0.6–0.7 V while the
+   pump is requested. 0 V means the control or the resistor is open; much more
+   means the transistor's legs are the wrong way round.
 3. **Voltage across the pump**: 4–5 V while running. **About 1.3 V is the
    signature of a collapsed supply**, not a bad transistor — the pump's
    start-up surge is several times its running current and a USB port cannot
    deliver it. Power the pump from the **5 V 2 A bank** with the grounds
    joined.
-4. **Drain to source**: under ~1.5 V is on. If it is 3–4 V the transistor is
-   not being switched at 3.3 V; see `docs/wiring.md` §4.
+4. **Collector to emitter**: a few tenths of a volt while the pump runs (the
+   2N2222 is saturated). Several volts means it is not being driven — check
+   the 82 Ω, the E-B-C leg order and the common ground; see `docs/wiring.md`
+   §4.
 
 A resistor or lamp dummy load passing does **not** prove the pump will: it
 draws a steady 171 mA, while the motor wants several times that for a fraction

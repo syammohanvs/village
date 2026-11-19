@@ -43,11 +43,11 @@
 static_assert(VILLAGE_FORCE_AP == 0 || VILLAGE_FORCE_AP == 1,
               "VILLAGE_FORCE_AP must be 0 or 1");
 
-// BENCH-ONLY: drive the pump gate HIGH at boot with no commissioning.
+// BENCH-ONLY: drive the pump-switch control HIGH at boot with no commissioning.
 //
-// This exists so the MOSFET can be measured with a dummy load while the pump
-// is still disconnected: it proves the GPIO, the series resistor and the gate
-// pull-down actually switch the channel.  It bypasses BOTH pump gates, so:
+// This exists so the pump switch can be checked with a dummy load while the
+// pump is still disconnected: it proves the GPIO and the base resistor actually
+// turn the 2N2222 on.  It bypasses BOTH pump safety gates, so:
 //   * leave it 0 in every build that can be connected to a pump;
 //   * the board reports it as board.pump_bench_drive and logs it at boot;
 //   * set it back to 0 and reflash before the pump is wired.
@@ -57,17 +57,19 @@ static_assert(VILLAGE_FORCE_AP == 0 || VILLAGE_FORCE_AP == 1,
 static_assert(VILLAGE_PUMP_BENCH_DRIVE == 0 || VILLAGE_PUMP_BENCH_DRIVE == 1,
               "VILLAGE_PUMP_BENCH_DRIVE must be 0 or 1");
 
-// DEMO-ONLY: invert the pump gate level.
+// DEMO-ONLY: invert the pump-switch control level.
 //
-// A single NPN between the GPIO and the gate is an inverting driver: GPIO
-// HIGH pulls the gate LOW. This flag makes the firmware drive the pin the
-// other way round so "pump on" still means "pump on" from the UI.
+// The installed 2N2222 common-emitter driver is NON-inverting: GPIO HIGH feeds
+// the base, the transistor conducts and the pump runs. This flag exists for an
+// inverting driver (for example a transistor stage feeding a high-side switch),
+// where GPIO HIGH would turn the pump OFF; it makes the firmware drive the pin
+// the other way round so "pump on" still means "pump on" from the UI.
 //
-// It is a bench/demo concession, not a design: while the gate is inverted, a
-// reset leaves the pin floating, so the gate is pulled HIGH and the pump runs
+// It is a bench/demo concession, not the design: while the control is inverted,
+// a reset leaves the pin floating, so the level is pulled HIGH and the pump runs
 // for the few hundred milliseconds before setupOutputs() runs. The pump must
-// stay submerged for the whole demo, and this flag goes back to 0 with a
-// proper logic-level MOSFET.
+// stay submerged for the whole demo, and this flag is 0 on the exhibit with the
+// 2N2222 fitted.
 #ifndef VILLAGE_PUMP_DRIVE_INVERTED
 #define VILLAGE_PUMP_DRIVE_INVERTED 0
 #endif

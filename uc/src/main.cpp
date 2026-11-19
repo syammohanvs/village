@@ -65,7 +65,7 @@ void setup() {
     Serial.println("[boot] BENCH DRIVE is on: the pump gate is HIGH regardless of "
                    "the configuration. The pump must be disconnected.");
   } else if (VILLAGE_PUMP_DRIVE_INVERTED == 1) {
-    Serial.println("[boot] pump drive INVERTED for the NPN demo driver: "
+    Serial.println("[boot] pump drive INVERTED for an inverting demo driver: "
                    "GPIO HIGH = pump off, GPIO LOW = pump on.");
   } else {
     Serial.printf("[boot] pump output is LOW; config revision %lu\n",
@@ -76,8 +76,8 @@ void setup() {
 // Test page (Setup → Test outputs): one switch per output, straight to the pin.
 // While its master switch is on the page owns all five outputs, so the normal
 // drivers cannot pull a pin back down between writes.  The pump is written with
-// applyPumpDirect(): the page's master switch is the gate, and the commissioning
-// gate must not quietly veto a switch the operator pressed.
+// applyPumpDirect(): the page's master switch is the safety gate, and no other
+// gate may quietly veto a switch the operator pressed.
 static void applyTestOutputs(uint32_t) {
   if (!rt.test_enabled) return;
   applyPumpDirect(rt.test_pump);
@@ -100,7 +100,7 @@ void loop() {
   const IrrigationInputs inputs = buildIrrigationInputs(now);
   rt.irrigation.tick(now, inputs);
 #if VILLAGE_PUMP_BENCH_DRIVE == 1
-  // Hold the gate high on EVERY pass, not every 2 s.  The bench block used to
+  // Hold the control high on EVERY pass, not every 2 s.  The bench block used to
   // write HIGH once per report while the line above wrote pumpOn() (usually
   // false) on every other pass, so the pin chattered at loop rate and the motor
   // never turned -- "pin high indefinitely" needs this call to be the only one.

@@ -3,7 +3,7 @@
 > **No hardware verification is claimed by the repository.** The firmware
 > compiles and its safety core is tested on the host, but the physical board,
 > pump, probes and sensors must be checked by the builder. Record the results
-> below and only then open the pump gate.
+> below and only then power the pump.
 
 Do this in order. Use the 5 V 2 A power bank and keep the pump **disconnected**
 until step 8.
@@ -115,13 +115,27 @@ on its own, use the build flags in the firmware instead (`VILLAGE_PUMP_BENCH_DRI
 
 ## G. Pump driver and pump
 
-**Parts measured on the real pump** (2026-11-10):
+**The installed switch** is a **2N2222A NPN** (TO-92, **E · B · C**):
 
-| Part | Type | Result |
+```
+GPIO 19 ──[ 82 Ω ]── base
+emitter ──────────── common ground
+collector ────────── pump −
+pump + ───────────── separate 5 V supply
+1N4007 across the pump: cathode (band) to pump +, anode to pump −
+ESP32 GND and pump-supply GND joined
+```
+
+GPIO HIGH turns the transistor on. **82 Ω is the installed, bench-tested base
+resistor for this build** — not a general recommendation for a 2N2222 and not a
+statement about GPIO electrical limits.
+
+**Parts that were tried but are not installed** (bench, 2026-11-10):
+
+| Part | Type | Result then |
 | --- | --- | --- |
-| **2N7000** | logic-level N-channel MOSFET, TO-92, **S · G · D** | **used** — gate 3.27 V, Vds 1.3 V at 157 mA, pump runs |
-| 2N2222A | NPN BJT, TO-92, **E · B · C**, 800 mA | spare — use if a motor's surge needs more than the 2N7000 |
-| IRFZ44N | standard-level MOSFET, TO-220, G · D · S | needs a 5 V gate driver; not used with the 2N7000 fitted |
+| 2N7000 | logic-level N-channel MOSFET, TO-92, S · G · D | bench driver only — 220 Ω gate, 10 kΩ pull-down, Vds 1.3 V at 157 mA; **replaced by the 2N2222** |
+| IRFZ44N | standard-level MOSFET, TO-220, G · D · S | needs a 5 V gate drive; not fitted |
 | 2N3904 | small-signal NPN, 200 mA | **not** a pump switch |
 
 - The pump is a **DC 3–6 V mini submersible**, rated **130–220 mA**, maximum
@@ -147,20 +161,25 @@ on its own, use the build flags in the firmware instead (`VILLAGE_PUMP_BENCH_DRI
   | > 1 V, or a dim lamp | replace with a logic-level part (IRLZ44N, AO3400) |
 
 - [ ] Driver tested with a **dummy load** (5 V lamp or 47 Ω / 1 W resistor)
-      before the pump, gate tied to 3V3.
+      before the pump: 3V3 through the fitted **82 Ω** into the base (or the
+      board's Test outputs), emitter to ground.
 - [ ] Alternatively, build with `VILLAGE_PUMP_BENCH_DRIVE 1` to have the
       firmware drive D19 HIGH at boot (`board.pump_bench_drive` in
-      `/api/v1/health`). That build bypasses both pump gates: the pump must be
-      disconnected, and it must be reflashed with the flag back at `0`.
-- [ ] Measured Vds: __________ (record it; see the table above).
-- [ ] Gate resistor **220 Ω**; gate pull-down **10 kΩ** (2N7000: gate is
-      the **middle** leg, source the **left**, drain the **right**).
-- [ ] Flyback diode (**1N4007**) across the pump, cathode to +5 V.
-- [ ] Pump powered from **VIN** with the 5 V 2 A power bank, USB unplugged;
-      the board's 3.3 V regulator is not in the pump path.
+      `/api/v1/health`), which turns the 2N2222 on. That build bypasses both
+      pump gates: the pump must be disconnected, and it must be reflashed with
+      the flag back at `0`.
+- [ ] Pump runs with the **collector** voltage low; record the pump current and
+      the 5 V rail under load: __________ / __________.
+- [ ] Base resistor **82 Ω** (installed, bench-tested) from D19 to the 2N2222
+      base; emitter to common ground; collector to pump negative.
+- [ ] Flyback diode (**1N4007**) across the pump, **cathode to pump +**, anode
+      to pump − (the collector).
+- [ ] Pump powered from a **separate 5 V supply** (the 5 V 2 A power bank),
+      never from the board's VIN or USB; pump-supply ground joined to ESP32
+      ground.
 - [ ] Pump connected **in water**, never dry.
 - [ ] Running current: __________ Stall current: __________
-- [ ] 5 V rail holds up; the MOSFET does not overheat.
+- [ ] 5 V rail holds up; the 2N2222 does not overheat.
 - [ ] Firmware pump output is LOW at boot and after reset.
 - [ ] Pump stops on Stop, low water, invalid sensor, maximum runtime and
       maximum pulses.

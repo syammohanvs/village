@@ -20,12 +20,12 @@ and uses no paid API.
 | Dashboard (React/Vite, charcoal/burgundy/gold) | **built and served; 37 tests pass** |
 | Sara guide (welcome, tours, live narration, 3 languages) | **done; verified in Chromium 16/16** |
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
-| Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
+| Hardware wiring | **streetlights, LDR, reservoir probes, bin LEDs, the wind circuit and the pump switch are wired; soil calibrated on this board** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
 | Waste model (ResNet50, offline fallback) | **installed (v18); 74.7% exact / 82.6% item action on the 241-photo probe, 14/18 on the booth's own first crops (labels machine-made, not human-verified)** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
-physical part needs the commissioning checks below.
+physical part needs the bench checks below.
 
 The board itself is programmed and reachable: it joins the home Wi-Fi in
 station mode (so the laptop keeps its internet) and `/api/v1/state?mode=live`
@@ -33,8 +33,8 @@ reports `source.kind: "esp32"`. The four streetlight lamps and the LDR module
 are wired and working, including automatic lamps in the dark. The soil probe is
 connected but calibrated only against wheat flour so far, so treat its
 percentage as a bench check until it is redone in real soil. The reservoir
-probes, bin rangefinders and pump are not wired yet; the pump stays disabled by
-both safety gates.
+probes and bin indicator LEDs are wired, and the pump switch is installed; the
+pump runs in Auto / On / Off from its own 5 V supply.
 
 ## Quick start
 
@@ -66,13 +66,13 @@ Stop only this project:
   “Irrigation blocked: reservoir water is low.”
 - **Irrigation** — short pulses, soak intervals, a fresh moisture check,
   cumulative runtime and pulse limits, a no-rise lockout, and immediate Stop.
-  It requires valid calibrated soil, dry soil and available water, and the
-  pump has a separate commissioning gate.
+  It requires valid calibrated soil, dry soil and available water. The pump's
+  own switch (Auto / On / Off) is separate; a manual On is stopped only by a
+  tank the controller knows is low.
 - **Streetlights** — Auto (LDR with hysteresis and a stable delay), Manual On
   and Manual Off. Stale sensor → Auto stays off and says why.
-- **Three bins** — three **VL53L0X time-of-flight laser rangefinders** on one
-  I²C bus, read in turn, with estimation and confirmation and a loud
-  **unavailable** when a module does not answer (never “empty”).
+- **Three bins** — one indicator LED per category (organic, plastic, paper),
+  lit only while a recognised item matches. Nothing measures how full a bin is.
 - **Voice** — push-to-talk, English/Malayalam/Hindi, local Whisper, deterministic
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
 - **Sort Waste** — one item placed on the marked base, one press of **Check the
@@ -129,13 +129,14 @@ cannot affect the site build. A push to `main` triggers the build; see
 The purchased board is the **30-pin NodeMCU-style ESP32-WROOM-32 DevKit V1**
 (4 MB flash, AMS1117, micro-USB). The pin map uses GPIO numbers only:
 soil **34**, reservoir sense **35** / excite **25**, LDR **32**, solar panel
-**33** / current sense **36**, pump gate **19**, streetlights **13**, waste LEDs
-**21/22/23**, and the bin rangefinders on an I²C bus — SDA **4**, SCL **16**,
-XSHUT **17/18/26**. All analogue inputs are **ADC1** because Wi-Fi is active.
+**39** / junction **36**, wind circuit **33**, pump-switch control (2N2222 base,
+82 Ω) **19**, streetlights **13**, waste LEDs **21/22/23**. Pins **4, 16, 17,
+18, 26** are deliberately left free. All analogue inputs are **ADC1** because
+Wi-Fi is active.
 Flash pins, input-only misuse, strapping pins and UART0 are avoided; the
 firmware has `static_assert` checks. See [docs/wiring.md](docs/wiring.md) for
-the power branch, MOSFET/flyback requirements, the ToF bus and address
-sequence, probe circuit and the unidentified driver-component warning.
+the power branch, the installed 2N2222 pump switch and its flyback diode, the
+probe circuits and the wind circuit.
 
 ## Tests run locally
 
@@ -161,9 +162,10 @@ cd web/frontend && npm run typecheck && npm test && npm run build
   (v18 ResNet50, the offline fallback), and **14/18** on the exhibit's own first
   crops — a figure whose labels are the hosted model's names, not human-verified.
   See [docs/waste-approach.md](docs/waste-approach.md) for what each set means.
-- Hardware: streetlights, LDR, reservoir probes and the pump driver have been
-  exercised; the bench checklist in [docs/bench-test.md](docs/bench-test.md)
-  remains the gate for soil and the bin rangefinders.
+- Hardware: streetlights, LDR, reservoir probes, the installed pump switch
+  (2N2222, 82 Ω base resistor) and the bin LEDs have been exercised; the bench
+  checklist in [docs/bench-test.md](docs/bench-test.md) remains the gate for a
+  new board.
 
 ## Models you must supply
 
@@ -208,7 +210,7 @@ controller decided, not that water flowed.
 1. Charge the 5 V 2 A power bank.
 2. Put water in the reservoir, probes at the minimum level, pump intake
    submerged.
-3. Complete the bench test and open the pump gate only then.
+3. Complete the bench test before the pump is powered.
 4. Start the router, ESP32, then `./scripts/launch.sh`.
 5. Check the Setup checklist; turn **Demo mode off** for the physical part.
 6. Keep `Stop irrigation` in reach.

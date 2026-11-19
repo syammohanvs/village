@@ -53,7 +53,8 @@ TEST(waste_leds_share_the_free_header_side) {
 }
 
 TEST(pump_gate_shares_the_free_header_side) {
-  // The pump gate sits on the free header side, beside the waste LEDs.
+  // The pump-switch control sits on the free header side, beside the waste
+  // LEDs.
   CHECK(pins::PUMP_GATE == 19);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_ORGANIC);
   CHECK(pins::PUMP_GATE != pins::WASTE_LED_PLASTIC);

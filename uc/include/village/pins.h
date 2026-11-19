@@ -161,10 +161,13 @@ inline constexpr int LDR_ADC = 32;             // ADC1_CH4, analogue or digital
 // then returned to high impedance (INPUT, no pull).
 inline constexpr int RESERVOIR_EXCITE = 25;
 
-// Pump MOSFET gate.  The pump itself is powered from the 5 V rail through
-// the driver; this GPIO only carries the logic signal.  D19 sits on the free
-// header side beside the waste LEDs, so the low-current signal leaves the
-// board on one edge.
+// Pump-switch control signal: the 2N2222's base, through an 82 ohm resistor.
+// The pump is powered from its own 5 V supply through the transistor's
+// collector, so this GPIO carries only the base current.  HIGH turns the
+// transistor on (active high).  D19 sits on the free header side beside the
+// waste LEDs, so the low-current signal leaves the board on one edge.  The
+// constant keeps its name because the pin map and protocol already report it
+// as `pump_gate`.
 inline constexpr int PUMP_GATE = 19;
 
 // All five streetlight lamps are driven from ONE GPIO (D13), each with its

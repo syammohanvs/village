@@ -50,7 +50,7 @@ itself.
 | solar panel voltage | **39** (VN) | ADC1, input-only |
 | solar LED junction | **36** (VP) | ADC1, input-only |
 | wind current tap | **33** | ADC1, the last free ADC1 pin — across the 47 Ω resistor behind the blue LED |
-| pump MOSFET gate | **19** | logic only; pump has its own 5 V supply |
+| pump-switch control (2N2222 base) | **19** | logic only, 82 Ω to the base; pump has its own 5 V supply |
 | streetlights (all five lamps) | **13** | one pin, ~9 mA total |
 | waste LED — organic | **21** | green |
 | waste LED — plastic | **22** | red |
@@ -72,9 +72,16 @@ are indicators of what the camera last recognised.
   and the probe to GND, so **wet = lower voltage**. Soil is calibrated with two
   measured endpoints; the tank probe's margins are thin (3145 mV dry, ~2760–2800
   mV wet) because water conducts weakly through it.
-- The **pump** is switched by a MOSFET on D19; the board carries only the logic
-  signal. A pump on the same 5 V bank as the ESP32 browned the board out twice
-  (documented in `docs/wiring.md`) — separate supply.
+- The **pump** is switched by a **2N2222 NPN** on D19: **GPIO 19 → 82 Ω →
+  base**, emitter → common ground, collector → pump negative, pump positive →
+  a **separate 5 V supply**, with a **1N4007 across the pump** (cathode/striped
+  end to pump +, anode to pump −) and the pump supply's ground joined to the
+  ESP32's. GPIO HIGH turns the transistor on, so switching stays **active
+  high**. The board carries only the base current. **82 Ω is the installed,
+  bench-tested base resistor for this build**, not a general recommendation for
+  a 2N2222 and not a claim about GPIO electrical limits. A pump on the same 5 V
+  bank as the ESP32 browned the board out twice (documented in
+  `docs/wiring.md`) — separate supply.
 - The **streetlights** are five lamps on one pin, each with its series resistor.
 - The **waste LEDs** are one per category; the firmware holds at most one lit at
   a time, for `indicate_ms` (8000 default), and `CLEAR_WASTE` ends it early.
@@ -357,7 +364,9 @@ back on within ~14 s while the laptop has an uplink to share; a hotspot found
 - The board's identity, Wi-Fi join, polling, commands, config save/load and the
   **bin LED selection** have all been exercised on the physical board. The
   operator has confirmed the LEDs light for the selected bin. The 8-second
-  automatic switch-off is verified behaviour and unchanged.
+  automatic switch-off is verified behaviour and unchanged. The **installed
+  pump switch** (2N2222, 82 Ω base resistor) has run the pump end to end from
+  the app (2026-11-10).
 - **Two changes are built and waiting for one OTA flash**, because the board is
   not currently on the hotspot: `CLEAR_WASTE` (0.2.9, needs one physical press to
   confirm an immediate lamp off) and the **wind circuit reading** (2.3). Both are

@@ -2873,3 +2873,27 @@ real change of what the ADC means, not a relabelled number:
   answer is not "0 mA".  `docs/esp32-and-wifi.md` carries the circuit as **§2.3**
   (diagram, arithmetic, config bounds, the card's four states) and the `/status`
   fields under §5; the desktop copy was refreshed for the reviewer.
+
+**Documentation correction — the installed pump switch is a 2N2222, not a
+2N7000 (2026-11-20).**  Documentation only; no firmware behaviour, protocol
+field or wiring changed.  The installed switch is **GPIO 19 → 82 Ω → 2N2222
+base**, emitter → common ground, collector → pump negative, pump + → a separate
+5 V supply, 1N4007 across the pump (cathode to pump +), grounds joined.
+**82 Ω is the installed, bench-tested value for this build**, not a general
+recommendation, and the docs no longer imply it settles any GPIO limit.
+
+Corrected: `docs/wiring.md` (§4 rewritten — installed wiring, active-high,
+flyback, the 2N2222 saturates; the 2N7000 + 220 Ω/10 kΩ is now bench history;
+pin table; bench steps 4/7; §9 replaced — the compile-time commissioning flag
+it described was deleted 2026-11-17), `docs/bench-test.md` (part table and
+checklist), `docs/installation.md` (the half-corrected commissioning note),
+`docs/verification.md` (the 2026-11-10 record is annotated as the bench 2N7000,
+not the installed part), `docs/troubleshooting.md` (gate/source/drain steps →
+base-emitter 0.6–0.7 V, collector-emitter saturation), `docs/esp32-and-wifi.md`
+(pin row, §2.2, §10), README (pin list, status rows, "pump gate"/MOSFET
+phrasing, and the stale VL53L0X bins + solar pin 33 it listed), and source
+comments in `uc/include/village/pins.h`, `build_config.h`, `outputs.h`,
+`uc/src/outputs.cpp`, `uc/src/main.cpp`, `uc/test/test_pins.cpp` and
+`web/frontend/src/components/TestModeDialog.tsx`.
+
+Gate: firmware **560 checks / 0 failed** (comments only, rebuilt).

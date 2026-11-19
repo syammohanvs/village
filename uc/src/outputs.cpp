@@ -17,9 +17,9 @@ inline int wasteLedLevel(bool on) {
   return (VILLAGE_WASTE_LEDS_ALWAYS_ON == 1 || on) ? HIGH : LOW;
 }
 
-// The pump gate is LOW unless the two commissioning gates allow it.  The
-// bench-drive build (VILLAGE_PUMP_BENCH_DRIVE) holds it HIGH so the MOSFET can
-// be measured with a dummy load; that build must never see a real pump.
+// The pump-switch control is LOW unless the safety gates allow it.  The
+// bench-drive build (VILLAGE_PUMP_BENCH_DRIVE) holds it HIGH so the 2N2222 can
+// be checked with a dummy load; that build must never see a real pump.
 inline int pumpGateLevel(bool on) {
   const bool active = VILLAGE_PUMP_BENCH_DRIVE == 1 || on;
   const bool level = VILLAGE_PUMP_DRIVE_INVERTED == 1 ? !active : active;
@@ -67,11 +67,11 @@ void applyPump(bool on) {
   digitalWrite(pins::PUMP_GATE, pumpGateLevel(allowed));
 }
 
-// Test page only.  `applyPump(true)` is answered LOW while the commissioning
-// gate is closed -- correct for the controller, but it made the page's pump
+// Test page only.  `applyPump(true)` is answered LOW while the automatic-watering
+// setting refuses it -- correct for the controller, but it made the page's pump
 // switch look broken: the switch read "on" while D19 stayed low (reported
-// 2026-11-16).  The page's master switch is the gate, so this writes the pad
-// directly.
+// 2026-11-16).  The page's master switch is the safety gate, so this writes the
+// pad directly.
 void applyPumpDirect(bool on) { digitalWrite(pins::PUMP_GATE, pumpGateLevel(on)); }
 
 void applyStreetlights(bool on) {
@@ -97,8 +97,8 @@ void allOutputsOff() {
 }
 
 // Test mode drives the light outputs by hand.  The pump goes through
-// applyPump() like every other caller, so the commissioning and polarity rules
-// stay in one place; these four have no such rules beyond the active level.
+// applyPump() like every other caller, so its rules and polarity stay in one
+// place; these four have no such rules beyond the active level.
 void applyTestLeds(bool organic, bool plastic, bool paper, bool streetlights) {
   digitalWrite(pins::WASTE_LED_ORGANIC, wasteLedLevel(organic));
   digitalWrite(pins::WASTE_LED_PLASTIC, wasteLedLevel(plastic));

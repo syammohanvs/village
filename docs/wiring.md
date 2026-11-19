@@ -49,7 +49,7 @@ logical order.
 | LDR analogue/digital | **32** | D32 | ADC/digital input | ADC1_CH4 |
 | Solar panel voltage | **39** | VN | ADC input | ADC1_CH3, input-only |
 | Solar current sense | **36** | VP | ADC input | ADC1_CH0, input-only |
-| Pump MOSFET gate | **19** | D19 | Digital output | Safe output, boot-low |
+| Pump-switch control (2N2222 base) | **19** | D19 | Digital output | Safe output, boot-low; 82 Ω to the base |
 | Streetlight lamps (all five) | **13** | D13 | Digital output | Safe output; one pin drives the loom |
 | Waste LED — organic | **21** | D21 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
@@ -99,111 +99,114 @@ Anything added next has six pins to choose from.
   common at one star point.
 - A 2 A power bank is the minimum. A small pump can draw a large stall current;
   measure it, or use a supply with headroom.
-- Add a **flyback diode** across the pump (cathode to +5 V, anode to the
-  MOSFET drain) and a 100 nF / 100 µF capacitor across the pump terminals if
-  the pump is noisy.
+- Add a **flyback diode** across the pump (cathode/striped end to the pump's
+  +5 V lead, anode to its negative lead at the transistor's collector) and a
+  100 nF / 100 µF capacitor across the pump terminals if the pump is noisy.
 - Do **not** back-feed the board's 5 V pin while USB is connected unless the
   board documentation explicitly allows it. Powering through USB is the
   simplest safe arrangement for the exhibit.
 
-## 4. Pump driver — 2N7000 (measured), IRFZ44N as the fallback
+## 4. Pump driver — 2N2222 NPN (installed, measured)
 
 The pump is a **DC 3–6 V mini submersible** rated **130–220 mA**, maximum lift
-**40–110 mm**. It is powered from **VIN** with the 5 V 2 A power bank; the GPIO
-only drives the gate. Its winding measures **28 Ω** cold.
+**40–110 mm**. Its winding measures **28 Ω** cold. It runs from a **separate
+5 V supply** (the 5 V 2 A power bank) and the ESP32 only drives the transistor's
+base — the pump current never flows through the board.
 
-**Measured on the real pump, 2026-11-10** — the fitted part is a **2N7000**
-(TO-92, **S · G · D** left→right, flat face towards you):
+### Installed wiring
 
-| Measurement | Value |
-| --- | --- |
-| D19 ↔ GND (gate driven) | 3.30 V |
-| Gate ↔ source | 3.27 V |
-| Vds, 23.5 Ω dummy load (157 mA) | 1.3 V |
-| Pump from the 5 V 2 A bank | runs; Vds ≈ 1.3 V |
+```
+ESP32 GPIO 19 ──[ 82 Ω ]── base       2N2222 (TO-92, flat face towards you,
+                                       legs E · B · C)
+ESP32 GND ──────────────── emitter
+pump − ─────────────────── collector
+pump + ─────────────────── +5 V (separate supply)
+pump + ◀──|── pump −       1N4007: cathode (band) to pump +, anode to pump −
+pump-supply GND ────────── ESP32 GND   (one common ground point)
+```
 
-The **IRFZ44N** (TO-220, G-D-S, tab = drain) is the fallback. Its on-resistance
-is specified at **Vgs = 10 V**, not 3.3 V, so it must be measured at 3.3 V
-before it is used; in practice it needs a 5 V gate driver (a 2N2222A as an
-inverting level shifter). A 2N3904 is also in the kit and is **not** a suitable
-pump switch: 200 mA is below the pump's running current and its start-up surge.
+- **GPIO 19 → 82 Ω → base.** The driver is **active high**: GPIO HIGH feeds the
+  base, the transistor conducts, and its collector pulls the pump's negative
+  lead low. The firmware's meaning of `PUMP_ON` is unchanged.
+- **Emitter → common ground. Collector → pump negative. Pump positive → the
+  separate 5 V supply.** The pump supply's ground and the ESP32's ground are
+  joined, so the base current and the pump current share one reference.
+- **The flyback diode is mandatory.** 1N4007 (or equivalent) across the pump,
+  **cathode/striped end to the pump's +5 V lead**, anode to the pump's negative
+  lead (the collector). It catches the winding's back-EMF when the transistor
+  turns off.
+- **82 Ω is the installed, bench-tested base resistor for this build.** It is a
+  measured value for this transistor and this pump — not a general
+  recommendation for driving a 2N2222 from an ESP32, and not a claim that any
+  GPIO electrical limit is established. The GPIO carries only the base current;
+  the pump current flows entirely in the 5 V loop.
+- Keep the pump's **+5 V** and the ESP32's supply as separate branches that meet
+  only at the common ground. A pump on the same 5 V bank as the ESP32 browned
+  the board out twice (2026-11-15) — not a transistor fault.
+
+### Bench history — parts tried, not installed
+
+Earlier bench work used a **2N7000** logic-level MOSFET with a **220 Ω** gate
+resistor and a **10 kΩ** gate-to-ground pull-down; it measured Vds **1.3 V** at
+157 mA and ran the pump from the 5 V 2 A bank. An **IRFZ44N** (specified at
+Vgs = 10 V) was kept as a fallback, and a **2N3904** was rejected as too small
+for the pump. **None of those is the installed switch** — the exhibit uses the
+2N2222 wiring above. The 2N7000's 220 Ω gate resistor and 10 kΩ pull-down do not
+apply to the installed driver.
 
 **Two traps found the hard way — neither is a transistor fault:**
 
 1. **A resistor dummy load is not a motor test.** A 23.5 Ω resistor draws a
-   steady 171 mA and works where the pump gets 1.3 V on identical wiring,
+   steady 171 mA and passes where the pump gets 1.3 V on identical wiring,
    because a motor wants several times its running current for a fraction of a
    second while it spins up. Size the supply for the **surge**.
 2. **Never power the pump from the PC's USB port.** Measured: on USB the rail
-   collapses and the pump sees **1.3 V**, which reads as a dead MOSFET. On the
+   collapses and the pump sees **1.3 V**, which reads as a dead switch. On the
    5 V 2 A bank the same circuit runs normally. Grounds must be common.
 
-Required driver interface:
-
-| Property | Requirement |
-| --- | --- |
-| Type | Logic-level N-channel MOSFET (preferred) or a driver module with a transistor/optocoupler. |
-| Gate threshold | Must switch fully on at **Vgs ≤ 3.3 V** — for the IRFZ44N that is a measurement, not an assumption. |
-| Current | Rated above the pump's measured stall current, with margin. |
-| Gate resistor | 220 Ω–1 kΩ in series from GPIO 19. |
-| Gate pull-down | 10 kΩ from gate to GND, so the pump is off while the ESP32 boots. |
-| Flyback | Diode across the pump, cathode to +5 V. |
-| Ground | MOSFET source to the common ground. |
-
-### Measure the driver before trusting it
+### Check the installed driver before the pump
 
 Use a dummy load (5 V lamp, or 47 Ω / 1 W resistor), **not** the pump:
 
 ```
-VIN (+5 V) ── dummy load ──┬── drain   (2N7000: right leg · IRFZ44N: middle/tab)
-                           │
-GPIO 19 / 3V3 ──[220 Ω]── gate     (2N7000: middle · IRFZ44N: left)
-                           │
-                       [10 kΩ]
-                           │
-GND ───────────────────── source   (2N7000: left · IRFZ44N: right)
++5 V ── dummy load ──┬── collector
+                     │
+GPIO 19 ──[82 Ω]── base
+                     │
+GND ─────────────────┴── emitter
 ```
 
-With the gate held at **3.3 V**, measure Vds across the load-on MOSFET:
-
-| Vds | Decision |
-| --- | --- |
-| < 0.3 V | fully on — use it |
-| 0.3–1.4 V | usable at ~200 mA with the pump on the 2 A bank (the 2N7000 measures 1.3 V at 157 mA and runs the pump); it will warm |
-| > 1.5 V, or a dim lamp | not switching at 3.3 V — use a logic-level part |
+Drive the control high (Test outputs → Pump on, or 3V3 through the 82 Ω with the
+pump unplugged) and the collector should be pulled low and the load run. If the
+load stays off, check the transistor's leg order (**E · B · C**, flat face
+towards you), the 82 Ω, and the common ground — not the firmware.
 
 **Beware the dummy load passing while the pump fails.** The resistor draws a
 steady 171 mA; the pump's start-up surge is several times that, so a supply
 that is marginal on USB passes the resistor test and collapses on the motor.
-That is a supply problem, not a transistor one — measured: 4.0 V on the
-resistors, 1.3 V on the pump, same wiring, USB feed.
+That is a supply problem, not a switch one — measured: 4.0 V on the resistors,
+1.3 V on the pump, same wiring, USB feed.
 
-If the driver fails at 3.3 V, use a **logic-level** part (IRLZ44N drop-in, or
-an AO3400/IRLML2502 module), or drive an IRFZ44N's gate from 5 V through a
-2N2222A. **Do not** use the 2N3904 as the switch, and **do not** pull the gate
-up to 5 V directly: at reset the GPIO is an input, so a 5 V pull-up would turn
-the pump on during boot and put 5 V on a 3.3 V pin.
-
-### Wiring once Vds passes
+### Wiring once the dummy load passes
 
 ```
-VIN (+5 V) ──┬──────── pump +
-             │
-          [1N4007]   cathode → +5 V, anode → drain
-             │
-GPIO 19 ──[220 Ω]── gate
-             │
-         [10 kΩ]
-             │
-GND ─────────┴── source ─── pump −
+pump + ──┬──────── +5 V (separate supply)
+         │
+      [1N4007]   cathode → pump +, anode → pump −
+         │
+pump − ──┴── collector        2N2222
+                       base ──[82 Ω]── GPIO 19
+                     emitter ───────── GND (common)
 ```
 
-- Pump **+** to VIN, pump **−** to the drain; source to the common ground.
-- 1N4007 across the pump is mandatory (band/cathode to **+5 V**, plain end to
-  the drain); 100 µF across the pump terminals is optional and tames the
+- Pump **+** to the separate 5 V supply, pump **−** to the collector, emitter to
+  the common ground.
+- 1N4007 across the pump is mandatory (band/cathode to **pump +**, plain end to
+  the collector); 100 µF across the pump terminals is optional and tames the
   start-up surge.
-- Power bank into **VIN** with USB unplugged. OTA is used for firmware, so the
-  cable never has to be connected while the pump is powered.
+- The pump supply is separate from the board's USB feed. OTA is used for
+  firmware, so the USB cable never has to be connected while the pump is
+  powered.
 - Keep the intake above the sludge line and **below** the reservoir probes'
   low level, so “Available” means the pump is submerged. Never run it dry.
 - The outlet must be within about **10 cm** of the water surface; this pump
@@ -487,39 +490,40 @@ Do this in order, with the pump **disconnected** until step 7:
 2. Confirm module markings and header labels.
 3. Power the ESP32 alone from USB; measure 5 V and 3.3 V rails.
 4. Flash the firmware with the pump disabled. Confirm `/api/v1/health` reports
-   the expected chip and pin map; confirm the pump gate is LOW at boot.
+   the expected chip and pin map; confirm the pump-switch control (D19) is LOW
+   at boot, so the transistor is off.
 5. Test each LED on the Our Village page; measure the resistor current.
 6. Trigger each bin indicator LED from the camera (or the API) and confirm the
    matching bin lights. There is no fill sensor to test.
 7. Test the pump driver with a **dummy load** (a 5 V lamp or a resistor + LED)
-   before the pump. Confirm the gate switches, the flyback diode is the right
-   way round, and the MOSFET does not overheat.
+   before the pump. Confirm the 2N2222 switches (the collector pulls low), the
+   flyback diode is the right way round, and the transistor does not overheat.
 8. Connect the pump **in water**, never dry. Measure the running and stall
    current. Confirm the 5 V supply holds up.
 9. Calibrate soil (dry and wet) and the reservoir (dry and wet). The bins need no calibration: they have indicator LEDs only.
 10. Run the acceptance tests in `docs/bench-test.md`. There is no commissioning step any more.
 
-## 9. Commissioning the pump
+## 9. How the pump is allowed to run
 
-The pump is protected by two independent gates:
+There is **no commissioning flag** — it was removed on 2026-11-17, when the
+hardware was finished. The pump has the same **Auto / On / Off** switch as the
+lights:
 
-1. Compile-time: `VILLAGE_PUMP_COMMISSIONED` in
-   `uc/include/village/build_config.h` is `0` by default.
-2. Runtime: `config.irrigation.pump_enabled` is `false` by default and is
-   stored in NVS.
+- **Auto** — the irrigation rules decide: soil dry enough, water available, the
+  pulse/soak limits, the runtime caps and the 5-second post-boot guard. The
+  saved configuration must also have the pump enabled (`pump_enabled`); that is
+  the first of the two gates on the automatic path, the controller's own rules
+  being the second.
+- **On / Off** — the operator's switch. A manual **On** is stopped only by a tank
+  the controller *knows* is low; a missing or uncalibrated probe does not refuse
+  it. A spoken "stop the pump" also releases a manual On.
+- **The test page** can drive the output directly, but only while its master
+  switch is on (session-only), and the page is the gate in that mode.
 
-After the bench test passes:
-
-1. Set `VILLAGE_PUMP_COMMISSIONED 1` and reflash.
-2. On the village page, the pump's **Auto / On / Off** switch decides. Nothing needs enabling
-   that was not there before; that older checklist item read
-   the pump. The device accepts this only when the compile-time gate is open.
-3. Fill the reservoir, place the probes, and run one short pulse with the
-   pump in water while watching the current.
-4. Record the result in `docs/bench-test.md`.
-
-If either gate is closed, every irrigation start is rejected with
-`IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED`; the rest of the village still runs.
+The pump-switch control (D19) is LOW at boot and whenever the transistor is off,
+so the pump cannot run while the board is starting. `actuators.pump.pin_high`
+reports the pad itself, which is the honest answer to "did pressing On do
+anything?".
 
 ## 10. Solar panel — VN/GPIO 39 (volts) and VP/GPIO 36 (current)
 

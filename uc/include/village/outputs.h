@@ -8,14 +8,14 @@ namespace village {
 // Sets every output to a safe state.  Called before Wi-Fi, sampling or HTTP.
 void setupOutputs();
 
-// These apply the final hardware gate.  The pump can only be HIGH when the
-// compile-time commissioning flag and the runtime config both agree.
+// Applies the pump safety gate.  The pump output can only be HIGH when the
+// saved configuration enables the pump and the controller's rules allow it.
 void applyPump(bool on);
 
-// The test page's pump switch.  Writes the gate with none of applyPump()'s
-// checks -- the commissioning gate included -- because the page's master switch
-// is the gate there and the operator takes the protection on themselves.  Every
-// other caller must keep using applyPump().
+// The test page's pump switch.  Writes the control signal with none of
+// applyPump()'s checks, because the page's master switch is the safety gate
+// there and the operator takes the protection on themselves.  Every other
+// caller must keep using applyPump().
 void applyPumpDirect(bool on);
 void applyStreetlights(bool on);
 void applyWasteCategory(WasteCategory category);

@@ -16,7 +16,7 @@ import { IconPlug } from './Icons';
  *
  * It is deliberately blunt, at the operator's own instruction (2026-11-16):
  * past the switch there is no oversight of the soil probe, the tank probe, the
- * commissioning gate or the kill switch.  What protects the pump is the
+ * automatic-watering setting or the kill switch.  What protects the pump is the
  * operator's hand and the fact that closing the panel stops everything.
  */
 export function TestModeDialog({
