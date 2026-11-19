@@ -122,9 +122,13 @@ export function AboutHelp() {
               <IconSun size={18} />
               <div>
                 <strong>Energy.</strong> A real solar panel is measured — volts, milliamps and
-                milliwatts — and the wind generator has its own card. It says “Not fitted” until
-                the turbine is wired to GPIO 33, and then it reports volts only: one analogue input
-                cannot also measure current, so the card never invents a power figure.
+                milliwatts. The wind generator has its own card, and it is one circuit: the
+                generator feeds a blue LED, then the 47 Ω resistor the board measures. Current is
+                that resistor voltage ÷ 47; the generator's voltage is that plus the LED's measured
+                2.8 V; power is volts × milliamps. This is the electrical power delivered to the
+                LED-and-resistor circuit — not the wind's power, and not energy generated over
+                time. Below the noise floor the LED is not conducting, so the card shows a dash
+                rather than inventing a generator voltage, and says it has no measurable output.
               </div>
             </li>
           </ul>

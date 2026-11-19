@@ -858,7 +858,8 @@ sharing safe for the *village*, not for the account:
   (`soil_pct`), tank `available|low`, outside light (`light_metric`),
   `solar_light`, `wind_speed`, and `lights_mode` for the presets.  Solar is one
   circuit (mW = V × mA, junction clamped at the LED's forward voltage); wind is
-  **voltage only** — no current or power field exists, deliberately.  A manual
+  one circuit too (the ADC reads a 47 Ω resistor behind the blue LED, so the
+  card shows voltage, current and power from that one measurement).  A manual
   **On** is stopped by a *low* tank in the simulator exactly as on the board,
   and the switch stays where the operator put it.  Demo answers are prefixed
   "Simulated: " so a spoken reply cannot imply the physical model moved.
@@ -2826,3 +2827,45 @@ plain background". Consequence for the venue: **do not use focus on a sheet** �
 the red base, with the item filling the square, is the better condition, and the
 `objectMask` white plate (which is why `focus.ts` warns that "a plain white
 224x224 square is Paper 0.69") should be left unused in front of the bins.
+
+## Status / next steps
+
+**Latest — the wind card is a circuit, not a voltage (2026-11-20).**  The
+operator wired `generator + → blue LED → ADC junction → 47 Ω → GND` and asked
+for voltage, current and power, with the LED's forward voltage measured at
+2.8 V.  The old reading was the generator's open-circuit volts, so this is a
+real change of what the ADC means, not a relabelled number:
+
+- **Firmware:** `uc/include/village/core/wind.h` holds the arithmetic
+  (`I = Vr / R`, `V = Vr + Vled`, `P = V × I`) and `WindConfig` carries the
+  hardware (`sense_ohms` 47, `led_forward_mv` 2800, `noise_floor_mv` 20) in NVS
+  as JSON, with `validateConfig` bounds.  The pin is read with
+  `analogReadMilliVolts` and four reads are averaged (the whole signal is tens
+  of millivolts).  **Below the floor nothing is added:** `voltage_v` is `null`,
+  current and power are 0, because a dark LED cannot tell you the generator's
+  voltage.  `/status` `sensors.wind` now carries `resistor_millivolts`,
+  `measuring`, `voltage_v|voltage_millivolts` (nullable), `current_ma`,
+  `power_mw` and the three settings; `generate_mv` is gone.
+- **Backend:** the simulator computes the same circuit from the slider (0–260 mV
+  across the resistor → 0–5.5 mA, 0–17 mW) and reports `null` voltage at rest,
+  so Simulation cannot invent 2.8 V either.  `makeState`/`localVillage` do the
+  same for frames the page builds itself.
+- **Frontend:** the Wind card keeps its row, chip and picture and shows
+  `Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW` (or
+  `Voltage — · Current 0.00 mA · Power 0.0 mW` with **No measurable output**).
+  A missing, stale or offline frame shows no readings at all rather than a zero;
+  the windmill turns with the current, not the old volts.  `wind.help` in
+  `messages.ts` is the operator's sentence in en/hi/ml, the About page says the
+  same and that this is **not wind power or energy**, and the obsolete
+  "power is not measured" copy is deleted from messages, `docs/operation.md`,
+  `docs/wiring.md` §11 and README.
+- **Gates:** firmware **560 checks / 0 failed** (5 new wind units + the
+  rewritten config test), backend **195 passed**, frontend **449 passed**,
+  typecheck and build clean.  The OTA image was rebuilt
+  (`uc/.pio/build/esp32doit-devkit-v1-ota/firmware.bin`, marker **1**, carries
+  `voltage_millivolts`), so the next board session flashes both changes:
+  `CLEAR_WASTE` (the one pending hardware press) and this reading.  Measured in
+  Chromium on :8010 in Simulation: 230 mV → `Voltage 3.03 V · Current 4.89 mA ·
+  Power 14.8 mW`; slider at 0 → `Voltage — · Current 0.00 mA · Power 0.0 mW`
+  with **No measurable output**; Malayalam at 390 px with no horizontal
+  overflow and zero page errors.

@@ -359,28 +359,67 @@ describe('wind card', () => {
     // No placeholder line: the chip already says the turbine is not fitted, and
     // "No reading" under it repeated that in worse words (2026-11-18).
     expect(card.queryByText('No reading')).not.toBeInTheDocument();
-    // No invented power figure: one tap cannot measure current.
+    // Nothing is wired, so there is no circuit to measure: no readings line at
+    // all rather than a zero that was never taken.
     expect(card.queryByText(/mW/)).not.toBeInTheDocument();
+    expect(card.getByTestId('wind-live-note')).toHaveTextContent(/No turbine is wired/);
   });
 
-  it('goes green once the generator is turning above its threshold', async () => {
+  it('shows voltage, current and power calculated from the resistor', async () => {
+    // 230 mV across 47 ohm = 4.89 mA; the generator is that plus the lit LED's
+    // 2.8 V = 3.03 V; power = 3.03 V x 4.89 mA = 14.8 mW.  These are the board's
+    // own numbers, not a second calculation in the page.
     vi.mocked(api.state).mockResolvedValue(
-      makeState({ windMillivolts: 2400, windInstalled: true }),
+      makeState({ windMillivolts: 230, windInstalled: true }),
     );
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Generating')).toHaveClass('chip', 'chip--live');
-    expect(card.getByText('2.40 V')).toBeInTheDocument();
+    expect(
+      card.getByText('Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW'),
+    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-help')).toHaveTextContent(
+      'Current is calculated from the voltage across a 47 Ω resistor.',
+    );
+    expect(card.queryByText(/No measurable output/)).not.toBeInTheDocument();
   });
 
-  it('stays neutral when a fitted turbine is not turning', async () => {
+  it('shows no voltage at all while the LED is dark, and says why', async () => {
+    // 12 mV is the ADC's own noise: below the noise floor the LED is not
+    // conducting, so there is no current to divide and no generator voltage to
+    // estimate.  Showing 2.8 V here would be the mistake this guards.
     vi.mocked(api.state).mockResolvedValue(
-      makeState({ windMillivolts: 120, windInstalled: true }),
+      makeState({ windMillivolts: 12, windInstalled: true }),
     );
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Not generating')).toHaveClass('chip', 'chip--neutral');
-    expect(card.getByText('0.12 V')).toBeInTheDocument();
+    expect(
+      card.getByText('Voltage — · Current 0.00 mA · Power 0.0 mW'),
+    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-help')).toHaveTextContent(/^No measurable output/);
+    expect(card.queryByText('2.80 V')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing rather than a zero when the controller is offline', async () => {
+    // A missing frame is not "0 mA": nothing was measured, so the card says
+    // nothing and the chip carries the state.  An invented zero would be a
+    // reading that never happened.
+    vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
+    await renderReady();
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.queryByText(/Current/)).not.toBeInTheDocument();
+    expect(card.queryByText(/Power/)).not.toBeInTheDocument();
+  });
+
+  it('shows nothing rather than an old number when the frame is stale', async () => {
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ stale: true, windMillivolts: 230, windInstalled: true }),
+    );
+    await renderReady();
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.queryByText(/Current/)).not.toBeInTheDocument();
+    expect(card.queryByText(/14.8 mW/)).not.toBeInTheDocument();
   });
 });
 
@@ -562,17 +601,22 @@ describe('Our Village — the words on the page', () => {
     expect(card.queryByText('Open camera')).not.toBeInTheDocument();
   });
 
-  it('says the turbine measures volts and not power', async () => {
+  it('reports all three readings from the board and explains the circuit', async () => {
     vi.mocked(api.state).mockResolvedValue(
-      makeState({ windMillivolts: 1200, windInstalled: true }),
+      makeState({ windMillivolts: 120, windInstalled: true }),
     );
     await renderReady();
 
     const card = within(await screen.findByTestId('card-wind'));
-    expect(card.getByText('1.20 V')).toBeInTheDocument();
-    // Live says *measured*: the figure comes from the board.
-    expect(card.getByText('Voltage measured; power is not measured.')).toBeInTheDocument();
-    expect(card.queryByText(/second input/i)).not.toBeInTheDocument();
+    expect(
+      card.getByText('Voltage 2.92 V · Current 2.55 mA · Power 7.5 mW'),
+    ).toBeInTheDocument();
+    // The sentence names the resistor and the LED's measured forward voltage, so
+    // the reader can check the arithmetic rather than trust a number.
+    expect(card.getByTestId('wind-help')).toHaveTextContent(
+      'using the LED’s measured forward voltage of 2.8 V',
+    );
+    expect(card.queryByText(/power is not measured/i)).not.toBeInTheDocument();
   });
 });
 
@@ -714,15 +758,19 @@ describe('the simulation lab changes conditions and explains itself', () => {
     await waitFor(() => expect(api.demoScenario).toHaveBeenCalledWith({ wind_speed: 0.9 }));
   });
 
-  it('says the turbine’s power is not measured', async () => {
+  it('runs the same circuit in the lab, and says it is simulated', async () => {
     window.localStorage.setItem('village.demoMode', 'demo');
-    vi.mocked(api.state).mockResolvedValue(makeState({ windMillivolts: 1200, windInstalled: true }));
+    vi.mocked(api.state).mockResolvedValue(makeState({ windMillivolts: 230, windInstalled: true }));
     await renderReady();
 
     const card = within(await screen.findByTestId('card-wind'));
-    // In the lab the number is simulated, and the card says so.
-    expect(card.getByText('Simulated voltage; power is not measured.')).toBeInTheDocument();
-    expect(card.queryByText(/mW|mA/)).not.toBeInTheDocument();
+    // Same arithmetic as the board, with the simulation named.
+    expect(
+      card.getByText('Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW'),
+    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-help')).toHaveTextContent(
+      /^Simulated with the same circuit as the board/,
+    );
   });
 });
 

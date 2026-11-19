@@ -49,7 +49,7 @@ itself.
 | LDR (light) | **32** | ADC1 |
 | solar panel voltage | **39** (VN) | ADC1, input-only |
 | solar LED junction | **36** (VP) | ADC1, input-only |
-| wind generator voltage | **33** | ADC1, the last free ADC1 pin |
+| wind current tap | **33** | ADC1, the last free ADC1 pin — across the 47 Ω resistor behind the blue LED |
 | pump MOSFET gate | **19** | logic only; pump has its own 5 V supply |
 | streetlights (all five lamps) | **13** | one pin, ~9 mA total |
 | waste LED — organic | **21** | green |
@@ -90,7 +90,8 @@ are indicators of what the camera last recognised.
 3. `handleApi()` — serve any pending HTTP request.
 4. `sampleSensors(now)` — fixed periods: soil **400 ms**, light **500 ms**,
    reservoir **2000 ms** (7 samples, 5 ms settle after raising the excite pin),
-   solar+wind **1000 ms**. `sample_seq` increments per sample.
+   solar+wind **1000 ms** (the wind tap is averaged over four calibrated reads).
+   `sample_seq` increments per sample.
 5. Irrigation controller and the pump pad (Auto = rules and the tank; On/Off =
    the operator's switch, watched only by the tank).
 6. Streetlight controller (LDR hysteresis, `stable_ms`).

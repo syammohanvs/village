@@ -194,11 +194,14 @@ cd web/frontend && npm run typecheck && npm test && npm run build
 ## Honest data rules
 
 The app never displays a tank percentage, litres, capacity, household water
-use, pressure, flow, battery charge, solar/wind generation or energy savings.
-The reservoir has two wire probes at one minimum level; bin fill is an
-estimated height from a laser distance measurement; soil moisture is a
-calibrated relative value. The solar panels, windmill and model buildings are static.
-An acknowledged command proves the controller decided, not that water flowed.
+use, pressure, flow, battery charge, wind energy or energy savings. The reservoir
+has two wire probes at one minimum level; the bins carry indicator LEDs only and
+nothing measures how full they are; soil moisture is a calibrated relative
+value. The solar panel is a real one (volts, milliamps, milliwatts), and so is
+the wind circuit's power — `generator → blue LED → 47 Ω resistor`, measured
+across the resistor, so it is the power delivered to that circuit and not the
+wind's power. The model buildings are static. An acknowledged command proves the
+controller decided, not that water flowed.
 
 ## Exhibition checklist
 

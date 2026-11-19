@@ -41,10 +41,13 @@ describe('About & Help — the architecture it states', () => {
     expect(screen.queryByText(/Camera frames are not uploaded/i)).not.toBeInTheDocument();
   });
 
-  it('describes the wind card as fitted rather than always a display piece', async () => {
+  it('describes the wind card as fitted rather than always a display piece, and as one circuit', async () => {
     render(<App />);
-    expect((await screen.findAllByText(/Not fitted/)).length).toBeGreaterThan(0);
-    expect(screen.getByText(/reports volts only/i)).toBeInTheDocument();
+    // The card is a resistor behind an LED now: current from the resistor's
+    // voltage, generator voltage from the LED's 2.8 V, power from both.
+    expect(await screen.findByText(/47 Ω resistor the board measures/i)).toBeInTheDocument();
+    expect(screen.getByText(/not the wind'?s power/i)).toBeInTheDocument();
+    expect(screen.queryByText(/reports volts only/i)).not.toBeInTheDocument();
   });
 
   it('names the confidence bar a bin needs, and the referral bar', async () => {

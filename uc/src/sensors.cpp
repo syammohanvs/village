@@ -56,6 +56,7 @@ void setupSensors() {
   analogSetPinAttenuation(pins::LDR_ADC, ADC_11db);
   analogSetPinAttenuation(pins::SOLAR_PANEL_ADC, ADC_11db);
   analogSetPinAttenuation(pins::SOLAR_CURRENT_ADC, ADC_11db);
+  analogSetPinAttenuation(pins::WIND_ADC, ADC_11db);
   ensureLightPinMode();
   const uint32_t now = millis();
   g_next_soil = now;
@@ -84,8 +85,20 @@ void sampleSensors(uint32_t now) {
     rt.solar_junction_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::SOLAR_CURRENT_ADC));
     // Wind shares the solar sampling period: one more ADC read on the last free
     // ADC1 pin, and it is the same kind of slow signal.
-    rt.wind_raw = static_cast<uint16_t>(analogRead(pins::WIND_ADC));
-    rt.wind_mv = static_cast<uint16_t>(analogReadMilliVolts(pins::WIND_ADC));
+    //
+    // The tap is across a 47 ohm resistor, so the whole reading is a few tens of
+    // millivolts and the ADC's own noise would otherwise be a large share of it.
+    // Four calibrated reads are averaged (about 0.4 ms) -- the threshold below
+    // which nothing counts as current is therefore a real floor, not jitter.
+    uint32_t wind_raw_sum = 0;
+    uint32_t wind_mv_sum = 0;
+    constexpr uint8_t kWindSamples = 4;
+    for (uint8_t i = 0; i < kWindSamples; ++i) {
+      wind_raw_sum += analogRead(pins::WIND_ADC);
+      wind_mv_sum += analogReadMilliVolts(pins::WIND_ADC);
+    }
+    rt.wind_raw = static_cast<uint16_t>(wind_raw_sum / kWindSamples);
+    rt.wind_mv = static_cast<uint16_t>(wind_mv_sum / kWindSamples);
     markSample(now);
   }
 

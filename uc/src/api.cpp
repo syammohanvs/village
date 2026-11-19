@@ -12,6 +12,7 @@
 #include "village/build_config.h"
 #include "village/core/irrigation.h"
 #include "village/core/solar.h"
+#include "village/core/wind.h"
 #include "village/core/time.h"
 #include "village/device_state.h"
 #include "village/net.h"
@@ -138,16 +139,38 @@ void buildStatus(JsonDocument& doc) {
   solar["power_mw"] = power.power_mw;
   solar["valid"] = power.valid;
 
+  // The wind circuit (2026-11-20): generator + -> blue LED -> ADC junction ->
+  // 47 ohm -> GND.  **The ADC reads the resistor**, not the generator, so the
+  // arithmetic below is the circuit and not a relabelling of the old voltage:
+  // I = Vr / R, Vgen = Vr + Vled, P = V * I, and below the noise floor there is
+  // no current at all -- so there is no generator voltage to report either.
+  const WindPower windPower = computeWindPower(
+      rt.wind_mv, rt.config.wind.sense_ohms, rt.config.wind.led_forward_mv,
+      rt.config.wind.noise_floor_mv);
   JsonObject wind = sensors["wind"].to<JsonObject>();
   wind["installed"] = rt.config.wind.installed;
   wind["raw"] = rt.wind_raw;
-  wind["millivolts"] = rt.wind_mv;
-  wind["volts"] = static_cast<float>(rt.wind_mv) / 1000.0f;
-  wind["generate_millivolts"] = rt.config.wind.generate_mv;
-  // One tap, so there is no current and no power to report -- saying so is
-  // better than inventing a number from a voltage.
-  wind["generating"] = rt.config.wind.installed && rt.wind_mv >= rt.config.wind.generate_mv;
-  wind["valid"] = rt.config.wind.installed;
+  // Two names for one measurement, and the explicit one is the truth: the ADC
+  // is across the resistor.  `millivolts` is kept because older clients read it.
+  wind["resistor_millivolts"] = windPower.resistor_mv;
+  wind["millivolts"] = windPower.resistor_mv;
+  wind["sense_ohms"] = rt.config.wind.sense_ohms;
+  wind["led_forward_millivolts"] = rt.config.wind.led_forward_mv;
+  wind["noise_floor_millivolts"] = rt.config.wind.noise_floor_mv;
+  wind["measuring"] = windPower.measuring;
+  if (windPower.has_voltage) {
+    wind["voltage_millivolts"] = windPower.voltage_mv;
+    wind["voltage_v"] = round2(static_cast<float>(windPower.voltage_mv) / 1000.0f);
+  } else {
+    // Not zero: this circuit cannot know the generator voltage while the LED is
+    // dark, and a dash is the honest answer.
+    wind["voltage_millivolts"] = nullptr;
+    wind["voltage_v"] = nullptr;
+  }
+  wind["current_ma"] = windPower.current_ma;
+  wind["power_mw"] = windPower.power_mw;
+  wind["generating"] = rt.config.wind.installed && windPower.measuring;
+  wind["valid"] = rt.config.wind.installed && windPower.valid;
 
   const IrrigationStatus irr = rt.irrigation.status(now);
   JsonObject actuators = root["actuators"].to<JsonObject>();

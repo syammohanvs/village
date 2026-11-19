@@ -195,8 +195,9 @@ inline constexpr int WASTE_LED_PAPER = 23;
 // GPIO 2/5/15 are strapping pins that stay unused, and GPIO 1/3 remain the USB
 // serial console.  D33 is the named spare.
 // The last free ADC1 pin, and the only one left: every other ADC1 pin carries a
-// sensor, and ADC2 cannot be used while Wi-Fi runs.  A second analogue input for
-// wind (the current tap) needs an external ADC -- see docs/wiring.md.
+// sensor, and ADC2 cannot be used while Wi-Fi runs.  Since 2026-11-20 this is
+// the wind **current** tap (the voltage across the 47 ohm resistor), not the
+// generator's own voltage -- see docs/wiring.md section 11.
 inline constexpr int SPARE_INPUT = 33;
 inline constexpr int WIND_ADC = SPARE_INPUT;  // ADC1_CH5, input-only
 

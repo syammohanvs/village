@@ -73,15 +73,19 @@ struct WasteConfig {
 // junction between that resistor and the LED.  The voltage across the resistor
 // gives the current (I = V/R) and the panel voltage times that current is the
 // power it is delivering.
-// Wind generator: voltage only for now.  The board has exactly one free ADC1
-// pin (GPIO 33), so there is no second tap to measure current the way the solar
-// block does with its LED junction; a second input means an external ADC.
+// Wind generator: ONE ADC tap (GPIO 33), but it is placed where the current
+// flows -- across a 47 ohm resistor in series with the generator's blue LED --
+// so one measurement gives all three figures: I = V/R, the generator voltage is
+// that plus the LED's forward voltage, and power is V x I.  See wind.h.
 struct WindConfig {
   bool installed = false;
-  // Above this the generator is doing something.  A small DC motor used as a
-  // generator idles near 0 V, so this is a real threshold, not a guess -- but it
-  // is a setting because the turbine and gearing decide the number.
-  uint16_t generate_mv = 1000;
+  // The circuit (2026-11-20): generator + -> blue LED -> ADC junction ->
+  // 47 ohm -> GND.  The ADC reads the resistor, so the three numbers below are
+  // the hardware: the resistor it divides by, the LED's measured forward
+  // voltage, and the noise floor below which nothing is flowing.
+  uint16_t sense_ohms = 47;
+  uint16_t led_forward_mv = 2800;
+  uint16_t noise_floor_mv = 20;
 };
 
 struct SolarConfig {
@@ -248,10 +252,17 @@ inline bool validateConfig(const DeviceConfig& c, ConfigError& err) {
     return fail("solar.sense_ohms", "Solar sense resistor must be 1..10000 ohms.");
   }
 
-  // A wind threshold above the pin's own range would make "generating" true
-  // only on an impossible reading, so it is refused rather than stored.
-  if (!inRange(static_cast<int>(c.wind.generate_mv), 0, 3300)) {
-    return fail("wind.generate_mv", "Wind generating threshold must be 0..3300 mV.");
+  // The wind circuit's three numbers are hardware: a resistor of 0 would divide
+  // by nothing, an LED forward voltage outside 0.5..5 V is not a blue LED, and a
+  // noise floor above 1 V would refuse every real reading.
+  if (!inRange(static_cast<int>(c.wind.sense_ohms), 1, 10000)) {
+    return fail("wind.sense_ohms", "Wind sense resistor must be 1..10000 ohms.");
+  }
+  if (!inRange(static_cast<int>(c.wind.led_forward_mv), 500, 5000)) {
+    return fail("wind.led_forward_mv", "Wind LED forward voltage must be 500..5000 mV.");
+  }
+  if (!inRange(static_cast<int>(c.wind.noise_floor_mv), 0, 1000)) {
+    return fail("wind.noise_floor_mv", "Wind noise floor must be 0..1000 mV.");
   }
 
   err = ConfigError{};

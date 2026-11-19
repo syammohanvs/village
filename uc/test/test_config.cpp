@@ -116,25 +116,33 @@ TEST(config_rejects_inverted_reservoir_and_light_thresholds) {
 }
 
 
-// Wind: the board has one free ADC1 pin (GPIO 33), so the block is a voltage
-// tap plus the level that counts as generating.  A threshold the pin's own range
-// cannot reach would make "generating" permanently false, so it is refused.
-TEST(config_wind_threshold_stays_inside_the_adc_range) {
+// Wind: the ADC is across a 47 ohm resistor behind the blue LED, so the block
+// carries the hardware (resistor, LED forward voltage) and the noise floor.  A
+// resistor of zero would divide by nothing and an LED voltage outside a real
+// blue LED's range is a typo, so both are refused rather than stored.
+TEST(config_wind_carries_the_circuit_and_refuses_impossible_values) {
   DeviceConfig c = defaults();
   ConfigError err;
   CHECK(validateConfig(c, err));
   CHECK(c.wind.installed == false);
-  CHECK(c.wind.generate_mv == 1000);
+  CHECK(c.wind.sense_ohms == 47);
+  CHECK(c.wind.led_forward_mv == 2800);
+  CHECK(c.wind.noise_floor_mv == 20);
 
-  c.wind.generate_mv = 3300;
+  c.wind.sense_ohms = 47;
+  c.wind.led_forward_mv = 3000;
+  c.wind.noise_floor_mv = 0;
   CHECK(validateConfig(c, err));
 
-  c.wind.generate_mv = 3301;
+  c.wind.sense_ohms = 0;
   CHECK(!validateConfig(c, err));
   CHECK(err.field != nullptr);
 
   c = defaults();
-  c.wind.installed = true;
-  c.wind.generate_mv = 0;
-  CHECK(validateConfig(c, err));
+  c.wind.led_forward_mv = 499;
+  CHECK(!validateConfig(c, err));
+
+  c = defaults();
+  c.wind.noise_floor_mv = 1001;
+  CHECK(!validateConfig(c, err));
 }

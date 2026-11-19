@@ -65,7 +65,9 @@ void writeConfigJson(JsonObject out, const DeviceConfig& c) {
 
   JsonObject wind = out["wind"].to<JsonObject>();
   wind["installed"] = c.wind.installed;
-  wind["generate_mv"] = c.wind.generate_mv;
+  wind["sense_ohms"] = c.wind.sense_ohms;
+  wind["led_forward_mv"] = c.wind.led_forward_mv;
+  wind["noise_floor_mv"] = c.wind.noise_floor_mv;
 }
 
 bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
@@ -145,7 +147,9 @@ bool readConfigJson(JsonObjectConst c, DeviceConfig& out, const char** error) {
   JsonObjectConst wind = c["wind"].as<JsonObjectConst>();
   if (!wind.isNull()) {
     out.wind.installed = wind["installed"] | out.wind.installed;
-    out.wind.generate_mv = wind["generate_mv"] | out.wind.generate_mv;
+    out.wind.sense_ohms = wind["sense_ohms"] | out.wind.sense_ohms;
+    out.wind.led_forward_mv = wind["led_forward_mv"] | out.wind.led_forward_mv;
+    out.wind.noise_floor_mv = wind["noise_floor_mv"] | out.wind.noise_floor_mv;
   }
 
   JsonObjectConst solar = c["solar"].as<JsonObjectConst>();

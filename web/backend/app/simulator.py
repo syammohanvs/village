@@ -108,7 +108,11 @@ def default_config() -> dict[str, Any]:
         },
         "wind": {
             "installed": True,
-            "generate_mv": 1000,
+            # The circuit: generator + -> blue LED -> ADC junction -> 47 ohm ->
+            # GND.  Simulation uses the same three hardware numbers as the board.
+            "sense_ohms": 47,
+            "led_forward_mv": 2800,
+            "noise_floor_mv": 20,
         },
         "irrigation": {
             "auto_enabled": True,
@@ -534,26 +538,42 @@ class SimulatedDevice:
             }
 
     def _wind(self) -> dict[str, Any]:
-        """A generator whose voltage follows the windmill's simulated speed.
+        """The board's wind circuit, simulated with the same arithmetic.
 
-        Simulation has to show a reading here for the same reason it shows one
-        for the solar panel: a card that says "Not fitted" teaches nothing about
-        what the panel will look like once the turbine is wired (asked for
-        2026-11-16).
+        generator + -> blue LED -> ADC junction -> 47 ohm -> GND, so the ADC
+        reads the resistor.  I = Vr / R, Vgen = Vr + Vled, P = V x I — and below
+        the noise floor the LED is not conducting, so there is no current and no
+        generator voltage to report (`voltage_v` is null, not 2.8).
 
-        Voltage only.  There is no current or power figure because the board has
-        no second input for it — inventing one here would be the exact claim the
-        card refuses to make (2026-11-17).
+        The windmill speed sets the resistor voltage: 0..260 mV, which is
+        0..5.5 mA and 0..17 mW — the range a small generator with this load
+        produces.  Simulation is a separate device class and never touches the
+        board.
         """
-        millivolts = int(round(2600 * max(0.0, min(1.0, self.wind_speed))))
+        speed = max(0.0, min(1.0, self.wind_speed))
+        resistor_mv = int(round(260 * speed))
+        cfg = self.config.get("wind", {})
+        sense = int(cfg.get("sense_ohms", 47)) or 47
+        led = int(cfg.get("led_forward_mv", 2800))
+        floor = int(cfg.get("noise_floor_mv", 20))
+        measuring = resistor_mv > floor
+        current_ma = (resistor_mv / sense) if measuring else 0.0
+        voltage_mv = (resistor_mv + led) if measuring else None
         return {
             "installed": True,
-            "raw": millivolts,
-            "millivolts": millivolts,
-            "volts": millivolts / 1000.0,
-            "generate_millivolts": self.config.get("wind", {}).get("generate_mv", 1000),
-            "generating": millivolts >= self.config.get("wind", {}).get("generate_mv", 1000),
-            "speed": round(max(0.0, min(1.0, self.wind_speed)), 3),
+            "raw": resistor_mv,
+            "resistor_millivolts": resistor_mv,
+            "millivolts": resistor_mv,
+            "sense_ohms": sense,
+            "led_forward_millivolts": led,
+            "noise_floor_millivolts": floor,
+            "measuring": measuring,
+            "voltage_millivolts": voltage_mv,
+            "voltage_v": round(voltage_mv / 1000.0, 2) if voltage_mv is not None else None,
+            "current_ma": current_ma,
+            "power_mw": (voltage_mv / 1000.0) * current_ma if voltage_mv is not None else 0.0,
+            "speed": round(speed, 3),
+            "generating": measuring,
             "valid": True,
         }
 

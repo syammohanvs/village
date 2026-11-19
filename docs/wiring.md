@@ -629,11 +629,10 @@ better than a BAT54 here. The simpler answer for an exhibit is a **panel
 disconnect** when it is packed away, or just keep the board powered whenever the
 panel is in the light.
 
-## 11. Wind generator — GPIO 33 (volts only, 2026-11-16)
+## 11. Wind generator — GPIO 33 (one circuit, 2026-11-20)
 
-**One wire, because one pin is all there is.** Every other analogue input is
-taken, and the remaining "analogue" pins on the pinout diagrams are not usable on
-this board:
+**One analogue input for the whole wind circuit**, because every other ADC1 pin
+is taken and ADC2 cannot be used while Wi-Fi runs:
 
 | ADC1 pin | carries |
 | --- | --- |
@@ -642,55 +641,69 @@ this board:
 | 35 | reservoir probes (§5) |
 | 36 | solar current tap (§10) |
 | 39 | solar panel tap (§10) |
-| **33** | **wind generator — this section** |
+| **33** | **wind circuit — this section** |
 
-**ADC2 cannot be used here.** It shares hardware with the Wi-Fi radio, and this
-exhibit is online the whole time, so GPIO 25, 26, 4, 2 and 12–15 read zero (or
-error) while the station link is up. `uc/include/village/pins.h` enforces this at
-compile time — `isSafeAnalog()` accepts only ADC1 pins, and the build fails if a
-sensor is assigned anywhere else.
+`uc/include/village/pins.h` enforces the ADC1 rule at compile time —
+`isSafeAnalog()` accepts only ADC1 pins, and the build fails if a sensor is
+assigned anywhere else.
 
 ### Wiring
 
 ```
-generator +  ──[ 10 kΩ ]──  D33 (GPIO 33)
-generator −  ─────────────  GND
+generator +  ──▶|── (blue LED) ──┬── D33 (GPIO 33)
+                                 │
+                                [R] 47 Ω
+                                 │
+generator −  ────────────────────┴── GND
 ```
 
-- The **10 kΩ is protection**, exactly as on the solar taps: it carries no
-  current and bounds what the pin's clamp sees if the board is unpowered while
-  the turbine spins.
-- Keep the generator's **open-circuit voltage under 3.3 V**. A small DC motor
-  used as a generator usually stays well below that when spun by a model
-  turbine; if yours does not, add a divider and account for it when reading.
-- No load resistor is used, so the reading is the generator's **open-circuit
-  volts**. That is a real measurement, and it is why the card shows volts only.
+- **The ADC is across the 47 Ω resistor, not the generator.** That is the whole
+  reason the card can show current at all: the resistor turns the current into a
+  voltage, and `I = V_resistor / 47`.
+- **The blue LED sets the threshold.** It does not conduct until the generator is
+  above its forward voltage, which was **measured at 2.8 V while lit**. Below
+  that there is no current, and this circuit cannot say what the generator's
+  voltage is — so the firmware must not add 2.8 V there.
+- A blue LED's forward voltage moves slightly with current (a few tens of
+  millivolts between dim and bright), which is why the card says so rather than
+  presenting the estimate as exact.
+- Keep the generator's **open-circuit voltage reasonable for the LED + resistor
+  branch**; if it can far exceed 3.3 V, add a divider ahead of the LED and scale
+  the numbers in `WindConfig` accordingly.
+- GPIO 33 is input-only on this module, which is correct here: it only measures.
 
-### What the app does with it
+### What the firmware does with it
 
-`wind.installed` (default **false**) and `wind.generate_mv` (default **1000**,
-range 0–3300) are in the saved configuration. The card on Our Village says:
+`uc/include/village/core/wind.h` holds the arithmetic in one place, and
+`WindConfig` holds the three hardware numbers so a different resistor or LED can
+be measured and entered without a firmware change:
+
+| setting | default | meaning |
+| --- | --- | --- |
+| `wind.installed` | false | a turbine is wired |
+| `wind.sense_ohms` | **47** | the resistor the ADC is across |
+| `wind.led_forward_mv` | **2800** | the blue LED's measured forward voltage |
+| `wind.noise_floor_mv` | **20** | below this the reading is ADC noise, not current |
+
+```
+current_ma  = resistor_mv / sense_ohms
+voltage_mv  = resistor_mv + led_forward_mv     (only while current flows)
+power_mw    = (voltage_mv / 1000) * current_ma
+```
+
+The wind pin is read with `analogReadMilliVolts` (the ESP32's own calibration)
+and four reads are averaged, because the whole signal is tens of millivolts.
+
+### What the card says
 
 | state | card |
 | --- | --- |
-| `installed` false | **Not fitted**, "No reading" |
-| installed, volts ≥ threshold | **Generating** (green) |
-| installed, volts below it | **Not generating** (neutral) |
+| `installed` false | **Not fitted**, and a sentence saying nothing flows |
+| installed, above the noise floor | **Generating** (green), `Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW` |
+| installed, at or below it | **Not generating** (neutral), `Voltage — · Current 0.00 mA · Power 0.0 mW`, *No measurable output* |
 
-The threshold is a setting because the turbine, its gearing and the generator
-decide what "turning" means. A stationary generator idles near 0 V, so there is
-no ambiguity at the bottom of the range.
+A dash is not zero: the LED is dark, so there is no generator voltage to report.
 
-### If you want current and power as well
-
-The card deliberately reports **no milliamps and no milliwatts**: a voltage alone
-cannot give either honestly, and there is no second tap. Two ways to get one:
-
-1. **An ADS1115 (I2C, 4 channels, 16-bit)** on two of the free digital pins —
-   e.g. GPIO 4 (SDA) and GPIO 26 (SCL). Its second channel takes the
-   `generator → 330 Ω → LED → GND` tap the solar section uses, and its readings
-   are unaffected by the ESP32 ADC's non-linearity. This is the route to take if
-   the wind card is meant to show a power figure.
-2. **Free an ADC1 pin** by moving the reservoir (35) or the LDR (32) to another
-   input. That is a hardware change; nothing in the firmware needs editing beyond
-   the pin constant, but the calibration of the moved sensor starts again.
+**This is the electrical power delivered to the LED-and-resistor circuit — not
+the wind's power, and not energy generated over time.** There is no second tap
+and no wind-speed or torque measurement, so nothing on the card claims either.

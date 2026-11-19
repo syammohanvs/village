@@ -1022,8 +1022,12 @@ async def test_demo_mode_shows_a_wind_reading_like_the_solar_panel(tmp_path):
     sensors = (response.json().get("status") or {}).get("sensors") or {}
     wind = sensors.get("wind") or {}
     assert wind.get("installed") is True
-    assert wind.get("millivolts", 0) > 0
+    assert wind.get("resistor_millivolts", 0) > 0
+    assert wind.get("measuring") is True
     assert wind.get("generating") is True
+    assert wind.get("voltage_v") is not None
+    assert wind.get("current_ma", 0) > 0
+    assert wind.get("power_mw", 0) > 0
     # The solar card in Simulation is the model this follows.
     assert (sensors.get("solar") or {}).get("installed") is True
 

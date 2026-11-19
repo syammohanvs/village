@@ -540,7 +540,7 @@ then says what the village did about it:
 | Rain Water Tank | **Water available** / **Low water** | Two wires in the tank can say one thing: whether the water reaches the low level, or not. **Available** is answered as "there is enough water in the tank" — enough to water with, not full, and never a percentage or a litre count. |
 | Lights | **Outside light**, Dark → Bright | The room's light. **Outside: Dark** and **Streetlights: On** are shown separately, because they are different facts. |
 | Solar | **Light on solar panel**, Low → Strong | The panel's own light. Volts, the current through the 330 Ω resistor and power are one circuit: **mW = V × mA**. |
-| Wind | **Windmill speed**, Still → Fast | Voltage only. Power is not measured, and nothing claims it is. |
+| Wind | **Windmill speed**, Still → Fast | One circuit: the ADC reads the 47 Ω resistor behind the blue LED, so the card shows **voltage, current and power**. It is the electrical power delivered to that circuit, not the wind's power. |
 | Waste | **Try a sample** | Five preset items showing the guidance the camera would give. Not an AI result. |
 
 Every row ends with a sentence naming the rule that decided: *“It is dark and
@@ -577,10 +577,18 @@ appear anywhere.
 
 What **is** measured, and may be quoted: soil moisture, the tank's one minimum
 level, the light level, the **solar** panel (volts, milliamps and milliwatts,
-through a real panel and a red LED as the load) and the **wind** generator's
-volts once a turbine is wired to GPIO 33 — the wind card reads "Not fitted"
-until then, and it deliberately reports no current or power, because one
-analogue input cannot measure both.
+through a real panel and a red LED as the load) and the **wind** circuit (volts,
+milliamps and milliwatts). The wind card reads "Not fitted" until a turbine is
+wired to GPIO 33.
+
+The wind reading is one measurement of one circuit: `generator + → blue LED →
+ADC junction → 47 Ω → ground`, so the ADC is across the resistor. Current is
+`V_resistor / 47`, the generator's voltage is that plus the LED's **measured
+2.8 V** forward voltage, and power is volts × milliamps. **It is the electrical
+power delivered to the LED-and-resistor circuit — not the wind's power, and not
+energy generated over time.** Below the noise floor the LED is not conducting,
+so there is no current and no way to know the generator's voltage: the card shows
+a dash and "No measurable output" rather than 2.8 V for a stopped windmill.
 
 The model **buildings** are static display models. The bins have indicator LEDs
 only: nothing measures how full a bin is.

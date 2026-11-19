@@ -1,4 +1,4 @@
-import type { StateEnvelope } from '../types';
+import type { StateEnvelope, WindReading } from '../types';
 
 /**
  * A complete, plausible village frame — the shape `/api/v1/state` answers with.
@@ -24,7 +24,7 @@ export interface StateOptions {
   lightInstalled?: boolean;
   /** Panel volts on VN. Omit for "no solar reading yet". */
   solarMillivolts?: number | null;
-  /** Wind generator volts; null means no reading at all (the default). */
+  /** Wind **resistor** millivolts (the ADC tap); null means no reading at all. */
   windMillivolts?: number | null;
   windInstalled?: boolean;
   solarCurrentMa?: number;
@@ -39,6 +39,39 @@ export interface StateOptions {
   testPump?: boolean;
   wasteCategory?: 'organic' | 'plastic' | 'paper' | null;
   lightMetric?: number;
+}
+
+/**
+ * The wind circuit, calculated the same way the board calculates it.
+ *
+ * generator + → blue LED → ADC junction → 47 Ω → ground, so the ADC reads the
+ * resistor: I = Vr / 47, V = Vr + 2.8, P = V × I — and below the noise floor
+ * there is no current, so there is no generator voltage to report (`voltage_v`
+ * is null, not 2.8).
+ */
+function windReading(resistorMv: number, installed: boolean): WindReading {
+  const senseOhms = 47;
+  const ledForwardMv = 2800;
+  const noiseFloorMv = 20;
+  const measuring = resistorMv > noiseFloorMv;
+  const currentMa = measuring ? resistorMv / senseOhms : 0;
+  const voltageMv = measuring ? resistorMv + ledForwardMv : null;
+  return {
+    installed,
+    raw: 0,
+    resistor_millivolts: resistorMv,
+    millivolts: resistorMv,
+    sense_ohms: senseOhms,
+    led_forward_millivolts: ledForwardMv,
+    noise_floor_millivolts: noiseFloorMv,
+    measuring,
+    voltage_millivolts: voltageMv,
+    voltage_v: voltageMv === null ? null : voltageMv / 1000,
+    current_ma: currentMa,
+    power_mw: voltageMv === null ? 0 : (voltageMv / 1000) * currentMa,
+    generating: installed && measuring,
+    valid: installed,
+  };
 }
 
 export function makeState(options: StateOptions = {}): StateEnvelope {
@@ -152,15 +185,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
         wind:
           windMillivolts === null
             ? undefined
-            : {
-                installed: windInstalled,
-                raw: 0,
-                millivolts: windMillivolts,
-                volts: windMillivolts / 1000,
-                generate_millivolts: 1000,
-                generating: windInstalled && windMillivolts >= 1000,
-                valid: windInstalled,
-              },
+            : windReading(windMillivolts, windInstalled),
       },
       actuators: {
         pump: {

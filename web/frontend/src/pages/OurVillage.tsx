@@ -75,7 +75,7 @@ function tankWordKey(state: string | undefined): MessageKey {
 }
 
 export function OurVillage() {
-  const { status, envelope, loading, error, reload, connected, demo } = useVillage();
+  const { status, envelope, loading, error, reload, connected, stale, demo } = useVillage();
   const { send } = useCommands();
   const { openPanel, language, setLanguage } = useVoiceUi();
   const navigate = useNavigate();
@@ -155,7 +155,29 @@ export function OurVillage() {
   const solarPower = hasStatus && solar?.power_mw != null ? solar.power_mw.toFixed(1) : null;
   const solarGenerating = Boolean(solarVolts) && (solar?.power_mw ?? 0) >= SOLAR_GENERATING_MW;
 
-  const windVolts = hasStatus && wind?.millivolts != null ? (wind.millivolts / 1000).toFixed(2) : null;
+  // The wind circuit: generator + -> blue LED -> ADC junction -> 47 ohm -> GND,
+  // so `voltage_v`/`current_ma`/`power_mw` are the board's own arithmetic over
+  // one measurement.  A frame that is missing, stale or disconnected has no
+  // readings at all -- and a reading below the noise floor has no voltage to
+  // report, so the page shows a dash there rather than the LED's 2.8 V.
+  const windFrame = hasStatus && !stale ? wind : undefined;
+  const windKnown = Boolean(windFrame && windFrame.installed && windFrame.valid !== false);
+  const windMeasuring = Boolean(windKnown && windFrame?.measuring && windFrame?.voltage_v != null);
+  const windUnreadable = Boolean(windKnown && windFrame?.measuring !== true);
+  // "Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW".  Below the noise floor
+  // the current really is zero and the voltage is a dash: this circuit cannot
+  // say what the generator is doing while the LED is dark.
+  const windReadings = (() => {
+    if (!windKnown) return '';
+    const volts = windMeasuring ? windFrame?.voltage_v?.toFixed(2) ?? '—' : '—';
+    const currentMa = windMeasuring ? windFrame?.current_ma ?? 0 : 0;
+    const powerMw = windMeasuring ? windFrame?.power_mw ?? 0 : 0;
+    return [
+      `${t('wind.voltage')} ${windMeasuring ? `${volts} V` : volts}`,
+      `${t('wind.current')} ${currentMa.toFixed(2)} mA`,
+      `${t('wind.power')} ${powerMw.toFixed(1)} mW`,
+    ].join(' · ');
+  })();
 
   // What the two pictures follow.  In Simulation the slider's own value is in
   // the frame; in Live the picture follows the measured volts, through the same
@@ -171,10 +193,12 @@ export function OurVillage() {
     if (!hasStatus) return 0;
     if (typeof wind?.speed === 'number') return Math.max(0, Math.min(1, wind.speed));
     if (!wind?.installed) return 0;
-    return Math.max(0, Math.min(1, (wind?.millivolts ?? 0) / 2600));
+    // The turbine turns with the current through the LED, so the picture follows
+    // the amps (5.5 mA is the simulator's full speed) rather than the old volts.
+    return Math.max(0, Math.min(1, (wind?.current_ma ?? 0) / 5.5));
   })();
-  const windFitted = wind?.installed ?? false;
-  const windGenerating = Boolean(wind?.generating);
+  const windFitted = windFrame?.installed ?? false;
+  const windGenerating = Boolean(windFrame?.generating);
 
   const modelInstalled = model.data?.installed ?? model.data?.available ?? model.data?.present;
   const modelChip = model.error
@@ -701,10 +725,12 @@ export function OurVillage() {
             windGenerating ? 'live' : 'neutral',
           )}
         </header>
-        {stateLine(windVolts ? `${windVolts} V` : '', 'neutral')}
+        {stateLine(windReadings, 'neutral')}
         {windFitted || demo ? (
-          <p className="vcard-note">
-            {demo ? t('wind.simulatedLine') : t('wind.measuredLine')}
+          <p className="vcard-note" data-testid="wind-help">
+            {windUnreadable ? `${t('wind.noOutput')}. ` : ''}
+            {demo ? t('wind.helpSimulated') : t('wind.help')}{' '}
+            {t('wind.notWindPower')}
           </p>
         ) : null}
         {/* The windmill turns in Simulation, and in Live it turns as fast as the
@@ -731,7 +757,7 @@ export function OurVillage() {
           ) : (
             !windFitted && (
               <p className="sim-hint sim-hint--live" data-testid="wind-live-note">
-                {t('wind.noTurbine', { volts: windVolts ?? '0.00' })}
+                {t('wind.noTurbine')}
               </p>
             )
           )}

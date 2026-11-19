@@ -8,6 +8,7 @@ routes; this one covers what the lab computes and explains (2026-11-17).
 
 from __future__ import annotations
 
+import pytest
 from app.simulator import SimulatedDevice, default_config
 
 
@@ -46,22 +47,42 @@ def test_more_light_on_the_panel_is_more_voltage_and_more_power() -> None:
 
 
 # ---------------------------------------------------------------------- wind ---
-def test_wind_reports_voltage_only_and_follows_its_slider() -> None:
+def test_wind_is_the_led_and_resistor_circuit_at_every_speed() -> None:
+    """Simulation is the board's arithmetic, not a second opinion.
+
+    At rest the LED does not conduct, so there is no current and **no generator
+    voltage** (`voltage_v` is null — not 2.8 V).  Turning stops it producing,
+    not the reverse: power rises with speed and always equals V x I.
+    """
     device = SimulatedDevice(demo=True)
     device.scenario({"wind_speed": 0.0})
     still = status(device)["sensors"]["wind"]
-    assert still["millivolts"] == 0
+    assert still["resistor_millivolts"] == 0
+    assert still["measuring"] is False
     assert still["generating"] is False
-    # No current or power: the board has no second input for them, and inventing
-    # one here would be the exact claim the card refuses to make.
-    assert "current_ma" not in still
-    assert "power_mw" not in still
+    assert still["voltage_v"] is None
+    assert still["voltage_millivolts"] is None
+    assert still["current_ma"] == 0.0
+    assert still["power_mw"] == 0.0
 
     device.scenario({"wind_speed": 1.0})
     fast = status(device)["sensors"]["wind"]
-    assert fast["millivolts"] > still["millivolts"]
+    assert fast["resistor_millivolts"] > still["resistor_millivolts"]
+    assert fast["measuring"] is True
     assert fast["generating"] is True
     assert fast["speed"] == 1.0
+    # One calculation: I = Vr / R, V = Vr + Vled, P = V x I.
+    assert fast["current_ma"] == pytest.approx(fast["resistor_millivolts"] / 47)
+    assert fast["voltage_v"] == pytest.approx(
+        round((fast["resistor_millivolts"] + 2800) / 1000.0, 2)
+    )
+    assert fast["power_mw"] == pytest.approx(
+        (fast["voltage_millivolts"] / 1000.0) * fast["current_ma"]
+    )
+
+    device.scenario({"wind_speed": 0.5})
+    half = status(device)["sensors"]["wind"]
+    assert 0 < half["current_ma"] < fast["current_ma"]
 
 
 # -------------------------------------------------------------------- watering ---

@@ -96,6 +96,12 @@ describe('the message table', () => {
     for (const text of MESSAGES['solar.liveHint']) expect(text).toContain('1.8 V');
     // And a template's placeholders are the same set in every language.
     expect(placeholders(MESSAGES['sort.spoken'][2])).toBe('action,category,item');
-    expect(placeholders(MESSAGES['wind.noTurbine'][1])).toBe('volts');
+    // The wind card's numbers are the hardware, so every language carries both:
+    // the resistor the ADC is across and the LED's measured forward voltage.
+    for (const text of MESSAGES['wind.help']) {
+      expect(text).toContain('47 Ω');
+      expect(text).toContain('2.8 V');
+    }
+    expect(placeholders(MESSAGES['wind.noTurbine'][0])).toBe('');
   });
 });

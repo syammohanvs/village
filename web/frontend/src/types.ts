@@ -69,21 +69,36 @@ export interface SolarReading {
 
 
 /**
- * Wind generator, voltage only.
+ * Wind generator, through the blue LED and 47 Ω resistor.
  *
- * The board has one free analogue pin (GPIO 33, ADC1_CH5) and the rest of ADC1
- * carries the soil, reservoir, LDR and solar sensors; ADC2 cannot be used while
- * Wi-Fi runs. So there is no second tap, and therefore no current or power to
- * report -- a voltage is a real measurement, a power figure would be invented.
+ * The ADC (GPIO 33) is across **the resistor**, not the generator:
+ * generator + → blue LED → ADC junction → 47 Ω → ground.  So `current_ma` is
+ * V<sub>resistor</sub> / 47, `voltage_v` is that plus the LED's measured 2.8 V
+ * forward voltage, and `power_mw` is V × I — all computed once, on the board (or
+ * in the simulator), never re-derived in the page.
+ *
+ * Below the noise floor the LED is not conducting: `measuring` is false,
+ * `voltage_v`/`voltage_millivolts` are null, and current/power are 0.  A dash on
+ * the card means exactly that, never "0 V".
  */
 export interface WindReading {
   installed?: boolean;
   /** The simulator's windmill speed, 0..1.  Simulation only. */
   speed?: number;
   raw?: number | null;
+  /** The ADC reading: across the 47 Ω resistor. */
+  resistor_millivolts?: number | null;
+  /** Kept for older clients; the same resistor voltage. */
   millivolts?: number | null;
-  volts?: number | null;
-  generate_millivolts?: number | null;
+  sense_ohms?: number | null;
+  led_forward_millivolts?: number | null;
+  noise_floor_millivolts?: number | null;
+  /** True when the resistor voltage is above the noise floor. */
+  measuring?: boolean | null;
+  voltage_millivolts?: number | null;
+  voltage_v?: number | null;
+  current_ma?: number | null;
+  power_mw?: number | null;
   generating?: boolean | null;
   valid?: boolean | null;
 }

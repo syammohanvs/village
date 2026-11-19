@@ -313,9 +313,9 @@ export const MESSAGES = {
   'sim.still': ['Still', 'रुका हुआ', 'നിശ്ചലം'],
   'sim.fast': ['Fast', 'तेज़', 'വേഗത്തിൽ'],
   'sim.windHint': [
-    'Simulated voltage; power is not measured — the board has no second input for current.',
-    'सिमुलेटेड वोल्टेज; पावर नहीं नापी जाती — बोर्ड में करंट के लिए दूसरा इनपुट नहीं है।',
-    'സിമുലേറ്റഡ് വോൾട്ടേജ്; പവർ അളക്കുന്നില്ല — കറന്റിന് ബോർഡിൽ രണ്ടാമത്തെ ഇൻപുട്ടില്ല.',
+    'Sets the simulated voltage across the 47 Ω resistor.',
+    '47 Ω प्रतिरोध पर सिमुलेटेड वोल्टेज तय करता है।',
+    '47 Ω റെസിസ്റ്ററിലെ സിമുലേറ്റഡ് വോൾട്ടേജ് നിശ്ചയിക്കുന്നു.',
   ],
 
   // ------------------------------------------------------------- light why ---
@@ -389,20 +389,38 @@ export const MESSAGES = {
   ],
 
   // ------------------------------------------------------------------ wind ---
-  'wind.simulatedLine': [
-    'Simulated voltage; power is not measured.',
-    'सिमुलेटेड वोल्टेज; पावर नहीं नापी जाती।',
-    'സിമുലേറ്റഡ് വോൾട്ടേജ്; പവർ അളക്കുന്നില്ല.',
+  'wind.voltage': ['Voltage', 'वोल्टेज', 'വോൾട്ടേജ്'],
+  'wind.current': ['Current', 'करंट', 'കറന്റ്'],
+  'wind.power': ['Power', 'पावर', 'പവർ'],
+  'wind.noOutput': [
+    'No measurable output',
+    'कोई मापने योग्य आउटपुट नहीं',
+    'അളക്കാവുന്ന ഔട്ട്പുട്ടില്ല',
   ],
-  'wind.measuredLine': [
-    'Voltage measured; power is not measured.',
-    'वोल्टेज नापा गया; पावर नहीं नापी जाती।',
-    'വോൾട്ടേജ് അളന്നു; പവർ അളക്കുന്നില്ല.',
+  // The sentence the operator asked for, in one place: how the three numbers are
+  // obtained from one measurement.  The card and the About page read the same
+  // facts; nothing here re-derives them.
+  'wind.help': [
+    'Current is calculated from the voltage across a 47 Ω resistor. Voltage and power are calculated using the LED’s measured forward voltage of 2.8 V. The LED voltage can vary slightly with current.',
+    'करंट 47 Ω प्रतिरोध के सिरों के वोल्टेज से निकाला जाता है। वोल्टेज और पावर LED के नापे गए 2.8 V फ़ॉरवर्ड वोल्टेज को जोड़कर निकाले जाते हैं। LED का वोल्टेज करंट के साथ थोड़ा बदल सकता है।',
+    'കറന്റ് 47 Ω റെസിസ്റ്ററിലെ വോൾട്ടേജിൽ നിന്നാണ് കണക്കാക്കുന്നത്. വോൾട്ടേജും പവറും LED-യുടെ അളന്ന 2.8 V ഫോർവേഡ് വോൾട്ടേജ് കൂട്ടിയാണ് കണക്കാക്കുന്നത്. കറന്റ് കൂടുമ്പോൾ LED-യുടെ വോൾട്ടേജ് അൽപം മാറാം.',
+  ],
+  // Said beside the figures, because "power" alone invites the reading that
+  // this is the wind's power or energy over time.  It is neither.
+  'wind.notWindPower': [
+    'This is the power in this LED-and-resistor circuit, not the wind’s power or energy over time.',
+    'यह इसी LED और प्रतिरोध वाले सर्किट की पावर है, हवा की पावर या समय के साथ बनी ऊर्जा नहीं।',
+    'ഇത് ഈ LED-റെസിസ്റ്റർ സർക്യൂട്ടിലെ പവറാണ്; കാറ്റിന്റെ പവറോ സമയത്തിലുടനീളമുള്ള ഊർജമോ അല്ല.',
+  ],
+  'wind.helpSimulated': [
+    'Simulated with the same circuit as the board: current is calculated from the voltage across a 47 Ω resistor, and voltage and power use the LED’s 2.8 V forward voltage.',
+    'बोर्ड जैसे ही सर्किट से सिमुलेट किया गया: करंट 47 Ω प्रतिरोध के वोल्टेज से निकलता है, और वोल्टेज व पावर LED के 2.8 V फ़ॉरवर्ड वोल्टेज से।',
+    'ബോർഡിലേതിന് സമാനമായ സർക്യൂട്ട് ഉപയോഗിച്ച് സിമുലേറ്റ് ചെയ്തത്: കറന്റ് 47 Ω റെസിസ്റ്ററിലെ വോൾട്ടേജിൽ നിന്ന്, വോൾട്ടേജും പവറും LED-യുടെ 2.8 V ഫോർവേഡ് വോൾട്ടേജിൽ നിന്ന്.',
   ],
   'wind.noTurbine': [
-    'No turbine is wired to this board, so the windmill stands still; only the pin’s own {volts} V is reported.',
-    'इस बोर्ड से कोई टर्बाइन नहीं जुड़ा, इसलिए पवनचक्की रुकी है; सिर्फ़ पिन का {volts} V बताया जाता है।',
-    'ഈ ബോർഡിൽ ടർബൈൻ ഘടിപ്പിച്ചിട്ടില്ല, അതിനാൽ കാറ്റാടി നിശ്ചലമാണ്; പിൻറെ {volts} V മാത്രം അറിയിക്കുന്നു.',
+    'No turbine is wired to this board, so nothing flows through the LED and its 47 Ω resistor. The card has no voltage, current or power to report.',
+    'इस बोर्ड से कोई टर्बाइन नहीं जुड़ा, इसलिए LED और उसके 47 Ω प्रतिरोध से कुछ नहीं बहता। कार्ड के पास बताने के लिए वोल्टेज, करंट या पावर नहीं है।',
+    'ഈ ബോർഡിൽ ടർബൈൻ ഘടിപ്പിച്ചിട്ടില്ല, അതിനാൽ LED-യിലൂടെയും അതിന്റെ 47 Ω റെസിസ്റ്ററിലൂടെയും ഒന്നും കടക്കുന്നില്ല. കാർഡിന് വോൾട്ടേജോ കറന്റോ പവറോ അറിയിക്കാനില്ല.',
   ],
 
   // --------------------------------------------------------------- waste: bins ---
