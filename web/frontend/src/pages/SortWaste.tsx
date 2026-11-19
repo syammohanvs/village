@@ -6,31 +6,14 @@ import { useApi } from '../lib/useApi';
 import {
   averageFrames,
   createWasteStabilizer,
-  rankPredictions,
   type Prediction,
-  type StabilizerSnapshot,
   type StableEvent,
 } from '../lib/wasteStabilizer';
 import { BinLeds } from '../components/BinLeds';
 import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
-import {
-  centreCrop,
-  cropGuide,
-  objectMask,
-  regionInGuide,
-  scaleBox,
-  sceneState,
-  type FocusRegion,
-} from '../lib/focus';
-import {
-  SCENE_WARMUP_FRAMES,
-  createSceneMemory,
-  learnScene,
-  noteScene,
-  resetScene,
-  sceneReady,
-} from '../lib/sceneMemory';
+import { centreCrop, cropGuide, scaleBox } from '../lib/focus';
+import { backdropBox } from '../lib/backdrop';
 import { groupedPrediction } from '../lib/wasteActions';
 import { speakText } from '../lib/speech';
 import {
@@ -40,26 +23,13 @@ import {
   readStoredCamera,
   waitForFrames,
 } from '../lib/camera';
-import {
-  SUPPORT,
-  confidenceBar,
-  guideFor,
-  spokenFor,
-  type Disposal,
-} from '../lib/wasteGuide';
+import { SUPPORT, confidenceBar, guideFor, spokenFor } from '../lib/wasteGuide';
 import { useT } from '../lib/i18n';
 import type { MessageKey } from '../lib/messages';
 import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import { useDemo } from '../lib/demo';
 import { useVillage } from '../lib/village';
-import {
-  clearBackgrounds as clearStoredBackgrounds,
-  loadBackgrounds,
-  saveBackgrounds,
-  MAX_BACKGROUNDS,
-  type BackgroundFrame,
-} from '../lib/backgroundStore';
 import type { WasteRecognitionResult } from '../types';
 
 interface Classifier {
@@ -70,20 +40,6 @@ interface Classifier {
     flipped?: boolean,
   ): Promise<{ className: string; probability: number }[]>;
 }
-
-/**
- * What the camera loop got for this frame.
- *
- * `empty` and `unmatched` are two different facts and must not share an answer:
- * an empty table is “Not a waste item”, while a background that no longer
- * describes the table is something the Gram Sahayak has to fix — and the item in
- * front of the camera still has to be classified.
- */
-type FocusOutcome =
-  | { kind: 'empty' }
-  | { kind: 'warming'; progress: number }
-  | { kind: 'whole'; input: HTMLVideoElement; warning?: string }
-  | { kind: 'object'; input: HTMLCanvasElement; region: FocusRegion };
 
 const ANALYSIS_WIDTH = 160;
 const ANALYSIS_HEIGHT = 120;
@@ -243,18 +199,6 @@ export function SortWaste() {
   const [cameraError, setCameraError] = useState('');
   const [modelState, setModelState] = useState<ModelState>('idle');
   const [modelError, setModelError] = useState('');
-  // The room, learned from the live stream when no backdrop was set.
-  const sceneRef = useRef(createSceneMemory(ANALYSIS_WIDTH, ANALYSIS_HEIGHT));
-  // Off by default.  An automatic watcher in a room with a person in it decides
-  // for itself what is "being shown", and at the venue that decision was wrong
-  // often enough to classify a hand, a wall and an empty frame.  A press cannot
-  // be wrong about that, so the press is the default and the watcher is opt-in.
-  const [autoWatch, setAutoWatch] = useState(false);
-  const [warming, setWarming] = useState(false);
-  // 0..1 while the room is being learned, null once the camera is ready.  Shown
-  // as a badge on the preview: without it the visitor cannot tell whether the
-  // page is ready for an item or still watching the room.
-  const [sceneProgress, setSceneProgress] = useState<number | null>(null);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   // The loop runs on an interval, and `accept` is a callback whose identity must
   // not change per frame, so it read a stale empty list -- which is why every
@@ -267,7 +211,6 @@ export function SortWaste() {
   const { connected, status } = useVillage();
   const { demo } = useDemo();
   const boardOffline = !connected && !demo;
-  const [stability, setStability] = useState<StabilizerSnapshot | null>(null);
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
   const [referralLabel, setReferralLabel] = useState<string | null>(null);
   const [hazardousLabel, setHazardousLabel] = useState<string | null>(null);
@@ -283,12 +226,9 @@ export function SortWaste() {
   const stabilizerRef = useRef(createWasteStabilizer());
   const busyRef = useRef(false);
   const acceptingRef = useRef(false);
-  const backgroundRef = useRef<BackgroundFrame[]>([]);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [backgroundCount, setBackgroundCount] = useState(0);
   // A press reads three frames now, so it takes about a second.  The button
   // says so instead of looking like it did nothing.
   const [reading, setReading] = useState(false);
@@ -307,13 +247,7 @@ export function SortWaste() {
   // was.  One press per mistake is the venue's whole learning loop.
   const captureFileRef = useRef<string | null>(null);
   const [correction, setCorrection] = useState<string>('');
-  // A reader's own statement about the item (mixed bag, sanitary waste, a sharp)
-  // is not a model class, so it is kept apart from `recognition`.
-  const [manualGuide, setManualGuide] = useState<Disposal | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
-  const [backgroundReady, setBackgroundReady] = useState(false);
-  const [focusOn, setFocusOn] = useState(true);
-  const [focusNote, setFocusNote] = useState('');
 
   const installed = modelInstalled(modelStatus.data);
   // Whether a hosted model can name the object.  False on a deployment with no
@@ -333,43 +267,15 @@ export function SortWaste() {
   const stabilityFrames = settings.data?.waste_stability_frames ?? 2;
   const cooldownMs = settings.data?.waste_cooldown_ms ?? 3000;
 
-  // With focus on, the release signal is the item leaving the frame (an empty
-  // scene, decided by geometry now that the room is learned), so a timer would
-  // only add dead time between items.  It is kept for the unfocused mode, where
-  // every frame is classified blindly and only a clock prevents duplicates.
-  const effectiveCooldown = focusOn ? 0 : cooldownMs;
-
   useEffect(() => {
     stabilizerRef.current = createWasteStabilizer({
       threshold: confidence,
       consecutiveFrames: stabilityFrames,
-      // With a stored background, the empty-scene frames are the duplicate
-      // guard: an item still in view never produces them.  The time cooldown
-      // would otherwise make the Gram Sahayak wait after the item is removed.
-      cooldownMs: effectiveCooldown,
+      // A press is always deliberate, so the cooldown only has to stop a
+      // double-tap from recording the same item twice.
+      cooldownMs,
     });
-  }, [confidence, stabilityFrames, effectiveCooldown]);
-
-  useEffect(() => {
-    let storage: Storage | null = null;
-    try {
-      storage = window.localStorage;
-    } catch {
-      storage = null;
-    }
-    const stored = loadBackgrounds(storage);
-    if (!stored) return;
-    const usable = stored.filter(
-      (frame) => frame.width === ANALYSIS_WIDTH && frame.height === ANALYSIS_HEIGHT,
-    );
-    if (usable.length === 0) return;
-    backgroundRef.current = usable;
-    setBackgroundCount(usable.length);
-    setBackgroundReady(true);
-    setFocusNote(
-      `${usable.length} background${usable.length === 1 ? '' : 's'} remembered from this device.`,
-    );
-  }, []);
+  }, [confidence, stabilityFrames, cooldownMs]);
 
   useEffect(() => {
     return () => {
@@ -383,70 +289,9 @@ export function SortWaste() {
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
-    setSceneProgress(null);
     setPredictions([]);
     setGroupedTop(null);
     setFrameWarning('');
-    stabilizerRef.current.reset();
-  }, []);
-
-  // Remember the empty scene once.  Everything that differs from it later is
-  // the object, and only that box is handed to the classifier.
-  const captureBackground = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || video.readyState < 2) {
-      setFocusNote('The camera frame is not ready yet.');
-      return false;
-    }
-    const canvas = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-    const context = canvas.getContext('2d');
-    if (!context) {
-      setFocusNote('This browser cannot read the camera frame, so the whole picture is classified.');
-      return false;
-    }
-    try {
-      context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      const frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      // Keep the newest three.  Adding a fourth at a hall whose background has
-      // changed again should replace the oldest, not lock the Gram Sahayak out.
-      const next: BackgroundFrame[] = [
-        ...backgroundRef.current,
-        { width: ANALYSIS_WIDTH, height: ANALYSIS_HEIGHT, data: frame.data },
-      ].slice(-MAX_BACKGROUNDS);
-      backgroundRef.current = next;
-      let storage: Storage | null = null;
-      try {
-        storage = window.localStorage;
-      } catch {
-        storage = null;
-      }
-      const saved = saveBackgrounds(storage, next);
-      setBackgroundCount(next.length);
-      setBackgroundReady(true);
-      setFocusNote(
-        saved
-          ? `Background ${next.length} of ${MAX_BACKGROUNDS} stored on this device. Show one item; only the object is classified.`
-          : `Background ${next.length} of ${MAX_BACKGROUNDS} captured, but this browser could not store it.`,
-      );
-      return true;
-    } catch {
-      setFocusNote('The camera frame could not be read. Press Set background again.');
-      return false;
-    }
-  }, []);
-
-  const clearBackgrounds = useCallback(() => {
-    backgroundRef.current = [];
-    let storage: Storage | null = null;
-    try {
-      storage = window.localStorage;
-    } catch {
-      storage = null;
-    }
-    clearStoredBackgrounds(storage);
-    setBackgroundCount(0);
-    setBackgroundReady(false);
-    setFocusNote('Backgrounds cleared. Every frame is classified now — hold an item up to the camera.');
     stabilizerRef.current.reset();
   }, []);
 
@@ -465,255 +310,6 @@ export function SortWaste() {
     },
     [],
   );
-
-  const focusInput = useCallback(
-    (video: HTMLVideoElement): FocusOutcome | null => {
-      const wholeFrame = () => ({
-        x: 0,
-        y: 0,
-        width: video.videoWidth || ANALYSIS_WIDTH,
-        height: video.videoHeight || ANALYSIS_HEIGHT,
-      });
-      if (!focusOn) {
-        // Focus off: the model is handed the whole frame, so that is what the
-        // box shows.
-        drawPreview(video, wholeFrame());
-        return { kind: 'whole', input: video };
-      }
-
-      const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      const context = analysis.getContext('2d');
-      if (!context) {
-        drawPreview(video, wholeFrame());
-        return { kind: 'whole', input: video };
-      }
-      let frame: ImageData;
-      try {
-        context.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        frame = context.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-      } catch {
-        drawPreview(video, wholeFrame());
-        return { kind: 'whole', input: video };
-      }
-
-      // What to compare against.  A backdrop the Gram Sahayak set is used when there
-      // is one; otherwise the room is learned from the live stream, so the venue
-      // never has to clear a table it does not have.  Either way the comparison
-      // below is the same code -- the learned room is simply a background that
-      // maintains itself.
-      const stored = backgroundRef.current;
-      const learning = stored.length === 0;
-      const sceneFrames: Uint8ClampedArray[] = stored.map((background) => background.data);
-      if (learning) {
-        const memory = sceneRef.current;
-        if (!sceneReady(memory)) {
-          // The first frames ARE the room: fold them in outright rather than
-          // diffing against an empty buffer.
-          learnScene(memory, frame.data, { alpha: memory.frames === 0 ? 1 : 0.25 });
-          return { kind: 'warming', progress: Math.min(1, memory.frames / SCENE_WARMUP_FRAMES) };
-        }
-        sceneFrames.push(memory.background);
-      }
-      const state = sceneState(
-        sceneFrames,
-        frame.data,
-        ANALYSIS_WIDTH,
-        ANALYSIS_HEIGHT,
-      );
-      if (state.kind === 'empty') {
-        // Nothing being shown: this frame IS the room, so let the memory drift
-        // towards it (a door opening, the lights changing).
-        if (learning) {
-          noteScene(sceneRef.current, 'empty', Date.now());
-          learnScene(sceneRef.current, frame.data);
-        }
-        return { kind: 'empty' };
-      }
-      if (state.kind === 'unmatched') {
-        // Everything differs.  With a stored backdrop that means the camera was
-        // nudged; with a learned one it means the same, and the cure is to learn
-        // the room again rather than to classify a picture of a moved camera.
-        if (learning) {
-          // The whole view changed: a moved camera, not an item.  Start again.
-          resetScene(sceneRef.current);
-          learnScene(sceneRef.current, frame.data, { alpha: 1 });
-          return {
-            kind: 'warming',
-            progress: Math.min(1, sceneRef.current.frames / SCENE_WARMUP_FRAMES),
-          };
-        }
-        return {
-          kind: 'whole',
-          input: video,
-          warning:
-            'The stored background no longer matches this view. Press Set background again on the empty table, or press Clear backgrounds and show the item in your hand instead.',
-        };
-      }
-      // Something is being shown.
-      //
-      // Two failures came out of freezing here unconditionally. If the reference
-      // had captured the item (somebody was already holding it when the room was
-      // learned), then taking it away never returns to "empty" and the camera
-      // deadlocks -- reported as "it did not re-arm even after I moved the item
-      // away and back". And an item held very still was either absorbed or
-      // frozen out for ever, with no way back.
-      //
-      // So: freeze while this is plausibly an item, and if the same thing has
-      // been "shown" for four seconds, take the frame as the new room and start
-      // again. That is self-healing in both directions, and the camera can never
-      // be permanently stuck.
-      if (learning) {
-        const stale = noteScene(sceneRef.current, 'object', Date.now());
-        if (stale) {
-          resetScene(sceneRef.current);
-          learnScene(sceneRef.current, frame.data, { alpha: 1 });
-          return {
-            kind: 'warming',
-            progress: Math.min(1, sceneRef.current.frames / SCENE_WARMUP_FRAMES),
-          };
-        }
-        learnScene(sceneRef.current, frame.data, { frozen: true });
-      }
-      const region = state.region;
-      // Only the thing held up in front of the camera is an item.
-      //
-      // The change has to sit mostly **inside the square the Gram Sahayak is told to
-      // use** (`regionInGuide`).  Something held at the edge of the picture is a
-      // change too, and without this it was classified as waste with the crop of
-      // the middle of the frame answering for it -- reported as "a bottle held
-      // at the edge read as paper, then glass".
-      //
-      // Honest limit: this does not stop a person *standing in front of* the
-      // camera from being read as an object, because the person is the change
-      // and they are in the middle.  Nothing in this pipeline can tell a held
-      // item from a nearby person; that is why a press is the default and the
-      // watcher is opt-in.
-      //
-      // A frame that fails is treated as the room: the memory drifts towards it,
-      // so somebody standing there becomes part of the learned background
-      // instead of being read as an object over and over.
-      const guided = regionInGuide(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
-      if (!guided.ok) {
-        if (learning) {
-          noteScene(sceneRef.current, 'empty', Date.now());
-          learnScene(sceneRef.current, frame.data);
-        }
-        // Show the square unmasked: nothing is being classified, so the honest
-        // thing in the box is what the camera can see.
-        drawPreview(video, scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT,
-                                    video.videoWidth || ANALYSIS_WIDTH,
-                                    video.videoHeight || ANALYSIS_HEIGHT));
-        return { kind: 'empty' };
-      }
-      const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
-      const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
-      const source = scaleBox(region.box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
-      const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
-      const cropContext = crop.getContext('2d');
-      if (!cropContext) return { kind: 'whole', input: video };
-      try {
-        cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
-        // Background is painted out, not merely cropped away.  A pixel inside the
-        // square that still matches the stored empty scene is the table, the
-        // room or the space beside the item, so it is replaced with a plain
-        // plate and the classifier sees the object on its own.  Measured on 217
-        // scenes: item-level accuracy 32.9% (crop only) -> about 60% (crop + this).
-        const mask = objectMask(
-          sceneFrames,
-          frame.data,
-          ANALYSIS_WIDTH,
-          ANALYSIS_HEIGHT,
-          region.box,
-        );
-        if (mask) {
-          const maskCanvas = ensureCanvas(maskCanvasRef, mask.width, mask.height);
-          const maskContext = maskCanvas.getContext('2d');
-          if (maskContext) {
-            const painted = maskContext.createImageData(mask.width, mask.height);
-            painted.data.set(mask.data);
-            maskContext.putImageData(painted, 0, 0);
-            cropContext.drawImage(
-              video,
-              source.x,
-              source.y,
-              source.width,
-              source.height,
-              0,
-              0,
-              CROP_SIZE,
-              CROP_SIZE,
-            );
-            // Keep only what the mask covers, then put a white plate behind it so
-            // the model never sees transparency.
-            cropContext.globalCompositeOperation = 'destination-in';
-            cropContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height, 0, 0, CROP_SIZE, CROP_SIZE);
-            cropContext.globalCompositeOperation = 'destination-over';
-            cropContext.fillStyle = '#ffffff';
-            cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
-          } else {
-            return { kind: 'whole', input: video };
-          }
-        } else {
-          // No usable mask: the plain crop, exactly as before.
-          cropContext.drawImage(
-            video,
-            source.x,
-            source.y,
-            source.width,
-            source.height,
-            0,
-            0,
-            CROP_SIZE,
-            CROP_SIZE,
-          );
-        }
-        cropContext.globalCompositeOperation = 'source-over';
-      } catch {
-        return { kind: 'whole', input: video };
-      }
-      // Show exactly the pixels the model will be handed.  Reported from the
-      // venue as "it is looking at my hair and shirt, not what the fingers are
-      // holding" -- and that is precisely what a person-sized change produces:
-      // the visitor is the thing that differs from the room.  Nothing in the
-      // picture can separate a held item from the person holding it (measured:
-      // every non-skin blob in those frames touches the frame edge), so the cure
-      // is to let the operator SEE the box and either move, or set the
-      // background with themselves in the shot so only the item changes.
-      drawPreview(crop, { x: 0, y: 0, width: CROP_SIZE, height: CROP_SIZE });
-      return { kind: 'object', input: crop, region };
-    },
-    [focusOn, drawPreview],
-  );
-
-  // Syringes, cotton, napkins, diapers, urine bags and catheters are hazardous
-  // waste, not one of the three bins.  The camera cannot reliably tell a
-  // syringe from a plastic tube, so this is an explicit operator decision
-  // rather than a guess: it records the item as "medical", lights no bin LED
-  // and stops the camera.
-  const recordHazardous = useCallback(async () => {
-    if (acceptingRef.current) return;
-    acceptingRef.current = true;
-    setRecognitionError('');
-    setDisposalMessage('');
-    setDisposalError('');
-    setNote('');
-    setReferralLabel(null);
-    setHazardousLabel('Medical waste');
-    stopCamera();
-    try {
-      const result = await api.postRecognition({
-        category: 'medical',
-        confidence: 1,
-        model: 'manual',
-        requestId: api.newRequestId(),
-      });
-      setRecognition(result);
-    } catch (cause) {
-      setRecognitionError(errorMessage(cause));
-    } finally {
-      acceptingRef.current = false;
-    }
-  }, [stopCamera]);
 
   /**
    * Ask the hosted model what the object is, and remember the answer.
@@ -736,22 +332,6 @@ export function SortWaste() {
       setNaming(false);
     }
   }, [visionReady]);
-
-  /**
-   * A manual choice is an answer too.
-   *
-   * The reader's word replaces the model's, so nothing is recorded and no bin
-   * LED is lit -- but it is still spoken, in the language chosen in Setup, the
-   * same way a camera answer is.  Pressing "Not one of our three bins" for a
-   * pencil used to leave the visitor reading a card in silence.
-   */
-  const chooseManual = useCallback(
-    (disposal: Disposal) => {
-      setManualGuide(disposal);
-      void speakText(spokenFor(disposal, voiceLanguage), voiceLanguage, 0.95);
-    },
-    [voiceLanguage],
-  );
 
   const loadModel = useCallback(async () => {
     if (!installed || modelState === 'loading' || modelState === 'ready') return;
@@ -874,10 +454,6 @@ export function SortWaste() {
         }
       }
       setCameraOn(true);
-      // A one-press reading crops the middle of the picture and needs no room
-      // learned, so only the watcher starts a warm-up. Showing "learning the
-      // room 0%" beside a page that will never learn one was a lie.
-      setSceneProgress(autoWatch ? 0 : null);
       setGroupedTop(null);
       setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
@@ -1005,21 +581,35 @@ export function SortWaste() {
       const cropContext = crop.getContext('2d');
       if (!analysisContext || !cropContext) return;
 
-      // A stored backdrop is still worth subtracting -- it is the booth case and
-      // it is not what fails here.
-      let backgrounds: Uint8ClampedArray[] = backgroundRef.current.map((f) => f.data);
-      if (backgrounds.length === 0) {
-        const memory = sceneRef.current;
-        if (sceneReady(memory)) backgrounds = [memory.background];
-      }
-
-      const box = centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
-      const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
 
-      /** One look at the item: crop the frame now, paint out the room, read it. */
+      /**
+       * The crop for this frame: the item found on the backdrop, or the middle
+       * of the picture when there is no plain backdrop to find it against.
+       *
+       * This is the "auto focus" the booth needs.  A fixed centre square made a
+       * visitor centre an item that a hand or a sleeve then filled the edge of;
+       * the backdrop is one flat colour, so the item is simply the part that is
+       * not that colour -- and when the scene is genuinely busy (a wooden table,
+       * no sheet) `backdropBox` refuses and the old centre crop is used, so
+       * nothing regresses on a plain table.
+       */
+      const boxFor = (frame: ImageData) =>
+        backdropBox(frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT).box ??
+        centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
+
+      /** One look at the item: crop the frame now and read it. */
       const readOnce = async (): Promise<Prediction[]> => {
+        analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        const source = scaleBox(
+          boxFor(frame),
+          ANALYSIS_WIDTH,
+          ANALYSIS_HEIGHT,
+          videoWidth,
+          videoHeight,
+        );
         cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
         cropContext.drawImage(
           video,
@@ -1032,28 +622,7 @@ export function SortWaste() {
           CROP_SIZE,
           CROP_SIZE,
         );
-
-        analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        const mask =
-          backgrounds.length > 0
-            ? objectMask(backgrounds, frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, box)
-            : null;
-        if (mask) {
-          const maskCanvas = ensureCanvas(maskCanvasRef, mask.width, mask.height);
-          const maskContext = maskCanvas.getContext('2d');
-          if (maskContext) {
-            const painted = maskContext.createImageData(mask.width, mask.height);
-            painted.data.set(mask.data);
-            maskContext.putImageData(painted, 0, 0);
-            cropContext.globalCompositeOperation = 'destination-in';
-            cropContext.drawImage(maskCanvas, 0, 0, mask.width, mask.height, 0, 0, CROP_SIZE, CROP_SIZE);
-            cropContext.globalCompositeOperation = 'destination-over';
-            cropContext.fillStyle = '#ffffff';
-            cropContext.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
-            cropContext.globalCompositeOperation = 'source-over';
-          }
-        }
+        drawPreview(crop, { x: 0, y: 0, width: CROP_SIZE, height: CROP_SIZE });
         const raw = await classifier.predict(crop);
         return raw.map((row) => ({ label: row.className, confidence: row.probability }));
       };
@@ -1078,7 +647,6 @@ export function SortWaste() {
       if (!grouped) return;
       const isBackground = grouped.label.trim().toLowerCase() === 'background';
       if (isBackground) {
-        setStability({ ...stabilizerRef.current.snapshot(), stable: true });
         return;
       }
       // The threshold applies here too.  A pressed reading used to skip it, so a
@@ -1122,105 +690,6 @@ export function SortWaste() {
     if (modelState !== 'idle') return;
     void loadModel();
   }, [installed, modelState, loadModel]);
-
-  useEffect(() => {
-    if (!cameraOn || modelState !== 'ready' || !autoWatch) return;
-    let cancelled = false;
-    const timer = setInterval(async () => {
-      const video = videoRef.current;
-      const classifier = classifierRef.current;
-      if (!video || !classifier || busyRef.current || video.readyState < 2) return;
-      busyRef.current = true;
-      try {
-        const focused = focusInput(video);
-        if (cancelled) return;
-        if (!focused) return;
-        if (focused.kind === 'warming') {
-          setSceneProgress(focused.progress);
-          // The room is being learned.  Nothing is classified yet, on purpose:
-          // classifying a room is what named the wall "textile".
-          setWarming(true);
-          setFrameWarning('');
-          const background = [{ label: 'Background', confidence: 1 }];
-          setPredictions(background);
-          setGroupedTop(background[0]);
-          stabilizerRef.current.push(background);
-          setStability(stabilizerRef.current.snapshot());
-          return;
-        }
-        if (focused.kind === 'empty') {
-          setWarming(false);
-          setSceneProgress(null);
-          // The empty scene (or a moved camera) is not a classification
-          // problem: there is no object to sort.  Say so without asking the
-          // model to name a material from the room.
-          setFrameWarning('');
-          const background = [{ label: 'Background', confidence: 1 }];
-          setPredictions(background);
-          setGroupedTop(background[0]);
-          const event = stabilizerRef.current.push(background);
-          setStability(stabilizerRef.current.snapshot());
-          if (event) void accept(event);
-          return;
-        }
-        if (focused.kind === 'whole') {
-          setWarming(false);
-          setSceneProgress(null);
-          // Either focus is off, or the stored background no longer matches the
-          // view.  The second case used to report “Not a waste item” and never
-          // classify anything; now it says what to fix and still answers.
-          setFrameWarning(focused.warning ?? '');
-          const raw = await classifier.predict(focused.input);
-          if (cancelled) return;
-          const all = rankPredictions(
-            raw.map((row) => ({ label: row.className, confidence: row.probability })),
-            raw.length,
-          );
-          const grouped = groupedPrediction(all);
-          predictionsRef.current = all.slice(0, 3);
-          setPredictions(predictionsRef.current);
-          setGroupedTop(grouped);
-          const event = grouped ? stabilizerRef.current.push([grouped]) : null;
-          setStability(stabilizerRef.current.snapshot());
-          if (event) void accept(event);
-          return;
-        }
-        setWarming(false);
-        setSceneProgress(null);
-        const { input, region } = focused;
-        setFrameWarning(
-          region?.edgeTouch && region.coverage > 0.18
-            ? 'A hand or person fills most of the picture. Hold the item inside the square and keep the rest of you out of it.'
-            : '',
-        );
-        const raw = await classifier.predict(input);
-        if (cancelled) return;
-        const all = rankPredictions(
-          raw.map((row) => ({ label: row.className, confidence: row.probability })),
-          raw.length,
-        );
-        const grouped = groupedPrediction(all);
-        predictionsRef.current = all.slice(0, 3);
-        setPredictions(predictionsRef.current);
-        setGroupedTop(grouped);
-        const event = grouped ? stabilizerRef.current.push([grouped]) : null;
-        setStability(stabilizerRef.current.snapshot());
-        if (event) void accept(event);
-      } catch {
-        if (!cancelled) {
-          setPredictions([]);
-          setGroupedTop(null);
-          setFrameWarning('');
-        }
-      } finally {
-        busyRef.current = false;
-      }
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [cameraOn, modelState, autoWatch, accept, focusOn, captureBackground, focusInput]);
 
   // The box is captioned "What it is reading" and sits on screen the whole time
   // the camera is on, but it was only painted while a read was in flight -- so
@@ -1276,8 +745,9 @@ export function SortWaste() {
       ? groupedTop.label.trim().toLowerCase() === 'background'
       : top && top.label.trim().toLowerCase() === 'background',
   );
-  const waitingRemoval = stability?.phase === 'waiting-removal';
-  const removing = waitingRemoval && !recognition;
+  // The camera stays on between items; there is no watcher waiting for one to
+  // be taken away, so "removing" is only ever false now.
+  const removing = false;
 
   const resultCategory = targetCategory ? capitalise(String(targetCategory)) : null;
   const referred = Boolean(referralLabel) || String(targetCategory ?? '').toLowerCase() === 'other';
@@ -1349,23 +819,6 @@ export function SortWaste() {
                 <figcaption>{t('sort.whatReading')}</figcaption>
               </figure>
             ) : null}
-            {cameraOn && (
-              <div className="camera-status" data-testid="camera-status">
-                {autoWatch && sceneProgress !== null ? (
-                  <span className="chip chip--warn">
-                    {t('sort.learningRoom', { percent: Math.round(sceneProgress * 100) })}
-                  </span>
-                ) : autoWatch ? (
-                  waitingRemoval ? (
-                    <span className="chip chip--neutral">{t('sort.showNextItem')}</span>
-                  ) : (
-                    <span className="chip chip--good">{t('sort.readyShow')}</span>
-                  )
-                ) : (
-                  <span className="chip chip--good">{t('sort.readyPress')}</span>
-                )}
-              </div>
-            )}
             {!cameraOn && (
               <div className="camera-placeholder">
                 <IconCamera size={34} />
@@ -1426,59 +879,6 @@ export function SortWaste() {
                 <IconCheck size={18} /> {reading ? 'Reading…' : 'Check the item'}
               </button>
             )}
-            {cameraOn && installed && (
-              <div className="focus-controls">
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={() => captureBackground()}
-                  title={
-                    backgroundCount >= MAX_BACKGROUNDS
-                      ? 'Three backgrounds are stored; adding another replaces the oldest.'
-                      : 'Optional: remember an empty table, so only the object that appears is classified.'
-                  }
-                  data-testid="set-background"
-                >
-                  <IconRefresh size={16} />{' '}
-                  {backgroundCount === 0 ? t('sort.setBackground') : t('sort.addBackground')}
-                </button>
-                {backgroundCount > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn--ghost"
-                    onClick={clearBackgrounds}
-                    data-testid="clear-backgrounds"
-                  >
-                    {t('sort.clearBackgrounds')}
-                  </button>
-                )}
-                <label className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={focusOn}
-                    onChange={(event) => setFocusOn(event.target.checked)}
-                  />
-                  <span>{t('sort.focusOnObject')}</span>
-                </label>
-                <label className="check-row">
-                  <input
-                    type="checkbox"
-                    checked={autoWatch}
-                    onChange={(event) => setAutoWatch(event.target.checked)}
-                    data-testid="auto-watch"
-                  />
-                  <span>{t('sort.watchAutomatically')}</span>
-                </label>
-              </div>
-            )}
-            <button
-              type="button"
-              className="btn btn--ghost btn--large"
-              data-testid="hazardous-button"
-              onClick={() => void recordHazardous()}
-            >
-              {t('sort.hazardous')}
-            </button>
             <div className="camera-picker" data-testid="camera-picker">
               <label className="field">
                 <span>{t('sort.cameraDevice')}</span>
@@ -1504,68 +904,6 @@ export function SortWaste() {
                 </p>
               )}
             </div>
-            {focusNote && (
-              <p className="hint" data-testid="focus-note">
-                {focusNote}
-              </p>
-            )}
-            {cameraOn && installed && focusOn && (
-              <p className="hint">
-                {backgroundReady
-                  ? t('sort.backgrounds', {
-                      count: backgroundCount,
-                      max: MAX_BACKGROUNDS,
-                      next:
-                        backgroundCount >= MAX_BACKGROUNDS
-                          ? t('sort.bgReplaceOldest')
-                          : t('sort.bgAddAnother'),
-                    })
-                  : t('sort.focusEmpty')}
-              </p>
-            )}
-            {cameraOn && (
-              <div className="focus-controls" data-testid="special-choices">
-                <span className="hint">{t('sort.notOneClean')}</span>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  data-testid="mixed-bag"
-                  onClick={() => chooseManual(guideFor('mixed bag', { mixedBag: true }))}
-                >
-                  {t('sort.mixedBag')}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  data-testid="sanitary-waste"
-                  onClick={() => chooseManual(guideFor('sanitary pad'))}
-                >
-                  {t('sort.sanitary')}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  data-testid="sharps"
-                  onClick={() => chooseManual(guideFor('syringe'))}
-                >
-                  {t('sort.sharps')}
-                </button>
-                {/*
-                  Not waste yet: a pencil, a wooden ruler, a crayon.  The camera
-                  has no class for "still useful" — it reads a pencil as Plastic
-                  or Organic — so the reader says it instead of the model, and
-                  the answer is the reuse sentence rather than a bin.
-                */}
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  data-testid="not-in-bins"
-                  onClick={() => chooseManual(guideFor('not in our bins'))}
-                >
-                  {t('sort.notInBins')}
-                </button>
-              </div>
-            )}
             {frameWarning && (
               <p className="warn-text" data-testid="frame-warning">
                 {frameWarning}
@@ -1613,15 +951,13 @@ export function SortWaste() {
             title={
               disposal
                 ? t(disposal.titleKey)
-                : manualGuide
-                  ? t('waste.title.askSahayak')
-                  : removing
-                    ? t('sort.titleRemove')
-                    : naming
-                      ? t('sort.titleNaming')
-                      : reading
-                        ? t('sort.titleReading')
-                        : t('sort.titleWaiting')
+                : removing
+                  ? t('sort.titleRemove')
+                  : naming
+                    ? t('sort.titleNaming')
+                    : reading
+                      ? t('sort.titleReading')
+                      : t('sort.titleWaiting')
             }
           >
             {(reading || naming) && (
@@ -1632,33 +968,7 @@ export function SortWaste() {
                 {naming ? t('sort.naming') : t('sort.reading')}
               </p>
             )}
-            {manualGuide ? (
-              <>
-                {/*
-                  The reader told the page what the item is — a mixed bag, sanitary
-                  waste, a sharp.  Those are not model classes, and inventing one
-                  for them would be a lie about what the camera can do, so they are
-                  an explicit choice instead.
-                */}
-                <p className="result-big" data-testid="waste-result">
-                  {manualGuide.itemKey ? t(manualGuide.itemKey) : manualGuide.item}
-                </p>
-                <p className="result-sub" data-testid="waste-destination">
-                  <strong>{t(manualGuide.titleKey)}.</strong> {t(manualGuide.reasonKey)}
-                </p>
-                <CardActions
-                  onScanAnother={() => {
-                    setManualGuide(null);
-                    setRecognition(null);
-                    setPredictions([]);
-                    setCorrection('');
-                    captureFileRef.current = null;
-                    stabilizerRef.current.reset();
-                  }}
-                  support={SUPPORT}
-                />
-              </>
-            ) : recognition ? (
+            {recognition ? (
               <>
                 {/*
                   The object first, the category second.  A visitor checks an
@@ -1754,23 +1064,13 @@ export function SortWaste() {
                     )}
                   </div>
                 )}
-                {stability?.phase === 'waiting-removal' && (
-                  <p className="hint" data-testid="waste-rearm">
-                    {t('sort.rearm')}
-                  </p>
-                )}
-                {stability?.phase === 'armed' && (
-                  <p className="hint" data-testid="waste-ready">
-                    {t('sort.armed')}
-                  </p>
-                )}
                 {!cameraOn && (
                   <p className="hint" data-testid="waste-camera-stopped">
                     {t('sort.cameraStopped')}
                   </p>
                 )}
               </>
-            ) : !autoWatch && !recognition && !top ? (
+            ) : !recognition && !top ? (
               <>
                 {/*
                   Sara used to say this out loud as soon as the page opened, which
@@ -1785,10 +1085,6 @@ export function SortWaste() {
                   {t('sort.pressHint')}
                 </p>
               </>
-            ) : warming ? (
-              <p className="result-sub" data-testid="waste-warming">
-                {t('sort.warming')}
-              </p>
             ) : removing ? (
               <p className="result-sub" data-testid="waste-remove">
                 {t('sort.removeHint')}
@@ -1893,11 +1189,7 @@ export function SortWaste() {
               <div className="prediction-meta">
                 <span>Confidence threshold {Math.round(confidence * 100)}%</span>
                 <span>{stabilityFrames} frames to accept</span>
-                <span>
-                  {focusOn
-                    ? 'Rearm after the item is removed'
-                    : `Cooldown ${Math.round(cooldownMs / 1000)}s`}
-                </span>
+                <span>Auto-crops the item on the backdrop</span>
               </div>
               {predictions.length === 0 ? (
                 <p className="hint">No predictions yet.</p>

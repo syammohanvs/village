@@ -2051,8 +2051,10 @@ lesson: **Metal improves 3/6 → 4/6 and Leather 1/5 → 3/5, while Ewaste colla
 3/6 → 0/6**, because a remote control's *material* is plastic.  Asking for a
 material is the wrong question for anything electronic.  On the venue's own
 frame the material question was worse, not better: the **pipe** came back
-`foam roller | foam` — it did not recognise the pipe either — and the cardboard
-came back `piece of bread | bread`.
+`foam roller | foam` — it did not recognise the pipe either.
+*The cardboard answering "bread" is **not** a model failure* (the operator,
+2026-11-19): the piece is small, brown and torn, and a person would say brown
+bread too.  See the note beside the four-model table below.
 
 So "let the model name the object" is not the missing step: **both models fail
 on the same objects, for the same reason — those objects are not in the training
@@ -2100,9 +2102,10 @@ model's strength, and the class is the part it gets wrong (43.9 % exact).
 - **Use it on a fresh session, not on the archive.**  The first run over the only
   *real* venue session (18 Nov, `--since 2026-11-18T14:55`) found **7 takes**: a
   pipe (Plastic), a glue bottle (Plastic), the cardboard piece — which the model
-  called `bread = Organic` while the operator says Paper — the remote
-  (`Ewaste`, right), a pen (Plastic), a pencil (`Organic`, wrong) and one it
-  could not answer.
+  called `bread = Organic` while the operator says Paper, though the operator
+  later judged the piece itself ambiguous ("small and even humans can call it
+  brown bread") — the remote (`Ewaste`, right), a pen (Plastic), a pencil
+  (`Organic`, wrong) and one it could not answer.
 - **The 40 takes from 13–15 Nov in the same log are NOT venue items** — they are
   the hand-held **evaluation set**: archive photos (high heels on a wooden floor,
   a bag, a pamphlet, a plate of food) and composites with a **drawn arm and
@@ -2181,6 +2184,34 @@ a `reuse` line per language.  **Do not promote the pencil frame to Paper or
 Organic** — that teaches the model the mistake the button prevents.
 
 
+**The Sort Waste page is camera · start · check, and the item is found
+automatically (2026-11-19, the user's instruction).**  "Ease of use for children
+and audience is the goal" — and the right-hand card already says where each kind
+of item goes, so the camera is a help for someone who cannot read it or wants a
+quick answer, not a control panel.  Everything else is gone:
+
+- **removed**: *Focus on the object*, *Set / Add / Clear backgrounds*, *Watch
+  automatically*, the "learning the room" badges, the re-arm / ready hints,
+  *Hazardous / medical*, and the manual item row (*Mixed bag*, *Sanitary waste*,
+  *Sharp or medical*, *Not one of our three bins*).  The rules behind them stay
+  in `wasteGuide.ts` (a pencil still routes to the reuse sentence) but nothing on
+  the page offers them; `lib/backgroundStore.ts` and `lib/sceneMemory.ts` were
+  deleted with the features they served.
+- **the page is now**: camera picker · Start/Stop · **Check the item** · the
+  result card (object, then category) · the three bin lamps.
+- **the object is found, not framed by hand** — `web/frontend/src/lib/backdrop.ts`
+  (6 unit tests).  The exhibit puts one item on a red, green or white sheet, so
+  the backdrop colour is the median of a 3-px border band, the item is the pixels
+  further than 48 (per channel) from it, and the crop is that bounding box grown
+  12 % and squared.  It **refuses** — returns null and the caller uses the old
+  centre square — when the item is under 2 % of the frame, when it covers more
+  than 85 %, and when the scene has no plain backdrop at all (a wooden table
+  reads as "everything differs", so nothing is guessed).  A close-up is still an
+  item: 81 % of the frame crops, it is not refused.
+- **why the centre square was wrong**: measurements already in this file — a
+  visitor centres the item, but the hand, sleeve or wall then fills the edge of
+  the 224 square, and the classifier judges that.
+
 **The card names the object first, and says what it is doing while it waits
 (2026-11-19).**  Reported at the bins: a **plastic cap read as Ewaste 0.40** with
 nothing on screen saying what the camera thought it was.  The same crop sent to
@@ -2207,9 +2238,17 @@ the result card now reads:
   the six confirmed items (object naming, expected word): DeepSeek 4/6 at 6.7 s,
   llava-1.5-7b 3/6 at 1.1 s, llama-4-scout 3/6 at 7.2 s, **llama-3.2-11b-vision
   3/6 at 0.9 s**.  All of them miss the pipe (foam roller / rolled paper) and call
-  the cardboard "bread" — four independent models agreeing points at the 224 crop,
-  not the model.  Resolution is not the fix: the same probe photos at 448 scored
-  **worse** (41.5 / 63.4 against 53.7 / 75.6 at 224).
+  the cardboard "bread" — and **that one is the item, not the model**: the
+  operator's own words were "the cardboard in the pic is small and even humans
+  can call it brown bread, so don't hold it against the model" (2026-11-19).  So
+  the honest naming scoreboard on the six is **3 right** (glue bottle, remote,
+  pencil), **1 ambiguous** (the cardboard), **1 badly framed** (the pen: a sliver
+  of a picture that is otherwise the white sheet) and **1 material missed** (the
+  pipe: every model got a cylinder and called it foam).  Resolution is not the
+  fix: the same probe photos at 448 scored **worse** (41.5 / 63.4 against 53.7 /
+  75.6 at 224).  **At the exhibit, use items a stranger could name** — a printed
+  cardboard box rather than a torn brown chunk, a whole pen rather than one held
+  over white paper.
 - **`.env.secrets` exists now, and it is load-bearing.**  GitHub's push
   protection refuses a Cloudflare token (`cfut_…`) even in this private repo, so
   the token lives in a git-ignored `.env.secrets`, which `Settings.load()` reads

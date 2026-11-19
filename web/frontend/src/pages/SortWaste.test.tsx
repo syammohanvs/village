@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
-import { saveBackgrounds } from '../lib/backgroundStore';
 import { makeSettings, makeState } from '../test/fixtures';
 
 vi.mock('../lib/api', async (importOriginal) => {
@@ -116,6 +115,26 @@ beforeEach(() => {
         width,
         height,
       }),
+      // The press reads the frame to find the object on the backdrop, so every
+      // test gets a picture: a red sheet with one pale item in the middle.
+      getImageData: (_x: number, _y: number, width: number, height: number) => {
+        const data = new Uint8ClampedArray(width * height * 4);
+        for (let i = 0; i < data.length; i += 4) {
+          data[i] = 190;
+          data[i + 1] = 60;
+          data[i + 2] = 55;
+          data[i + 3] = 255;
+        }
+        for (let y = Math.floor(height * 0.3); y < Math.floor(height * 0.7); y += 1) {
+          for (let x = Math.floor(width * 0.35); x < Math.floor(width * 0.65); x += 1) {
+            const i = (y * width + x) * 4;
+            data[i] = 230;
+            data[i + 1] = 225;
+            data[i + 2] = 215;
+          }
+        }
+        return { data, width, height };
+      },
     }),
   });
   toDataUrlCalls.length = 0;
@@ -221,15 +240,14 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    // A press is the only trigger now: no watcher decides for itself what is
+    // "being shown".
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
     // predict(image, flipped) returns every class; passing a count mirrored the
     // frame and made '3' look like a page size.
     expect(vi.mocked(api.wasteClassify).mock.calls.length).toBeGreaterThan(0);
-    expect(await screen.findByText(/Looking at Plastic/i)).toBeInTheDocument();
 
     // The list is ranked, not left in metadata order (which starts at Organic).
     await waitFor(() => {
@@ -246,12 +264,11 @@ describe('Sort Waste', () => {
     });
     expect(await screen.findByTestId('waste-result')).toHaveTextContent('Plastic');
 
-    // The camera stays on after a confirmed item.  Removing the item lets the
-    // stabilizer re-arm, so the next item needs no Start Camera press.
+    // The camera stays on after a confirmed item, so the next item is one press
+    // away and needs no Start Camera.
     expect(stopTrack).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
     expect(screen.queryByTestId('waste-camera-stopped')).not.toBeInTheDocument();
-    expect(screen.getByTestId('waste-rearm')).toHaveTextContent(/remove the item/i);
   }, 15000);
 
   it('refers a recycler material to the agent instead of a bin', async () => {
@@ -298,9 +315,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    // A press is the only trigger now: no watcher decides for itself what is
+    // "being shown".
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const recyclerCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -314,153 +331,6 @@ describe('Sort Waste', () => {
     expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
     expect(stopTrack).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
-  }, 15000);
-
-  it('refers hazardous waste to the operator instead of a bin', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'medical',
-      recognition: { id: 10, category: 'medical', confidence: 0.92 },
-    });
-    predictionState.current = [
-      { className: 'Organic', probability: 0.01 },
-      { className: 'Plastic', probability: 0.03 },
-      { className: 'Paper', probability: 0.01 },
-      { className: 'Glass', probability: 0.02 },
-      { className: 'Metal', probability: 0.02 },
-      { className: 'Textile', probability: 0.005 },
-      { className: 'Leather', probability: 0.005 },
-      { className: 'Footwear', probability: 0.005 },
-      { className: 'Thermocol', probability: 0.005 },
-      { className: 'Ewaste', probability: 0.005 },
-      { className: 'Medical', probability: 0.9 },
-      { className: 'Background', probability: 0.01 },
-    ];
-    const stopTrack = vi.fn();
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
-      category: 'medical',
-      confidence: 0.9,
-    });
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/do not place this in our three bins/i);
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
-    expect(screen.queryByText(/Put it in the medical bin/i)).not.toBeInTheDocument();
-    // A camera-recognised hazardous item also leaves the camera running; the
-    // manual Hazardous button is the one that stops it.
-    expect(stopTrack).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
-  }, 15000);
-
-  it('records a hazardous item through the manual button without a bin LED', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'medical',
-      recognition: { id: 11, category: 'medical', confidence: 1 },
-    });
-    predictionState.current = DEFAULT_PREDICTIONS;
-    const stopTrack = vi.fn();
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    // The sign-in gate adds one round trip before the page mounts, so the
-    // button is not on screen at the moment render() returns.
-    fireEvent.click(await screen.findByTestId('hazardous-button'));
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 4000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
-      category: 'medical',
-      confidence: 1,
-    });
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Medical waste');
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/do not place this in our three bins/i);
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
-    expect(screen.getByTestId('waste-destination')).not.toHaveTextContent(/ask the gram sahayak/i);
-  }, 15000);
-
-  it('offers a background snapshot so the room is not classified', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    predictionState.current = DEFAULT_PREDICTIONS;
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
-
-    expect(await screen.findByTestId('set-background')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Focus on the object/i)).toBeChecked();
-    // The venue is a dynamic room where the item is held up to the camera, so
-    // an empty table is the exception, not the instruction.  The page used to
-    // tell the operator to clear a table they do not have.
-    expect(screen.getByText(/held in your hand is fine/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Show the empty table and press/i)).not.toBeInTheDocument();
   }, 15000);
 
   it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
@@ -504,9 +374,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    // A press is the only trigger now: no watcher decides for itself what is
+    // "being shown".
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     expect(await screen.findByText(/Nothing to sort/i, {}, { timeout: 4000 })).toBeInTheDocument();
     await waitFor(() => {
@@ -566,9 +436,9 @@ describe('Sort Waste', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    // A press is the only trigger now: no watcher decides for itself what is
+    // "being shown".
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
     const splitCall = vi.mocked(api.postRecognition).mock.calls[0][0];
@@ -578,64 +448,6 @@ describe('Sort Waste', () => {
     expect(screen.getByTestId('waste-destination')).toHaveTextContent(/keep separate|gram sahayak/i);
   }, 15000);
 
-  it('keeps the camera running and arms itself for the next item', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockClear();
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'plastic',
-      recognition: { id: 21, category: 'plastic', confidence: 0.95 },
-    });
-    predictionState.current = predictionsFor('Plastic', 0.95);
-    const stopTrack = vi.fn();
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // The automatic watcher is opt-in now: a press cannot be wrong about whether
-    // an item is being shown, so it is the default.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(1), { timeout: 6000 });
-    expect(stopTrack).not.toHaveBeenCalled();
-
-    // The item is removed: the empty scene re-arms the stabilizer.
-    predictionState.current = predictionsFor('Background', 0.99);
-    expect(await screen.findByTestId('waste-ready', {}, { timeout: 10000 })).toHaveTextContent(
-      /camera armed/i,
-    );
-
-    // The next item is classified without pressing Start Camera again.
-    predictionState.current = predictionsFor('Paper', 0.95);
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalledTimes(2), { timeout: 6000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[1][0]).toMatchObject({
-      category: 'paper',
-      confidence: 0.95,
-    });
-    expect(stopTrack).not.toHaveBeenCalled();
-  }, 25000);
-});
-
-describe('Sort Waste — a low guess says what it is', () => {
   it('names its best guess and the percentage instead of going quiet', async () => {
     // "Unable to identify it for a long time" was the report: the page said
     // "Not sure yet" forever, which tells the operator nothing.  Naming the
@@ -667,7 +479,7 @@ describe('Sort Waste — a low guess says what it is', () => {
     fireEvent.click(start);
     // These suites keep the automatic watcher on: the behaviour they
     // cover is what happens while the camera is being watched.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     // Under the bar it names no material at all.  "Best guess Thermocol at 59%"
     // read as a classification -- the venue reported a cloth scrunchie as
@@ -680,337 +492,6 @@ describe('Sort Waste — a low guess says what it is', () => {
     expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
     expect(api.postRecognition).not.toHaveBeenCalled();
   }, 15000);
-});
-
-describe('Sort Waste — the empty table is painted out', () => {
-  // jsdom has no canvas implementation, so the drawing calls are recorded.  What
-  // is asserted here is the *order* and the composite operations, which is the
-  // part a component test can hold; the pixels are measured in docs/verification.md
-  // against 217 real scenes.
-  // `null` draws one item over the stored empty scene; a number paints the
-  // whole frame that brightness, which is what a nudged camera or a change of
-  // light looks like.
-  let frameOverride: number | null = null;
-  // Whether the item is in the frame.  The room is what the page learns; the
-  // item is what it should classify once the room is known.
-  let showItem = true;
-
-  class RecordingContext {
-    canvas: HTMLCanvasElement;
-    ops: string[];
-    globalCompositeOperation = 'source-over';
-    fillStyle = '';
-    constructor(canvas: HTMLCanvasElement, ops: string[]) {
-      this.canvas = canvas;
-      this.ops = ops;
-    }
-    drawImage() {
-      this.ops.push(`drawImage:${this.canvas.width}x${this.canvas.height}`);
-    }
-    getImageData(_x: number, _y: number, width: number, height: number) {
-      const base = frameOverride ?? 20;
-      const data = new Uint8ClampedArray(width * height * 4);
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] = base;
-        data[i + 1] = base;
-        data[i + 2] = base;
-        data[i + 3] = 255;
-      }
-      if (frameOverride === null && showItem) {
-        // An item sitting in the middle of the analysis frame; everything else
-        // is exactly the stored empty scene.
-        for (let y = 50; y < 62; y += 1) {
-          for (let x = 70; x < 82; x += 1) {
-            const i = (y * width + x) * 4;
-            data[i] = 250;
-            data[i + 1] = 250;
-            data[i + 2] = 250;
-          }
-        }
-      }
-      return { data, width, height };
-    }
-    putImageData() {
-      this.ops.push('putImageData');
-    }
-    clearRect() {
-      this.ops.push('clearRect');
-    }
-    fillRect() {
-      this.ops.push(`fillRect:${this.fillStyle}`);
-    }
-    createImageData(width: number, height: number) {
-      return { data: new Uint8ClampedArray(width * height * 4), width, height };
-    }
-  }
-
-  function installCanvas() {
-    const ops: string[] = [];
-    const originals = {
-      getContext: HTMLCanvasElement.prototype.getContext,
-    };
-    HTMLCanvasElement.prototype.getContext = (function getContext(this: HTMLCanvasElement) {
-      return new RecordingContext(this, ops);
-    } as unknown) as typeof HTMLCanvasElement.prototype.getContext;
-    return {
-      ops,
-      restore() {
-        HTMLCanvasElement.prototype.getContext = originals.getContext;
-      },
-    };
-  }
-
-  it('replaces the unchanged table with a plain plate, then classifies the crop', async () => {
-    const canvas = installCanvas();
-    try {
-      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-      vi.mocked(api.settings).mockResolvedValue(
-        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-      );
-      vi.mocked(api.postRecognition).mockResolvedValue({
-        ok: true,
-        category: 'plastic',
-        recognition: { id: 1, category: 'plastic', confidence: 0.95 },
-      });
-      // One stored empty scene, the same 160x120 frame the page analyses.
-      const empty = new Uint8ClampedArray(160 * 120 * 4);
-      for (let i = 0; i < empty.length; i += 4) {
-        empty[i] = 20;
-        empty[i + 1] = 20;
-        empty[i + 2] = 20;
-        empty[i + 3] = 255;
-      }
-      // Seeded through the app's own store, so the test also proves the snapshot
-      // round-trips through localStorage.
-      expect(
-        saveBackgrounds(window.localStorage, [{ width: 160, height: 120, data: empty }]),
-      ).toBe(true);
-
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: {
-          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-          enumerateDevices: vi.fn().mockResolvedValue([]),
-        },
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-        configurable: true,
-        value: vi.fn().mockResolvedValue(undefined),
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-        configurable: true,
-        get: () => 2,
-      });
-
-      vi.mocked(api.wasteClassify).mockClear();
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      // The model loads asynchronously; clicking before it is ready does nothing.
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      // These suites keep the automatic watcher on: the behaviour they
-      // cover is what happens while the camera is being watched.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
-      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
-
-      // The mask was painted and used to punch the picture out.
-      expect(canvas.ops).toContain('putImageData');
-      expect(canvas.ops.join('|')).toMatch(/clearRect.*drawImage:224x224/);
-      // ...and a white plate was put behind it, so no transparency reaches the
-      // model.
-      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(true);
-      // The crop is handed to the backend as a JPEG data URL, never the raw
-      // video: the model runs on the laptop now, not in this browser.
-      const sent = vi.mocked(api.wasteClassify).mock.calls[0][0];
-      expect(sent.startsWith('data:image/jpeg')).toBe(true);
-      // 0.92, not 0.85: the lower quality cost 5 points of hand-held accuracy
-      // for a payload difference of a couple of kilobytes.
-      expect(toDataUrlCalls).toContain(0.92);
-      // The visitor can see the 112-px copy of exactly these pixels.  Reported
-      // from the venue as "it is looking at my hair and shirt, not what the
-      // fingers are holding" -- a person-sized crop, which nothing in the
-      // picture can separate from the person (measured: every non-skin blob in
-      // those frames touches the frame edge).
-      const preview = await screen.findByTestId('crop-preview');
-      expect(preview.querySelector('canvas')).not.toBeNull();
-      expect(preview.textContent).toMatch(/reading/i);
-      expect(canvas.ops).toContain('drawImage:112x112');
-    } finally {
-      canvas.restore();
-    }
-  }, 15000);
-
-  it('still classifies when the stored background no longer matches the view', async () => {
-    // The reported bug: after Set background, a nudged camera or a change of
-    // light makes every pixel differ, the old code reported "no object", and the
-    // screen sat on "Nothing to sort" while a real item was in front of it.
-    const canvas = installCanvas();
-    try {
-      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-      vi.mocked(api.settings).mockResolvedValue(
-        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-      );
-      vi.mocked(api.postRecognition).mockResolvedValue({
-        ok: true,
-        category: 'plastic',
-        recognition: { id: 2, category: 'plastic', confidence: 0.95 },
-      });
-      const empty = new Uint8ClampedArray(160 * 120 * 4);
-      for (let i = 0; i < empty.length; i += 4) {
-        empty[i] = 20;
-        empty[i + 1] = 20;
-        empty[i + 2] = 20;
-        empty[i + 3] = 255;
-      }
-      expect(
-        saveBackgrounds(window.localStorage, [{ width: 160, height: 120, data: empty }]),
-      ).toBe(true);
-      // Every pixel differs from that snapshot.
-      frameOverride = 210;
-
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: {
-          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-          enumerateDevices: vi.fn().mockResolvedValue([]),
-        },
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-        configurable: true,
-        value: vi.fn().mockResolvedValue(undefined),
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-        configurable: true,
-        get: () => 2,
-      });
-
-      vi.mocked(api.wasteClassify).mockClear();
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      // These suites keep the automatic watcher on: the behaviour they
-      // cover is what happens while the camera is being watched.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
-
-      // The model is still asked, on the whole frame.
-      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 5000 });
-      // The backend is asked to classify, so the model is not local any more.
-      expect(api.wasteClassify).toHaveBeenCalled();
-      // ...and the page says what to fix instead of claiming there is no waste.
-      expect(await screen.findByTestId('frame-warning')).toHaveTextContent(
-        /background no longer matches/i,
-      );
-      expect(screen.queryByText(/this does not look like waste/i)).not.toBeInTheDocument();
-    } finally {
-      frameOverride = null;
-      canvas.restore();
-    }
-  }, 15000);
-
-  it('learns the room instead of classifying it', async () => {
-    // The reported failure: with no stored backdrop the page classified the
-    // room itself and called the wall "textile".  The first frames are now the
-    // room, and nothing is classified until it has been learned.
-    const canvas = installCanvas();
-    try {
-      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: {
-          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-          enumerateDevices: vi.fn().mockResolvedValue([]),
-        },
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-        configurable: true,
-        value: vi.fn().mockResolvedValue(undefined),
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-        configurable: true,
-        get: () => 2,
-      });
-      // An empty room: no item in the picture at all.
-      frameOverride = null;
-      showItem = false;
-      vi.mocked(api.wasteClassify).mockClear();
-
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      // These suites keep the automatic watcher on: the behaviour they
-      // cover is what happens while the camera is being watched.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
-
-      expect(await screen.findByTestId('waste-warming', {}, { timeout: 5000 })).toBeInTheDocument();
-      // The room is never sent to the model.
-      expect(api.wasteClassify).not.toHaveBeenCalled();
-
-      // Once learned, the room is "not a waste item" -- still not classified.
-      expect(
-        await screen.findByText(/Nothing to sort/i, {}, { timeout: 8000 }),
-      ).toBeInTheDocument();
-      expect(api.wasteClassify).not.toHaveBeenCalled();
-    } finally {
-      frameOverride = null;
-      showItem = true;
-      canvas.restore();
-    }
-  }, 25000);
-
-  it('classifies an item shown in the learned room, and paints the room out', async () => {
-    const canvas = installCanvas();
-    try {
-      vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-      vi.mocked(api.settings).mockResolvedValue(
-        makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-      );
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: {
-          getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-          enumerateDevices: vi.fn().mockResolvedValue([]),
-        },
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-        configurable: true,
-        value: vi.fn().mockResolvedValue(undefined),
-      });
-      Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-        configurable: true,
-        get: () => 2,
-      });
-      // The room first, then somebody holds an item up in it.
-      frameOverride = null;
-      showItem = false;
-      vi.mocked(api.wasteClassify).mockClear();
-      vi.mocked(api.postRecognition).mockClear();
-
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      // These suites keep the automatic watcher on: the behaviour they
-      // cover is what happens while the camera is being watched.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
-      await screen.findByTestId('waste-warming', {}, { timeout: 5000 });
-
-      // Let the room be learned, then present the item.
-      await new Promise((resolve) => setTimeout(resolve, 3200));
-      showItem = true;
-
-      await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 10000 });
-      // The learned room is subtracted exactly like a stored one, so the model
-      // sees the item on a plain plate rather than the room around it.
-      expect(canvas.ops).toContain('putImageData');
-      expect(canvas.ops.some((op) => op === 'fillRect:#ffffff')).toBe(true);
-    } finally {
-      frameOverride = null;
-      showItem = true;
-      canvas.restore();
-    }
-  }, 30000);
 });
 
 describe('Sort Waste — Sara speaks without waiting on the recording', () => {
@@ -1055,7 +536,7 @@ describe('Sort Waste — Sara speaks without waiting on the recording', () => {
     fireEvent.click(start);
     // These suites keep the automatic watcher on: the behaviour they
     // cover is what happens while the camera is being watched.
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     // The greeting speaks on mount, so look for the classification itself.
     await waitFor(
@@ -1125,90 +606,6 @@ describe('Sort Waste — the camera waits for the model', () => {
     await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
     expect(start).toHaveTextContent(/start camera/i);
   }, 15000);
-});
-
-describe('Sort Waste — the page says whether it is ready', () => {
-  it('shows the learned progress, then Ready, before an item is shown', async () => {
-    // Reported: "I could not really see from the webpage any indication whether
-    // you have learned the background or not before showing the key fob."  The
-    // answer belongs on the picture, where it is read *before* the item.
-    vi.mocked(api.state).mockResolvedValue(makeState());
-    vi.mocked(api.events).mockResolvedValue({ events: [] });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
-    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    // A frame the page can actually read: an empty room, unchanging.
-    const originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = (function () {
-      return {
-        drawImage() {},
-        clearRect() {},
-        putImageData() {},
-        fillRect() {},
-        createImageData: (width: number, height: number) => ({
-          data: new Uint8ClampedArray(width * height * 4),
-          width,
-          height,
-        }),
-        getImageData: (_x: number, _y: number, width: number, height: number) => {
-          const data = new Uint8ClampedArray(width * height * 4);
-          for (let i = 0; i < data.length; i += 4) {
-            data[i] = 30;
-            data[i + 1] = 30;
-            data[i + 2] = 30;
-            data[i + 3] = 255;
-          }
-          return { data, width, height };
-        },
-      };
-    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-
-    try {
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-
-      // Nothing is claimed while the camera is off.
-      expect(screen.queryByTestId('camera-status')).not.toBeInTheDocument();
-
-      fireEvent.click(start);
-      const status = await screen.findByTestId('camera-status');
-      // With the watcher off the page is ready for a press and has no room to
-      // learn. "Learning the room 0%" forever, beside a page that will never
-      // learn one, is the bug that was reported.
-      expect(status).toHaveTextContent(/press/i);
-
-      // Ticking the watcher starts a real warm-up, and the badge says so.
-      fireEvent.click(await screen.findByTestId('auto-watch'));
-      await waitFor(() => expect(status).toHaveTextContent(/learning the room/i), {
-        timeout: 8000,
-      });
-
-      // Once the room is known the badge says so, so an item can be shown
-      // without guessing whether the page is watching or ready.
-      await waitFor(() => expect(status).toHaveTextContent(/ready/i), { timeout: 10000 });
-      expect(status).toHaveTextContent(/show one item/i);
-    } finally {
-      HTMLCanvasElement.prototype.getContext = originalGetContext;
-    }
-  }, 25000);
 });
 
 describe('Sort Waste — one press reads the video, not one frame', () => {
@@ -1566,7 +963,6 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     const check = await screen.findByTestId('classify-now');
     // The default is what makes it safe: the watcher is off, so the loop that
     // decides what is "being shown" does not run at all.
-    expect(screen.getByTestId('auto-watch')).not.toBeChecked();
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(api.wasteClassify).not.toHaveBeenCalled();
     expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(/press/i);
@@ -1621,7 +1017,7 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
 
@@ -1668,7 +1064,7 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     await waitFor(() => expect(spoken.length).toBeGreaterThan(0), { timeout: 8000 });
     expect(spokenLanguages).toContain('ml');
@@ -1724,7 +1120,7 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     const correction = await screen.findByTestId('waste-correction', {}, { timeout: 8000 });
     expect(within(correction).getByText(/Wrong\? It was/)).toBeInTheDocument();
@@ -1770,7 +1166,7 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     const startButton = await screen.findByTestId('start-camera');
     await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('auto-watch'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
 
     expect(await screen.findByTestId('waste-result', {}, { timeout: 8000 })).toHaveTextContent('Plastic');
     const note = await screen.findByTestId('waste-led-note');
@@ -1981,60 +1377,12 @@ describe('Sort Waste — choosing the camera', () => {
   });
 });
 
-describe('Sort Waste — an item that is not waste yet', () => {
-  it('answers a pencil with the reuse sentence, lights no bin and says it', async () => {
-    // Reported 2026-11-19: a pencil is wood, graphite and clay, so it belongs
-    // in none of our three bins -- and the classifier reads it as Plastic 0.53
-    // or Organic 0.90, either of which would open a bin.  The reader says what
-    // it is instead, and Sara answers with the reuse sentence.
-    window.localStorage.setItem('village.demoMode', 'demo');
-    vi.mocked(api.state).mockResolvedValue(makeState({ wasteCategory: null }));
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    stubCamera();
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-    render(<App />);
-
-    await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(screen.getByTestId('start-camera'));
-    fireEvent.click(await screen.findByTestId('not-in-bins'));
-
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent(
-      /not one of our three bins/i,
-    );
-    const destination = screen.getByTestId('waste-destination');
-    expect(destination).toHaveTextContent(/use it for as long as possible/i);
-    expect(destination).toHaveTextContent(/gram sahayak/i);
-    // The reader's word is not a model answer, so nothing is recorded and no
-    // lamp is lit -- a pencil must never look like a plastic press.
-    expect(api.postRecognition).not.toHaveBeenCalled();
-    const leds = screen.getByTestId('bin-leds');
-    for (const bin of ['organic', 'plastic', 'paper']) {
-      expect(within(leds).getByTestId(`bin-led-${bin}`)).not.toHaveClass('is-on');
-    }
-    // ...and it is spoken, not only written: the card is not a poster.
-    await waitFor(
-      () => expect(spoken.some((line) => /not one of our three bins/i.test(line))).toBe(true),
-      { timeout: 4000 },
-    );
-  });
-});
-
-
 /**
  * A canvas with a picture in it.
  *
- * The press crops the middle of the video through a canvas, and the page reads
- * pixels back to decide whether anything is being shown, so jsdom needs
- * `getImageData` as well as `drawImage` — without it the press throws before any
- * request is made.  Returns a restore function.
+ * The press reads the frame to find the object on the backdrop and crops it
+ * through a canvas, so jsdom needs `getImageData` as well as `drawImage`.
+ * Returns a restore function.
  */
 function stubCanvasWithPicture(): () => void {
   const original = HTMLCanvasElement.prototype.getContext;
@@ -2052,16 +1400,16 @@ function stubCanvasWithPicture(): () => void {
       getImageData: (_x: number, _y: number, width: number, height: number) => {
         const data = new Uint8ClampedArray(width * height * 4);
         for (let i = 0; i < data.length; i += 4) {
-          data[i] = 40;
-          data[i + 1] = 40;
-          data[i + 2] = 40;
+          data[i] = 190;
+          data[i + 1] = 60;
+          data[i + 2] = 55;
           data[i + 3] = 255;
         }
-        for (let y = 40; y < 80; y += 1) {
-          for (let x = 50; x < 110; x += 1) {
+        for (let y = Math.floor(height * 0.3); y < Math.floor(height * 0.7); y += 1) {
+          for (let x = Math.floor(width * 0.35); x < Math.floor(width * 0.65); x += 1) {
             const i = (y * width + x) * 4;
-            data[i] = 220;
-            data[i + 1] = 220;
+            data[i] = 230;
+            data[i + 1] = 225;
             data[i + 2] = 215;
           }
         }

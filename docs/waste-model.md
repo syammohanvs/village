@@ -274,7 +274,21 @@ easier to spot in that order.  So the result card says:
 **The name comes from a hosted vision model and the category stays local.**  The
 one that made this necessary: a plastic cap photographed in a hand was classified
 **Ewaste 0.40** — and the same crop sent to `llama-3.2-11b-vision` came back
-**"Clear plastic lid"** in 1.4 s.  A vision model must not choose the bin
+**"Clear plastic lid"** in 1.4 s.
+
+**The page has three controls on purpose.**  Camera, Start / Stop, and *Check
+the item*.  The exhibit puts one item on a plain coloured sheet, so the software
+finds it itself: `lib/backdrop.ts` reads the sheet's colour from the frame's
+edge, takes everything that differs from it as the item, and crops that square.
+On a busy scene with no sheet it refuses and the middle of the picture is used,
+which is what the page always did.  Focus, background snapshots and the automatic
+watcher were removed — they were three ways to say the same thing and a visitor
+could not tell which one was in charge.
+
+**The item has to be nameable by a stranger.**  A small torn brown piece of
+cardboard came back "bread" from every model tried — and the operator said a
+person could call it brown bread too, so that one is the item's ambiguity, not
+the model's mistake.  Show a printed box, a whole pen, a clean bottle.  A vision model must not choose the bin
 (53.7 % exact on the venue probe against the local model's 74.7 %), but it is
 what lets a visitor see the disagreement instead of being told a confident wrong
 answer.
