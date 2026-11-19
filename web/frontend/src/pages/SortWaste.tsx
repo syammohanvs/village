@@ -716,6 +716,28 @@ export function SortWaste() {
   }, [stopCamera]);
 
   /**
+   * Ask the hosted model what the object is, and remember the answer.
+   *
+   * Resolves with the name (or null), so a caller can decide whether to wait for
+   * it.  Used twice: on an accepted reading the card and Sara say it first, and
+   * on a reading *under* the bar — where the page refuses to name a bin — the
+   * name is the one useful thing it can still offer.
+   */
+  const nameTheItem = useCallback(async (): Promise<string | null> => {
+    const crop = lastCropRef.current;
+    if (!crop || !visionReady) return null;
+    setNaming(true);
+    try {
+      const answer = await api.wasteIdentify(crop).catch(() => null);
+      const name = answer?.object ?? null;
+      if (lastCropRef.current === crop) setObjectName(name);
+      return name;
+    } finally {
+      setNaming(false);
+    }
+  }, [visionReady]);
+
+  /**
    * A manual choice is an answer too.
    *
    * The reader's word replaces the model's, so nothing is recorded and no bin
@@ -890,26 +912,14 @@ export function SortWaste() {
     // The name never moves the item out of a bin or into one.  The category is
     // still the local classifier's, because on the venue probe a vision model
     // scored 53.7% exact against its 70.7%.
-    const crop = lastCropRef.current;
     let named: string | null = null;
-    if (crop && visionReady) {
-      setNaming(true);
-      const asked = api
-        .wasteIdentify(crop)
-        .then((answer) => answer.object)
-        .catch(() => null);
+    if (visionReady) {
+      // A late answer still names the card -- `nameTheItem` stores it itself --
+      // but the visitor is not kept waiting for it beyond this window.
       named = await Promise.race([
-        asked,
+        nameTheItem(),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
       ]);
-      // A late answer still names the card, as long as the camera is still on
-      // the same crop.  It is not spoken again -- the visitor has been answered.
-      const mine = crop;
-      void asked.then((late) => {
-        if (late && lastCropRef.current === mine) setObjectName(late);
-      });
-      setNaming(false);
-      setObjectName(named);
     } else {
       setObjectName(null);
     }
@@ -961,7 +971,7 @@ export function SortWaste() {
       // be removed and then re-arms, so the next item is classified without
       // pressing Start Camera again.
     }
-  }, [t, visionReady, voiceLanguage]);
+  }, [t, nameTheItem, visionReady, voiceLanguage]);
 
   /**
    * Classify once, on demand.
@@ -1079,7 +1089,13 @@ export function SortWaste() {
       //
       // A bin is held to a higher bar than a referral (BIN_CONFIDENCE): a wrong
       // bin has a physical consequence, a wrong "keep it separate" does not.
-      if (grouped.confidence < confidenceBar(confidence, guideFor(grouped.material ?? grouped.label))) return;
+      if (grouped.confidence < confidenceBar(confidence, guideFor(grouped.material ?? grouped.label))) {
+        // Too unsure to name a bin -- but "I see a clear plastic lid" is still
+        // the most useful thing on the page, so it is asked for anyway.  It
+        // never becomes a category; the card says it is not sure.
+        void nameTheItem();
+        return;
+      }
       const event: StableEvent = {
         label: grouped.material ?? grouped.label,
         category: (grouped.material ?? grouped.label).trim().toLowerCase(),
@@ -1094,7 +1110,7 @@ export function SortWaste() {
       busyRef.current = false;
       setReading(false);
     }
-  }, [accept]);
+  }, [accept, nameTheItem]);
 
 
   // The model is loaded when the page opens rather than when the camera starts,
@@ -1778,18 +1794,27 @@ export function SortWaste() {
                 {t('sort.removeHint')}
               </p>
             ) : cameraOn ? (
-              <p className="result-sub">
-                {top
-                  ? topIsBackground
-                    ? t('sort.nothingToSort')
-                    : strong
-                      ? t('sort.lookingAt', { item: displayName(top.label) })
-                      : t('sort.notSure', {
-                          percent: Math.round(confidenceBar(confidence, guideFor(top.label)) * 100),
-                          frames: stabilityFrames,
-                        })
-                  : t('sort.waitingSee')}
-              </p>
+              <>
+                <p className="result-sub">
+                  {top
+                    ? topIsBackground
+                      ? t('sort.nothingToSort')
+                      : strong
+                        ? t('sort.lookingAt', { item: displayName(top.label) })
+                        : t('sort.notSure', {
+                            percent: Math.round(confidenceBar(confidence, guideFor(top.label)) * 100),
+                            frames: stabilityFrames,
+                          })
+                    : t('sort.waitingSee')}
+                </p>
+                {objectName && !recognition && (
+                  // Named but not sorted: the page may not choose a bin under the
+                  // bar, so the name is what it can honestly give.
+                  <p className="result-sub" data-testid="waste-sees-unsure">
+                    {t('sort.sees', { object: objectName })}
+                  </p>
+                )}
+              </>
             ) : cameraOn && previewOnly ? (
               <p className="result-sub" data-testid="waste-preview-only">
                 {t('sort.previewOnlyNote')}

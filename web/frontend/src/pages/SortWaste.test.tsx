@@ -2188,3 +2188,50 @@ describe('Sort Waste — the object is named before the category', () => {
     }
   }, 25000);
 });
+
+describe('Sort Waste — a named object on a reading the page will not bin', () => {
+  it('still says what it sees when the classifier is under its bar', async () => {
+    // A wrong bin is the failure this page exists to avoid, so a reading under
+    // 70% is refused — but "I see a clear plastic lid" is the one useful thing
+    // left, and it is exactly the case the reporter hit (cap read as Ewaste).
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
+      installed: true,
+      model: 'resnet50',
+      classes: [],
+      vision: { provider: 'cloudflare', model: 'llama', ready: true },
+    });
+    vi.mocked(api.wasteIdentify).mockResolvedValue({
+      object: 'clear plastic lid',
+      provider: 'cloudflare',
+      model: 'llama',
+      ms: 900,
+    });
+    vi.mocked(api.settings).mockResolvedValue(makeSettings());
+    vi.mocked(api.postRecognition).mockClear();
+    // A bin needs 70%: Plastic 0.40 is refused, so nothing may be recorded.
+    predictionState.current = predictionsFor('Plastic', 0.4);
+    stubCamera();
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true,
+      get: () => 2,
+    });
+    const restore = stubCanvasWithPicture();
+    try {
+      render(<App />);
+      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
+      fireEvent.click(screen.getByTestId('start-camera'));
+      fireEvent.click(await screen.findByTestId('classify-now'));
+
+      const sees = await screen.findByTestId('waste-sees-unsure', {}, { timeout: 8000 });
+      expect(sees).toHaveTextContent(/I see: clear plastic lid/i);
+      // Nothing was recorded: the name is not a category and must not open a bin.
+      expect(api.postRecognition).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  }, 25000);
+});
