@@ -202,7 +202,7 @@ inline constexpr int WASTE_LED_PAPER = 23;
 // the wind **current** tap (the voltage across the 47 ohm resistor), not the
 // generator's own voltage -- see docs/wiring.md section 11.
 inline constexpr int SPARE_INPUT = 33;
-inline constexpr int WIND_ADC = SPARE_INPUT;  // ADC1_CH5, input-only
+inline constexpr int WIND_ADC = SPARE_INPUT;  // ADC1_CH5, used as an input here
 
 // Pins deliberately left free for future work.  Kept as a list so a build that
 // starts using one fails the uniqueness check rather than colliding silently.
@@ -222,7 +222,7 @@ static_assert(isSafeAnalog(SOLAR_PANEL_ADC),
 static_assert(isSafeAnalog(SOLAR_CURRENT_ADC),
               "solar current sense must be on an exposed ADC1 pin");
 static_assert(isSafeAnalog(WIND_ADC),
-              "wind generator voltage must be on an exposed ADC1 pin");
+              "the wind current tap must be on an exposed ADC1 pin");
 static_assert(isSafeOutput(RESERVOIR_EXCITE),
               "reservoir excitation must be a safe output");
 static_assert(isSafeOutput(PUMP_GATE), "pump gate must be a safe output");

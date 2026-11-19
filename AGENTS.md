@@ -2854,7 +2854,10 @@ real change of what the ADC means, not a relabelled number:
   current and power are 0, because a dark LED cannot tell you the generator's
   voltage.  `/status` `sensors.wind` now carries `resistor_millivolts`,
   `measuring`, `voltage_v|voltage_millivolts` (nullable), `current_ma`,
-  `power_mw` and the three settings; `generate_mv` is gone.
+  `power_mw` and the three settings; `generate_mv` is gone.  **GPIO 33 is
+  output-capable** — Espressif's input-only pins are 34–39 — and is simply used
+  as an input here; `isInputOnly()` never listed it (comments that called it
+  input-only were wrong and are corrected).
 - **Backend:** the simulator computes the same circuit from the slider (0–260 mV
   across the resistor → 0–5.5 mA, 0–17 mW) and reports `null` voltage at rest,
   so Simulation cannot invent 2.8 V either.  `makeState`/`localVillage` do the

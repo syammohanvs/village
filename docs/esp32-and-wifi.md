@@ -49,7 +49,7 @@ itself.
 | LDR (light) | **32** | ADC1 |
 | solar panel voltage | **39** (VN) | ADC1, input-only |
 | solar LED junction | **36** (VP) | ADC1, input-only |
-| wind current tap | **33** | ADC1, the last free ADC1 pin — across the 47 Ω resistor behind the blue LED |
+| wind current tap | **33** | ADC1_CH5, output-capable pin used as an input here — across the 47 Ω resistor behind the blue LED |
 | pump-switch control (2N2222 base) | **19** | logic only, 82 Ω to the base; pump has its own 5 V supply |
 | streetlights (all five lamps) | **13** | one pin, ~9 mA total |
 | waste LED — organic | **21** | green |

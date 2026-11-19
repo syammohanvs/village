@@ -54,7 +54,7 @@ logical order.
 | Waste LED — organic | **21** | D21 | Digital output | Safe output |
 | Waste LED — plastic | **22** | D22 | Digital output | Safe output |
 | Waste LED — paper | **23** | D23 | Digital output | Safe output |
-| Wind generator volts | **33** | D33 | ADC input | ADC1_CH5 — the last free analogue pin (§11) |
+| Wind circuit current tap | **33** | D33 | ADC input (output-capable pin) | ADC1_CH5, used as an input here — the last free analogue pin (§11) |
 | *Left over* | 4, 16, 17, 18, 26 | D4, D16, D17, D18, D26 | Digital I/O | Freed when the bin rangefinders were removed |
 
 ### Why not other pins
@@ -674,7 +674,9 @@ generator −  ────────────────────┴�
 - Keep the generator's **open-circuit voltage reasonable for the LED + resistor
   branch**; if it can far exceed 3.3 V, add a divider ahead of the LED and scale
   the numbers in `WindConfig` accordingly.
-- GPIO 33 is input-only on this module, which is correct here: it only measures.
+- GPIO 33 is **output-capable** on this module (Espressif's input-only pins are
+  GPIO 34–39); it is used here purely as an input, which is all this circuit
+  needs. `isInputOnly()` in `pins.h` deliberately does not list it.
 
 ### What the firmware does with it
 
