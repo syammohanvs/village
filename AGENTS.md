@@ -2034,6 +2034,35 @@ path.  **If a hosted vision model is wired in, it belongs behind
 `VILLAGE_VISION_*`, off by default, with the local answer as the fallback and the
 panel's privacy line saying the picture leaves the laptop.**
 
+**Asking for the OBJECT AND ITS MATERIAL does not beat asking for the class
+(measured 2026-11-19).**  The user's proposal was that the local model never
+recognises the object, so the hosted model should name it *and* its material
+("metal pipe") and let that decide.  It was tested exactly that way on the same
+41 probe photos — prompt `object | material`, a deterministic material→class
+table (metal/steel/iron→Metal, plastic/pvc→Plastic, foam/eps→Thermocol, …):
+
+| question asked | exact | item-action |
+| --- | ---: | ---: |
+| "choose one of the 11 words" | 43.9 % | 58.5 % |
+| "object \| material", then map the material | **43.9 %** | **58.5 %** |
+
+The same total, from a different pattern of errors — and the pattern is the
+lesson: **Metal improves 3/6 → 4/6 and Leather 1/5 → 3/5, while Ewaste collapses
+3/6 → 0/6**, because a remote control's *material* is plastic.  Asking for a
+material is the wrong question for anything electronic.  On the venue's own
+frame the material question was worse, not better: the **pipe** came back
+`foam roller | foam` — it did not recognise the pipe either — and the cardboard
+came back `piece of bread | bread`.
+
+So "let the model name the object" is not the missing step: **both models fail
+on the same objects, for the same reason — those objects are not in the training
+data.**  The local model is not poor at objects in general (74.7 % exact across
+the probe); it is 0/6 on Metal with zero Metal photos in `waste-samples`.  Where
+a *word* really does decide the answer — a pencil is in no bin, a remote is
+Ewaste whatever its shell is made of — the right home is a small
+**operator-approved object→answer table** (the pencil route described below), checked once
+by a person and answered in 50–85 ms offline, not a 5–12 s fused model call.
+
 **A hosted vision model was measured against the classifier on the same photos,
 and it is worse (2026-11-19).**  With a fresh key pasted into `.env`
 (`VILLAGE_VISION_*`, base `https://opencode.ai/inference/go/v1`,
