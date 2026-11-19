@@ -20,14 +20,18 @@ def no_provider(monkeypatch: pytest.MonkeyPatch):
     `Settings.load()` reads the repository's `.env`, so without this a machine
     that has a Cloudflare token would make the suite call the real API.
     """
-    for name in (
-        "VILLAGE_CF_API_TOKEN",
+    names = [
         "VILLAGE_CF_ACCOUNT_ID",
         "VILLAGE_CF_VISION_MODEL",
         "VILLAGE_VISION_API_KEY",
         "VILLAGE_VISION_PROVIDER",
         "VILLAGE_VISION_BASE_URL",
-    ):
+    ]
+    # The provider chain can hold several Cloudflare accounts, so every one of
+    # them has to go or a machine with a token calls the real API in a test.
+    for suffix in ("", "_2", "_3", "_4", "_5"):
+        names += [f"VILLAGE_CF_API_TOKEN{suffix}", f"VILLAGE_CF_ACCOUNT_ID{suffix}"]
+    for name in names:
         monkeypatch.delenv(name, raising=False)
     vision._CACHE.clear()
     vision._CACHE_ORDER.clear()

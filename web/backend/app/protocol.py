@@ -80,7 +80,9 @@ class RecognitionRequest(BaseModel):
     mode: Mode = "live"
     category: str = Field(min_length=3, max_length=20)
     confidence: float = Field(ge=0.0, le=1.0)
-    model: str = Field(default="teachable-machine", max_length=80)
+    # The browser MobileNet was replaced by ResNet50 on this laptop; an older
+    # client that omits the field is recorded under the model that answers now.
+    model: str = Field(default="resnet50", max_length=80)
     request_id: str = Field(min_length=8, max_length=80)
     profile_id: int | None = None
     # What the model actually named, and its best few guesses.  A recycler is

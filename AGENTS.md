@@ -2236,6 +2236,40 @@ as **Ewaste (10)**, then Paper/Thermocol.  No accuracy was improved this round:
 the one metal photo added is one photo, and the two-photo retrain measured
 earlier took the probe *down* from 74.7 % to 73.0 %.
 
+**An object in the name outranks the material it is made of (2026-11-19, from
+the user's own two presses).**  The two items a visitor checked — a white remote,
+pressed twice — came back Ewaste **37.6 %** and **45.6 %** (under the 0.50
+material bar, so "not sure") while the namer said *"Remote control made of
+plastic"* and *"White plastic remote control"*.  Read as a **material** claim,
+the word "plastic" disagreed with Ewaste and would have produced a conflict —
+which is the recorded lesson that a material is the wrong question for anything
+electronic.  `wasteDecision.ts` now has an `OBJECT_ROUTES` layer that is checked
+**before** any material word: remote, keyboard, mouse, cable, charger, phone,
+laptop, watch, circuit board … → `collect.ewaste`; pencil, crayon, eraser →
+`separate.unknown`.  The list is deliberately small — a word belongs in it only
+if it has a **route of its own**, so `keychain` and `bottle` are *not* there (a
+keychain can be metal or electronic, a bottle can be any of three materials);
+those stay material questions, where a disagreement refuses the answer.  Both
+pressing now answer **e-waste collection** (a referral — no lamp, and the record
+keeps the classifier's own 0.38/0.46, unpublished as confidence).
+
+**Passing more of the name to the classifier was measured and refused.**  The
+user asked whether the name could help ResNet50.  `scripts/waste/evidence_experiment.py`
+scores three policies on the 241-photo probe: (A) classifier only — 72.2 % exact
+/ 80.5 % item / 27 false bins; (B) let the name **promote a different** top-3
+class — 73.9 / 83.0 / 26; (C) let the name **corroborate the same** class,
+materials only — 72.2 / 80.5 / 27.  A second run of B on the same probe gave
+**+4 false bins**, because the namer confuses metal-looking electronics in both
+directions (it called watches and keychains "metal" — wrong — and a glass bottle
+"plastic" — wrong).  A promotion that opens the wrong physical bin is worse than
+an abstention, so **B ships nowhere**; **C** changes nothing on the probe and is
+shipped only because it fixes the exhibit's own case, with a floor
+(`CORROBORATION_FLOOR` 0.30), materials only, never a bin.
+
+**The named model is ResNet50, and the record says so.**  The recognition row used
+to be written as `model: "teachable-machine"` long after the browser MobileNet
+was removed; the page, `api.ts` and the backend's default now say `resnet50`.
+
 **The acceptance rule is one rule, and the old copy was wrong.**  A press reads
 **three frames 250 ms apart and averages them**, then takes **one** decision
 against the bar — there is no "two consecutive frames" rule any more (that
@@ -2286,7 +2320,9 @@ the result card now reads:
   the plastic bin.") — the visitor hears what it is before where it goes.
 - **Wait for the name, but not forever.**  The page asks about the *same crop*
   the classifier saw (kept in `lastCropRef`) and waits at most
-  **`VISION_WAIT_MS` = 4 s**; Workers AI answers in ~1 s, OpenCode Go in 5–12.
+  **`VISION_WAIT_MS` = 6 s**; Workers AI answers in ~1 s once warm but the first
+  call after a backend restart measured **4.7 s** on 2026-11-19 (a 4 s cap made
+  that press say "identification unavailable"), and OpenCode Go takes 5–12.
   A late answer still fills the card, but is not spoken again.
 - **A press now says what it is doing** — *Reading the item…* for the three
   frames, *Naming the item…* while the model is asked (`data-testid="waste-working"`),

@@ -62,10 +62,19 @@ describe('e-waste is not ordinary recycling', () => {
     );
     const decision = decide({ predictions, itemLabel: 'cable', visionConfigured: true, ...BARS });
     expect(decision.classId).toBe('ewaste');
+    // 0.45, not 0.80: the two probabilities are never added.
     expect(decision.classConfidence).toBeCloseTo(0.45);
-    expect(decision.status).toBe('uncertain');
-    expect(decision.routeId).toBe('separate.unknown');
     expect(decision.allowLamp).toBe(false);
+    // With a *corroborating* name ("cable") it goes to the e-waste collection at
+    // its own 45% — a referral, not a bin, and not a claimed 80%.
+    expect(decision.routeId).toBe('collect.ewaste');
+    expect(decision.reasonId).toBe('corroborated');
+
+    // Without the name it is "keep separate and ask".
+    const alone = decide({ predictions, itemLabel: null, visionConfigured: true, ...BARS });
+    expect(alone.status).toBe('uncertain');
+    expect(alone.routeId).toBe('separate.unknown');
+    expect(alone.allowLamp).toBe(false);
   });
 
   it('sends a confident e-waste item to its own collection, not to a bin', () => {
@@ -237,5 +246,116 @@ describe('the word maps', () => {
     expect(materialClaimOf('orange pencil')).toBe('separate.unknown');
     expect(materialClaimOf('remote control')).toBe('collect.ewaste');
     expect(materialClaimOf('bottle')).toBeNull();
+  });
+});
+
+describe('the name corroborating the classifier (materials only)', () => {
+  it('accepts a low e-waste reading when the name agrees — the remote at 0.40', () => {
+    // The exhibit's own case, 2026-11-19: "remote control", Ewaste 0.40.  Under
+    // the material bar, so the page used to say "not sure" about an item it had
+    // already classed correctly.
+    const decision = decide({
+      predictions: dist('Ewaste', 0.4),
+      itemLabel: 'remote control',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('accepted');
+    expect(decision.routeId).toBe('collect.ewaste');
+    expect(decision.reasonId).toBe('corroborated');
+    expect(decision.classConfidence).toBeCloseTo(0.4);
+  });
+
+  it('never lets the name corroborate a BIN, however sure it sounds', () => {
+    const decision = decide({
+      predictions: dist('Plastic', 0.45),
+      itemLabel: 'clear plastic lid',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('uncertain');
+    expect(decision.allowLamp).toBe(false);
+  });
+
+  it('does not corroborate a different material', () => {
+    const decision = decide({
+      predictions: dist('Metal', 0.4),
+      itemLabel: 'plastic lid',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('conflict');
+  });
+
+  it('does not corroborate from almost nothing', () => {
+    const decision = decide({
+      predictions: dist('Metal', 0.2),
+      itemLabel: 'metal keys',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('uncertain');
+    expect(decision.routeId).toBe('separate.unknown');
+  });
+
+  it('leaves a confident material exactly as it was', () => {
+    const decision = decide({
+      predictions: dist('Ewaste', 0.88),
+      itemLabel: 'remote control',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.reasonId).toBe('ok');
+  });
+});
+
+describe('an object in the name outranks the material it is made of', () => {
+  it('sends a plastic remote control to e-waste, not the plastic bin', () => {
+    // The exhibit's own two items (2026-11-19): Ewaste 0.38 and 0.46 averaged,
+    // named "Remote control made of plastic".  Read as a *plastic claim* this
+    // was a conflict; the object is what decides, and it is e-waste.
+    const decision = decide({
+      predictions: dist('Ewaste', 0.38),
+      itemLabel: 'Remote control made of plastic',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('accepted');
+    expect(decision.routeId).toBe('collect.ewaste');
+    expect(decision.reasonId).toBe('corroborated');
+    expect(decision.allowLamp).toBe(false);
+  });
+
+  it('does not turn a confident keyboard into a plastic referral', () => {
+    const decision = decide({
+      predictions: dist('Ewaste', 0.62),
+      itemLabel: 'plastic keyboard',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.routeId).toBe('collect.ewaste');
+    expect(decision.reasonId).toBe('ok');
+    expect(decision.status).toBe('accepted');
+  });
+
+  it('refuses a metal referral for a watch the name calls electronic', () => {
+    // Measured 2026-11-19: letting the name promote "silver metal watch" to
+    // Metal was one of the wrong changes.  Object vs material is a disagreement,
+    // so the page asks instead.
+    const decision = decide({
+      predictions: dist('Metal', 0.62),
+      itemLabel: 'silver metal watch',
+      visionConfigured: true,
+      ...BARS,
+    });
+    expect(decision.status).toBe('conflict');
+    expect(decision.routeId).toBe('separate.unknown');
+    expect(decision.allowLamp).toBe(false);
+  });
+
+  it('still reads a name with no object as the material it states', () => {
+    expect(materialClaimOf('metal pipe')).toBe('collect.metal');
+    expect(materialClaimOf('Remote control made of plastic')).toBe('collect.ewaste');
+    expect(materialClaimOf('plastic keyboard')).toBe('collect.ewaste');
   });
 });

@@ -838,13 +838,32 @@ describe('Sort Waste — two models, one decision', () => {
     const predictions = predictionsFor('Ewaste', 0.45).map((row) =>
       row.className === 'Metal' ? { ...row, probability: 0.35 } : row,
     );
-    const restore = await press({ predictions, object: 'cable' });
+    // No name here: the sum is not allowed to make it a confident recyclable.
+    const restore = await press({ predictions, object: null });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/keep this item separate/i);
+      expect(action).toHaveTextContent(/identification unavailable|keep this item separate/i);
       expect(action).not.toHaveTextContent(/recycling agent/i);
       expect(screen.getByTestId('waste-result')).toHaveTextContent(/not certain/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('answers a low e-waste reading when the name agrees — the 0.40 remote', async () => {
+    // The exhibit's own item (2026-11-19): a black car remote at Ewaste 0.40.
+    // The name "remote control" corroborates the class, so the page answers the
+    // e-waste collection instead of "not sure" — no lamp either way.
+    const restore = await press({ predictions: predictionsFor('Ewaste', 0.4), object: 'remote control' });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/e-waste collection/i),
+        { timeout: 8000 },
+      );
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Electronic waste/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {

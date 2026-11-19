@@ -578,7 +578,7 @@ export const api = {
         mode: activeMode,
         category: input.category,
         confidence: input.confidence,
-        model: input.model ?? 'teachable-machine',
+        model: input.model ?? 'resnet50',
         request_id: input.requestId ?? newRequestId(),
         material: input.material ?? null,
         top: input.top ?? null,

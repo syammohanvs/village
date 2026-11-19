@@ -51,6 +51,7 @@ export type ReasonId =
   | 'conflict'
   | 'specialCare'
   | 'identificationMissing'
+  | 'corroborated'
   | 'unsupported';
 
 export interface DecisionInput {
@@ -87,6 +88,14 @@ export interface Decision {
 /** The bar a material must clear before the page names it at all. */
 export const MATERIAL_BAR = 0.5;
 
+/**
+ * How sure the classifier must be for the *name* to corroborate a material.
+ *
+ * Below this the picture has not really chosen, and a name alone is how a wall
+ * becomes "metal".  It applies to materials only — never to a bin.
+ */
+export const CORROBORATION_FLOOR = 0.3;
+
 const BIN_OF: Record<string, BinId> = {
   organic: 'organic',
   plastic: 'plastic',
@@ -120,12 +129,41 @@ const SPECIAL_CARE: { words: string[]; reason: ReasonId }[] = [
 ];
 
 /**
- * What the item name says it is *made of*.
+ * Objects whose *route is not decided by their material*.
+ *
+ * This layer exists because a material word is the wrong question for anything
+ * electronic: a remote control is **made of plastic** and is still e-waste, so
+ * reading "Remote control made of plastic" as a claim on the plastic bin sent
+ * the exhibit's own two items the wrong way (2026-11-19).  An object in the name
+ * outranks the material it is made of — and it is also what makes the pencil
+ * rule work, since a pencil is wood, graphite and clay rather than paper.
+ *
+ * Deliberately small and conservative: a word here must have a route of its own,
+ * not a material's.  `keychain` and `bottle` are *not* here, because a keychain
+ * can be metal or electronic and a bottle can be any of three materials — those
+ * stay material questions, where a disagreement refuses the answer.
+ */
+const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
+  {
+    route: 'collect.ewaste',
+    words: [
+      'remote', 'remote control', 'keyboard', 'mouse', 'cable', 'charger', 'adapter',
+      'phone', 'smartphone', 'mobile', 'tablet', 'laptop', 'computer', 'router',
+      'circuit board', 'pcb', 'usb', 'hard disk', 'headphone', 'earphone', 'speaker',
+      'camera', 'calculator', 'watch', 'pendrive', 'memory card',
+    ],
+  },
+  // Still useful after its working life, and in none of the three bins.
+  { route: 'separate.unknown', words: ['pencil', 'crayon', 'eraser'] },
+];
+
+/**
+ * What the item name says it is *made of*, when the name names no object.
  *
  * This is the half that catches a real disagreement — the namer calling a metal
  * pipe "foam roller" is harmless, but a name that clearly states another
  * material than the bin the classifier chose is not.  A name with no material
- * word (a remote control, a pencil) never creates a conflict by itself.
+ * word (a keyset, a figurine) never creates a conflict by itself.
  */
 const MATERIAL_WORDS: { route: RouteId | BinId; words: string[] }[] = [
   { route: 'bin.organic', words: ['food', 'banana', 'peel', 'vegetable', 'fruit', 'leaf', 'flower', 'leftover'] },
@@ -137,8 +175,6 @@ const MATERIAL_WORDS: { route: RouteId | BinId; words: string[] }[] = [
   { route: 'collect.leather', words: ['leather'] },
   { route: 'collect.footwear', words: ['shoe', 'sandal', 'slipper', 'boot', 'footwear'] },
   { route: 'collect.thermocol', words: ['thermocol', 'styrofoam', 'foam'] },
-  { route: 'collect.ewaste', words: ['remote', 'phone', 'cable', 'charger', 'electronic', 'keyboard', 'mouse'] },
-  { route: 'separate.unknown', words: ['pencil', 'crayon', 'ruler', 'eraser'] },
 ];
 
 function fold(text: string): string {
@@ -159,8 +195,32 @@ export function specialCareOf(itemLabel: string | null): ReasonId | null {
   return null;
 }
 
-/** What the name says the item is made of, as a route (or null). */
+/**
+ * The object the name states, when that object has a route of its own.
+ *
+ * Checked before any material word, on purpose: "Remote control made of
+ * plastic" is e-waste, and only a photograph of a casing could say otherwise.
+ */
+export function objectRouteOf(itemLabel: string | null): RouteId | BinId | null {
+  if (!itemLabel) return null;
+  const text = fold(itemLabel);
+  for (const group of OBJECT_ROUTES) {
+    if (hasWord(text, group.words)) return group.route;
+  }
+  return null;
+}
+
+/**
+ * What the name says this item is, as a route (or null).
+ *
+ * The object wins over the material: a plastic remote is e-waste, and a metal
+ * watch is e-waste too.  Only a name that states no object is read as a
+ * material — which is what keeps "metal pipe" a metal claim and "orange pencil"
+ * a pencil.
+ */
 export function materialClaimOf(itemLabel: string | null): RouteId | BinId | null {
+  const object = objectRouteOf(itemLabel);
+  if (object) return object;
   if (!itemLabel) return null;
   const text = fold(itemLabel);
   for (const group of MATERIAL_WORDS) {
@@ -310,6 +370,32 @@ export function decide(input: DecisionInput): Decision {
       allowLamp: false,
     };
   }
+  // 6b. A material the picture already chose, *corroborated by the name*, is
+  // accepted below the material bar.  This is deliberately narrow:
+  //   - only a material, never a bin, so it cannot open a lamp;
+  //   - only when the name's material is the SAME as the classifier's top
+  //     class — the name corroborates, it never overrides;
+  //   - never on a made-up probability: the classifier's own figure is kept.
+  // Measured 2026-11-19: letting the name *promote a different* class gained a
+  // few classes but added false bins, and the gain moved between two runs of the
+  // same probe.  This rule measured as no change at all on the probe, and it
+  // fixes the exhibit's own case (a remote control at Ewaste 0.40 + "remote
+  // control", which used to be "not sure").
+  if (
+    materialRoute &&
+    confidence >= CORROBORATION_FLOOR &&
+    claim === materialRoute
+  ) {
+    return {
+      ...empty,
+      ...common,
+      status: 'accepted',
+      routeId: materialRoute,
+      reasonId: 'corroborated',
+      allowLamp: false,
+    };
+  }
+
   // 7. an uncertain material is not a confirmed recyclable.
   return {
     ...empty,

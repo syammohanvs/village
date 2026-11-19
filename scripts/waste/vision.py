@@ -26,6 +26,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
+# Which candidate answered last; sticky, so a dead or spent account is not paid
+# for on every photo.
+_INDEX = [0]
+
 
 def settings() -> dict[str, str]:
     """`VILLAGE_*` from `.env`, then `.env.secrets` on top (the app's own order)."""
@@ -104,13 +108,22 @@ def ask_object(
         return ""
     model = model or model_name(conf, chain[0]["provider"])
     last: Exception | None = None
-    for candidate in chain:
+    start = min(_INDEX[0], len(chain) - 1)
+    for offset in range(len(chain)):
+        index = (start + offset) % len(chain)
+        candidate = chain[index]
         try:
             if candidate["provider"] == "cloudflare":
-                return _cloudflare(jpeg, prompt, model, conf, timeout, candidate)
-            return _opencode(jpeg, prompt, model, conf, timeout)
+                text = _cloudflare(jpeg, prompt, model, conf, timeout, candidate)
+            else:
+                text = _opencode(jpeg, prompt, model, conf, timeout)
+            if text:
+                _INDEX[0] = index
+                return text
+            last = RuntimeError("no answer")
         except Exception as error:  # noqa: BLE001 - try the next account
             last = error
+            _INDEX[0] = (index + 1) % len(chain)
             continue
     if last is not None:
         print(f"vision: {last}")

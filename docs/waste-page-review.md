@@ -38,7 +38,7 @@ guidance section under it covers everything the three bins do not.
 - **They run in parallel and neither feeds the other.** The namer is not an input
   to ResNet50; the classifier is not an input to the namer. The page says so in
   the panel ("Cloud vision model" / "Local ResNet50") and in the docs.
-- **The decision waits for both**, or for the namer's 4 s cap, before anything
+- **The decision waits for both**, or for the namer's 6 s cap, before anything
   physical happens. A bin is never lit and then reconsidered.
 - **Only an accepted handling decision** posts a bin category; everything else is
   recorded as `other`, which sends no `INDICATE_WASTE`. A raw classifier result
@@ -91,11 +91,22 @@ Order matters, and it is the safety argument:
 | --- | --- | --- |
 | 1 | background / unknown class | **nothing to sort**, nothing recorded |
 | 2 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" |
-| 3 | the name states a different material than the chosen route (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic, plastic lid vs Ewaste) | **conflict** — no bin |
+| 3 | the name states a different *object or material* than the chosen route (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic, plastic lid vs Ewaste) | **conflict** — no bin |
 | 4 | a bin under **70 %** on its own class | **uncertain** — no bin, "keep separate and ask" |
 | 5 | a bin at/over 70 %, identification present | **accepted** — the lamp may light |
 | 6 | a material at/over **50 %** | its own collection route (e-waste ≠ metal ≠ glass), no lamp |
+| 6b | a material under 50 % but at/over **30 %**, *corroborated by the name* | its own collection route, no lamp, recorded as `corroborated` |
 | 7 | anything else | **uncertain** — "keep this item separate and ask" |
+
+**An object in the name outranks the material it is made of.** A remote control
+is made of plastic and is still e-waste, so “Remote control made of plastic”
+must not read as a claim on the plastic bin — which is exactly what it did on
+2026-11-19, before this layer existed. The object list is deliberately small
+(remote, keyboard, mouse, cable, charger, phone, laptop, watch, circuit board …;
+pencil, crayon, eraser) because a word in it must have a **route of its own**,
+not a material's. `keychain` and `bottle` are not in it: a keychain can be metal
+or electronic and a bottle can be any of three materials, so those stay material
+questions, where a disagreement refuses the answer.
 
 **There is no grouping by outcome any more.** Ewaste 45 % + Metal 35 % is *not*
 80 % recycling: the decision uses the strongest class's own probability. Two
@@ -146,6 +157,35 @@ wrong physical bin with the local model alone. That is exactly the case the name
 and the conflict rules exist for — and exactly why a deployment with no namer is
 a deliberate, documented choice rather than the default.
 
+**Should the name be passed to the classifier as evidence?** Measured on the same
+241 photos with `scripts/waste/evidence_experiment.py`:
+
+| policy | exact | item action | false bins |
+| --- | ---: | ---: | ---: |
+| A classifier only (what ships below the bar) | 72.2 % | 80.5 % | 27 |
+| B let the name *promote a different* top-3 class | 73.9 % | 83.0 % | 26 |
+| C let the name *corroborate the same* class (materials only) | 72.2 % | 80.5 % | 27 |
+
+B looks better here and worse in a second run of the same probe (**+4 false
+bins**, and the gain moved between runs), because the namer confuses
+metal-looking electronics in both directions: it called watches and keychains
+“metal” (wrong) and a glass bottle “plastic” (wrong). A promotion that opens the
+wrong physical bin is worse than an abstention, so **B is not shipped**. C
+changes nothing on the probe and is not a claim of accuracy — it fixes the
+exhibit's own case, where the picture had already chosen the right class and the
+name agreed with it.
+
+**The two items actually checked on 2026-11-19** (a white remote, pressed twice),
+through the running server:
+
+| | averaged classifier | name | before | now |
+| --- | --- | --- | --- | --- |
+| item A | Ewaste **37.6 %** | “Remote control made of plastic” | not sure | e-waste collection |
+| item B | Ewaste **45.6 %** | “White plastic remote control” | not sure | e-waste collection |
+
+Both are **referrals, not bins**: no lamp is lit, and the record stores the
+classifier's own 0.38/0.46 — never a number inflated by the name.
+
 ## 8. Guidance below the page (restored)
 
 A collapsed **"Other waste or unsure where it goes?"** section carries, in all
@@ -187,8 +227,9 @@ claim that the model recognises a new class.
 2. **25 false bins in 241 probe photos** with the local model alone — the reason
    degraded mode refuses to light a bin.
 3. **The namer is fallible**: it calls a torn brown cardboard piece "bread"
-   (a human would too), and it named a pipe "foam roller". Its 4 s cap trades
-   completeness for a prompt answer.
+   (a human would too), and it named a pipe "foam roller". Its 6 s cap trades
+   completeness for a prompt answer — measured: the first call after a backend
+   restart takes ~4.7 s, later ones 0.8–1.0 s.
 4. **Auto-crop needs the plain sheet**; on a busy scene it falls back to the
    centre square, which the page now says out loud.
 5. **The conflict rules are a small, conservative word list** — they catch the

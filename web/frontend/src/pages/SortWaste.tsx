@@ -67,7 +67,11 @@ const PRESS_FRAME_GAP_MS = 250;
  * visitor is not made to wait longer than this for a name — the category is
  * already decided, and the name fills in behind the card if it arrives late.
  */
-const VISION_WAIT_MS = 4000;
+// Measured 2026-11-19: the first Workers AI call after a restart took 4.7 s
+// (cold model), later ones 0.8–1.0 s, and the DeepSeek fallback 5–7 s.  A 4 s
+// cap made the first press of a session say "identification unavailable" on a
+// backend that had just been started, so the cap covers a cold call.
+const VISION_WAIT_MS = 6000;
 
 
 function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
@@ -534,7 +538,7 @@ export function SortWaste() {
         const result = await api.postRecognition({
           category: decision.allowLamp && decision.bin ? decision.bin : 'other',
           confidence: decision.classConfidence,
-          model: 'teachable-machine',
+          model: 'resnet50',
           material: decision.classId ?? 'unknown',
           top: averaged
             .slice(0, 3)
