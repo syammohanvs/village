@@ -169,6 +169,12 @@ class Settings:
     def load(cls, repo_root: Path | None = None) -> "Settings":
         root = (repo_root or Path(__file__).resolve().parents[3]).resolve()
         load_dotenv(root / ".env", override=False)
+        # Per-machine secrets that must never be committed (a Cloudflare token is
+        # refused by GitHub's push protection even in a private repo).  Loaded
+        # afterwards and allowed to override, so `.env` stays the documented,
+        # portable configuration and this file is the one paste a new laptop
+        # needs.
+        load_dotenv(root / ".env.secrets", override=True)
 
         mode = os.getenv("VILLAGE_DEVICE_MODE", "simulator").strip().lower()
         if mode not in {"real", "simulator"}:

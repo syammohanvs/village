@@ -28,15 +28,15 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 def settings() -> dict[str, str]:
-    """`VILLAGE_*` from the app's own `.env` (the file the app reads)."""
-    path = ROOT / ".env"
-    if not path.is_file():
-        return {}
-    text = path.read_text()
-    return {
-        match.group(1): match.group(2).strip().strip("'\"")
-        for match in re.finditer(r"^([A-Z0-9_]+)=(.*)$", text, re.M)
-    }
+    """`VILLAGE_*` from `.env`, then `.env.secrets` on top (the app's own order)."""
+    values: dict[str, str] = {}
+    for name in (".env", ".env.secrets"):
+        path = ROOT / name
+        if not path.is_file():
+            continue
+        for match in re.finditer(r"^([A-Z0-9_]+)=(.*)$", path.read_text(), re.M):
+            values[match.group(1)] = match.group(2).strip().strip("'\"")
+    return values
 
 
 def provider(conf: dict[str, str] | None = None) -> str | None:
@@ -190,10 +190,21 @@ def _cloudflare(jpeg: bytes, prompt: str, model: str, conf: dict[str, str], time
             continue
         result = body.get("result") or {}
         if isinstance(result, dict):
+            # Workers AI returns one of three shapes depending on the model:
+            #   {response}                       (llama-3.2 vision, llava)
+            #   {choices: [{message: {content}}]} (llama-4, qwen)
+            #   {choices: [{text}]}               (llama-4 with a raw prompt)
             for key in ("response", "description", "text", "output"):
                 value = result.get(key)
                 if isinstance(value, str) and value.strip():
                     return value.strip()
+            choices = result.get("choices")
+            if isinstance(choices, list) and choices:
+                first = choices[0] or {}
+                message = first.get("message") or {}
+                for value in (message.get("content"), first.get("text")):
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
         if isinstance(result, str) and result.strip():
             return result.strip()
         return json.dumps(result)[:400]
