@@ -638,9 +638,9 @@ export const MESSAGES = {
     'ക്യാമറ കാഴ്ച കാണാം, പക്ഷേ ഇപ്പോൾ തിരിച്ചറിയൽ പരിശോധിക്കാനാവില്ല.',
   ],
   'sort.promptHoldStill': [
-    'Show one item to the camera. Hold it still.',
-    'कैमरे को एक चीज़ दिखाएँ। उसे स्थिर रखें।',
-    'ക്യാമറയ്ക്ക് ഒരു വസ്തു കാണിക്കുക. അത് അനങ്ങാതെ പിടിക്കുക.',
+    'Place one item inside the square.',
+    'एक चीज़ चौकोर के अंदर रखें।',
+    'ഒരു വസ്തു ചതുരത്തിനുള്ളിൽ വയ്ക്കുക.',
   ],
   'sort.promptStart': ['Start the camera to begin.', 'शुरू करने के लिए कैमरा चालू करें।', 'തുടങ്ങാൻ ക്യാമറ ഓൺ ചെയ്യുക.'],
   'sort.promptPreviewOnly': [
@@ -654,12 +654,14 @@ export const MESSAGES = {
     'കാഴ്ചയ്ക്കായി ക്യാമറ ഓൺ ചെയ്യുക. തിരിച്ചറിയലിന് മോഡൽ വേണം.',
   ],
   'sort.holdStill': [
-    'Hold it still for a few seconds.', 'इसे कुछ सेकंड स्थिर रखें।', 'ഇത് കുറച്ച് സെക്കൻഡ് അനങ്ങാതെ പിടിക്കുക.',
+    'One item, placed inside the square.',
+    'एक चीज़, चौकोर के अंदर रखी हुई।',
+    'ഒരു വസ്തു, ചതുരത്തിനുള്ളിൽ വച്ചത്.',
   ],
   'sort.oneAtATime': [
-    'One item at a time. After an item is recognised, remove it; the camera arms itself for the next one.',
-    'एक बार में एक चीज़। चीज़ पहचान लेने के बाद उसे हटा दें; कैमरा अगली के लिए खुद तैयार हो जाता है।',
-    'ഒരു സമയം ഒരു വസ്തു. വസ്തു തിരിച്ചറിഞ്ഞാൽ അത് എടുത്തുമാറ്റുക; ക്യാമറ അടുത്തതിനായി സ്വയം തയ്യാറാകും.',
+    'One item at a time. Take it away, then press Check the item again for the next one.',
+    'एक बार में एक चीज़। उसे हटाएँ, फिर अगली के लिए “चीज़ जाँचें” फिर दबाएँ।',
+    'ഒരു സമയം ഒരു വസ്തു. അത് എടുത്തുമാറ്റി, അടുത്തതിനായി “വസ്തു പരിശോധിക്കുക” വീണ്ടും അമർത്തുക.',
   ],
 
   // ------------------------------------------------------- waste: the result ---
@@ -726,25 +728,10 @@ export const MESSAGES = {
     'कैमरा तैयार है। जब चाहें अगली चीज़ दिखाएँ।',
     'ക്യാമറ തയ്യാറാണ്. തയ്യാറാകുമ്പോൾ അടുത്ത വസ്തു കാണിക്കുക.',
   ],
-  'sort.cameraStopped': [
-    'The camera stopped after this item. Start it again for the next one.',
-    'इस चीज़ के बाद कैमरा बंद हो गया। अगली के लिए इसे फिर चालू करें।',
-    'ഈ വസ്തുവിന് ശേഷം ക്യാമറ നിന്നു. അടുത്തതിനായി വീണ്ടും ഓൺ ചെയ്യുക.',
-  ],
   'sort.pressHint': [
-    'Hold the item up and press Check the item. Nothing is classified until you do.',
-    'चीज़ ऊपर उठाकर “चीज़ जाँचें” दबाएँ। तब तक कुछ पहचाना नहीं जाता।',
-    'വസ്തു ഉയർത്തിപ്പിടിച്ച് “വസ്തു പരിശോധിക്കുക” അമർത്തുക. അതുവരെ ഒന്നും തിരിച്ചറിയില്ല.',
-  ],
-  'sort.warming': [
-    'Learning this room so the background is never classified as an item. Hold the item up in a moment.',
-    'इस कमरे को सीख रहे हैं ताकि पृष्ठभूमि कभी चीज़ न गिनी जाए। थोड़ी देर में चीज़ दिखाएँ।',
-    'പശ്ചാത്തലം ഒരിക്കലും വസ്തുവായി കണക്കാക്കാതിരിക്കാൻ ഈ മുറി പഠിക്കുന്നു. അൽപ്പസമയത്തിന് ശേഷം വസ്തു കാണിക്കുക.',
-  ],
-  'sort.removeHint': [
-    'Take this item away — the camera re-arms by itself.',
-    'इस चीज़ को हटा लें — कैमरा खुद तैयार हो जाता है।',
-    'ഈ വസ്തു എടുത്തുമാറ്റുക — ക്യാമറ സ്വയം തയ്യാറാകും.',
+    'Place one item on the marked base, then press Check the item. Nothing is classified until you do.',
+    'एक चीज़ चिह्नित आधार पर रखें, फिर “चीज़ जाँचें” दबाएँ। तब तक कुछ पहचाना नहीं जाता।',
+    'ഒരു വസ്തു അടയാളപ്പെടുത്തിയ തറയിൽ വയ്ക്കുക, എന്നിട്ട് “വസ്തു പരിശോധിക്കുക” അമർത്തുക. അതുവരെ ഒന്നും തിരിച്ചറിയില്ല.',
   ],
   'sort.nothingToSort': [
     'Nothing to sort — this does not look like waste. Show one item, held in your hand is fine.',
@@ -755,9 +742,9 @@ export const MESSAGES = {
     'Looking at {item}… hold still.', '{item} देख रहे हैं… स्थिर रखें।', '{item} നോക്കുന്നു… അനങ്ങാതെ പിടിക്കുക.',
   ],
   'sort.notSure': [
-    'Not sure what this is — hold one item on its own, filling the square, and keep still. A bin needs {percent}% on {frames} frames in a row.',
-    'पक्का नहीं कि यह क्या है — एक चीज़ अकेली, चौकोर में भरकर, स्थिर पकड़ें। बिन के लिए लगातार {frames} फ़्रेम पर {percent}% चाहिए।',
-    'ഇത് എന്താണെന്ന് ഉറപ്പില്ല — ഒരു വസ്തു മാത്രം, ചതുരത്തിൽ നിറച്ച്, അനങ്ങാതെ പിടിക്കുക. ബിന്നിന് തുടർച്ചയായി {frames} ഫ്രെയിമിൽ {percent}% വേണം.',
+    'Not sure what this is — place one item on the base, filling the square, and press Check the item again.',
+    'पक्का नहीं कि यह क्या है — एक चीज़ आधार पर, चौकोर भरकर रखें और “चीज़ जाँचें” फिर दबाएँ।',
+    'ഇത് എന്താണെന്ന് ഉറപ്പില്ല — ഒരു വസ്തു തറയിൽ, ചതുരം നിറച്ച് വയ്ക്കുക, എന്നിട്ട് “വസ്തു പരിശോധിക്കുക” വീണ്ടും അമർത്തുക.',
   ],
   'sort.waitingSee': [
     'Waiting for the camera to see something.',
@@ -1001,7 +988,28 @@ export const MESSAGES = {
   'sort.visionNote': [
     'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. The category is decided from that name, and the crop is kept here to teach the offline model.',
     'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। श्रेणी उसी नाम से तय होती है, और ऑफ़लाइन मॉडल को सिखाने के लिए तस्वीर यहीं रखी जाती है।',
-    'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. മറ്റൊന്നും അയക്കുന്നില്ല; ബിൻ തീരുമാനം ഇപ്പോഴും ഈ ലാപ്ടോപ്പിൽ തന്നെയാണ്.',
+    'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. ആ പേരിൽ നിന്നാണ് വിഭാഗം തീരുമാനിക്കുന്നത്; ഓഫ്‌ലൈൻ മോഡലിനെ പഠിപ്പിക്കാൻ ചിത്രം ഇവിടെ സൂക്ഷിക്കുന്നു.',
+  ],
+  'sort.lateName': [
+    'A later reply named it {item}. The answer above was already given and was not changed.',
+    'बाद में आए उत्तर ने इसे {item} बताया। ऊपर का उत्तर पहले ही दिया जा चुका है और वह नहीं बदला।',
+    'പിന്നീട് വന്ന മറുപടി ഇതിനെ {item} എന്ന് പേരിട്ടു. മുകളിലെ ഉത്തരം നേരത്തെ നൽകിയതാണ്, അത് മാറ്റിയിട്ടില്ല.',
+  ],
+  // The two readers, named exactly, inside Model details.
+  'sort.detailsNamer': [
+    'Item naming model',
+    'वस्तु का नाम रखने वाला मॉडल',
+    'വസ്തുവിന് പേരിടുന്ന മോഡൽ',
+  ],
+  'sort.detailsClassifier': [
+    'Waste classifier (on this laptop, the fallback)',
+    'कचरा वर्गीकरण (इसी लैपटॉप पर, विकल्प)',
+    'മാലിന്യ വർഗ്ഗീകരണം (ഈ ലാപ്ടോപ്പിൽ, പകരം)',
+  ],
+  'sort.detailsChain': [
+    'If that stops answering, the next service is tried: {models}',
+    'अगर वह जवाब देना बंद कर दे, तो अगली सेवा आज़माई जाती है: {models}',
+    'അത് മറുപടി നൽകുന്നത് നിർത്തിയാൽ അടുത്ത സേവനം ശ്രമിക്കും: {models}',
   ],
 
   // ------------------------------------------------------------- Sara's panel ---

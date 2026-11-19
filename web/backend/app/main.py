@@ -853,13 +853,32 @@ def create_app(
         db: Database = Depends(get_db),
     ):
         category = body.category.strip().lower()
-        # What the model named, kept with the record.  A recycler is posted as
-        # "other", so without this there is no way to answer "what did it call
-        # my key fob?" after the event.
+        # What happened, kept with the record: the hosted name, what the
+        # classifier actually read, which reader decided and where it was sent.
+        # A recycler is posted as "other", so without this there is no way to
+        # answer "what did it call my key fob?" after the event.
         observed = {
             "material": body.material,
             "top": (body.top or [])[:3],
+            "item": body.item,
+            "namer": body.namer,
+            "route": body.route,
+            "source": body.source,
         }
+        # The record's `confidence` is the classifier's own number and is 0 when
+        # it offered nothing; the sentence says which reader decided, so a
+        # named item is never read as "the classifier was 0 % sure".
+        classifier = (
+            f"classifier {body.material} {body.confidence:.2f}"
+            if body.material and body.material != "unknown"
+            else "classifier gave no reading"
+        )
+        if body.item:
+            detail = f"named '{body.item}' by {body.namer or 'a hosted model'}; {classifier}"
+        else:
+            detail = f"no name came back; {classifier}"
+        if body.source:
+            detail += f"; decided by the {body.source}"
         if category not in WASTE_CATEGORIES and category not in {"other", "medical"}:
             raise HTTPException(
                 status_code=422,
@@ -883,8 +902,7 @@ def create_app(
             )
             await db.add_event(
                 body.mode, "waste", "Hazardous waste recognised",
-                f"confidence {body.confidence:.2f}; referred to the Gram Sahayak; "
-                "no bin indicator used",
+                f"{detail}; referred to the Gram Sahayak; no bin indicator used",
                 "warning",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
@@ -911,8 +929,7 @@ def create_app(
             )
             await db.add_event(
                 body.mode, "waste", "Recyclable item recognised",
-                f"confidence {body.confidence:.2f}; referred to the recycling agent; "
-                "no bin indicator used",
+                f"{detail}; referred to the recycling agent; no bin indicator used",
                 "info",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
@@ -957,12 +974,12 @@ def create_app(
         )
         await db.add_event(
             body.mode, "waste", f"{category.title()} recognised",
-            f"confidence {body.confidence:.2f}; {category} indicator "
+            f"{detail}; {category} indicator "
             f"{'confirmed' if confirmed else 'NOT confirmed'}",
             "warning" if not confirmed else "info",
             "camera",
             {"recognition_id": record.get("id"), "category": category,
-             "confidence": body.confidence},
+             "confidence": body.confidence, **observed},
         )
         return {
             "recognition": record,

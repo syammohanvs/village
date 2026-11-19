@@ -1,32 +1,40 @@
 """Name the object in a waste crop with a hosted vision model.
 
-**This never decides a bin.**  The classifier's classes are materials (Plastic,
-Glass, Metal, Thermocol) and a vision model answers with objects — measured
-2026-11-19 it scored 53.7 % exact on the venue probe against the local model's
-70.7 % — so the bin stays a local decision and this only answers the question a
-visitor asks first: *what do you think this is?*
+**It names the item; the page's rules decide the route.**  `wasteDecision.ts`
+reads the name's material word, so this *can* choose a bin ("clear plastic
+bottle" → plastic) — it is an input to the answer, not a caption on it.  What
+it does not do is pick the bin by itself: the special-care and object rules are
+checked first, and a name with no usable material word falls through to the
+local classifier's thresholds.
 
-Why it exists: the local classifier called a plastic cap **Ewaste 0.40**, and
-the same crop sent to `llama-3.2-11b-vision` came back **"Plastic circular
-container"** (2026-11-19).  Saying the object out loud before the category is
-what lets a visitor — and the operator — see a wrong answer instead of being
-told one.
+Why the rules and not "whatever it says": measured 2026-11-19 the hosted model
+scored 43.9 % exact on 41 probe photos against the local ResNet50's 70.7 % — a
+vision model answers with *objects* and the bins are *materials* (it calls the
+plastic casing of a remote "plastic").  The name is also the only thing that can
+say what the object is, which is what a visitor asks first: the local classifier
+called a plastic cap **Ewaste 0.40**, and the same crop came back "Plastic
+circular container".  So the name is spoken and routed, and the classifier is
+the fallback when no name arrives.
 
-**A chain, not one provider.**  The free Workers AI allowance is per account
-per day, so the exhibit can carry more than one: `VILLAGE_CF_API_TOKEN`,
-`VILLAGE_CF_API_TOKEN_2`, … each with its own account id (resolved from the
-token when blank).  When one answers "quota/limit/expired", the next is used —
-stickily, so the rest of the session does not keep hitting the exhausted one.
-If every Cloudflare account is spent, `VILLAGE_VISION_API_KEY` (DeepSeek on
-OpenCode Go) is the last resort: ~7 s instead of ~1 s, but an answer rather
-than an "unavailable".
+Syntax is deliberately small: no prompt can turn a picture into a bin — the
+decision is over words this module returns, and the rules are what make it safe.
+
+**A chain, not one provider.**  Naming has three layers, tried stickily: the
+Cloudflare Workers AI free allowance is per account per day, so the exhibit
+carries more than one (`VILLAGE_CF_API_TOKEN`, `VILLAGE_CF_API_TOKEN_2`, … each
+with its own account id, all answering with
+`@cf/meta/llama-3.2-11b-vision-instruct`).  When one answers
+"quota/limit/expired", the next is used — stickily, so the rest of the session
+does not keep hitting the exhausted one.  If every Cloudflare account is spent,
+`VILLAGE_VISION_API_KEY` (DeepSeek `deepseek-v4.1-flash` on OpenCode Go) is the
+last resort: ~7 s instead of ~1 s, but an answer rather than "unavailable".
 
   VILLAGE_VISION_PROVIDER=cloudflare  →  cf token 1, cf token 2, …, opencode
   VILLAGE_VISION_PROVIDER=opencode    →  opencode, then any cf tokens
 
 Nothing here runs unless a key is configured: `status()["ready"]` is False and
 `identify()` answers `object: None` in microseconds, so the page behaves exactly
-as it did before.
+as it did before — and the local classifier decides on its own.
 """
 from __future__ import annotations
 
@@ -108,6 +116,15 @@ def status() -> dict[str, Any]:
         # How many accounts/providers can answer before the page must say
         # "identification unavailable".
         "chain": len(chain),
+        # The redundancy in full, in the order it is tried: the Cloudflare
+        # accounts (each one the same model) and then the OpenCode Go /
+        # DeepSeek last resort.  The page shows this in Model details, so a
+        # presenter can answer "what is naming the item, and what happens when
+        # that stops answering?" without reading the source.
+        "attempts": [
+            {"provider": item["provider"], "model": model_name(item["provider"])}
+            for item in chain
+        ],
         "timeout_s": TIMEOUT_S,
     }
 

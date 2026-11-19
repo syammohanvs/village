@@ -22,7 +22,7 @@ and uses no paid API.
 | Cloudflare deploy | **Worker + static assets, repo `village`, branch `main`** |
 | Hardware wiring | **streetlights, LDR and reservoir probes working; soil bench-only; bins and pump not wired** |
 | Reservoir probes | **verified 2026-11-08 (well water; 2300 / 2800 mV thresholds)** |
-| Waste model (Teachable Machine format) | **trained and installed; 93.4% exact class, 97.3% right action on 549 held-out photos** |
+| Waste model (ResNet50, offline fallback) | **installed (v18); 74.7% exact / 82.6% item action on the 241-photo probe, 14/18 on the booth's own first crops (labels machine-made, not human-verified)** |
 
 The exhibition can run today in **simulator** mode with no hardware. The
 physical part needs the commissioning checks below.
@@ -75,15 +75,18 @@ Stop only this project:
   **unavailable** when a module does not answer (never “empty”).
 - **Voice** — push-to-talk, English/Malayalam/Hindi, local Whisper, deterministic
   command allowlist. Negated, ambiguous and unsupported phrases never actuate.
-- **Sort Waste** — local Teachable Machine model behind a large camera preview,
-  stable predictions, one event per item, and the camera stops itself once the
-  item is accepted (start it again for the next one). Organic, plastic and
-  paper light the matching bin LED and warn when that bin is full. Cloth,
+- **Sort Waste** — one item placed on the marked base, one press of **Check the
+  item**. A hosted vision model names the item (Cloudflare
+  `@cf/meta/llama-3.2-11b-vision-instruct` on two accounts, then DeepSeek
+  `deepseek-v4.1-flash` as the last resort), and small rules turn that name into
+  a route: organic, plastic and paper light the matching bin LED; cloth,
   leather, footwear, glass, metal, thermocol and electronic waste say **hand it
-  to our recycling agent and contact the operator**, and light no bin LED.
-  Syringes, cotton, napkins, diapers, urine bags and catheters use a manual
-  **Hazardous / medical** button for the same reason: a camera cannot reliably
-  tell them apart from plastic and paper.
+  to our recycling agent and contact the operator** and light no bin. Batteries,
+  syringes, diapers and medicine are refused outright. A local ResNet50 runs on
+  every press as the **offline fallback** — it decides only when no name comes
+  back, and every named press saves its crop for a future retrain (saved, not
+  learned: the weights change only when the model is retrained and redeployed).
+  Nothing is measured about bin fullness; the LEDs are indicators only.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
 - **What Happened** — one timeline of actions and reasons; raw codes, filters
@@ -149,10 +152,10 @@ cd web/frontend && npm run typecheck && npm test && npm run build
   scenario, confirmed Start, Lights Off and the 10-phrase voice panel were
   driven in Chromium against the running server.
 - Whisper: `GET /health` → `{"status":"ok"}` with the multilingual model loaded.
-- Waste classifier: **97.1% on 140 held-out photos**, and all four classes
-  (three items plus an empty table) driven in Chromium with a fake camera
-  against a simulator backend; see
-  [docs/verification.md](docs/verification.md).
+- Waste classifier: **74.7% exact / 82.6% item action on the 241-photo probe**
+  (v18 ResNet50, the offline fallback), and **14/18** on the exhibit's own first
+  crops — a figure whose labels are the hosted model's names, not human-verified.
+  See [docs/waste-approach.md](docs/waste-approach.md) for what each set means.
 - Hardware: streetlights, LDR, reservoir probes and the pump driver have been
   exercised; the bench checklist in [docs/bench-test.md](docs/bench-test.md)
   remains the gate for soil and the bin rangefinders.
@@ -172,13 +175,14 @@ cd web/frontend && npm run typecheck && npm test && npm run build
    [docs/installation.md](docs/installation.md)) or set
    `VILLAGE_WHISPER_BIN` in `.env`.
 3. **Waste classifier** — already installed from a local training run
-   (`models/waste/` is git-ignored). It uses the Teachable Machine format and
-   architecture, trained from TrashNet plus organic and background photos;
-   it scores **93.4% exact class** and **97.3% right action** on 549 held-out
-   photos. Its sources are TrashNet (MIT), the Voxel51 food-waste dataset
-   (MIT), clothing-dataset-small (CC0) and freely licensed Wikimedia Commons
-   photos. Rebuild or retrain it with photos from the exhibition table using
-   [`scripts/waste/`](scripts/waste/README.md); see
+   (`models/waste-resnet50/model.pt`, git-ignored like the other model files).
+   It is **ResNet50** with a frozen backbone and a small head; it scores
+   **74.7 % exact class** and **82.6 % right action** on the 241-photo probe,
+   and **14/18** on the exhibit's own first crops (labels machine-made). It runs
+   on this laptop's CPU as the **offline fallback** — the category normally
+   comes from a hosted vision model's name. Retrain it with photos of the
+   exhibit's own items using [`scripts/waste/`](scripts/waste/README.md); see
+   [docs/waste-approach.md](docs/waste-approach.md) and
    [docs/waste-model.md](docs/waste-model.md). The app reports the model as
    missing rather than inventing predictions.
 

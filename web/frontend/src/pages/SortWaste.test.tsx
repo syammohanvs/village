@@ -714,18 +714,33 @@ describe('Sort Waste — two models, one decision', () => {
     vision?: boolean;
     identify?: (image: string) => Promise<unknown>;
     record?: unknown;
+    /** Override the model-status answer, e.g. to carry a provider chain. */
+    status?: {
+      installed: boolean;
+      model: string;
+      classes: string[];
+      vision?: {
+        provider: string | null;
+        model: string | null;
+        ready: boolean;
+        chain?: number;
+        attempts?: Array<{ provider: string; model: string }>;
+      };
+    };
   };
 
   async function press(options: Options): Promise<() => void> {
     const vision = options.vision !== false;
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
-      installed: true,
-      model: 'resnet50',
-      classes: [],
-      ...(vision
-        ? { vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true } }
-        : {}),
-    });
+    vi.mocked(api.wasteResnetStatus).mockResolvedValue(
+      options.status ?? {
+        installed: true,
+        model: 'resnet50',
+        classes: [],
+        ...(vision
+          ? { vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true } }
+          : {}),
+      },
+    );
     vi.mocked(api.wasteIdentify).mockImplementation(
       (options.identify as never) ??
         (async () => ({
@@ -790,7 +805,22 @@ describe('Sort Waste — two models, one decision', () => {
 
       // Only an accepted bin decision asks for a lamp.
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+        category: 'plastic',
+        // The record says what happened: the hosted name, which service gave it,
+        // the route, and that the name decided.  The classifier's own number is
+        // kept as the classifier's, not as a confidence in this answer.
+        item: 'clear plastic lid',
+        namer: '@cf/meta/llama-3.2-11b-vision-instruct',
+        route: 'bin.plastic',
+        source: 'vision',
+        model: 'resnet50',
+        material: 'Plastic',
+        confidence: 0.95,
+      });
+      const payload = vi.mocked(api.postRecognition).mock.calls[0][0];
+      expect(payload.top?.[0]).toMatchObject({ className: 'Plastic', probability: 0.95 });
+      expect(payload.top).toHaveLength(3);
     } finally {
       restore();
     }
@@ -988,6 +1018,10 @@ describe('Sort Waste — two models, one decision', () => {
     expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(
       /nothing is classified until you do/i,
     );
+    // The item is placed on the base now, not held up in front of the camera.
+    expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(
+      /place one item on the marked base/i,
+    );
     expect(screen.getByText('Suggested bin')).toBeInTheDocument();
     // Nothing has been asked of either model.
     expect(api.wasteIdentify).not.toHaveBeenCalled();
@@ -1066,8 +1100,73 @@ describe('Sort Waste — two models, one decision', () => {
       // The late answer must not change the action or the record.
       expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i);
       expect(vi.mocked(api.postRecognition).mock.calls).toHaveLength(1);
+      // Nor the visitor-facing name: it is operator detail only, inside the
+      // collapsed Model details.
+      expect(screen.getByTestId('waste-sees')).toHaveTextContent(/unavailable/i);
+      expect(screen.getByTestId('waste-late-name')).toHaveTextContent(/orange pencil/i);
+      expect(screen.getByTestId('waste-late-name')).toHaveTextContent(/was not changed/i);
     } finally {
       restore();
     }
   }, 30000);
+
+  it('records a special-care item as hazardous waste, never as a bin', async () => {
+    // The refusal is a different outcome from a referral: the page posts
+    // `medical`, the backend answers with the hazardous sentence, and no bin
+    // command is sent — a battery must not light a lamp.
+    const restore = await press({ predictions: plasticAt(0.9), object: 'used AA battery' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+        category: 'medical',
+        route: 'separate.unknown',
+        source: 'vision',
+        item: 'used AA battery',
+      });
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/gram sahayak/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('names both services, and the whole chain, in Model details', async () => {
+    // The redundancy is a fact a presenter may have to explain: the Cloudflare
+    // model, the same model on a second account, DeepSeek as the last resort,
+    // and ResNet50 on this laptop when no name comes back.
+    const restore = await press({
+      predictions: plasticAt(0.9),
+      object: 'clear plastic bottle',
+      status: {
+        installed: true,
+        model: 'resnet50',
+        classes: [],
+        vision: {
+          provider: 'cloudflare',
+          model: '@cf/meta/llama-3.2-11b-vision-instruct',
+          ready: true,
+          chain: 3,
+          attempts: [
+            { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct' },
+            { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct' },
+            { provider: 'opencode', model: 'deepseek-v4.1-flash' },
+          ],
+        },
+      },
+    });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const details = screen.getByTestId('waste-details');
+      expect(within(details).getByTestId('waste-details-namer')).toHaveTextContent(
+        /@cf\/meta\/llama-3\.2-11b-vision-instruct/,
+      );
+      expect(within(details).getByTestId('waste-details-classifier')).toHaveTextContent(/resnet50/i);
+      // Each model is named once, in the order it is tried.
+      const chain = within(details).getByTestId('waste-details-chain');
+      expect(chain).toHaveTextContent(
+        /@cf\/meta\/llama-3\.2-11b-vision-instruct → deepseek-v4\.1-flash/,
+      );
+    } finally {
+      restore();
+    }
+  }, 25000);
 });

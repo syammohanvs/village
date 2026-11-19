@@ -497,7 +497,14 @@ export const api = {
     model: string;
     classes: string[];
     /** The hosted model that names the object, when one is configured. */
-    vision?: { provider: string | null; model: string | null; ready: boolean };
+    vision?: {
+      provider: string | null;
+      model: string | null;
+      ready: boolean;
+      chain?: number;
+      /** Every account/provider in the order it is tried, with its model id. */
+      attempts?: Array<{ provider: string; model: string }>;
+    };
   }> {
     return request<{
       installed: boolean;
@@ -582,14 +589,25 @@ export const api = {
 
   postRecognition(input: {
     category: string;
+    /**
+     * The **local classifier's** top probability — not a confidence in the
+     * answer.  It is 0 when the classifier returned nothing, and it is kept
+     * apart from a decision the hosted name made (`source`).
+     */
     confidence: number;
     model?: string;
     requestId?: string;
-    /** What the model named. A recycler is posted as "other", so this is the
-     *  only record of the material the visitor was shown. */
+    /** What the classifier read, and its best few guesses. */
     material?: string | null;
-    /** The best few guesses, for a session that has to be reviewed later. */
     top?: Array<{ className: string; probability: number }> | null;
+    /** The hosted model's words for the item, when one answered. */
+    item?: string | null;
+    /** The route this check actually decided (`bin.plastic`, `collect.metal`, …). */
+    route?: string | null;
+    /** Which reader decided: the hosted name, or the classifier alone. */
+    source?: 'vision' | 'local' | null;
+    /** The hosted model that supplied the name, for the record. */
+    namer?: string | null;
   }): Promise<WasteRecognitionResult> {
     return request<WasteRecognitionResult>('/waste/recognition', {
       method: 'POST',
@@ -601,6 +619,10 @@ export const api = {
         request_id: input.requestId ?? newRequestId(),
         material: input.material ?? null,
         top: input.top ?? null,
+        item: input.item ?? null,
+        route: input.route ?? null,
+        source: input.source ?? null,
+        namer: input.namer ?? null,
       },
     });
   },

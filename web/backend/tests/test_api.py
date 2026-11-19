@@ -438,6 +438,90 @@ async def test_medical_waste_is_referred_without_a_bin_command(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_a_named_item_records_the_name_the_classifier_reading_and_the_source(tmp_path):
+    """A record must say what happened, not paper over it.
+
+    With a hosted name, the category comes from the *name*; the classifier's own
+    probability is a separate fact and must not be posted as 0, nor as the
+    confidence in the answer.  The event keeps the name, the namer, the route and
+    which reader decided, so a session can be reviewed afterwards.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live",
+                "category": "plastic",
+                "confidence": 0.42,
+                "model": "resnet50",
+                "request_id": "named-item-01",
+                "item": "clear plastic bottle",
+                "namer": "@cf/meta/llama-3.2-11b-vision-instruct",
+                "route": "bin.plastic",
+                "source": "vision",
+                "material": "Plastic",
+                "top": [
+                    {"className": "Plastic", "probability": 0.42},
+                    {"className": "Glass", "probability": 0.31},
+                ],
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        # The classifier's own number is stored as such — not replaced by 0.
+        assert body["recognition"]["confidence"] == pytest.approx(0.42)
+
+        events = (await client.get("/api/v1/events?mode=live")).json()["events"]
+        event = next(e for e in events if e["title"] == "Plastic recognised")
+        assert "clear plastic bottle" in event["detail"]
+        assert "@cf/meta/llama-3.2-11b-vision-instruct" in event["detail"]
+        assert "decided by the vision" in event["detail"]
+        assert event["meta"]["route"] == "bin.plastic"
+        assert event["meta"]["source"] == "vision"
+        assert event["meta"]["item"] == "clear plastic bottle"
+        assert event["meta"]["top"][0]["className"] == "Plastic"
+        # A bin still lights its lamp, and the record says it was confirmed.
+        assert body["indication"]["confirmed"] is True
+        assert real.calls[0]["type"] == "INDICATE_WASTE"
+
+
+@pytest.mark.asyncio
+async def test_a_special_care_refusal_is_recorded_as_medical(tmp_path):
+    """A hostile item (battery, syringe) is a refusal, not a bin: the page posts
+    it as `medical`, so the record and the message say hazardous waste — and no
+    lamp command is sent for it."""
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live",
+                "category": "medical",
+                "confidence": 0.55,
+                "request_id": "special-care-01",
+                "item": "used AA battery",
+                "namer": "@cf/meta/llama-3.2-11b-vision-instruct",
+                "route": "separate.unknown",
+                "source": "vision",
+                "material": "Plastic",
+                "top": [{"className": "Plastic", "probability": 0.55}],
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["indication"] is None
+        assert "Hazardous" in body["note"]
+        assert real.calls == []
+        events = (await client.get("/api/v1/events?mode=live")).json()["events"]
+        event = next(e for e in events if e["title"] == "Hazardous waste recognised")
+        assert "used AA battery" in event["detail"]
+        assert "no bin indicator used" in event["detail"]
+
+
+@pytest.mark.asyncio
 async def test_an_offline_controller_is_reported_not_crashed(tmp_path):
     """The board is switched off most of the time in ordinary use.
 

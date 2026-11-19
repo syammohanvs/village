@@ -68,6 +68,10 @@ describe('the item name decides, and the classifier is the fallback', () => {
       expect(decision.reasonId).toBe('specialCare');
       expect(decision.allowLamp).toBe(false);
       expect(decision.needsOperator).toBe(true);
+      // The name produced the cue, so the name is the reader — and there is no
+      // class to teach from a battery, so the classifier's guess is not carried.
+      expect(decision.source).toBe('vision');
+      expect(decision.classId).toBeNull();
     }
   });
 

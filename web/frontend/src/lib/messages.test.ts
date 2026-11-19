@@ -95,7 +95,7 @@ describe('the message table', () => {
     // The measured threshold keeps its figure and its unit in all three.
     for (const text of MESSAGES['solar.liveHint']) expect(text).toContain('1.8 V');
     // And a template's placeholders are the same set in every language.
-    expect(placeholders(MESSAGES['sort.notSure'][2])).toBe('frames,percent');
+    expect(placeholders(MESSAGES['sort.spoken'][2])).toBe('action,category,item');
     expect(placeholders(MESSAGES['wind.noTurbine'][1])).toBe('volts');
   });
 });

@@ -51,7 +51,6 @@ export type ReasonId =
   | 'conflict'
   | 'specialCare'
   | 'identificationMissing'
-  | 'corroborated'
   | 'named'
   | 'unnamed'
   | 'unsupported';
@@ -63,9 +62,9 @@ export interface DecisionInput {
   itemLabel: string | null;
   /** Whether a hosted model is configured at all. */
   visionConfigured: boolean;
-  /** The bar a bin must clear on its own class. */
+  /** The bar a bin must clear when the **classifier** is the reader (no name). */
   binBar: number;
-  /** The bar a material must clear before it is named. */
+  /** The bar a material must clear before the classifier may name it. */
   materialBar: number;
 }
 
@@ -95,32 +94,6 @@ export interface Decision {
 
 /** The bar a material must clear before the page names it at all. */
 export const MATERIAL_BAR = 0.5;
-
-/**
- * The bar a **bin** must clear when the name states the same material.
- *
- * One model alone needs 0.70 before a physical lamp is lit.  Two models that
- * agree on what the item is made of need less, and the number is measured
- * rather than chosen: on the 241-photo probe the corroborated route gains **12
- * correct bins and costs one** (`scripts/waste/evidence_experiment.py`), and that
- * one is a photograph of oranges **in cardboard boxes** whose class label is
- * Thermocol — a human would say paper too.  The exhibit's own case is the
- * business card a visitor checked on 2026-11-19: Paper at 0.5–0.7, named "white
- * paper with red and black text", which used to be refused.
- *
- * It is not a blanket lowering of the bar: the floor is still 0.50, the name
- * must state **this bin's** material (or a different one refuses earlier as a
- * conflict), and with no name at all the bar stays 0.70.
- */
-export const CORROBORATED_BIN_FLOOR = 0.5;
-
-/**
- * How sure the classifier must be for the *name* to corroborate a material.
- *
- * Below this the picture has not really chosen, and a name alone is how a wall
- * becomes "metal".  It applies to materials only — never to a bin.
- */
-export const CORROBORATION_FLOOR = 0.3;
 
 const BIN_OF: Record<string, BinId> = {
   organic: 'organic',
@@ -321,14 +294,23 @@ function runnerUp(predictions: Prediction[], label: string | null): Prediction |
 /**
  * Decide.  Pure: same inputs, same answer, no state, no clock.
  *
- * The order matters and is the safety argument:
- *   1. nothing / unknown class  → nothing to sort
- *   2. a special-care cue        → never a bin, ask a person
- *   3. a material disagreement   → never a bin, ask a person
- *   4. a bin under its bar       → uncertain, no lamp
- *   5. a bin at/over its bar     → accepted, lamp allowed
- *   6. a material at/over its bar→ its own collection route, no lamp
- *   7. otherwise                 → uncertain, keep separate, ask
+ * **When a hosted name arrives, the name decides and there is no probability
+ * bar** — the rules read it, and its material word is what routes an ordinary
+ * item, so "clear plastic bottle" opens the plastic bin even if the classifier
+ * disagreed.  The confidence thresholds below belong to the *other* regime,
+ * when no name came back and the local classifier is the only reader.
+ *
+ * The order is the safety argument:
+ *   1. a special-care cue in the name → refuse, ask a person (batteries, syringes)
+ *   2. an object the name states, with a route of its own → that route
+ *      (a plastic remote is e-waste; a pencil is in none of the three bins)
+ *   3. the FIRST material word in the name → that material's route, which is a
+ *      bin when the material is organic/plastic/paper
+ *   4. no name and no classifier reading at all → uncertain, ask
+ *   5. no name: background / an unknown class → nothing to sort
+ *   6. no name: a bin class at/over `binBar` → accepted, lamp allowed;
+ *      a material at/over `materialBar` → its collection route, never a lamp
+ *   7. otherwise → uncertain, keep separate, ask
  */
 export function decide(input: DecisionInput): Decision {
   const top = base(input.predictions);
@@ -363,6 +345,9 @@ export function decide(input: DecisionInput): Decision {
 
   // 1. a special-care cue in the name refuses every bin and every route — before
   // anything else, because it is a safety rule and not a classification one.
+  // The name produced the cue, so it is the reader; and there is no class to
+  // teach from it (a battery is not one of the eleven), so `classId` is cleared
+  // rather than inheriting the classifier's guess.
   const special = specialCareOf(input.itemLabel);
   if (special) {
     return {
@@ -370,6 +355,9 @@ export function decide(input: DecisionInput): Decision {
       ...common,
       status: 'conflict',
       routeId: 'separate.unknown',
+      classId: null,
+      classConfidence: 0,
+      source: 'vision',
       reasonId: 'specialCare',
       needsOperator: true,
     };

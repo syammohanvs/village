@@ -79,17 +79,27 @@ class RecognitionRequest(BaseModel):
 
     mode: Mode = "live"
     category: str = Field(min_length=3, max_length=20)
+    # The **classifier's** top probability, or 0 when it returned nothing.  It is
+    # not a confidence in the answer: with a hosted name the route is decided by
+    # the name (`source`), and the two must not be conflated.
     confidence: float = Field(ge=0.0, le=1.0)
     # The browser MobileNet was replaced by ResNet50 on this laptop; an older
     # client that omits the field is recorded under the model that answers now.
     model: str = Field(default="resnet50", max_length=80)
     request_id: str = Field(min_length=8, max_length=80)
     profile_id: int | None = None
-    # What the model actually named, and its best few guesses.  A recycler is
-    # posted as "other", so without this a session cannot be reviewed afterwards:
+    # What the classifier read, and its best few guesses.  A recycler is posted
+    # as "other", so without this a session cannot be reviewed afterwards:
     # "identified wrongly" would have no record of what was said.
     material: str | None = Field(default=None, max_length=40)
     top: list[dict[str, Any]] | None = None
+    # What the hosted model named the item, and which one named it.
+    item: str | None = Field(default=None, max_length=160)
+    namer: str | None = Field(default=None, max_length=80)
+    # The route this check decided (`bin.plastic`, `collect.ewaste`, …) and which
+    # reader decided it.
+    route: str | None = Field(default=None, max_length=40)
+    source: Literal["vision", "local"] | None = None
 
 
 class DisposalRequest(BaseModel):

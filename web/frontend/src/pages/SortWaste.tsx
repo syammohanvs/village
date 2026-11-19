@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, errorMessage } from '../lib/api';
 import type { Prediction } from '../lib/wasteStabilizer';
 import { useApi } from '../lib/useApi';
@@ -120,6 +120,11 @@ export function SortWaste() {
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('operator') === '1';
   const [correction, setCorrection] = useState('');
   const [alert, setAlert] = useState('');
+  // A hosted name that arrived *after* the answer was shown, spoken and sent to
+  // the board.  It is operator detail only (`Model details`): the visitor's
+  // answer, the lamp and Sara's sentence are already final for this check, and
+  // a late name must never rewrite one of them without the others.
+  const [lateName, setLateName] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -131,8 +136,10 @@ export function SortWaste() {
   // A press reads three frames now, so it takes about a second.  The button
   // says so instead of looking like it did nothing.
   const [reading, setReading] = useState(false);
-  // The hosted model's name for the object in front of the camera.  It is a
-  // name only: the bin is the classifier's decision (see vision.py).
+  // The hosted model's name for the object in front of the camera.  The name is
+  // an *input to the decision*: `wasteDecision` reads its material word, so
+  // "clear plastic bottle" can put an item in the plastic bin.  It is not the
+  // whole answer either — the rules in wasteDecision.ts decide the route.
   const lastCropRef = useRef<string | null>(null);
   // The camera's own shape, so the frame shows the WHOLE picture.  A fixed 4:3
   // box with `object-fit: cover` silently hid the left and right edges of a
@@ -144,11 +151,21 @@ export function SortWaste() {
   const captureFileRef = useRef<string | null>(null);
   const [frameWarning, setFrameWarning] = useState('');
 
-  // The page has ONE model now: the hosted vision model that names the item.
-  // The local ResNet50 was removed on 2026-11-19 (the operator's call): on the
-  // booth's own base it was wrong and unsure, and the name decides anyway.
+  // Two readers, run in parallel on every press: the hosted model names the
+  // object (online), and the local ResNet50 classifies the material (offline,
+  // and the fallback when the name is missing).  The page needs the hosted one
+  // configured to check at all; the local one is what keeps the booth working
+  // when the internet is not.
   const installed = Boolean(modelStatus.data?.vision?.ready);
   const visionReady = installed;
+  // The naming chain in the order it is tried, named once per *model*: the
+  // Cloudflare accounts all answer with the same model, and the OpenCode Go /
+  // DeepSeek id comes after them when it is configured.  Shown in Model details
+  // so the redundancy is visible without reading the source.
+  const namerChain = useMemo(() => {
+    const attempts = modelStatus.data?.vision?.attempts ?? [];
+    return [...new Set(attempts.map((attempt) => attempt.model).filter(Boolean))];
+  }, [modelStatus.data]);
   // Three different facts: the browser can open a camera, the model status is
   // known, and the model is installed.  Collapsing them into one boolean is
   // what produced "the camera can still be used" next to a disabled button.
@@ -339,11 +356,12 @@ export function SortWaste() {
   /**
    * One press, one check, one decision.
    *
-   * The two models answer different questions and run **in parallel**: the
+   * The two readers answer different questions and run **in parallel**: the
    * local ResNet50 gives a material distribution in ~70 ms, the hosted model
-   * gives a name in ~1 s.  Neither is an input to the other, and the decision
-   * below waits for both (or the name's timeout) before anything physical
-   * happens — so a bin is never lit and then reconsidered.
+   * gives a name in ~1 s.  The name is an input to the route (its material
+   * word can choose a bin) and the classifier is the fallback when no name
+   * arrives; the page waits for both, or for the name's timeout, before
+   * anything physical happens — so a bin is never lit and then reconsidered.
    *
    * `checkSeq` is the request identity.  A result belonging to an older press —
    * a late cloud answer, a frame that finished after the button was pressed
@@ -357,6 +375,10 @@ export function SortWaste() {
     setReading(true);
     setAlert('');
     setRecognition(null);
+    setLateName(null);
+    // Set once this check's answer has been shown, spoken and posted.  A name
+    // resolving after that is kept for the details and nothing else.
+    let settled = false;
     setCheck({
       phase: 'identifying',
       identify: visionReady ? 'checking' : 'idle',
@@ -410,18 +432,30 @@ export function SortWaste() {
           // and asked once — its answer is a name, never a bin.
           if (visionReady && lastCropRef.current) {
             const image = lastCropRef.current;
-            naming = api.wasteIdentify(image).then((answer) => answer.object).catch(() => null);
+            naming = api
+              .wasteIdentify(image)
+              .then((answer) => {
+                const name = answer.object;
+                // Late: the decision has already been given.  Record it for the
+                // operator, never as the visitor's answer.
+                if (name && settled && seq === checkSeq.current) setLateName(name);
+                return name;
+              })
+              .catch(() => null);
           }
           if (lastCropRef.current) {
             const image = lastCropRef.current;
             local = api
               .wasteClassify(image)
-              .then((answer) =>
-                answer.predictions.map((row) => ({
+              .then((answer) => {
+                // The crop the classifier kept, so the operator's correction can
+                // point at the exact frame it was shown.
+                captureFileRef.current = answer.file ?? null;
+                return answer.predictions.map((row) => ({
                   label: row.className,
                   confidence: row.probability,
-                })),
-              )
+                }));
+              })
               .catch(() => [] as Prediction[]);
           }
         }
@@ -458,10 +492,14 @@ export function SortWaste() {
         cropMode,
         error: '',
       });
+      // From here the answer is final: a name that resolves later is kept in
+      // the details only.
+      settled = true;
 
       // Teach the offline model in the background: this crop, under the class
       // the hosted model named.  Fire-and-forget — a training copy must never
-      // delay or fail a press.
+      // delay or fail a press.  Nothing is filed for an item the name placed in
+      // none of our bins (a pencil): there is no class to teach.
       if (lastCropRef.current && decision.source === 'vision' && decision.classId) {
         const label = decision.classId.charAt(0).toUpperCase() + decision.classId.slice(1);
         void api
@@ -474,19 +512,40 @@ export function SortWaste() {
       void speakText(spokenAnswer(decision), voiceLanguage, 0.95);
       if (decision.status === 'nothing') return;
 
-      // Only an accepted handling decision may ask the board for a lamp.
-      // Everything else is recorded as "other", which sends no INDICATE_WASTE.
+      // Only a bin decision may ask the board for a lamp.  Everything else is
+      // recorded honestly: 'medical' for the special-care refusal, 'other' for
+      // a referral or an uncertain answer.  Neither sends INDICATE_WASTE, so no
+      // lamp is lit for them — and the board's own timer clears the previous
+      // one within its `indicate_ms` (8 s), because the firmware has no clear
+      // command (see docs/waste-approach.md §6).
       if (acceptingRef.current) return;
       acceptingRef.current = true;
       try {
+        // What the classifier actually read, kept apart from the decision: with
+        // a name present the classifier did not decide, and its probability is
+        // not a confidence in the answer.  Ranked here rather than assuming the
+        // array arrives sorted, and taken from the decision's own top reading so
+        // the record and the card cannot disagree.
+        const ranked = [...predictions].sort((a, b) => b.confidence - a.confidence);
+        const top = ranked.slice(0, 3).map((row) => ({
+          className: row.label,
+          probability: Math.round(Math.min(1, row.confidence) * 1000) / 1000,
+        }));
         const result = await api.postRecognition({
-          category: decision.allowLamp && decision.bin ? decision.bin : 'other',
-          // There is no local model any more, so there is no probability to
-          // report.  The category and the material are the decision.
-          confidence: 0,
+          category:
+            decision.reasonId === 'specialCare'
+              ? 'medical'
+              : decision.allowLamp && decision.bin
+                ? decision.bin
+                : 'other',
+          confidence: Math.min(1, Math.max(0, decision.localConfidence)),
           model: 'resnet50',
-          material: decision.classId ?? 'unknown',
-          top: [],
+          material: decision.localClassId ?? 'unknown',
+          top,
+          item: decision.itemLabel ?? null,
+          route: decision.routeId,
+          source: decision.source,
+          namer: modelStatus.data?.vision?.model ?? null,
         });
         if (seq !== checkSeq.current) return;
         setRecognition(result);
@@ -808,9 +867,23 @@ export function SortWaste() {
                     {t('sort.cropCentre')}
                   </p>
                 )}
-                <p className="hint">
-                  {t('sort.sourceVision')}: {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
+                {lateName && (
+                  <p className="hint" data-testid="waste-late-name">
+                    {t('sort.lateName', { item: lateName })}
+                  </p>
+                )}
+                <p className="hint" data-testid="waste-details-namer">
+                  {t('sort.detailsNamer')}:{' '}
+                  {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
                 </p>
+                <p className="hint" data-testid="waste-details-classifier">
+                  {t('sort.detailsClassifier')}: {modelStatus.data?.model ?? 'resnet50'}
+                </p>
+                {namerChain.length > 1 && (
+                  <p className="hint" data-testid="waste-details-chain">
+                    {t('sort.detailsChain', { models: namerChain.join(' → ') })}
+                  </p>
+                )}
               </div>
             </details>
 

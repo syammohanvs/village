@@ -1717,6 +1717,67 @@ the measured numbers, the retrain commands, the rejected experiments and the
 invariants, written for a new agent to work from. Read it before changing
 anything here; this section is the history, that file is the current shape.
 
+**The review's nine points, and which of them were real (2026-11-19, later).**
+An outside review asked for nine changes. Seven were genuine and are in; two
+were **already true or would have been wrong to do**, and the reason matters:
+
+- **"the hosted model has no influence on a bin" was a stale claim, in code and
+  in docs.** `vision.py` said *"This never decides a bin"* and the page said the
+  bin was the classifier's decision — both false since name-first. The comments
+  now say what happens: the name's material word routes an ordinary item and
+  **can** open a bin; the special-care and object rules are checked first; the
+  classifier's thresholds apply only when no name arrives. `wasteDecision.ts`'s
+  own doc block listed a "material disagreement" branch that no longer exists and
+  is rewritten to the real order.
+- **two dead constants deleted**: `CORROBORATED_BIN_FLOOR` and
+  `CORROBORATION_FLOOR` were exported and read by nothing (no test either), and
+  the docs still described a "0.70, or 0.50 when two models agree" rule the
+  product does not have. Removed from the code and from both docs.
+- **a late hosted name is now shown in Model details.** It never changed the
+  answer (the `Promise.race` already fixed the value), but it was dropped
+  entirely; it is operator information, so it is kept there with the sentence
+  that the answer above was not changed. `settled` is set the moment the answer
+  is rendered, so a name resolving after that can only ever land in the details.
+- **the recognition record was lying.** The page posted `confidence: 0`,
+  `model: 'resnet50'`, `top: []` and `material: <the claimed class>` — with a
+  comment claiming the local model no longer exists. It now posts the real
+  top-3, the classifier's own top probability (0 only when it truly returned
+  nothing), its top class, the hosted name, the namer model id, the final route
+  and `source: vision|local`; the backend keeps all of it in the event metadata
+  and writes a sentence that names both readers
+  (`named '…' by …; classifier Plastic 0.42; decided by the vision`). The
+  acknowledgement of the lamp is unchanged and still checked.
+- **a special-care refusal is posted as `medical`, not `other`**, so the
+  hazardous path and its note are used. `decide()` also stopped inheriting the
+  classifier's class in that branch (`source: 'vision'`, `classId: null`) —
+  without it a battery would have been filed as training data under the
+  classifier's guess, the same bug the pencil rule had.
+- **visitor copy**: the press hint is now *"Place one item on the marked base,
+  then press Check the item."* (en/hi/ml), and four strings that described
+  deleted behaviour — "Learning this room", "the camera re-arms by itself",
+  "the camera stopped after this item", and "a bin needs X% on N frames" — are
+  gone. The Malayalam disclosure no longer claims the bin decision stays on the
+  laptop.
+- **Model details names all three layers**, from `vision.attempts`:
+  `@cf/meta/llama-3.2-11b-vision-instruct` (account 1 → account 2) →
+  `deepseek-v4.1-flash`, and `resnet50` on this laptop as the fallback. Live
+  `GET /waste/resnet-status` reports `chain: 3` with those ids.
+- **NOT changed — the review asked to clear the bin LEDs when a check starts.**
+  The firmware has no clear command: `WasteIndicator::indicate` refuses an
+  unknown category, and the LED is switched off by the board's own timer
+  (`indicate_ms`, 8 s default). A non-bin answer therefore sends nothing, and a
+  lamp lit by the *previous* item can stay on for the rest of its 8 seconds —
+  the only window where the physical lamp can disagree with a new answer. Adding
+  a clear command is a firmware change plus an OTA and a board test, which is
+  not worth doing the night before an exhibition; it is written up in
+  `docs/waste-approach.md` §2 instead. The page's own state (and the demo lamps,
+  which read the board) go dark immediately on a new check.
+- **NOT changed — "retain the centre-crop fallback with a visible guide".** Both
+  were already there (`crop-guide` square drawn from `PRESS_CROP_SHARE`, and
+  `sort.cropCentre` saying *"Using the middle of the picture"*). What was wrong
+  was the docs implying a backdrop failure meant a refusal to classify; §2 now
+  says the centre square is used and the details say so.
+
 **The repository is the master copy of the exhibit (2026-11-17).**  A fresh
 clone on another laptop must run as this one was left, so these are committed
 on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +
