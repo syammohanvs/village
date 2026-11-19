@@ -991,3 +991,31 @@ def test_a_word_the_model_misheard_still_refuses_the_command(matcher: IntentMatc
     answer = matcher.match("Top irrigation.", "en")
     assert answer["command"] is None
     assert answer["intent"] == "AMBIGUOUS"
+
+
+def test_the_malayalam_model_s_spellings_are_understood(matcher: IntentMatcher) -> None:
+    """Every transcript here is quoted verbatim from one real session (2026-11-19).
+
+    The Malayalam speech model writes `അവസ്താ` for `അവസ്ഥാ` and drops the
+    `്` under `ഗ്ര`, so "ഗ്രാമത്തിന്റെ അവസ്ഥ" came back four different ways and
+    every one of them was refused.  The vocabulary now carries the spellings the
+    model actually produces — the same practice as the pump's `പംഭ്`.
+    """
+    for said in (
+        "ഗരാമത്തിന്റെ അവസ്താ.",
+        "ഗരാമത്തിന്ലെ അവസ്താ.",
+        "യാമത്തിന്റെ അവസ്ഥാ.",
+        "ആമ്മത്തിന്ലെ അവസ്താ.",
+    ):
+        assert matcher.match(said, "ml")["intent"] == "VILLAGE_STATUS", said
+
+    assert matcher.match("ലക്കുകളുടെ അവശ്താ.", "ml")["intent"] == "LIGHTS_STATUS"
+    assert matcher.match("സാഹായം", "ml")["intent"] == "HELP"
+
+    # A state the model spelled differently still never actuates on its own:
+    # it asks which device.
+    for said in ("ന്നർത്താ.", "തെടാങ്ങുകാ."):
+        answer = matcher.match(said, "ml")
+        assert answer["intent"] == "AMBIGUOUS", said
+        assert "ഏത് ഉപകരണം" in answer["message"], said
+        assert answer["command"] is None

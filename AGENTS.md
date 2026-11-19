@@ -2312,6 +2312,25 @@ hall internet goes we have a reliable fall back with known objects."*  So:
 - The page's disclosure now says the crop is kept on the laptop to teach the
   offline model (en/hi/ml), and `sort.visionNote` says the same.
 
+**Malayalam status questions failed on the model's spelling, and the vocabulary
+now carries it (2026-11-19, reported as "a reading mistake").**  One session
+(13:48–13:55) asked the village status four ways and the lamps' status twice, and
+**every one was refused** — because the fine-tuned Malayalam model writes
+`അവസ്താ` for `അവസ്ഥാ` and drops the chandrakkala under `ഗ്ര`:
+
+  `ഗരാമത്തിന്റെ അവസ്താ.` · `ഗരാമത്തിന്ലെ അവസ്താ.` · `യാമത്തിന്റെ അവസ്ഥാ.`
+  · `ആമ്മത്തിന്ലെ അവസ്താ.` — four spellings of "the village's status"
+
+all now parse to **VILLAGE_STATUS**, `ലക്കുകളുടെ അവശ്താ.` (from "വിളക്കുകളുടെ
+അവസ്ഥ") to **LIGHTS_STATUS**, and `സാഹായം` (from "സഹായം", help) to **HELP** —
+all quoted verbatim from the recordings and added to `shared/intents.json`
+(phrases, `devices.lights.ml`, `grammar.ml.status_words`).  The two state words
+the model wrote, `ന്നർത്താ` (നിർത്താ, stop) and `തെടാങ്ങുകാ` (തുടങ്ങുക, start),
+join `states.off/on.ml`: alone they answer **"ഏത് ഉപകരണം?"** and never actuate,
+which is the difference between a wrong word and a wrong action.  Verified by
+re-running the five stored clips through `/voice/transcribe` + the parser on the
+running server.
+
 **English now gets a decoder prompt, measured on the room's own clips
 (2026-11-19).**  The next English session failed on *words*, not on the grammar:
 `Lead status.`, `Relate status.`, `Like status.`, `Stop Illusion!`, `BOM status!`,
