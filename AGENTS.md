@@ -1778,6 +1778,53 @@ were **already true or would have been wrong to do**, and the reason matters:
   was the docs implying a backdrop failure meant a refusal to classify; §2 now
   says the centre square is used and the details say so.
 
+**The remaining review points: a clear command, an empty scene, and a deadline
+that fits the chain (2026-11-19, second pass).**  Six changes, each with the
+reason it was needed, and one that is new hardware:
+
+- **`CLEAR_WASTE` is a new firmware command (0.2.9)** — `WasteIndicator::clear()`
+  puts every category LED out now, for exactly the state the `indicate_ms` timer
+  would have produced, and the timer is untouched. Sent by the page at the start
+  of every check through the new `POST /api/v1/waste/clear`
+  (`WasteClearRequest`), which reports the board's own acknowledgement and never
+  assumes one: an offline controller answers `cleared: false` with a note and the
+  press still runs. It is sequenced **before** that check's lamp command, and the
+  page now checks `checkSeq` *before* sending a lamp, not only after — a lamp is
+  physical. The simulator implements it too, so Simulation matches. **The OTA
+  image is built (`.pio/build/esp32doit-devkit-v1-ota/firmware.bin`, OTA marker
+  verified) and the board was not reachable tonight** (`relay.sh status`: nothing
+  on 192.168.137.0/24), so **this one command awaits a press on the board**; the
+  bin *selection* remains verified and was not re-tested.
+- **An unusable name falls through to the classifier.** "container" has no
+  special-care cue, no object route and no material word, so `decide()` reaches
+  the local branch and its 0.70/0.50 bars apply — the existing behaviour, now
+  documented and pinned by a test that asserts `source: 'local'` and the bin.
+- **"Nothing visible" is an answer, not a failure.** `vision.identify` returns
+  `empty: true` when the model literally answered "nothing" (and the cache keeps
+  that flag), `decide({itemEmpty})` returns `status: 'nothing'` *before* the
+  classifier branch, and the page renders its own "Nothing to sort" block with no
+  bin, no record and no training crop. A refusal ("I cannot tell") and `unknown`
+  are deliberately **not** empty — they are unusable and fall back.
+- **The deadlines now fit the chain.** Measured on this laptop: Workers AI
+  1.6–2.0 s (4.7 s cold after a restart), OpenCode Go / DeepSeek 8.1 s, 10.2 s
+  and 0.9 s. The old 6 s page deadline cut the fallback off exactly when it was
+  needed. Now: 8 s per Workers AI attempt (`VILLAGE_VISION_TIMEOUT_SECS`), 12 s
+  for the last resort (`…_TIMEOUT_LAST_SECS`), a 14 s budget for the whole chain
+  (`…_TOTAL_SECS`, an attempt that cannot finish in what is left is not started),
+  and a 15 s page deadline in `web/frontend/src/lib/wasteTiming.ts` — its own
+  module so tests can shorten it. Late names still land in Model details only.
+- **Docs corrected**: "lights the bin indicator" (the LED, not the bin), no
+  claim that model disagreement refuses, hosted-name routing vs local thresholds
+  stated as two regimes, collection ≠ training, the duplicated invariant number
+  fixed, the operator's already-verified LED selection recorded, and a §15 table
+  of what is verified vs what is new.
+
+Gates this pass: **508 firmware checks / 0 failed**, **188 backend**, **440
+frontend**, `npm run build`, app restarted on :8010 serving the new bundle. The
+simulator answers the clear with `WASTE_INDICATOR_CLEARED`; Live without a board
+answers `cleared: false` honestly. Two demo-mode records (one command, one event)
+were written by that live check and are in `data/village.db` like any demo use.
+
 **The repository is the master copy of the exhibit (2026-11-17).**  A fresh
 clone on another laptop must run as this one was left, so these are committed
 on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +

@@ -522,6 +522,65 @@ async def test_a_special_care_refusal_is_recorded_as_medical(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_clearing_the_bin_indicator_is_acknowledged_and_turns_the_lamp_off(tmp_path):
+    """A new check starts by putting the previous item's lamp out.
+
+    This is new behaviour (2026-11-19) and it is verified here on the simulator,
+    separately from the already-verified bin selection: the command goes out, the
+    acknowledgement is the board's own, and the state afterwards says no lamp is
+    lit.
+    """
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    async with client_for(settings, device=real) as (client, gateway, app):
+        # Light a lamp the way a check does, then clear it.
+        lit = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "live", "category": "plastic", "confidence": 0.9,
+                "request_id": "lit-before-clear",
+            },
+        )
+        assert lit.status_code == 200
+        assert lit.json()["indication"]["confirmed"] is True
+
+        response = await client.post(
+            "/api/v1/waste/clear",
+            json={"mode": "live", "request_id": "clear-check-01"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["cleared"] is True
+        assert body["confirmed"] is True
+        assert body["ack"]["result"] == "ACCEPTED"
+        assert real.calls[-1]["type"] == "CLEAR_WASTE"
+
+        state = (await client.get("/api/v1/state?mode=live")).json()
+        indicator = state["status"]["actuators"]["waste_indicator"]
+        assert indicator["active"] is False
+        assert indicator["category"] in (None, "unknown")
+
+
+@pytest.mark.asyncio
+async def test_a_clear_is_reported_honestly_when_the_board_is_off(tmp_path):
+    """No lamp is not a failed answer: the press still runs, and the caller is
+    told the clear was not confirmed rather than being handed a success."""
+    settings = make_settings(tmp_path)
+    real = RecordingDevice()
+    real.unreachable = True
+    async with client_for(settings, device=real) as (client, gateway, app):
+        response = await client.post(
+            "/api/v1/waste/clear",
+            json={"mode": "live", "request_id": "clear-check-02"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["cleared"] is False
+        assert body["confirmed"] is False
+        assert body["note"]
+
+
+@pytest.mark.asyncio
 async def test_an_offline_controller_is_reported_not_crashed(tmp_path):
     """The board is switched off most of the time in ordinary use.
 

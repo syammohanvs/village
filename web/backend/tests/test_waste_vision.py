@@ -65,7 +65,7 @@ def test_a_configured_model_names_the_object_and_is_asked_once(
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
     asked: list[bytes] = []
 
-    def fake_ask(candidate: dict, jpeg: bytes) -> str:
+    def fake_ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
         asked.append(jpeg)
         return "A clear plastic lid."
 
@@ -90,7 +90,7 @@ def test_a_failing_model_leaves_the_page_with_the_classifier(
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
 
-    def boom(candidate: dict, jpeg: bytes) -> str:
+    def boom(candidate: dict, jpeg: bytes, timeout: float) -> str:
         raise RuntimeError("HTTP Error 500: upstream")
 
     monkeypatch.setattr(vision, "_ask_candidate", boom)
@@ -123,7 +123,7 @@ async def test_the_route_names_the_object_when_a_provider_is_configured(
 ) -> None:
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
-    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg: "Remote control")
+    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg, timeout: "Remote control")
 
     settings = make_settings(tmp_path)
     async with client_for(settings) as (client, _gateway, _app):
@@ -150,7 +150,7 @@ def test_the_second_cloudflare_account_is_used_when_the_first_is_spent(
     monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID_2", "acct-two")
     seen: list[str] = []
 
-    def ask(candidate: dict, jpeg: bytes) -> str:
+    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
         seen.append(candidate["token"])
         if candidate["token"] == "cfut_one":
             raise RuntimeError("HTTP Error 429: quota exceeded")
@@ -181,7 +181,7 @@ def test_deepseek_is_the_last_resort_when_every_cloudflare_account_is_spent(
     monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
     seen: list[str] = []
 
-    def ask(candidate: dict, jpeg: bytes) -> str:
+    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
         seen.append(candidate["provider"])
         if candidate["provider"] == "cloudflare":
             raise RuntimeError("HTTP Error 429: quota exceeded")
@@ -195,6 +195,100 @@ def test_deepseek_is_the_last_resort_when_every_cloudflare_account_is_spent(
     assert seen == ["cloudflare", "cloudflare", "opencode"]
     # The page is told how many chances there are, not a guess.
     assert vision.status()["chain"] == 3
+
+
+def test_nothing_visible_is_an_answer_not_a_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty base must be told apart from "the service did not answer".
+
+    The page turns the first into "nothing to sort" and the second into the
+    classifier's fallback.  Both arrive as `object: None`, so the flag is the
+    only thing that keeps them apart.
+    """
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
+    monkeypatch.setattr(
+        vision, "_ask_candidate", lambda candidate, jpeg, timeout: "nothing"
+    )
+
+    answer = vision.identify(CROP)
+    assert answer["object"] is None
+    assert answer["empty"] is True
+    assert "no object" in (answer["reason"] or "")
+
+    # ...and the cached answer keeps the flag: the page must not see the same
+    # crop as "nothing" on the first press and as a failure on a retry.
+    again = vision.identify(CROP)
+    assert again["cached"] is True
+    assert again["empty"] is True
+
+
+@pytest.mark.parametrize("text, empty", [
+    ("nothing", True),
+    ("Nothing.", True),
+    ("no object", True),
+    ("empty", True),
+    ("unknown", False),
+    ("I cannot tell", False),
+    ("a container", False),
+    ("", False),
+])
+def test_only_a_literal_nothing_counts_as_an_empty_scene(text: str, empty: bool) -> None:
+    assert vision._says_nothing(text) is empty
+
+
+def test_the_fallback_provider_gets_the_longer_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The last resort is a reasoning model: 8 s cut it off mid-answer.
+
+    Measured 2026-11-19 it answered in 8.1 s, 10.2 s and 0.9 s (warm), so it
+    gets 12 s while Workers AI keeps 8 s for its ~1.6–2.0 s answers.
+    """
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
+    seen: list[tuple[str, float]] = []
+
+    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
+        seen.append((candidate["provider"], timeout))
+        if candidate["provider"] == "cloudflare":
+            raise RuntimeError("HTTP Error 429: quota exceeded")
+        return "clear plastic lid"
+
+    monkeypatch.setattr(vision, "_ask_candidate", ask)
+
+    answer = vision.identify(CROP)
+    assert answer["provider"] == "opencode"
+    assert [provider for provider, _ in seen] == ["cloudflare", "opencode"]
+    # Nothing may be given more time than the whole chain has left.
+    assert all(0 < timeout <= vision.TOTAL_S for _, timeout in seen)
+    assert seen[1][1] <= vision.TIMEOUT_LAST_S
+
+
+def test_a_chain_that_runs_out_of_time_answers_without_a_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The budget is the page's deadline: no attempt starts that cannot finish."""
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
+    monkeypatch.setattr(vision, "TOTAL_S", 0.0)
+    asked: list[str] = []
+
+    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
+        asked.append(candidate["provider"])
+        return "clear plastic lid"
+
+    monkeypatch.setattr(vision, "_ask_candidate", ask)
+
+    answer = vision.identify(CROP)
+    assert answer["object"] is None
+    assert "ran out of time" in (answer["reason"] or "")
+    assert asked == []
 
 
 def test_any_lead_in_is_stripped_to_the_name() -> None:

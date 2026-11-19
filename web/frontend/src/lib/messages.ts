@@ -873,9 +873,19 @@ export const MESSAGES = {
     'വസ്തുവിന്റെ തിരിച്ചറിയൽ ലഭ്യമല്ല. ബിന്നിൽ ഇടുന്നതിന് മുൻപ് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
   ],
   'sort.actionNothing': [
-    'Nothing to sort — show one item against the plain background.',
-    'छाँटने को कुछ नहीं — सादे बैकग्राउंड के सामने एक चीज़ दिखाएँ।',
-    'തരംതിരിക്കാൻ ഒന്നുമില്ല — പ്ലെയിൻ പശ്ചാത്തലത്തിൽ ഒരു വസ്തു കാണിക്കുക.',
+    'Nothing to sort — place one item on the marked base and try again.',
+    'छाँटने को कुछ नहीं — चिह्नित आधार पर एक चीज़ रखें और फिर कोशिश करें।',
+    'തരംതിരിക്കാൻ ഒന്നുമില്ല — അടയാളപ്പെടുത്തിയ തറയിൽ ഒരു വസ്തു വച്ച് വീണ്ടും ശ്രമിക്കുക.',
+  ],
+  'sort.emptyHeading': [
+    'Nothing to sort',
+    'छाँटने को कुछ नहीं',
+    'തരംതിരിക്കാൻ ഒന്നുമില്ല',
+  ],
+  'sort.emptyScene': [
+    'The camera sees the base and nothing on it. Place one item inside the square, then press Check the item.',
+    'कैमरे को आधार दिख रहा है, उस पर कुछ नहीं। एक चीज़ चौकोर के अंदर रखें, फिर “चीज़ जाँचें” दबाएँ।',
+    'ക്യാമറയ്ക്ക് തറ കാണാം, അതിൽ ഒന്നുമില്ല. ഒരു വസ്തു ചതുരത്തിനുള്ളിൽ വച്ച്, “വസ്തു പരിശോധിക്കുക” അമർത്തുക.',
   ],
   'sort.plainBackground': [
     'Show one item against the plain background.',

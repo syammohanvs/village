@@ -65,6 +65,7 @@ REASONS: dict[str, tuple[str, str]] = {
     "LIGHTS_MANUAL_OFF": ("LIGHTS_MANUAL_OFF", "Streetlights switched off manually."),
     "LIGHTS_NOT_INSTALLED": ("LIGHTS_NOT_INSTALLED", "Streetlights are not installed in this build."),
     "WASTE_UNKNOWN_CATEGORY": ("WASTE_UNKNOWN_CATEGORY", "Unknown waste category. No category indicator was activated."),
+    "WASTE_INDICATOR_CLEARED": ("WASTE_INDICATOR_CLEARED", "Bin indicator cleared. All three are off."),
     "DUPLICATE_COMMAND": ("DUPLICATE_COMMAND", "This command was already processed. No second action was taken."),
     "COMMAND_INVALID": ("COMMAND_INVALID", "The command type or parameters were not recognised."),
     "CONFIG_SAVED": ("CONFIG_SAVED", "Configuration saved and applied."),
@@ -749,6 +750,13 @@ class SimulatedDevice:
                     self.waste_until = self.now_ms + duration
                     code, text = CATEGORY_REASONS[category]
                     result = "ACCEPTED"
+            elif command_type == "CLEAR_WASTE":
+                # The page's "this answer has no bin" command: every category LED
+                # off now, instead of waiting out the previous item's window.
+                self.waste_category = None
+                self.waste_until = 0
+                code, text = reason("WASTE_INDICATOR_CLEARED")
+                result = "ACCEPTED"
             else:
                 code, text = reason("COMMAND_INVALID")
 

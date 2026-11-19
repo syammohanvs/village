@@ -46,6 +46,7 @@ from .protocol import (
     VoiceInterpretRequest,
     LoginRequest,
     WasteClassifyRequest,
+    WasteClearRequest,
     WasteCorrectionRequest,
     WasteTeachRequest,
 )
@@ -827,6 +828,51 @@ def create_app(
                 status_code=exc.status,
                 detail={"code": exc.code, "message": exc.message},
             ) from exc
+
+    @app.post("/api/v1/waste/clear")
+    async def waste_clear(
+        body: WasteClearRequest,
+        gateway: DeviceGateway = Depends(get_gateway),
+    ):
+        """Put every category LED out before a new item is checked.
+
+        The board already switches a lit LED off on its own after
+        `indicate_ms` (8 s), so this is not the only way a lamp goes out — it is
+        the way it goes out **before the next answer**, so a visitor never reads
+        the previous item's lamp against the new sentence.
+
+        The acknowledgement is reported, never assumed: a controller that is off
+        or refuses answers `cleared: false` with the reason, and the press goes
+        on (the answer does not depend on a lamp).
+        """
+        try:
+            answer = await gateway.send_command(
+                mode=body.mode,
+                command_type="CLEAR_WASTE",
+                parameters={},
+                request_id=body.request_id,
+                source="camera",
+            )
+        except RequestReuseError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - no lamp is not a failed answer
+            return {
+                "cleared": False,
+                "confirmed": False,
+                "ack": None,
+                "note": f"Bin indicator not cleared: {exc}.",
+            }
+        confirmed = bool(
+            answer
+            and answer.get("confirmed")
+            and (answer.get("ack") or {}).get("result") == "ACCEPTED"
+        )
+        return {
+            "cleared": confirmed,
+            "confirmed": confirmed,
+            "ack": (answer or {}).get("ack"),
+            "note": None if confirmed else "The controller did not acknowledge the clear.",
+        }
 
     @app.post("/api/v1/waste/teach")
     async def waste_teach(body: WasteTeachRequest):

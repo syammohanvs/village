@@ -7,6 +7,7 @@ import { Card, Notice } from '../components/ui';
 import { IconCamera, IconCheck, IconStop } from '../components/Icons';
 import { centreCrop, cropGuide, scaleBox } from '../lib/focus';
 import { backdropBox } from '../lib/backdrop';
+import { VISION_WAIT_MS } from '../lib/wasteTiming';
 import { MATERIAL_BAR, decide, type Decision } from '../lib/wasteDecision';
 import { speakText } from '../lib/speech';
 import {
@@ -29,18 +30,9 @@ const ANALYSIS_HEIGHT = 120;
 const CROP_SIZE = 224;
 const PRESS_CROP_SHARE = 0.8;
 
-/**
- * How long the page waits for the hosted model's name before it answers.
- *
- * Workers AI answers in about a second; OpenCode Go takes five to twelve.  A
- * visitor is not made to wait longer than this for a name — the category is
- * already decided, and the name fills in behind the card if it arrives late.
- */
-// Measured 2026-11-19: the first Workers AI call after a restart took 4.7 s
-// (cold model), later ones 0.8–1.0 s, and the DeepSeek fallback 5–7 s.  A 4 s
-// cap made the first press of a session say "identification unavailable" on a
-// backend that had just been started, so the cap covers a cold call.
-const VISION_WAIT_MS = 6000;
+// The wait for the hosted name is its own module so a test can shorten it
+// without changing the number the exhibit runs with (see lib/wasteTiming.ts).
+
 
 
 function ensureCanvas(ref: { current: HTMLCanvasElement | null }, width: number, height: number) {
@@ -125,6 +117,9 @@ export function SortWaste() {
   // answer, the lamp and Sara's sentence are already final for this check, and
   // a late name must never rewrite one of them without the others.
   const [lateName, setLateName] = useState<string | null>(null);
+  // Why the board did not acknowledge the clear, when that happens.  It is
+  // operator information: the answer above stands without a lamp.
+  const [clearNote, setClearNote] = useState('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -376,6 +371,23 @@ export function SortWaste() {
     setAlert('');
     setRecognition(null);
     setLateName(null);
+    setClearNote('');
+    // The previous item's lamp must not sit above this answer.  Sent here and
+    // awaited before the lamp command below, so the two can never arrive out of
+    // order; a controller that refuses is reported in the details and the press
+    // still runs (the answer does not depend on a lamp).  This is also what
+    // stops a delayed result from an older check restoring an old indication:
+    // the older check's own clear is what would have to outlive it, and its
+    // result is dropped by `checkSeq` before it can ask for a lamp.
+    const clearing = api
+      .wasteClear(`clear-${seq}-${Date.now()}`)
+      .then((answer) => {
+        if (seq === checkSeq.current && !answer.cleared) {
+          setClearNote(answer.note ?? '');
+        }
+        return answer;
+      })
+      .catch(() => null);
     // Set once this check's answer has been shown, spoken and posted.  A name
     // resolving after that is kept for the details and nothing else.
     let settled = false;
@@ -389,7 +401,9 @@ export function SortWaste() {
       error: '',
     });
 
-    let naming: Promise<string | null> = Promise.resolve(null);
+    // `empty` is the model saying "nothing there" — an answer, not a failure.
+    let naming: Promise<{ object: string | null; empty: boolean }> =
+      Promise.resolve({ object: null, empty: false });
     // The offline model runs in the background on every press.  It is not the
     // answer any more, but it must keep seeing the booth's own objects: it is
     // what answers if the internet goes, and every press teaches it (below).
@@ -439,9 +453,9 @@ export function SortWaste() {
                 // Late: the decision has already been given.  Record it for the
                 // operator, never as the visitor's answer.
                 if (name && settled && seq === checkSeq.current) setLateName(name);
-                return name;
+                return { object: name, empty: Boolean(answer.empty) };
               })
-              .catch(() => null);
+              .catch(() => ({ object: null, empty: false }));
           }
           if (lastCropRef.current) {
             const image = lastCropRef.current;
@@ -467,18 +481,24 @@ export function SortWaste() {
       if (seq !== checkSeq.current) return;
       // Overlapped with the frames, capped so a slow cloud model cannot hold
       // the answer hostage.
-      const itemLabel = visionReady
+      const named = visionReady
         ? await Promise.race([
             naming,
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
+            new Promise<{ object: string | null; empty: boolean }>((resolve) =>
+              setTimeout(() => resolve({ object: null, empty: false }), VISION_WAIT_MS),
+            ),
           ])
-        : null;
+        : { object: null, empty: false };
+      const itemLabel = named.object;
       const predictions = await local;
       if (seq !== checkSeq.current) return;
 
       const decision = decide({
         predictions,
         itemLabel,
+        // "Nothing visible" stays its own outcome: it is not a failed lookup,
+        // and the classifier's guess must not turn an empty base into a bin.
+        itemEmpty: named.empty,
         visionConfigured: visionReady,
         binBar: BIN_CONFIDENCE,
         materialBar: MATERIAL_BAR,
@@ -521,6 +541,15 @@ export function SortWaste() {
       if (acceptingRef.current) return;
       acceptingRef.current = true;
       try {
+        // The clear belongs to this check and must land before this check's
+        // lamp, or a fast answer could be undone by its own start-of-check
+        // clear.  It has been running since the press, so this is normally
+        // already done.
+        await clearing;
+        // An answer from an older press must not send a lamp command now that a
+        // newer check is the page's answer.  Checked *here*, before the request,
+        // not only after it: a lamp is physical.
+        if (seq !== checkSeq.current) return;
         // What the classifier actually read, kept apart from the decision: with
         // a name present the classifier did not decide, and its probability is
         // not a confidence in the answer.  Ranked here rather than assuming the
@@ -801,6 +830,16 @@ export function SortWaste() {
                   {t('sort.pressHint')}
                 </p>
               </div>
+            ) : check.decision?.status === 'nothing' ? (
+              // The model looked and there was nothing there.  Its own block,
+              // because "nothing to sort" is an answer and not a failed lookup:
+              // no bin, no lamp, and no crop filed as a training example.
+              <div data-testid="waste-empty-block">
+                <p className="result-big" data-testid="waste-empty">
+                  {t('sort.emptyHeading')}
+                </p>
+                <p className="result-lead">{t('sort.emptyScene')}</p>
+              </div>
             ) : (
               <>
                 <div className="model-state" data-testid="waste-identify">
@@ -865,6 +904,11 @@ export function SortWaste() {
                 {check.cropMode === 'centre' && (
                   <p className="hint" data-testid="waste-crop-centre">
                     {t('sort.cropCentre')}
+                  </p>
+                )}
+                {clearNote && (
+                  <p className="hint" data-testid="waste-clear-note">
+                    {clearNote}
                   </p>
                 )}
                 {lateName && (

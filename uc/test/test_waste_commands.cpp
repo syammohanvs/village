@@ -61,6 +61,29 @@ TEST(waste_indicator_duration_is_bounded) {
   CHECK(w.read(2000).remaining_ms == 8000);
 }
 
+TEST(waste_indicator_clear_puts_every_led_out_early) {
+  // The app clears the previous item's lamp when a new check starts.  Clearing
+  // must be the same state the timer produces, and it must not disable the
+  // timer: a later indication still expires on its own.
+  WasteConfig cfg;
+  cfg.indicate_ms = 8000;
+  WasteIndicator w;
+  w.configure(cfg);
+  CHECK(w.indicate(WasteCategory::Plastic, 0, 1000));
+  CHECK(w.read(2000).active);
+  w.clear();
+  CHECK(!w.active());
+  WasteLedState s = w.read(2000);
+  CHECK(!s.active);
+  CHECK(s.category == WasteCategory::Unknown);
+  CHECK(s.remaining_ms == 0);
+
+  CHECK(w.indicate(WasteCategory::Paper, 0, 3000));
+  CHECK(w.read(3000 + 7999).active);
+  w.tick(3000 + 8000);
+  CHECK(!w.read(3000 + 8000).active);
+}
+
 TEST(command_history_hashes_and_deduplicates) {
   CHECK(CommandHistory::hashId(nullptr) == 0);
   CHECK(CommandHistory::hashId("") == 0);

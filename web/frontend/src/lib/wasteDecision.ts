@@ -47,6 +47,7 @@ export type DecisionStatus =
 
 export type ReasonId =
   | 'ok'
+  | 'empty'
   | 'belowBar'
   | 'conflict'
   | 'specialCare'
@@ -60,6 +61,13 @@ export interface DecisionInput {
   predictions: Prediction[];
   /** The hosted model's name, or null when none came back. */
   itemLabel: string | null;
+  /**
+   * The hosted model answered "nothing" — an empty scene, which is an answer
+   * and not a failure.  `itemLabel` is null in that case too, so this flag is
+   * what keeps the two apart: an empty scene is "nothing to sort", while no
+   * answer at all falls back to the classifier.
+   */
+  itemEmpty?: boolean;
   /** Whether a hosted model is configured at all. */
   visionConfigured: boolean;
   /** The bar a bin must clear when the **classifier** is the reader (no name). */
@@ -342,6 +350,20 @@ export function decide(input: DecisionInput): Decision {
     runnerUpId: second?.label ?? null,
     runnerUpConfidence: second ? Math.min(1, second.confidence) : 0,
   };
+
+  // 0. the model says there is nothing there.  That is an answer, not a failure,
+  // and it must not fall through to the classifier: an empty scene that the
+  // classifier reads as "Plastic 0.8" because of a patterned base is exactly the
+  // wrong bin this page exists to avoid.
+  if (input.itemEmpty) {
+    return {
+      ...empty,
+      status: 'nothing',
+      routeId: 'nothing',
+      reasonId: 'empty',
+      itemLabel: null,
+    };
+  }
 
   // 1. a special-care cue in the name refuses every bin and every route — before
   // anything else, because it is a safety rule and not a classification one.

@@ -17,6 +17,10 @@ ALLOWED_COMMANDS = {
     "PUMP_OFF",
     "PUMP_AUTO",
     "INDICATE_WASTE",
+    # Puts every category LED out now.  The page sends it when a new item is
+    # checked, so the previous item's lamp cannot sit above the new answer; the
+    # firmware's own timer is what switches a lamp off otherwise.
+    "CLEAR_WASTE",
     # Bench control from Setup → Test outputs: TEST_MODE is the page's master
     # switch and TEST_OUTPUT drives one pin.  The firmware refuses an output
     # while the master switch is off, so this route only keeps the wire honest.
@@ -206,6 +210,21 @@ class WasteCorrectionRequest(BaseModel):
 
     file: str = Field(min_length=1, max_length=200)
     actual: str = Field(min_length=1, max_length=20)
+
+
+class WasteClearRequest(BaseModel):
+    """Put every category LED out before a new check starts.
+
+    A new item must not be shown under the lamp of the previous one.  The board
+    also has an automatic switch-off timer (`indicate_ms`, 8 s); this is the
+    same state, earlier.  `request_id` is the check's own id so a retried clear
+    is the same clear and not a second command.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Mode = "live"
+    request_id: str = Field(min_length=8, max_length=80)
 
 
 class WasteTeachRequest(BaseModel):

@@ -55,10 +55,22 @@ PROMPT = (
 )
 
 TIMEOUT_S = float(os.getenv("VILLAGE_VISION_TIMEOUT_SECS", "8"))
+# The last resort is a reasoning model on a slower lane: measured 8.1 s, 10.2 s
+# and 0.9 s (warm) for three calls on 2026-11-19, so the 8 s used for Workers AI
+# would cut it off exactly when it is needed.  Two Cloudflare calls run first at
+# ~1.6–2.0 s each in the usual case.
+TIMEOUT_LAST_S = float(os.getenv("VILLAGE_VISION_TIMEOUT_LAST_SECS", "12"))
+# The whole chain, not one call.  The page waits `VISION_WAIT_MS` (15 s) for the
+# name before giving the local classifier's answer; this budget must fit inside
+# it, or the last provider is cut off by the deadline it was added for.
+# Measured worst realistic path: two fast quota failures (~1 s) + 10.2 s = 11 s.
+TOTAL_S = float(os.getenv("VILLAGE_VISION_TOTAL_SECS", "14"))
 
 # The same crop is asked once: the page sends the frame it just classified, and
-# a correction or a retry must not pay for the same answer twice.
-_CACHE: dict[str, str | None] = {}
+# a correction or a retry must not pay for the same answer twice.  The cached
+# value is the answer itself (`object` + `empty`), because "nothing visible" is a
+# different fact from "no answer" and must survive a cache hit.
+_CACHE: dict[str, dict[str, Any]] = {}
 _CACHE_ORDER: list[str] = []
 _CACHE_MAX = 256
 
@@ -126,6 +138,11 @@ def status() -> dict[str, Any]:
             for item in chain
         ],
         "timeout_s": TIMEOUT_S,
+        # The whole chain's budget, and the slower last resort's own timeout —
+        # the page waits `VISION_WAIT_MS` (15 s) for a name, so these have to fit
+        # inside it or the fallback is cut off by the deadline it exists for.
+        "total_s": TOTAL_S,
+        "last_timeout_s": TIMEOUT_LAST_S,
     }
 
 
@@ -144,7 +161,7 @@ def identify(image: str) -> dict[str, Any]:
 
     key = hashlib.sha256(image.encode("utf-8")).hexdigest()
     if key in _CACHE:
-        return {**base, "object": _CACHE[key], "ms": 0, "cached": True}
+        return {**base, **_CACHE[key], "ms": 0, "cached": True}
 
     jpeg = _decode(image)
     if jpeg is None:
@@ -156,8 +173,18 @@ def identify(image: str) -> dict[str, Any]:
     for offset in range(len(chain)):
         index = (start + offset) % len(chain)
         candidate = chain[index]
+        # The whole chain has one deadline, because the page has one too.  An
+        # attempt that cannot finish inside it is not started: answering with the
+        # local classifier is better than a request cut off mid-flight.
+        remaining = TOTAL_S - (time.time() - started)
+        if remaining < 1.5:
+            first_error = first_error or RuntimeError(
+                f"the naming chain ran out of time after {TOTAL_S:.0f} s"
+            )
+            break
+        timeout = min(_attempt_timeout(candidate["provider"]), remaining)
         try:
-            text = _ask_candidate(candidate, jpeg)
+            text = _ask_candidate(candidate, jpeg, timeout)
         except Exception as exc:  # noqa: BLE001 - try the next account
             first_error = first_error or exc
             # Move on: this one is spent, expired or broken.  The index is
@@ -166,24 +193,48 @@ def identify(image: str) -> dict[str, Any]:
             continue
         _INDEX[0] = index
         name = _clean(text)
-        _remember(key, name)
-        return {
+        answer = {
             "provider": candidate["provider"],
             "model": model_name(candidate["provider"]),
             "object": name,
             "ms": int((time.time() - started) * 1000),
         }
+        # "Nothing visible" is an ANSWER, not a failure.  The page must be able
+        # to tell it apart from "the service did not answer", because the first
+        # is "nothing to sort" and the second falls back to the classifier.
+        if name is None and _says_nothing(text):
+            answer["empty"] = True
+            answer["reason"] = "the model saw no object"
+        _remember(key, {"object": answer["object"], "empty": bool(answer.get("empty"))})
+        return answer
     return {**base, "object": None, "ms": int((time.time() - started) * 1000),
             "reason": str(first_error)[:200] if first_error else "no provider answered"}
 
 
 # --------------------------------------------------------------------- helpers ---
 
-def _remember(key: str, value: str | None) -> None:
+def _remember(key: str, value: dict[str, Any]) -> None:
     _CACHE[key] = value
     _CACHE_ORDER.append(key)
     while len(_CACHE_ORDER) > _CACHE_MAX:
         _CACHE.pop(_CACHE_ORDER.pop(0), None)
+
+
+_NOTHING_WORDS = {
+    "nothing", "none", "no object", "no objects", "no item", "no items", "empty",
+    "n/a", "nothing visible", "no object visible",
+}
+
+
+def _says_nothing(text: str) -> bool:
+    """True when the model literally answered "nothing".
+
+    Deliberately narrow: `unknown` and a refusal ("I cannot tell") are *not* an
+    empty scene — they are an unusable answer, and the page falls back to the
+    classifier for those.
+    """
+    name = " ".join((text or "").split()).strip(" \"'`*.").rstrip(".").strip().lower()
+    return name in _NOTHING_WORDS
 
 
 def _clean(text: str) -> str | None:
@@ -250,13 +301,17 @@ def _ask(jpeg: bytes, which: str) -> str:
     return _opencode(jpeg)
 
 
-def _ask_candidate(candidate: dict[str, str], jpeg: bytes) -> str:
+def _attempt_timeout(provider: str) -> float:
+    return TIMEOUT_LAST_S if provider == "opencode" else TIMEOUT_S
+
+
+def _ask_candidate(candidate: dict[str, str], jpeg: bytes, timeout: float) -> str:
     if candidate["provider"] == "cloudflare":
-        return _cloudflare(jpeg, candidate)
-    return _opencode(jpeg)
+        return _cloudflare(jpeg, candidate, timeout)
+    return _opencode(jpeg, timeout)
 
 
-def _opencode(jpeg: bytes) -> str:
+def _opencode(jpeg: bytes, timeout: float = TIMEOUT_S) -> str:
     base = (os.getenv("VILLAGE_VISION_BASE_URL") or "https://opencode.ai/inference/go/v1").rstrip("/")
     key = os.getenv("VILLAGE_VISION_API_KEY", "")
     if not key:
@@ -284,13 +339,14 @@ def _opencode(jpeg: bytes) -> str:
             "User-Agent": "village-waste-classifier/1.0",
             "x-opencode-session": "village-waste-classifier-session",
         },
-        TIMEOUT_S,
+        timeout,
     )
     message = body["choices"][0]["message"]
     return (message.get("content") or "").strip()
 
 
-def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None) -> str:
+def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None,
+                timeout: float = TIMEOUT_S) -> str:
     candidate = candidate or {
         "token": os.getenv("VILLAGE_CF_API_TOKEN", ""),
         "account": os.getenv("VILLAGE_CF_ACCOUNT_ID", "").strip(),
@@ -327,7 +383,7 @@ def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None) -> str:
             else {"image": list(jpeg), "prompt": PROMPT, "max_tokens": 512}
         )
         try:
-            body = _post(url, payload, headers, TIMEOUT_S)
+            body = _post(url, payload, headers, timeout)
         except Exception as error:  # noqa: BLE001
             last = error
             continue

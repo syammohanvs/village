@@ -501,6 +501,15 @@ void handleCommand() {
         applyWasteCategory(category);
       }
     }
+  } else if (type == "CLEAR_WASTE") {
+    // The app's explicit "no lamp for this answer" command, sent when a new item
+    // is checked so the previous item's LED cannot outlive its own answer.  It
+    // is the same state the automatic timer produces, only sooner; the timer is
+    // untouched and still switches a lit LED off on its own.
+    rt.waste.clear();
+    if (!rt.test_enabled) applyWasteCategory(WasteCategory::Unknown);
+    result = CommandResult::Accepted;
+    reason = &reasons::kWasteCleared;
   } else if (type == "TEST_MODE") {
     // The master switch above the five outputs.  On forces every output OFF and
     // takes them from the normal drivers; off releases everything and hands

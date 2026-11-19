@@ -4,6 +4,8 @@ import App from '../App';
 import { api } from '../lib/api';
 import { makeSettings, makeState } from '../test/fixtures';
 
+vi.mock('../lib/wasteTiming', () => ({ VISION_WAIT_MS: 500 }));
+
 vi.mock('../lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/api')>();
   return {
@@ -18,6 +20,7 @@ vi.mock('../lib/api', async (importOriginal) => {
       wasteResnetStatus: vi.fn(),
       wasteClassify: vi.fn(),
       wasteIdentify: vi.fn(),
+      wasteClear: vi.fn(),
       wasteTeach: vi.fn(),
       postRecognition: vi.fn(),
       voiceReadiness: vi.fn(),
@@ -99,6 +102,10 @@ beforeEach(() => {
     username: null,
     auth_enabled: false,
   });
+  // Every check clears the previous lamp first.  Default to an acknowledged
+  // clear; the tests that care stub their own answer.
+  vi.mocked(api.wasteClear).mockClear();
+  vi.mocked(api.wasteClear).mockResolvedValue({ cleared: true, confirmed: true });
 
   window.history.pushState({}, '', '/waste');
   // The classifier adapter draws the crop into a canvas and sends it to the
@@ -714,6 +721,8 @@ describe('Sort Waste — two models, one decision', () => {
     vision?: boolean;
     identify?: (image: string) => Promise<unknown>;
     record?: unknown;
+    /** Override what the board says about the start-of-check clear. */
+    clear?: { cleared: boolean; confirmed: boolean; note?: string | null };
     /** Override the model-status answer, e.g. to carry a provider chain. */
     status?: {
       installed: boolean;
@@ -731,6 +740,10 @@ describe('Sort Waste — two models, one decision', () => {
 
   async function press(options: Options): Promise<() => void> {
     const vision = options.vision !== false;
+    vi.mocked(api.wasteClear).mockClear();
+    vi.mocked(api.wasteClear).mockResolvedValue(
+      options.clear ?? { cleared: true, confirmed: true },
+    );
     vi.mocked(api.wasteResnetStatus).mockResolvedValue(
       options.status ?? {
         installed: true,
@@ -774,6 +787,9 @@ describe('Sort Waste — two models, one decision', () => {
     await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(screen.getByTestId('start-camera'));
     fireEvent.click(await screen.findByTestId('classify-now'));
+    // The start-of-check clear answers on its own microtask; flushing it here
+    // keeps every later state update inside act() instead of after the test.
+    await act(async () => undefined);
     return restore;
   }
 
@@ -1165,6 +1181,91 @@ describe('Sort Waste — two models, one decision', () => {
       expect(chain).toHaveTextContent(
         /@cf\/meta\/llama-3\.2-11b-vision-instruct → deepseek-v4\.1-flash/,
       );
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('clears the previous lamp before it asks for a new one', async () => {
+    // A check starts by putting the last item's LED out, and that clear has to
+    // land before this check's own lamp command — otherwise a fast answer could
+    // be undone by the clear that started it.
+    const restore = await press({ predictions: plasticAt(0.95), object: 'clear plastic bottle' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(api.wasteClear).toHaveBeenCalledTimes(1);
+      const [requestId] = vi.mocked(api.wasteClear).mock.calls[0];
+      expect(String(requestId)).toMatch(/^clear-\d+-/);
+      expect(vi.mocked(api.wasteClear).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(api.postRecognition).mock.invocationCallOrder[0],
+      );
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('says so in the details when the board refuses the clear, and still answers', async () => {
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      object: 'clear plastic bottle',
+      clear: {
+        cleared: false,
+        confirmed: false,
+        note: 'Bin indicator not cleared: the controller is unreachable.',
+      },
+    });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      // The answer is not held hostage by a lamp.
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i);
+      expect(screen.getByTestId('waste-clear-note')).toHaveTextContent(/not cleared/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('falls back to the classifier when the name has nothing usable — "container"', async () => {
+    // A name with no special-care cue, no object route and no recognised
+    // material is not a refusal: the classifier's own thresholds decide.
+    const restore = await press({ predictions: plasticAt(0.9), object: 'container' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
+      expect(within(screen.getByTestId('waste-classify')).getByText(/local resnet50/i)).toBeInTheDocument();
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i);
+      const payload = vi.mocked(api.postRecognition).mock.calls[0][0];
+      expect(payload).toMatchObject({
+        category: 'plastic',
+        route: 'bin.plastic',
+        source: 'local',
+        item: 'container',
+      });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('treats "nothing visible" as nothing to sort, not as a classifier guess', async () => {
+    // An empty base is an answer.  The classifier would happily call the
+    // patterned sheet Plastic 0.95, and that must not light a bin.
+    vi.mocked(api.wasteTeach).mockClear();
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      identify: (async () => ({
+        object: null,
+        empty: true,
+        provider: 'cloudflare',
+        model: '@cf/meta/llama-3.2-11b-vision-instruct',
+        ms: 800,
+      })) as never,
+    });
+    try {
+      await screen.findByTestId('waste-empty', {}, { timeout: 8000 });
+      expect(screen.getByTestId('waste-empty')).toHaveTextContent(/nothing to sort/i);
+      // No bin question, no lamp, no record, and no training photo.
+      expect(api.postRecognition).not.toHaveBeenCalled();
+      expect(api.wasteTeach).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('waste-action')).not.toBeInTheDocument();
     } finally {
       restore();
     }

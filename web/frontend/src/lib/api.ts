@@ -530,14 +530,20 @@ export const api = {
   /**
    * Ask the hosted vision model what the object in this crop is.
    *
-   * It answers a *name* ("clear plastic lid"), never a bin: measured on the
-   * venue probe a vision model is 53.7% exact against the local classifier's
-   * 70.7%, so the category stays a local decision.  `object` is null when no
-   * provider is configured or the answer was unusable, and the page then says
-   * nothing about it.
+   * It returns the *name* ("clear plastic lid"), which the page's rules turn
+   * into a route — its material word can choose a bin.  It is not the whole
+   * answer: the rules check special care and object routes first, and a name
+   * with nothing usable falls through to the classifier.
+   *
+   * `object` is null when nothing was configured or the call failed; `empty` is
+   * true only when the model looked and answered "nothing" — an empty scene is a
+   * different fact from an unavailable service, and the page treats it as
+   * "nothing to sort" rather than falling back.
    */
   wasteIdentify(image: string): Promise<{
     object: string | null;
+    /** The model saw no object.  A distinct outcome from a failed call. */
+    empty?: boolean;
     provider: string | null;
     model: string | null;
     ms: number;
@@ -545,11 +551,32 @@ export const api = {
   }> {
     return request<{
       object: string | null;
+      empty?: boolean;
       provider: string | null;
       model: string | null;
       ms: number;
       reason?: string;
     }>('/waste/identify', { method: 'POST', body: { image }, mode: undefined });
+  },
+
+  /**
+   * Put every bin LED out before a new item is checked.
+   *
+   * The board switches a lit LED off by itself after `indicate_ms` (8 s); this
+   * makes the same thing happen at the start of a check, so the previous item's
+   * lamp cannot sit above the new answer.  The answer does not depend on it: a
+   * controller that refuses is reported, not thrown.
+   */
+  wasteClear(requestId?: string): Promise<{
+    cleared: boolean;
+    confirmed: boolean;
+    ack?: { result?: string; reason?: string } | null;
+    note?: string | null;
+  }> {
+    return request('/waste/clear', {
+      method: 'POST',
+      body: { mode: activeMode, request_id: requestId ?? newRequestId() },
+    });
   },
 
   /**

@@ -47,6 +47,19 @@ class WasteIndicator {
     }
   }
 
+  /**
+   * Put every category LED out now, before the timer would.
+   *
+   * The app sends this when a new item is about to be checked, so the previous
+   * item's lamp cannot sit above the new answer.  It is the same state the
+   * timer produces; it just arrives earlier.
+   */
+  void clear() {
+    active_ = false;
+    category_ = WasteCategory::Unknown;
+    until_ms_ = 0;
+  }
+
   WasteLedState read(uint32_t now) const {
     WasteLedState s;
     if (!active_) return s;

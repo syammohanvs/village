@@ -86,7 +86,10 @@ Stop only this project:
   every press as the **offline fallback** — it decides only when no name comes
   back, and every named press saves its crop for a future retrain (saved, not
   learned: the weights change only when the model is retrained and redeployed).
-  Nothing is measured about bin fullness; the LEDs are indicators only.
+  A check starts by **clearing the previous item's lamp** (`CLEAR_WASTE`, so the
+  old indication cannot outlive its answer), and an empty base answers "nothing
+  to sort" rather than guessing. Nothing is measured about bin fullness; the LEDs
+  are indicators only, and their selection has been verified on the board.
 - **Demo mode** — clearly labelled simulated data and simulated commands. It
   cannot reach real hardware; demo events are stored separately.
 - **What Happened** — one timeline of actions and reasons; raw codes, filters

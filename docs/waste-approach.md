@@ -63,6 +63,13 @@ The page also never claims more than it can see: no bin fullness, no
 
 `web/frontend/src/pages/SortWaste.tsx` → `runCheck()`
 
+0. **Clear the previous lamp.** `POST /api/v1/waste/clear` sends `CLEAR_WASTE`
+   and is awaited *before* this check's own lamp command, so the two can never
+   arrive out of order. The board also switches a lit LED off by itself after
+   `indicate_ms` (8 s); this is the same state, earlier, so a visitor never reads
+   the previous item's lamp against the new sentence. A controller that refuses
+   is reported (`cleared: false` + the reason) and the check still runs — the
+   answer does not depend on a lamp.
 1. **Analysis frame.** The video is drawn into a 160×120 canvas
    (`ANALYSIS_WIDTH` × `ANALYSIS_HEIGHT`) and read with `getImageData`.
 2. **Find the item.** `backdropBox()` (`lib/backdrop.ts`) measures the median
@@ -97,14 +104,13 @@ The page also never claims more than it can see: no bin fullness, no
    *name* decided and there is a class to file. See §7: this saves a photograph,
    it does not change the model.
 
-**The bin LEDs are bounded by the firmware, not by the page.** One category LED
-at a time, lit for `INDICATE_WASTE`'s `duration_ms` (8 s, capped by the board's
-`indicate_ms`), then switched off by the board's own timer. A non-bin answer
-sends no command, so no lamp is lit for it — but a lamp lit by the *previous*
-item can stay on for the rest of its 8 seconds, because the firmware has no
-"clear" command (`WasteIndicator::indicate` refuses `Unknown`). That is the one
-window in which the physical lamp can disagree with the new answer; adding a
-clear command is a firmware change and needs a board test.
+**The bin LEDs: one at a time, bounded, and now clearable.** One category LED is
+lit for `INDICATE_WASTE`'s `duration_ms` (8 s, capped by the board's
+`indicate_ms`), and the board's own timer switches it off. `CLEAR_WASTE` (firmware
+0.2.9, `WasteIndicator::clear`) is the explicit early clear the page sends when a
+new check starts; a non-bin answer sends no lamp command at all. The timer is
+untouched — clearing is simply the same state, sooner. **The clear is new
+behaviour and has only been exercised on the simulator** (see §15).
 
 `checkSeq` is the request identity: a result belonging to an older press is
 dropped rather than overwriting a newer answer.
@@ -114,8 +120,11 @@ dropped rather than overwriting a newer answer.
 ## 3. Model A — the hosted namer (`web/backend/app/vision.py`)
 
 `POST /api/v1/waste/identify {image}` →
-`{object, provider, model, ms, cached?, reason?}`. **Always 200.** `object` is
-`null` when nothing is configured, the model failed, or it answered "nothing".
+`{object, empty?, provider, model, ms, cached?, reason?}`. **Always 200.**
+`object` is `null` when nothing is configured or the call failed; `empty: true`
+is the separate fact that the model *looked and answered "nothing"*. The page
+turns the first into the classifier's fallback and the second into "nothing to
+sort".
 
 - **It names the item; the rules decide the route.** Its material word is an
   input to `wasteDecision`, so *it can put an item in a bin* — "clear plastic
@@ -143,9 +152,18 @@ dropped rather than overwriting a newer answer.
   `VILLAGE_VISION_PROVIDER` chooses which family goes first, and
   `GET /api/v1/waste/resnet-status` reports the chain in `vision.attempts`, which
   is what Model details shows.
-- **Cache:** the same image string is answered once (256 entries). A retry or a
-  correction must not pay twice.
-- **Timeout:** `VILLAGE_VISION_TIMEOUT_SECS` (default 8).
+- **Cache:** the same image string is answered once (256 entries), and the
+  cached answer keeps `empty` with it — the same crop cannot be "nothing" on one
+  press and a failure on the next.
+- **Timeout, per chain and per provider.** `VILLAGE_VISION_TIMEOUT_SECS`
+  (default 8) for Workers AI, `VILLAGE_VISION_TIMEOUT_LAST_SECS` (default 12) for
+  the OpenCode Go / DeepSeek last resort, and one budget for the whole chain,
+  `VILLAGE_VISION_TOTAL_SECS` (default 14). An attempt that cannot finish inside
+  the remaining budget is not started; the answer is then the local classifier's.
+  Measured on this laptop 2026-11-19: Workers AI 1.6–2.0 s (4.7 s cold) and
+  DeepSeek 8.1 s, 10.2 s and 0.9 s — which is why an 8 s cap for everything cut
+  the fallback off, and why the page's deadline is 15 s
+  (`web/frontend/src/lib/wasteTiming.ts`).
 - Keys live in `.env` / `.env.secrets` and are never printed, logged or
   committed into a doc.
 
@@ -183,6 +201,7 @@ The order **is** the safety argument. Nothing below may be reordered without
 re-measuring.
 
 ```
+0. the model says "nothing"                          -> nothing to sort
 1. a special-care cue in the name                   -> refuse, ask a person
 2. an OBJECT the name states, with its own route     -> that route (never a bin)
 3. the first MATERIAL word in the name               -> that material's route;
@@ -193,6 +212,13 @@ re-measuring.
    no name: classifier material at 0.50               -> collection route, no lamp
 7. anything else                                     -> "not sure, ask"
 ```
+
+**An unusable name is not a refusal.** "container" carries no special-care cue,
+no object route and no material word, so it has no claim to make — the classifier's
+thresholds decide, exactly as they do when no name arrived at all. The card then
+shows the classifier as the reader, and the name is still displayed as what the
+camera saw. This is the fallback the review asked for, and it is the existing
+behaviour made explicit and tested.
 
 **Two regimes, and the thresholds belong to only one of them.**
 
@@ -208,12 +234,14 @@ conversation, a wrong bin puts an object in the wrong physical place.
 **There is no "two models must agree" rule and no corroboration floor** — those
 constants were deleted in 2026-11-19 because the name-first path never applied
 them, and the numbers they carried came from a rule the product no longer has.
+Model disagreement alone never refuses an answer: the route is the name's word,
+or the classifier's own threshold when there is no word.
 
 **Object before material** is what makes a plastic remote e-waste, a metal watch
 e-waste, and a pencil "none of the bins". The object list is deliberately small
 — a word belongs in it only if it has a route **of its own**; `keychain` and
-`bottle` are not there, because either can be three materials and a
-disagreement should refuse rather than guess.
+`bottle` are not there, because either can be three materials, so they are left
+to the material word rather than guessed from the object.
 
 **Name-first is the operator's instruction (2026-11-19)**, with its cost stated:
 on synthetic probes the name is the *worse* classifier (archive 53.1/66.8 vs
@@ -233,6 +261,9 @@ answer).
 
 The result card is one big answer, not two model scores:
 
+0. **"Nothing to sort"** when the model looked and saw no object — its own
+   block, with no bin, no lamp and no training crop. It is an answer, not a
+   failed lookup, and the classifier's guess is not consulted for it.
 1. **"I see: clear plastic lid"** (the name), then the material in smaller type.
 2. **The suggested action** — e.g. *"Empty and rinse it, then put it in the
    plastic bin."*
@@ -282,6 +313,21 @@ deploys the result. The card says "kept here to teach the offline model", not
   four pencil/eraser crops had been filed as Plastic (2026-11-19), now fixed and
   pinned by two tests.
 - Git-ignored, like `data/waste-captures/`.
+
+---
+
+**Human involvement is correction-only.** The operator watches the exhibit,
+says nothing while it is right, and reports (or files) a correction when it is
+wrong. **Silence means no error was reported** — it is not a claim that every
+answer was checked, and nothing in the page asks a visitor or an operator to
+confirm a result. `data/waste-samples/` is where a reported mistake becomes a
+human-verified photo.
+
+**The physical side has been verified by the operator (2026-11-19):** the bin
+indicators light correctly for the selected bin. That selection is **not** in
+question here and was not re-tested. The only new hardware behaviour is the
+`CLEAR_WASTE` command in §2, which is covered by host tests and the simulator and
+still needs one press on the board.
 
 ---
 
@@ -409,9 +455,10 @@ crops **per class** is the threshold the project has been holding itself to.
    Hindi page cannot send an item to a different bin.
 7. **Nothing a visitor sees is a score.** No percentages, no provider names, no
    thresholds outside *Model details*.
-8. **The bin lamp is driven by the decision only** — never by a raw class, and
-   never for `other`/`medical`. A non-bin answer sends no lamp command, and the
-   board's own timer is what clears the previous lamp (≤ 8 s).
+8. **The bin indicator is driven by the decision only** — never by a raw class,
+   and never for `other`/`medical`. A non-bin answer sends no lamp command; the
+   previous lamp is cleared at the start of the next check (`CLEAR_WASTE`) and,
+   failing that, by the board's own timer (≤ 8 s).
 9. **A completed answer is final.** A hosted name that arrives after the answer
    was shown, spoken and sent must not rewrite it; it belongs in Model details.
 10. **Rejected and not to be re-proposed without new evidence:** CLIP/SigLIP
@@ -420,7 +467,7 @@ crops **per class** is the threshold the project has been holding itself to.
    70.7 %); letting the name promote a different top-3 class (+4 false bins);
    the u2net background remover inside the crop; a skin-colour "hand present"
    gate; training on synthetic base composites (v20 lost item action).
-10. **The name-first decoder prompt and the cloud disclosure are load-bearing** —
+11. **The name-first decoder prompt and the cloud disclosure are load-bearing** —
     if the prompt learns soil/water vocabulary it invents commands out of music
     (that is a voice rule, but the same discipline applies here: no prompt or
     heuristic that can turn noise into a bin).
@@ -431,6 +478,8 @@ crops **per class** is the threshold the project has been holding itself to.
 
 - `web/frontend/src/lib/wasteStabilizer.ts` is the three-frame stabiliser the
   page no longer uses; `Prediction` is still the shared type.
+- The firmware's `CLEAR_WASTE` command (0.2.9) and the backend's
+  `POST /api/v1/waste/clear` are new; the board press is the only check left.
 - The corrections UI lives behind `?operator=1`; the documented shape is
   `POST /waste/correction {file, actual}`. There is no visible button on the
   visitor card, on purpose — mistakes are reported to the operator, who files
@@ -490,3 +539,29 @@ The protocol that works, and the one the measurements support:
 5. **Ship only if both are acceptable.** If the head is too coarse at those
    counts, the gallery is the next thing to try — and it starts with a
    measurement on the same held-out views, not with a claim.
+
+---
+
+## 15. What is verified, and what is new
+
+| thing | status |
+| --- | --- |
+| bin selection → the right LED lights | **verified by the operator on the board** (2026-11-19) — do not re-test |
+| the LED switches itself off after `indicate_ms` | verified by the operator, and pinned in `uc/test/test_waste_commands.cpp` |
+| `CLEAR_WASTE` (new, firmware 0.2.9) | host tests + simulator + the route test; **one press on the board is outstanding** |
+| the empty-scene answer | frontend tests (no bin, no record, no crop) and a vision unit test |
+| the unusable-name fallback | frontend test (`container` → the classifier's bin) |
+| the chain's timeouts | unit-tested per provider and per budget; the numbers were measured live (1.6–2.0 s / 8.1–10.2 s) |
+
+To check the clear on the board when one is available:
+
+```bash
+# 1. light a lamp through the app's own route, then clear it
+curl -s -X POST localhost:8010/api/v1/waste/clear \
+  -H 'Content-Type: application/json' -d '{"mode":"live","request_id":"clear-board-01"}'
+```
+
+It must answer `{"cleared": true, "confirmed": true, "ack": {"result": "ACCEPTED"}}`
+and the lamp must go out at once, not after its 8 seconds. A board running an
+older image answers `REJECTED` / `COMMAND_INVALID` — that is the image, not the
+command.

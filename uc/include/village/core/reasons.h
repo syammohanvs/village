@@ -139,6 +139,12 @@ inline constexpr Reason kWastePlastic{
     "WASTE_INDICATED_PLASTIC", "Plastic recognised. Plastic-bin indicator activated."};
 inline constexpr Reason kWastePaper{
     "WASTE_INDICATED_PAPER", "Paper recognised. Paper-bin indicator activated."};
+// The one way a lit category LED goes out early.  It exists because a new item
+// can be checked while the previous lamp is still inside its `indicate_ms`
+// window, and the answer to the new item must not sit under a lamp belonging to
+// the old one.  The automatic switch-off timer is unchanged and still runs.
+inline constexpr Reason kWasteCleared{
+    "WASTE_INDICATOR_CLEARED", "Bin indicator cleared. All three are off."};
 inline constexpr Reason kWasteUnknown{
     "WASTE_UNKNOWN_CATEGORY",
     "Unknown waste category. No category indicator was activated."};
