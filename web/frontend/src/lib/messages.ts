@@ -816,6 +816,19 @@ export const MESSAGES = {
     'भौतिक संकेत उपलब्ध नहीं — कंट्रोलर जुड़ा नहीं है। ऊपर का उत्तर फिर भी मान्य है।',
     'ഭൗതിക സൂചന ലഭ്യമല്ല — കൺട്രോളർ ബന്ധിപ്പിച്ചിട്ടില്ല. മുകളിലെ ഉത്തരം അതേപടി സാധുവാണ്.',
   ],
+  'sort.suggestedBin': ['Suggested bin', 'सुझाया गया बिन', 'നിർദ്ദേശിച്ച ബിൻ'],
+  'sort.waitingForItem': ['Waiting for an item', 'चीज़ की प्रतीक्षा', 'വസ്തുവിനായി കാത്തിരിക്കുന്നു'],
+  'sort.helpLine': [
+    "Know the bin? Go ahead. Not sure? Show the item to the camera and I'll help.",
+    'बिन पता है? तो ठीक है। पक्का नहीं? चीज़ कैमरे के सामने दिखाएँ, मैं मदद करूँगी।',
+    'ബിൻ അറിയാമോ? എങ്കിൽ ഇട്ടേക്കാം. ഉറപ്പില്ലേ? വസ്തു ക്യാമറയ്ക്ക് മുന്നിൽ കാണിക്കുക, ഞാൻ സഹായിക്കാം.',
+  ],
+  'sort.spoken': [
+    'This is {item}. It is {category}. {action}',
+    'यह {item} है। यह {category} है। {action}',
+    'ഇത് {item} ആണ്. ഇത് {category} ആണ്. {action}',
+  ],
+  'sort.modelDetails': ['Model details', 'मॉडल की जानकारी', 'മോഡൽ വിവരങ്ങൾ'],
   'sort.labelIdentification': ['Item identification', 'वस्तु की पहचान', 'വസ്തുവിന്റെ തിരിച്ചറിയൽ'],
   'sort.labelClassification': ['Waste classification', 'कचरे का वर्गीकरण', 'മാലിന്യ വർഗ്ഗീകരണം'],
   'sort.labelAction': ['Suggested action', 'सुझाया गया कदम', 'നിർദ്ദേശിച്ച നടപടി'],
@@ -833,11 +846,11 @@ export const MESSAGES = {
   'sort.sourceLocal': ['Local ResNet50', 'स्थानीय ResNet50', 'ലോക്കൽ ResNet50'],
   'sort.stateWaiting': ['Waiting', 'प्रतीक्षा', 'കാത്തിരിക്കുന്നു'],
   'sort.stateIdentifying': [
-    'AI is identifying the item.…',
+    'Labelling the item…',
     'AI वस्तु की पहचान कर रहा है…',
     'AI വസ്തു തിരിച്ചറിയുന്നു…',
   ],
-  'sort.stateClassifying': ['Checking the material…', 'सामग्री जाँची जा रही है…', 'വസ്തുവക ജാതി പരിശോധിക്കുന്നു…'],
+  'sort.stateClassifying': ['Checking the waste category…', 'कचरे की श्रेणी जाँची जा रही है…', 'മാലിന്യ വിഭാഗം പരിശോധിക്കുന്നു…'],
   'sort.stateUnavailable': [
     'Item identification unavailable',
     'वस्तु की पहचान उपलब्ध नहीं',

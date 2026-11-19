@@ -383,6 +383,26 @@ export function SortWaste() {
     }
   };
 
+  const CLASS_KEY: Record<string, MessageKey> = {
+    organic: 'waste.item.organic',
+    plastic: 'waste.item.plastic',
+    paper: 'waste.item.paper',
+    glass: 'waste.item.glass',
+    metal: 'waste.item.metal',
+    textile: 'waste.item.textile',
+    leather: 'waste.item.leather',
+    footwear: 'waste.item.footwear',
+    thermocol: 'waste.item.thermocol',
+    ewaste: 'waste.item.ewaste',
+    background: 'waste.item.background',
+  };
+
+  /** The class name a decision is shown with, in the page's language. */
+  const categoryName = (decision: Decision): string => {
+    const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
+    return key ? t(key) : t('sort.stateUncertain');
+  };
+
   /**
    * The one sentence a decision is spoken and written as.
    *
@@ -407,6 +427,20 @@ export function SortWaste() {
     },
     [t],
   );
+
+  /**
+   * The sentence Sara says: the label, the category, then the path.
+   *
+   * Spoken once per press, and only for the decision that was actually taken —
+   * a late name is dropped before this is reached.
+   */
+  const spokenAnswer = (decision: Decision): string => {
+    const item = decision.itemLabel?.trim();
+    const category = categoryName(decision);
+    const action = actionSentence(decision);
+    if (!item) return `${category}. ${action}`;
+    return t('sort.spoken', { item, category, action });
+  };
 
   /**
    * One press, one check, one decision.
@@ -529,8 +563,9 @@ export function SortWaste() {
       });
       setPredictions(averaged.slice(0, 3));
 
-      // Sara says the accepted answer once, in the language it began in.
-      void speakText(actionSentence(decision), voiceLanguage, 0.95);
+      // Sara says the whole answer once, in the language it began in: what the
+      // item is, what it is made of, and where it goes.
+      void speakText(spokenAnswer(decision), voiceLanguage, 0.95);
       if (decision.status === 'nothing') return;
 
       // Only an accepted handling decision may ask the board for a lamp.
@@ -561,7 +596,7 @@ export function SortWaste() {
       if (seq === checkSeq.current) setReading(false);
       busyRef.current = false;
     }
-  }, [actionSentence, visionReady, voiceLanguage]);
+  }, [actionSentence, visionReady, voiceLanguage]);  // spokenAnswer is stable: t only
 
 
   // The model is loaded when the page opens rather than when the camera starts,
@@ -594,26 +629,6 @@ export function SortWaste() {
     }, 500);
     return () => clearInterval(timer);
   }, [cameraOn, drawPreview]);
-
-  const CLASS_KEY: Record<string, MessageKey> = {
-    organic: 'waste.item.organic',
-    plastic: 'waste.item.plastic',
-    paper: 'waste.item.paper',
-    glass: 'waste.item.glass',
-    metal: 'waste.item.metal',
-    textile: 'waste.item.textile',
-    leather: 'waste.item.leather',
-    footwear: 'waste.item.footwear',
-    thermocol: 'waste.item.thermocol',
-    ewaste: 'waste.item.ewaste',
-    background: 'waste.item.background',
-  };
-
-  /** The class name a decision is shown with, in the page's language. */
-  const categoryName = (decision: Decision): string => {
-    const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
-    return key ? t(key) : t('sort.stateUncertain');
-  };
 
   /** Back to waiting: a new press starts a new check with a new identity. */
   const resetCheck = useCallback(() => {
@@ -815,66 +830,60 @@ export function SortWaste() {
               {t('sort.disclosure')}
             </p>
           )}
-          <Card className="result-card" title={t('sort.panelTitle')}>
+          <Card className="result-card" title={t('sort.suggestedBin')}>
             {/*
-              Two models, two questions, shown as two states.  The local
-              classifier answers "what material"; the hosted model answers
-              "what is this".  Neither feeds the other, and the action below is
-              the only thing that may move an item.
+              The big answer first — what the item is, what it is made of, where
+              it goes — and the two model readings underneath, because that is
+              the order a visitor reads it in.  Nothing is classified until the
+              button is pressed, and the card says so while it waits.
             */}
-            <div className="model-state" data-testid="waste-identify">
-              <div className="model-state-head">
-                <span className="model-state-label">{t('sort.labelIdentification')}</span>
-                <span className="model-state-source">{t('sort.sourceVision')}</span>
+            {!check.decision && !reading ? (
+              <div data-testid="waste-waiting-block">
+                <p className="result-big" data-testid="waste-waiting">
+                  {t('sort.waitingForItem')}
+                </p>
+                <p className="result-lead">{t('sort.helpLine')}</p>
+                <p className="result-press" data-testid="waste-press-hint">
+                  {t('sort.pressHint')}
+                </p>
               </div>
-              <p className="model-state-value" data-testid="waste-sees">
-                {check.identify === 'checking'
-                  ? t('sort.stateIdentifying')
-                  : check.identify === 'done' && check.decision?.itemLabel
-                    ? t('sort.identified', { item: check.decision.itemLabel })
-                    : t('sort.stateUnavailable')}
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="model-state" data-testid="waste-identify">
+                  <div className="model-state-head">
+                    <span className="model-state-label">{t('sort.labelIdentification')}</span>
+                    <span className="model-state-source">{t('sort.sourceVision')}</span>
+                  </div>
+                  <p className="model-state-value" data-testid="waste-sees">
+                    {check.identify === 'checking'
+                      ? t('sort.stateIdentifying')
+                      : check.identify === 'done' && check.decision?.itemLabel
+                        ? check.decision.itemLabel
+                        : t('sort.stateUnavailable')}
+                  </p>
+                </div>
 
-            <div className="model-state" data-testid="waste-classify">
-              <div className="model-state-head">
-                <span className="model-state-label">{t('sort.labelClassification')}</span>
-                <span className="model-state-source">
-                  {check.decision?.source === 'vision' ? t('sort.sourceName') : t('sort.sourceLocal')}
-                </span>
-              </div>
-              <p className="model-state-value" data-testid="waste-result">
-                {check.classify === 'checking'
-                  ? t('sort.stateClassifying')
-                  : check.decision
-                    ? check.classify === 'uncertain'
-                      // The class is still reported — with its uncertainty, not
-                      // instead of it.
-                      ? `${t('sort.category', { category: categoryName(check.decision) })} · ${t('sort.stateUncertain')}`
-                      : t('sort.category', { category: categoryName(check.decision) })
-                    : t('sort.stateWaiting')}
-              </p>
-            </div>
+                <div className="model-state model-state--class" data-testid="waste-classify">
+                  <div className="model-state-head">
+                    <span className="model-state-label">{t('sort.labelClassification')}</span>
+                    <span className="model-state-source">
+                      {check.decision?.source === 'vision' ? t('sort.sourceName') : t('sort.sourceLocal')}
+                    </span>
+                  </div>
+                  <p className="model-state-value" data-testid="waste-result">
+                    {!check.decision || check.classify === 'checking'
+                      ? t('sort.stateClassifying')
+                      : check.classify === 'uncertain'
+                        ? `${categoryName(check.decision)} · ${t('sort.stateUncertain')}`
+                        : categoryName(check.decision)}
+                  </p>
+                </div>
 
-            <div className="suggested-action" data-testid="waste-action">
-              <span className="suggested-label">{t('sort.labelAction')}</span>
-              <p>
-                {check.decision
-                  ? actionSentence(check.decision)
-                  : t('sort.plainBackground')}
-              </p>
-            </div>
-
-            {check.crop && (
-              <figure className="crop-thumb" data-testid="waste-crop">
-                <img src={check.crop} alt="" width={72} height={72} />
-                <figcaption>{t('sort.cropLabel')}</figcaption>
-              </figure>
-            )}
-            {check.cropMode === 'centre' && (
-              <p className="hint" data-testid="waste-crop-centre">
-                {t('sort.cropCentre')}
-              </p>
+                <div className="suggested-action" data-testid="waste-action">
+                  <span className="suggested-label">{t('sort.labelAction')}</span>
+                  <p>{check.decision ? actionSentence(check.decision) : t('sort.stateWaiting')}</p>
+                </div>
+              </>
             )}
 
             {check.error && <Notice tone="bad">{check.error}</Notice>}
@@ -890,9 +899,20 @@ export function SortWaste() {
               </p>
             )}
 
-            <details className="advanced">
-              <summary>{t('sort.confidenceDetails')}</summary>
+            <details className="advanced" data-testid="waste-details">
+              <summary>{t('sort.modelDetails')}</summary>
               <div className="advanced-body">
+                {check.crop && (
+                  <figure className="crop-thumb" data-testid="waste-crop">
+                    <img src={check.crop} alt="" width={72} height={72} />
+                    <figcaption>{t('sort.cropLabel')}</figcaption>
+                  </figure>
+                )}
+                {check.cropMode === 'centre' && (
+                  <p className="hint" data-testid="waste-crop-centre">
+                    {t('sort.cropCentre')}
+                  </p>
+                )}
                 <p className="hint">
                   {t('sort.sourceVision')}: {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
                 </p>

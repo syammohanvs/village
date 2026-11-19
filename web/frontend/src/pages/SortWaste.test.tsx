@@ -204,7 +204,7 @@ describe('Sort Waste', () => {
     await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
     expect(start).toHaveTextContent(/start camera/i);
     expect(screen.getByText('How it works')).toBeInTheDocument();
-    expect(screen.getByText('Confidence and model details')).toBeInTheDocument();
+    expect(screen.getByText('Model details')).toBeInTheDocument();
     expect(screen.getByText(/does not identify people/i)).toBeInTheDocument();
   });
 
@@ -798,10 +798,10 @@ describe('Sort Waste — two models, one decision', () => {
       const action = screen.getByTestId('waste-action');
 
       expect(within(identifies).getByTestId('waste-sees')).toHaveTextContent(
-        /Item identified: clear plastic lid/i,
+        /clear plastic lid/i,
       );
       expect(within(identifies).getByText(/cloud vision model/i)).toBeInTheDocument();
-      expect(within(classifies).getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(within(classifies).getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
       // The name decided, so the row says so; the local model's own answer is
       // in the details rather than being presented as the category.
       expect(within(classifies).getByText(/from the item name/i)).toBeInTheDocument();
@@ -865,7 +865,7 @@ describe('Sort Waste — two models, one decision', () => {
         () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/e-waste collection/i),
         { timeout: 8000 },
       );
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Electronic waste/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Electronic waste/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
@@ -897,7 +897,7 @@ describe('Sort Waste — two models, one decision', () => {
         /identification unavailable/i,
       );
       // The category is still reported honestly…
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
       // …but nothing physical happens.
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
@@ -959,9 +959,9 @@ describe('Sort Waste — two models, one decision', () => {
         () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
         { timeout: 8000 },
       );
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
       expect(screen.getByText(/from the item name/i)).toBeInTheDocument();
-      fireEvent.click(screen.getByText(/confidence and model details/i));
+      fireEvent.click(screen.getByText(/^model details$/i));
       expect(screen.getByTestId('waste-local-reading')).toHaveTextContent(/paper/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
@@ -983,7 +983,7 @@ describe('Sort Waste — two models, one decision', () => {
         { timeout: 8000 },
       );
       expect(screen.getByTestId('waste-action')).toHaveTextContent(/paper & cardboard bin/i);
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Paper/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Paper/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'paper' });
     } finally {
@@ -991,7 +991,7 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('speaks the accepted answer once', async () => {
+  it('speaks the label, the category and the path, once', async () => {
     const restore = await press({ predictions: plasticAt(0.95), object: 'clear plastic lid' });
     try {
       await screen.findByTestId('waste-action', {}, { timeout: 8000 });
@@ -999,9 +999,30 @@ describe('Sort Waste — two models, one decision', () => {
         () => expect(spoken.filter((line) => /plastic bin/i.test(line))).toHaveLength(1),
         { timeout: 6000 },
       );
+      const line = spoken.find((text) => /plastic bin/i.test(text)) ?? '';
+      // "This is clear plastic lid. It is Plastic. Use the Plastic & cardboard
+      // bin." — the visitor hears what it is before where it goes.
+      expect(line).toMatch(/this is clear plastic lid/i);
+      expect(line).toMatch(/it is plastic/i);
+      expect(line).toMatch(/plastic bin/i);
     } finally {
       restore();
     }
+  }, 25000);
+
+  it('waits with the two sentences a visitor reads before pressing', async () => {
+    stubCamera();
+    render(<App />);
+    await screen.findByTestId('waste-waiting', {}, { timeout: 8000 });
+    expect(screen.getByTestId('waste-waiting')).toHaveTextContent(/waiting for an item/i);
+    expect(screen.getByText(/know the bin\? go ahead/i)).toBeInTheDocument();
+    expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(
+      /nothing is classified until you do/i,
+    );
+    expect(screen.getByText('Suggested bin')).toBeInTheDocument();
+    // Nothing has been asked of either model.
+    expect(api.wasteIdentify).not.toHaveBeenCalled();
+    expect(api.postRecognition).not.toHaveBeenCalled();
   }, 25000);
 
   it('shows the crop it analysed, and says so when it fell back to the centre', async () => {
@@ -1039,7 +1060,7 @@ describe('Sort Waste — two models, one decision', () => {
       });
       // The late answer must not change the action, the category or the record.
       expect(screen.getByTestId('waste-action')).toHaveTextContent(/identification unavailable/i);
-      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Plastic/i);
       expect(vi.mocked(api.postRecognition).mock.calls).toHaveLength(1);
     } finally {
       restore();
