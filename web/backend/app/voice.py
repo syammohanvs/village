@@ -43,9 +43,15 @@ from .config import Settings
 # the model is asked (peakLevel).
 LANGUAGE_PROMPTS = {
     "hi": "लाइट बंद करो, लाइट चालू करो, पंप चालू करो, पानी, स्ट्रीट लाइट.",
+    # Whole phrases rather than a word list: the list fixed "Stop Illusion!" and
+    # "BOM status!" but still lost the device entirely in "Lights status." ->
+    # "Status." (which the page then answered as the *village* status — reported
+    # 2026-11-19).  Phrased this way the same clip comes back "Lights status.",
+    # and — the reason it is phrased *without* "soil/water/village" — a music
+    # clip stays "[Music]" instead of being invented into "Water status.".
     "en": (
-        "Lights, streetlights, pump, irrigation, status, on, off, automatic, "
-        "soil, water, village."
+        "Lights on. Lights off. Lights status. Streetlights. Pump on. Pump off. "
+        "Pump status. Start irrigation. Stop irrigation. Automatic."
     ),
 }
 

@@ -2320,12 +2320,19 @@ large-v3-turbo** showed the model is not the lever: small repeated the errors an
 large-v3-turbo took **18–24 s and was worse** (`Will eat status?`,
 `Stop, Elegísi!`, `PAM SKATUS`).  The audio itself is ordinary speech (16 kHz, no
 band-limiting, no rumble), so the fix is **priming the decoder with the
-vocabulary**, exactly as Hindi is primed for its script: `LANGUAGE_PROMPTS["en"]`
-is `"Lights, streetlights, pump, irrigation, status, on, off, automatic, soil,
-water, village."`.  On the same base model and the same clips that turned
+vocabulary**, exactly as Hindi is primed for its script — and the first version
+of it (a bare word list) was **not enough**: it fixed the words above but still
+lost the device in *"lights status" → "Status."*, which the page then answered as
+the **village** status (reported the next minute).  What ships is **phrases**:
+`"Lights on. Lights off. Lights status. Streetlights. Pump on. Pump off. Pump
+status. Start irrigation. Stop irrigation. Automatic."` — with **no
+soil/water/village in it**, because adding those turned a music clip into
+*"Water status."*, i.e. a command invented from noise.  On the same base model and
+the same clips that turned
 
   `Stop Illusion!` → **`Stop irrigation.`** · `BOM status!` → **`Pump status.`**
-  · `Like status.` → **`Light status.`** · `automatic bomb.` → **`Automatic, pump.`**
+  · `Like status.` → **`Lights status.`** · `automatic bomb.` → **`Automatic, pump.`**
+  · `Status.` (from "lights status") → **`Lights status.`**
 
 …with no extra latency.  **The risk a prompt carries was checked on the noise
 clips**: `[Music]` and `[BLANK_AUDIO]` stayed noise, and a cough that read `Oh!`

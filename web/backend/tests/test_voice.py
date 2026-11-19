@@ -104,7 +104,13 @@ def test_the_decoder_is_primed_with_the_language_it_should_expect():
     english = request_fields("en")
     assert english["prompt"].strip()
     for word in ("lights", "pump", "irrigation", "status", "automatic"):
-        assert word in english["prompt"], word
+        assert word in english["prompt"].lower(), word
+    # Phrased as commands, not as a bare list — that is what recovered the device
+    # in "Lights status." — and deliberately without soil/water/village, which
+    # turned a music clip into "Water status." (measured).
+    assert "lights status" in english["prompt"].lower()
+    assert "water" not in english["prompt"].lower()
+    assert "soil" not in english["prompt"].lower()
 
     fields = request_fields("hi")
     assert fields["language"] == "hi"
