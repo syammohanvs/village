@@ -180,6 +180,19 @@ def _clean(text: str) -> str | None:
         return None
     if lowered.startswith(("i can", "i cannot", "i'm sorry", "sorry")):
         return None
+    # Some models answer the question instead of naming the object ("the single
+    # object in this photo is a clear plastic lid").  The name is what follows.
+    for prefix in (
+        "the single object in this photo is ",
+        "single object in this photo is ",
+        "the object in this photo is ",
+        "the object is ",
+        "this is ",
+        "it is ",
+    ):
+        if lowered.startswith(prefix):
+            name = name[len(prefix):]
+            break
     for article in ("a ", "an ", "the "):
         if lowered.startswith(article):
             name = name[len(article):]
