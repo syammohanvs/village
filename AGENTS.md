@@ -2860,7 +2860,7 @@ real change of what the ADC means, not a relabelled number:
   "power is not measured" copy is deleted from messages, `docs/operation.md`,
   `docs/wiring.md` §11 and README.
 - **Gates:** firmware **560 checks / 0 failed** (5 new wind units + the
-  rewritten config test), backend **195 passed**, frontend **449 passed**,
+  rewritten config test), backend **195 passed**, frontend **450 passed**,
   typecheck and build clean.  The OTA image was rebuilt
   (`uc/.pio/build/esp32doit-devkit-v1-ota/firmware.bin`, marker **1**, carries
   `voltage_millivolts`), so the next board session flashes both changes:
@@ -2868,4 +2868,6 @@ real change of what the ADC means, not a relabelled number:
   Chromium on :8010 in Simulation: 230 mV → `Voltage 3.03 V · Current 4.89 mA ·
   Power 14.8 mW`; slider at 0 → `Voltage — · Current 0.00 mA · Power 0.0 mW`
   with **No measurable output**; Malayalam at 390 px with no horizontal
-  overflow and zero page errors.
+  overflow and zero page errors.  A frame without `measuring` (a board flashed
+  before this change) shows **no readings at all** rather than zeros — an absent
+  answer is not "0 mA".

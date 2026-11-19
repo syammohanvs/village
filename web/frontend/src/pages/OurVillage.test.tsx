@@ -375,9 +375,9 @@ describe('wind card', () => {
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Generating')).toHaveClass('chip', 'chip--live');
-    expect(
-      card.getByText('Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW'),
-    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-readings')).toHaveTextContent(
+      'Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW',
+    );
     expect(card.getByTestId('wind-help')).toHaveTextContent(
       'Current is calculated from the voltage across a 47 Ω resistor.',
     );
@@ -394,9 +394,9 @@ describe('wind card', () => {
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByText('Not generating')).toHaveClass('chip', 'chip--neutral');
-    expect(
-      card.getByText('Voltage — · Current 0.00 mA · Power 0.0 mW'),
-    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-readings')).toHaveTextContent(
+      'Voltage — · Current 0.00 mA · Power 0.0 mW',
+    );
     expect(card.getByTestId('wind-help')).toHaveTextContent(/^No measurable output/);
     expect(card.queryByText('2.80 V')).not.toBeInTheDocument();
   });
@@ -408,8 +408,24 @@ describe('wind card', () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ connected: false }));
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
-    expect(card.queryByText(/Current/)).not.toBeInTheDocument();
-    expect(card.queryByText(/Power/)).not.toBeInTheDocument();
+    expect(card.queryByTestId('wind-readings')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing for a board whose firmware predates this reading', async () => {
+    // An older image reports volts and no `measuring`/`current_ma`.  It cannot
+    // say whether current flows, so its volts must not be presented as
+    // "0.00 mA" -- that would be a number the board never measured.
+    const frame = makeState({ windMillivolts: 230, windInstalled: true });
+    const wind = frame.status?.sensors.wind;
+    if (wind) {
+      delete wind.measuring;
+      delete wind.current_ma;
+      delete wind.power_mw;
+    }
+    vi.mocked(api.state).mockResolvedValue(frame);
+    await renderReady();
+    const card = within(await screen.findByTestId('card-wind'));
+    expect(card.queryByTestId('wind-readings')).not.toBeInTheDocument();
   });
 
   it('shows nothing rather than an old number when the frame is stale', async () => {
@@ -418,8 +434,7 @@ describe('wind card', () => {
     );
     await renderReady();
     const card = within(await screen.findByTestId('card-wind'));
-    expect(card.queryByText(/Current/)).not.toBeInTheDocument();
-    expect(card.queryByText(/14.8 mW/)).not.toBeInTheDocument();
+    expect(card.queryByTestId('wind-readings')).not.toBeInTheDocument();
   });
 });
 
@@ -608,9 +623,9 @@ describe('Our Village — the words on the page', () => {
     await renderReady();
 
     const card = within(await screen.findByTestId('card-wind'));
-    expect(
-      card.getByText('Voltage 2.92 V · Current 2.55 mA · Power 7.5 mW'),
-    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-readings')).toHaveTextContent(
+      'Voltage 2.92 V · Current 2.55 mA · Power 7.5 mW',
+    );
     // The sentence names the resistor and the LED's measured forward voltage, so
     // the reader can check the arithmetic rather than trust a number.
     expect(card.getByTestId('wind-help')).toHaveTextContent(
@@ -765,9 +780,9 @@ describe('the simulation lab changes conditions and explains itself', () => {
 
     const card = within(await screen.findByTestId('card-wind'));
     // Same arithmetic as the board, with the simulation named.
-    expect(
-      card.getByText('Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW'),
-    ).toBeInTheDocument();
+    expect(card.getByTestId('wind-readings')).toHaveTextContent(
+      'Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW',
+    );
     expect(card.getByTestId('wind-help')).toHaveTextContent(
       /^Simulated with the same circuit as the board/,
     );

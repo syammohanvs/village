@@ -37,11 +37,19 @@ function levelChip(text: string, tone: 'live' | 'warn' | 'bad' | 'neutral' | 'go
   return <Chip tone={tone}>{text}</Chip>;
 }
 
-function stateLine(text: string, tone: 'good' | 'warn' | 'bad' | 'neutral' = 'neutral') {
+function stateLine(
+  text: string,
+  tone: 'good' | 'warn' | 'bad' | 'neutral' = 'neutral',
+  testId?: string,
+) {
   // Nothing to report: render nothing.  A card's chip already says what state it
   // is in, so a second line reading "No reading" only repeats it in worse words.
   if (!text) return null;
-  return <p className={cx('vcard-state', `vcard-state--${tone}`)}>{text}</p>;
+  return (
+    <p className={cx('vcard-state', `vcard-state--${tone}`)} data-testid={testId}>
+      {text}
+    </p>
+  );
 }
 
 /** The soil state as a word, as a translation key. */
@@ -161,7 +169,16 @@ export function OurVillage() {
   // readings at all -- and a reading below the noise floor has no voltage to
   // report, so the page shows a dash there rather than the LED's 2.8 V.
   const windFrame = hasStatus && !stale ? wind : undefined;
-  const windKnown = Boolean(windFrame && windFrame.installed && windFrame.valid !== false);
+  // `measuring` is how the new firmware says "current is flowing".  A board
+  // flashed before this reading existed reports only volts, and an absent
+  // `measuring` must not be read as "zero amps" -- the card shows nothing until
+  // the controller can answer the question it is being asked.
+  const windKnown = Boolean(
+    windFrame &&
+      windFrame.installed &&
+      windFrame.valid !== false &&
+      typeof windFrame.measuring === 'boolean',
+  );
   const windMeasuring = Boolean(windKnown && windFrame?.measuring && windFrame?.voltage_v != null);
   const windUnreadable = Boolean(windKnown && windFrame?.measuring !== true);
   // "Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW".  Below the noise floor
@@ -725,7 +742,7 @@ export function OurVillage() {
             windGenerating ? 'live' : 'neutral',
           )}
         </header>
-        {stateLine(windReadings, 'neutral')}
+        {stateLine(windReadings, 'neutral', 'wind-readings')}
         {windFitted || demo ? (
           <p className="vcard-note" data-testid="wind-help">
             {windUnreadable ? `${t('wind.noOutput')}. ` : ''}
