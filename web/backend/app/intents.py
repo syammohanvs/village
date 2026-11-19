@@ -382,10 +382,18 @@ class IntentMatcher:
                     return roman
             if copula and not verb_hits:
                 return self._result("statement", language, "statement", device=device)
-            if verb_hits:
-                return self._result("ambiguous", language, "ambiguous_generic", device=device)
-            if is_request:
-                return self._result("ambiguous", language, "ambiguous_generic", device=device)
+            if verb_hits or is_request:
+                # A device was named and the state was not — "Top irrigation."
+                # (reported 2026-11-19: the visitor meant start or stop, and
+                # Whisper wrote neither).  "Which device?" answers the half that
+                # *was* said, and the generic "lights on or off?" names a device
+                # the visitor did not; ask for the missing half instead.
+                key = (
+                    "clarify_state"
+                    if {"on", "off", "auto"} & set(command_for_device)
+                    else "ambiguous_generic"
+                )
+                return self._result("ambiguous", language, key, device=device)
             # A whole catalogue phrase, exactly as written.  It used to be
             # excluded here, which is why a natural noun-phrase question
             # ("മണ്ണിലെ ഈർപ്പം", "मिट्टी की नमी") came back AMBIGUOUS even though

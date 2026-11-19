@@ -676,7 +676,9 @@
         "bulbs",
         "bulb",
         "leds",
-        "led"
+        "led",
+        "lead",
+        "leads"
       ],
       "ml": [
         "വിളക്കുകൾ",
@@ -1201,7 +1203,21 @@
         "need",
         "and",
         "please",
-        "kindly"
+        "kindly",
+        "um",
+        "uh",
+        "er",
+        "erm",
+        "hmm",
+        "hm",
+        "ah",
+        "oh",
+        "ok",
+        "okay",
+        "so",
+        "well",
+        "hey",
+        "sara"
       ]
     },
     "ml": {

@@ -958,3 +958,33 @@ def test_a_short_word_tolerates_one_letter_but_never_a_different_consonant() -> 
     assert not same_word("on", "off")    # two letters, never tolerated
     assert not same_word("eta", "oto")   # "how much" is not "auto"
 
+
+
+def test_english_fillers_and_the_models_own_spelling_of_led(matcher: IntentMatcher) -> None:
+    """What the room actually said, 2026-11-19, and what Whisper wrote.
+
+    The panel keeps every clip's transcript, and these are from one English
+    session: "Lead status." (the lights), "Automatic um…" (a mode with no
+    device), "Um, lights on.", "Sara, pump auto.".  A filler word used to make
+    the whole sentence unaccounted, so a perfectly clear command was refused.
+    """
+    assert matcher.match("Lead status.", "en")["intent"] == "LIGHTS_STATUS"
+    assert matcher.match("LED status.", "en")["intent"] == "LIGHTS_STATUS"
+    assert matcher.match("Um, lights on.", "en")["intent"] == "LIGHTS_ON"
+    assert matcher.match("Sara, pump auto.", "en")["intent"] == "PUMP_AUTO"
+    # A mode with no device asks which one, instead of naming the lights.
+    answer = matcher.match("Automatic um…", "en")
+    assert answer["intent"] == "AMBIGUOUS"
+    assert "Which device" in answer["message"]
+
+
+def test_a_word_the_model_misheard_still_refuses_the_command(matcher: IntentMatcher) -> None:
+    """`Top irrigation.` is "start" or "stop" — and the page must not guess.
+
+    Both spellings are one letter from the other (stop → top is Whisper dropping
+    the leading s), so the sentence reads as the pump with an unreadable word.
+    Nothing may be sent, and the reply asks for one clear command.
+    """
+    answer = matcher.match("Top irrigation.", "en")
+    assert answer["command"] is None
+    assert answer["intent"] == "AMBIGUOUS"

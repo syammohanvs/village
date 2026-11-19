@@ -2312,6 +2312,20 @@ hall internet goes we have a reliable fall back with known objects."*  So:
 - The page's disclosure now says the crop is kept on the laptop to teach the
   offline model (en/hi/ml), and `sort.visionNote` says the same.
 
+**English speech: fillers and the model's own spelling of LED (2026-11-19, from a
+real session).**  The panel keeps every clip, and one English session read:
+`Lead status.` (the lights), `Automatic um…` (a mode, no device), `Um, lights on.`,
+`Sara, pump auto.`  — three of the four were refused because **any** unaccounted
+word refuses the sentence, and English speech is full of fillers.  Fixed in
+`shared/intents.json` (data, not code): `um, uh, er, erm, hmm, hm, ah, oh, ok,
+okay, so, well, hey, sara` join `grammar.en.fillers`, and **`lead`/`leads`** join
+the lights aliases — Whisper hears "LED status" as "Lead status".  A mode with no
+device now answers *"Which device?"* (it said "Would you like the lights on or
+off?" before, naming a device the visitor did not).  **`Top irrigation.` is still
+refused, on purpose**: "top" is one dropped letter from *stop* and one guess from
+*start*, so the pump may not be moved on it — the reply asks for one clear
+command.  Verified through `/voice/interpret` on the running server.
+
 **The item name decides the category; the classifier is the fallback
 (2026-11-19, the operator's instruction after four of their own items).**  The
 operator saw the hosted namer get *every* item right (a clear plastic bag, a
