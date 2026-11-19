@@ -1709,6 +1709,13 @@ work.  When true, no inversion is applied.
 If the soil reading is backwards, flip the checkbox in Setup → Sensors &
 Calibration.  The calibration endpoints themselves are preserved.
 
+**`docs/voice-languages.md` is the language brief (2026-11-20)** — speech in
+(which model hears which language, prompts, fallbacks, the measurements), the
+grammar that understands it, speech out (Piper voices, the English
+pronunciation rewrites, the fallback order), and what "translation" means here
+(one hand-written three-column table with English fallback; **no MT at runtime**),
+plus the invariants and the file map.
+
 ## Waste classifier
 
 **`docs/waste-approach.md` is the handoff brief (2026-11-19)** — the pipeline,
