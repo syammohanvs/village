@@ -1837,6 +1837,62 @@ simulator answers the clear with `WASTE_INDICATOR_CLEARED`; Live without a board
 answers `cleared: false` honestly. Two demo-mode records (one command, one event)
 were written by that live check and are in `data/village.db` like any demo use.
 
+**The second review's nine points, all closed (2026-11-20).**  The visitor now
+gets **three outcomes, not a sentence per material**: a bin instruction, or the
+ordinary referral (*"Keep this item separate and contact the Gram Sahayak office
+for further sorting, collection and recycling instructions."*), or the
+special-handling referral (*"This item needs special handling. Keep it separate
+and contact the Gram Sahayak office for collection instructions."*).  Both are
+`sort.referralOrdinary` / `sort.referralSpecial` in `messages.ts` (en/hi/ml), used
+by the card, Sara and the About page; e-waste keeps its classification and gains
+one handling line, and the special sentence is never shown for an ordinary item
+(or the other way round).  The route, material and category are unchanged
+internally — only the displayed sentences were simplified.
+
+- **Timeouts are one absolute deadline, threaded everywhere.** `identify()` makes
+  a monotonic deadline and `_ask_candidate`/`_cloudflare`/`_opencode`/
+  `_first_account` each spend from it, so Cloudflare's two request shapes and the
+  account lookup cannot add fresh timeouts on top (the finding: two 8 s shapes =
+  16 s, and discovery had its own 20 s).  A shape that cannot finish is not
+  started.  Tested by driving the real `_cloudflare` with only `_post` stubbed.
+- **An empty scene is read from the model's words, not from `_clean()`.**  All
+  four phrases (`nothing`, `empty`, `nothing visible`, `no objects`) now return
+  `empty: true`; before, `_clean` kept the string and the flag was missed, so the
+  classifier could choose a bin for an empty base.  Parametrised through
+  `identify()`, plus the existing page test (no bin, no record, no crop).
+- **Leaving the page invalidates the check**: the unmount effect bumps
+  `checkSeq`, so a delayed name or a pending clear can no longer speak, teach or
+  post a lamp command after navigation.  Two tests: a name resolved after
+  unmount, and a clear resolved after unmount.
+- **Naming provenance is per check.**  The identify response's `provider`/`model`
+  travel with that answer (and survive the cache), so a DeepSeek fallback is not
+  recorded as Cloudflare — in the details, the training metadata and the
+  recognition event.  Tests: page (DeepSeek while Cloudflare is configured) and a
+  vision cache test.
+- **Events match the simplified routes.**  `other` is *"Item referred for further
+  sorting"* (was "Recyclable item recognised"), `medical` is *"Special handling
+  item recognised"*, both name the Gram Sahayak office; the response notes are the
+  two sentences above; a handover is *"Item handed over for further sorting"*.
+- **The clear-ordering test holds the clear open** (`clearDeferred`), asserts no
+  recognition while it is pending, then that the valid bin is posted — so removing
+  `await clearing` fails it.  A second test leaves the page while the clear is
+  pending and asserts no new speech, training or lamp.
+- **Corrections reset per item** and a slow correction reply is tied to the check
+  it was made on, so it cannot hide the next item's buttons.
+- **Copy corrections**: "photo kept … used when the offline model is next
+  retrained" (not "learn now") in en/hi/ml; the stale comments in
+  `vision.py`/`main.py`/`wasteDecision.ts`/`SortWaste.tsx` (six-second deadline,
+  "bin stays the classifier's decision", "the local classifier is gone",
+  "a disagreement refuses") are fixed.  Four dead message keys from the removed
+  disposal UI were deleted.
+
+Gates: **513 firmware checks / 0 failed**, **195 backend**, **447 frontend**,
+typecheck + build, app restarted on :8010.  Live checks: an ordinary referral
+answers the exact sentence, no indication and a neutral event; a battery answers
+the special sentence and its own event.  The physical LED selection and the 8 s
+auto-off remain the operator's verified behaviour; **`CLEAR_WASTE` is still the
+one hardware item awaiting a press on the board.**
+
 **The repository is the master copy of the exhibit (2026-11-17).**  A fresh
 clone on another laptop must run as this one was left, so these are committed
 on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +

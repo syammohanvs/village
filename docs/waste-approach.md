@@ -43,12 +43,16 @@ why it runs on every press.
 Three physical bins: **Organic / food**, **Plastic**, **Paper & cardboard**.
 Everything else is a referral, never a bin:
 
-- glass, metal, textile, leather, footwear, thermocol, e-waste → "keep it
-  separate, ask the collection agent" (no lamp);
-- batteries, syringes, diapers, medicine, chemicals → **special care**: refuse
-  before anything else, no lamp, ask a person;
-- a pencil / crayon / eraser → "use it as long as possible", no bin;
-- anything not read → "not sure, ask the Gram Sahayak".
+- **ordinary items outside the three bins** — glass, metal, textile, leather,
+  footwear, thermocol, pencils/crayons/erasers, e-waste, and any uncertain item
+  with no special-care cue → *"Keep this item separate and contact the Gram
+  Sahayak office for further sorting, collection and recycling instructions."*
+  (no lamp). Electronics keep their e-waste classification and add one handling
+  line: hand the whole item over, do not dismantle it;
+- **medical, sanitary or hazardous items** (any battery, sharps or chemical cue)
+  → *"This item needs special handling. Keep it separate and contact the Gram
+  Sahayak office for collection instructions."* — before anything else, no lamp,
+  and never the ordinary sentence.
 
 A wrong bin puts a real object in the wrong physical bin; that is the mistake
 that actually matters here. A wrong "ask somebody" costs a conversation. **Every
@@ -87,7 +91,7 @@ The page also never claims more than it can see: no bin fullness, no
    item-action on every measured set; q 1.00 is no better than 0.92.
 4. **Both models, in parallel, once.** One `wasteIdentify(crop)` and one
    `wasteClassify(crop)` per press. Nothing is re-sent.
-5. **Wait for the name, but not forever.** `VISION_WAIT_MS = 6000`. A name that
+5. **Wait for the name, but not forever.** `VISION_WAIT_MS = 15000`. A name that
    answers after that is **operator detail only**: it appears under Model details
    with the sentence that the answer above was already given. The visitor's
    answer, the lamp and Sara's sentence are final before it arrives, and one of
@@ -273,10 +277,11 @@ The result card is one big answer, not two model scores:
 2. **The suggested action** — e.g. *"Empty and rinse it, then put it in the
    plastic bin."*
 3. The three bin lamps (`BinLeds`), lit only for an accepted bin.
-4. **Model details** — collapsed. The naming model, the whole naming chain, the
-   classifier on this laptop, the local model's top classes and score, the crop
-   that was analysed, whether the crop was found or fell back to the centre, and
-   a hosted name that arrived after the answer.
+4. **Model details** — collapsed. The provider and model that **actually named
+   this item** (a DeepSeek last-resort reply is not attributed to Cloudflare),
+   the whole naming chain, the classifier on this laptop, the local model's top
+   classes and score, the crop that was analysed, whether the crop was found or
+   fell back to the centre, and a hosted name that arrived after the answer.
 5. A **cloud disclosure** in plain words (en/hi/ml): naming uses a service on the
    internet; the local classifier is the offline fallback; the crop is kept on
    the laptop to teach it later.
@@ -554,7 +559,9 @@ The protocol that works, and the one the measurements support:
 | bin selection → the right LED lights | **verified by the operator on the board** (2026-11-19) — do not re-test |
 | the LED switches itself off after `indicate_ms` | verified by the operator, and pinned in `uc/test/test_waste_commands.cpp` |
 | `CLEAR_WASTE` (new, firmware 0.2.9) | host tests + simulator + the route test; **one press on the board is outstanding** |
-| the empty-scene answer | frontend tests (no bin, no record, no crop) and a vision unit test |
+| the empty-scene answer | frontend test (no bin, no record, no crop) and vision tests for all four phrases |
+| the two referral sentences | frontend tests assert the exact sentences, and that special care never gets the ordinary one |
+| naming provenance | a frontend test (DeepSeek answered while Cloudflare is configured) and a vision cache test |
 | the unusable-name fallback | frontend test (`container` → the classifier's bin) |
 | the chain's timeouts | unit-tested per provider and per budget; the numbers were measured live (1.6–2.0 s / 8.1–10.2 s) |
 

@@ -154,6 +154,10 @@ def identify(image: str) -> dict[str, Any]:
     only the classifier, which is the behaviour before this feature existed.
     """
     started = time.time()
+    # One absolute deadline for the whole operation: account discovery, the two
+    # Cloudflare request shapes and the last resort all spend from it.  `time.time`
+    # only measures; the deadline is monotonic so a clock change cannot extend it.
+    deadline = time.monotonic() + TOTAL_S
     which = provider()
     base = {"provider": which, "model": model_name(which) if which else None}
     if not which:
@@ -173,18 +177,18 @@ def identify(image: str) -> dict[str, Any]:
     for offset in range(len(chain)):
         index = (start + offset) % len(chain)
         candidate = chain[index]
-        # The whole chain has one deadline, because the page has one too.  An
-        # attempt that cannot finish inside it is not started: answering with the
-        # local classifier is better than a request cut off mid-flight.
-        remaining = TOTAL_S - (time.time() - started)
+        # An attempt that cannot finish before the deadline is not started:
+        # answering with the local classifier is better than a request cut off
+        # mid-flight.  The functions below re-read the same deadline themselves,
+        # so a retry inside one provider cannot outlive it either.
+        remaining = deadline - time.monotonic()
         if remaining < 1.5:
             first_error = first_error or RuntimeError(
                 f"the naming chain ran out of time after {TOTAL_S:.0f} s"
             )
             break
-        timeout = min(_attempt_timeout(candidate["provider"]), remaining)
         try:
-            text = _ask_candidate(candidate, jpeg, timeout)
+            text = _ask_candidate(candidate, jpeg, deadline)
         except Exception as exc:  # noqa: BLE001 - try the next account
             first_error = first_error or exc
             # Move on: this one is spent, expired or broken.  The index is
@@ -192,7 +196,12 @@ def identify(image: str) -> dict[str, Any]:
             _INDEX[0] = (index + 1) % len(chain)
             continue
         _INDEX[0] = index
-        name = _clean(text)
+        # An empty scene is decided from the model's own words, NOT from what
+        # `_clean()` happened to return: `_clean("empty")` is the string "empty",
+        # so testing it afterwards missed every phrase except the literal
+        # "nothing" and the classifier could then choose a bin for an empty base.
+        empty = _says_nothing(text)
+        name = None if empty else _clean(text)
         answer = {
             "provider": candidate["provider"],
             "model": model_name(candidate["provider"]),
@@ -202,10 +211,17 @@ def identify(image: str) -> dict[str, Any]:
         # "Nothing visible" is an ANSWER, not a failure.  The page must be able
         # to tell it apart from "the service did not answer", because the first
         # is "nothing to sort" and the second falls back to the classifier.
-        if name is None and _says_nothing(text):
+        if empty:
             answer["empty"] = True
             answer["reason"] = "the model saw no object"
-        _remember(key, {"object": answer["object"], "empty": bool(answer.get("empty"))})
+        # The provider that answered is kept with the answer: a cached reply must
+        # not be attributed to whichever account happens to be current later.
+        _remember(key, {
+            "object": answer["object"],
+            "empty": bool(answer.get("empty")),
+            "provider": answer["provider"],
+            "model": answer["model"],
+        })
         return answer
     return {**base, "object": None, "ms": int((time.time() - started) * 1000),
             "reason": str(first_error)[:200] if first_error else "no provider answered"}
@@ -305,17 +321,31 @@ def _attempt_timeout(provider: str) -> float:
     return TIMEOUT_LAST_S if provider == "opencode" else TIMEOUT_S
 
 
-def _ask_candidate(candidate: dict[str, str], jpeg: bytes, timeout: float) -> str:
+def _remaining(deadline: float) -> float:
+    """Seconds left before the chain's absolute deadline (never negative)."""
+    return max(0.0, deadline - time.monotonic())
+
+
+def _ask_candidate(candidate: dict[str, str], jpeg: bytes, deadline: float) -> str:
+    """One provider, bounded by the *chain's* deadline, not just by its own.
+
+    Every request below recomputes `_remaining(deadline)` immediately before it
+    goes out, so an internal retry (Cloudflare's two request shapes, account
+    discovery) cannot add a second full timeout on top of the first.
+    """
     if candidate["provider"] == "cloudflare":
-        return _cloudflare(jpeg, candidate, timeout)
-    return _opencode(jpeg, timeout)
+        return _cloudflare(jpeg, candidate, deadline)
+    return _opencode(jpeg, deadline)
 
 
-def _opencode(jpeg: bytes, timeout: float = TIMEOUT_S) -> str:
+def _opencode(jpeg: bytes, deadline: float) -> str:
     base = (os.getenv("VILLAGE_VISION_BASE_URL") or "https://opencode.ai/inference/go/v1").rstrip("/")
     key = os.getenv("VILLAGE_VISION_API_KEY", "")
     if not key:
         return ""
+    timeout = min(TIMEOUT_LAST_S, _remaining(deadline))
+    if timeout <= 0:
+        raise TimeoutError("no time left for the last-resort namer")
     body = _post(
         base + "/chat/completions",
         {
@@ -346,15 +376,16 @@ def _opencode(jpeg: bytes, timeout: float = TIMEOUT_S) -> str:
 
 
 def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None,
-                timeout: float = TIMEOUT_S) -> str:
+                deadline: float | None = None) -> str:
     candidate = candidate or {
         "token": os.getenv("VILLAGE_CF_API_TOKEN", ""),
         "account": os.getenv("VILLAGE_CF_ACCOUNT_ID", "").strip(),
     }
+    deadline = deadline if deadline is not None else time.monotonic() + TIMEOUT_S
     token = candidate.get("token", "")
     if not token:
         return ""
-    account = candidate.get("account", "") or _first_account(token)
+    account = candidate.get("account", "") or _first_account(token, deadline)
     if not account:
         return ""
     model = model_name("cloudflare")
@@ -382,6 +413,12 @@ def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None,
             if wants_chat
             else {"image": list(jpeg), "prompt": PROMPT, "max_tokens": 512}
         )
+        # Each shape gets only what is left of the chain budget, so trying the
+        # other request format cannot double the time this provider may take.
+        timeout = min(TIMEOUT_S, _remaining(deadline))
+        if timeout <= 0:
+            last = last or TimeoutError("no time left for the Cloudflare request")
+            break
         try:
             body = _post(url, payload, headers, timeout)
         except Exception as error:  # noqa: BLE001
@@ -411,14 +448,21 @@ def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None,
     return ""
 
 
-def _first_account(token: str) -> str:
-    """The account id behind a user API token, when `.env` leaves it blank."""
+def _first_account(token: str, deadline: float | None = None) -> str:
+    """The account id behind a user API token, when `.env` leaves it blank.
+
+    Bounded by the chain's deadline: this lookup used to have its own 20 s
+    timeout, which alone outlived the 14 s budget the page waits for.
+    """
+    timeout = min(20.0, _remaining(deadline)) if deadline is not None else 20.0
+    if timeout <= 0:
+        return ""
     request = urllib.request.Request(
         "https://api.cloudflare.com/client/v4/accounts",
         headers={"Authorization": "Bearer " + token},
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             body = json.load(response)
     except Exception:  # noqa: BLE001
         return ""

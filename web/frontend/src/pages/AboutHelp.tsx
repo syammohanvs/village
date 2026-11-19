@@ -111,8 +111,10 @@ export function AboutHelp() {
               <IconWaste size={18} />
               <div>
                 <strong>Waste sorting.</strong> A camera recognises organic, plastic or paper waste
-                and lights the matching bin LED. Cloth, leather, footwear, glass, metal, thermocol
-                and electronic waste are referred to the recycling agent instead. It is a
+                and lights that bin's indicator. Anything outside the three bins — glass, metal,
+                cloth, leather, footwear, thermocol, pencils, electronics — is referred to the Gram
+                Sahayak office for further sorting, collection and recycling instructions. Batteries,
+                sharps and chemicals need special handling and their own collection. It is a
                 suggestion, not proof of disposal.
               </div>
             </li>

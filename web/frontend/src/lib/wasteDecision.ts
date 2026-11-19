@@ -172,7 +172,8 @@ const SPECIAL_CARE: { words: string[]; reason: ReasonId }[] = [
  * Deliberately small and conservative: a word here must have a route of its own,
  * not a material's.  `keychain` and `bottle` are *not* here, because a keychain
  * can be metal or electronic and a bottle can be any of three materials — those
- * stay material questions, where a disagreement refuses the answer.
+ * stay material questions, where the material word decides and a model
+ * disagreement is never a reason to refuse.
  */
 const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
   {

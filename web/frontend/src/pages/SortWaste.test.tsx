@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { api } from '../lib/api';
@@ -179,6 +179,7 @@ beforeEach(() => {
   vi.mocked(api.wasteClassify).mockImplementation(async () => ({
     model: 'resnet50',
     predictions: predictionState.current,
+    file: 'Plastic/booth-1.jpg',
   }));
   vi.mocked(api.wasteTeach).mockResolvedValue({
     saved: true,
@@ -723,6 +724,8 @@ describe('Sort Waste — two models, one decision', () => {
     record?: unknown;
     /** Override what the board says about the start-of-check clear. */
     clear?: { cleared: boolean; confirmed: boolean; note?: string | null };
+    /** Hold the clear open, to prove the lamp waits for it. */
+    clearDeferred?: Promise<{ cleared: boolean; confirmed: boolean }>;
     /** Override the model-status answer, e.g. to carry a provider chain. */
     status?: {
       installed: boolean;
@@ -741,9 +744,13 @@ describe('Sort Waste — two models, one decision', () => {
   async function press(options: Options): Promise<() => void> {
     const vision = options.vision !== false;
     vi.mocked(api.wasteClear).mockClear();
-    vi.mocked(api.wasteClear).mockResolvedValue(
-      options.clear ?? { cleared: true, confirmed: true },
-    );
+    if (options.clearDeferred) {
+      vi.mocked(api.wasteClear).mockReturnValue(options.clearDeferred);
+    } else {
+      vi.mocked(api.wasteClear).mockResolvedValue(
+        options.clear ?? { cleared: true, confirmed: true },
+      );
+    }
     vi.mocked(api.wasteResnetStatus).mockResolvedValue(
       options.status ?? {
         installed: true,
@@ -882,11 +889,16 @@ describe('Sort Waste — two models, one decision', () => {
     // e-waste collection instead of "not sure" — no lamp either way.
     const restore = await press({ predictions: predictionsFor('Ewaste', 0.4), object: 'remote control' });
     try {
+      // The category is still electronic waste; the visitor's instruction is the
+      // one ordinary referral sentence, plus the handling line e-waste needs.
       await waitFor(
-        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/e-waste collection/i),
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(
+          /further sorting, collection and recycling instructions/i,
+        ),
         { timeout: 8000 },
       );
       expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Electronic waste/i);
+      expect(screen.getByTestId('waste-ewaste-handling')).toHaveTextContent(/whole item/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
@@ -899,7 +911,8 @@ describe('Sort Waste — two models, one decision', () => {
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/e-waste collection/i);
+      expect(action).toHaveTextContent(/further sorting, collection and recycling instructions/i);
+      expect(screen.getByTestId('waste-ewaste-handling')).toBeInTheDocument();
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
@@ -1244,6 +1257,198 @@ describe('Sort Waste — two models, one decision', () => {
       restore();
     }
   }, 25000);
+
+  it('gives an ordinary referral one sentence, and no bin', async () => {
+    // Glass, metal, cloth, leather, footwear, thermocol, pencils … all reach the
+    // visitor as this one sentence.  The material stays in the classification.
+    const restore = await press({ predictions: predictionsFor('Glass', 0.9), object: 'glass jar' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(
+        'Keep this item separate and contact the Gram Sahayak office for further sorting, collection and recycling instructions.',
+      );
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Glass/i);
+      // No e-waste line, and no bin lamp.
+      expect(screen.queryByTestId('waste-ewaste-handling')).not.toBeInTheDocument();
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+        category: 'other',
+        route: 'collect.glass',
+      });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('gives a special-care item its own sentence, never the ordinary one', async () => {
+    const restore = await press({ predictions: plasticAt(0.92), object: 'used syringe' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(
+        'This item needs special handling. Keep it separate and contact the Gram Sahayak office for collection instructions.',
+      );
+      // The two referrals must not bleed into each other: no "recycling
+      // instructions" for a syringe, and no bin.
+      expect(action).not.toHaveTextContent(/recycling instructions/i);
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'medical' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('records the provider that actually named the item, not the one configured', async () => {
+    // Workers AI out of quota, DeepSeek answered.  The record and the details
+    // must say DeepSeek — attributing a fallback answer to Cloudflare is a
+    // provenance lie that makes a venue session unreadable afterwards.
+    vi.mocked(api.wasteTeach).mockClear();
+    const restore = await press({
+      predictions: plasticAt(0.9),
+      identify: (async () => ({
+        object: 'clear plastic bottle',
+        provider: 'opencode',
+        model: 'deepseek-v4.1-flash',
+        ms: 9000,
+      })) as never,
+    });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(screen.getByTestId('waste-details-namer')).toHaveTextContent(
+        /deepseek-v4\.1-flash \(opencode\)/,
+      );
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+        namer: 'deepseek-v4.1-flash',
+      });
+      // The training record says which model named it too.
+      expect(vi.mocked(api.wasteTeach).mock.calls[0][3]).toBe('deepseek-v4.1-flash');
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('waits for the clear before asking the board for a lamp', async () => {
+    // The old test resolved the clear immediately, so removing `await clearing`
+    // would not have failed it.  This one holds the clear open: the recognition
+    // must not be posted until it answers.
+    let releaseClear!: (value: { cleared: boolean; confirmed: boolean }) => void;
+    const clearDeferred = new Promise<{ cleared: boolean; confirmed: boolean }>((resolve) => {
+      releaseClear = resolve;
+    });
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      object: 'clear plastic bottle',
+      clearDeferred,
+    });
+    try {
+      // The decision is made and on screen while the clear is still pending.
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
+        { timeout: 8000 },
+      );
+      expect(api.postRecognition).not.toHaveBeenCalled();
+
+      await act(async () => {
+        releaseClear({ cleared: true, confirmed: true });
+      });
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('lets no lamp, speech or training follow a check that was left behind', async () => {
+    // Leaving the page while the clear is pending: the answer that was waiting
+    // must not act afterwards.  The eight-second timer is the board's and is
+    // untouched — what must not happen is a *command* from a page nobody is on.
+    vi.mocked(api.wasteTeach).mockClear();
+    let releaseClear!: (value: { cleared: boolean; confirmed: boolean }) => void;
+    const clearDeferred = new Promise<{ cleared: boolean; confirmed: boolean }>((resolve) => {
+      releaseClear = resolve;
+    });
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      object: 'clear plastic bottle',
+      clearDeferred,
+    });
+    await waitFor(
+      () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
+      { timeout: 8000 },
+    );
+    // The decision is already on screen (and its teaching crop already filed —
+    // that happened before anyone left).  What must not happen is anything NEW
+    // once the page is gone and the clear finally answers.
+    expect(api.postRecognition).not.toHaveBeenCalled();
+    const spokeBefore = spoken.length;
+    const taughtBefore = vi.mocked(api.wasteTeach).mock.calls.length;
+    cleanup(); // navigate away: unmount, which must invalidate the check
+    restore();
+
+    await act(async () => {
+      releaseClear({ cleared: true, confirmed: true });
+    });
+    await act(async () => undefined);
+
+    expect(api.postRecognition).not.toHaveBeenCalled();
+    expect(vi.mocked(api.wasteTeach).mock.calls.length).toBe(taughtBefore);
+    expect(spoken.length).toBe(spokeBefore);
+  }, 25000);
+
+  it('drops a name that arrives after the page has been left', async () => {
+    vi.mocked(api.wasteTeach).mockClear();
+    let releaseName!: (value: unknown) => void;
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      identify: () =>
+        new Promise((resolve) => {
+          releaseName = resolve;
+        }) as never,
+    });
+    const spokeBefore = spoken.length;
+    cleanup(); // navigate away before the name answers
+    restore();
+
+    await act(async () => {
+      releaseName({
+        object: 'orange pencil',
+        provider: 'cloudflare',
+        model: '@cf/meta/llama-3.2-11b-vision-instruct',
+        ms: 9000,
+      });
+    });
+    await act(async () => undefined);
+
+    expect(api.postRecognition).not.toHaveBeenCalled();
+    expect(api.wasteTeach).not.toHaveBeenCalled();
+    expect(spoken.length).toBe(spokeBefore);
+  }, 25000);
+
+  it('clears a correction message when the next item is checked', async () => {
+    // The operator's correction confirmation belongs to the item it was made
+    // about; left on screen it hid the next item's buttons.
+    window.history.pushState({}, '', '/waste?operator=1');
+    vi.mocked(api.wasteCorrect).mockResolvedValue({ file: 'Plastic/booth-1.jpg', actual: 'paper', saved_as: 'Paper/x.jpg' });
+    const first = await press({ predictions: plasticAt(0.95), object: 'clear plastic bottle' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      fireEvent.click(await screen.findByTestId('correct-paper'));
+      await waitFor(
+        () => expect(screen.getByTestId('waste-correction')).toHaveTextContent(/thank/i),
+        { timeout: 4000 },
+      );
+    } finally {
+      first();
+    }
+
+    const second = await press({ predictions: plasticAt(0.95), object: 'clear plastic bottle' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      // The buttons are back for this item.
+      expect(await screen.findByTestId('correct-paper')).toBeInTheDocument();
+      expect(screen.getByTestId('waste-correction')).not.toHaveTextContent(/thank|saved|recorded|noted/i);
+    } finally {
+      second();
+    }
+  }, 30000);
 
   it('treats "nothing visible" as nothing to sort, not as a classifier guess', async () => {
     // An empty base is an answer.  The classifier would happily call the

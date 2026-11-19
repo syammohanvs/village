@@ -756,14 +756,6 @@ export const MESSAGES = {
     'सिर्फ़ झलक — कोई बिन नहीं सुझाया, क्योंकि पहचान का मॉडल उपलब्ध नहीं है। प्रस्तुतकर्ता इसे सेटअप → आवाज़ और कैमरा से लगा सकते हैं।',
     'കാഴ്ച മാത്രം — തിരിച്ചറിയൽ മോഡൽ ലഭ്യമല്ലാത്തതിനാൽ ബിൻ നിർദ്ദേശിക്കുന്നില്ല. അവതാരകന് സെറ്റപ്പ് → ശബ്ദവും ക്യാമറയും എന്നതിൽ നിന്ന് ഇൻസ്റ്റാൾ ചെയ്യാം.',
   ],
-  'sort.recordSahayak': ['Record that the Gram Sahayak took it', 'दर्ज करें कि ग्राम सहायक ने लिया', 'ഗ്രാം സഹായക് എടുത്തുവെന്ന് രേഖപ്പെടുത്തുക'],
-  'sort.recordRecycling': ['Record that the recycling agent took it', 'दर्ज करें कि रीसाइक्लिंग एजेंट ने लिया', 'റീസൈക്ലിംഗ് ഏജന്റ് എടുത്തുവെന്ന് രേഖപ്പെടുത്തുക'],
-  'sort.recordBin': ['Record that you put it in the bin', 'दर्ज करें कि आपने इसे बिन में डाला', 'നിങ്ങൾ ഇത് ബിന്നിൽ ഇട്ടുവെന്ന് രേഖപ്പെടുത്തുക'],
-  'sort.depositHint': [
-    'This is a separate record. A recognition does not prove that the item was placed in a bin.',
-    'यह अलग रिकॉर्ड है। पहचान से यह साबित नहीं होता कि चीज़ बिन में डाली गई।',
-    'ഇത് പ്രത്യേക രേഖയാണ്. തിരിച്ചറിയൽ വസ്തു ബിന്നിൽ ഇട്ടുവെന്ന് തെളിയിക്കുന്നില്ല.',
-  ],
   'sort.note': ['Note (optional)', 'टिप्पणी (वैकल्पिक)', 'കുറിപ്പ് (നിർബന്ധമല്ല)'],
   'sort.notePlaceholder': [
     'e.g. plastic bottle from the kitchen', 'जैसे रसोई की प्लास्टिक बोतल', 'ഉദാ: അടുക്കളയിലെ പ്ലാസ്റ്റിക് കുപ്പി',
@@ -847,30 +839,26 @@ export const MESSAGES = {
   'sort.identified': ['Item identified: {item}', 'पहचानी गई वस्तु: {item}', 'തിരിച്ചറിഞ്ഞ വസ്തു: {item}'],
   'sort.category': ['Waste category: {category}', 'कचरे का वर्ग: {category}', 'മാലിന്യ വിഭാഗം: {category}'],
   'sort.actionBin': ['Use the {bin} bin.', '{bin} बिन में डालें।', '{bin} ബിന്നിൽ ഇടുക.'],
-  'sort.actionCollect': [
-    'Hand it to the recycling agent.',
-    'इसे रीसाइक्लिंग एजेंट को दें।',
-    'ഇത് റീസൈക്ലിംഗ് ഏജന്റിന് നൽകുക.',
+  // Two referral outcomes, and only two.  Everything outside the three bins
+  // reads the first sentence; a special-care cue reads the second and nothing
+  // else.  "Recycling instructions" is a line to ask about, not a claim that
+  // every referred item is recyclable — and neither sentence is a bin.
+  'sort.referralOrdinary': [
+    'Keep this item separate and contact the Gram Sahayak office for further sorting, collection and recycling instructions.',
+    'इस चीज़ को अलग रखें और आगे की छँटाई, संग्रह और रीसाइक्लिंग के निर्देशों के लिए ग्राम सहायक कार्यालय से संपर्क करें।',
+    'ഈ വസ്തു വേർതിരിച്ച് സൂക്ഷിക്കുക; തുടർന്നുള്ള തരംതിരിക്കലിനും ശേഖരണത്തിനും റീസൈക്ലിംഗ് നിർദ്ദേശങ്ങൾക്കും ഗ്രാം സഹായക് ഓഫീസിനെ സമീപിക്കുക.',
   ],
-  'sort.actionEwaste': [
-    'Take it to the authorised e-waste collection.',
-    'इसे अधिकृत ई-कचरा संग्रह केंद्र में दें।',
-    'ഇത് അംഗീകൃത ഇ-മാലിന്യ ശേഖരണ കേന്ദ്രത്തിൽ ഏൽപ്പിക്കുക.',
+  'sort.referralSpecial': [
+    'This item needs special handling. Keep it separate and contact the Gram Sahayak office for collection instructions.',
+    'इस चीज़ को विशेष हैंडलिंग चाहिए। इसे अलग रखें और संग्रह के निर्देशों के लिए ग्राम सहायक कार्यालय से संपर्क करें।',
+    'ഈ വസ്തുവിന് പ്രത്യേക കൈകാര്യം വേണം. ഇത് വേർതിരിച്ച് സൂക്ഷിക്കുക; ശേഖരണ നിർദ്ദേശങ്ങൾക്കായി ഗ്രാം സഹായക് ഓഫീസിനെ സമീപിക്കുക.',
   ],
-  'sort.actionSeparate': [
-    'Keep this item separate and ask the Gram Sahayak.',
-    'इसे अलग रखें और ग्राम सहायक से पूछें।',
-    'ഇത് വേർതിരിച്ച് സൂക്ഷിച്ച് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
-  ],
-  'sort.actionConflict': [
-    'The results need checking. Please ask the Gram Sahayak.',
-    'नतीजों की जाँच ज़रूरी है। कृपया ग्राम सहायक से पूछें।',
-    'ഫലങ്ങൾ പരിശോധിക്കേണ്ടതുണ്ട്. ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
-  ],
-  'sort.actionConfirm': [
-    'Item identification unavailable. Ask the Gram Sahayak before using a bin.',
-    'वस्तु की पहचान उपलब्ध नहीं। बिन में डालने से पहले ग्राम सहायक से पूछें।',
-    'വസ്തുവിന്റെ തിരിച്ചറിയൽ ലഭ്യമല്ല. ബിന്നിൽ ഇടുന്നതിന് മുൻപ് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  // Electronics keep their e-waste classification and get this one line of
+  // handling advice; the referral sentence above is what a visitor acts on.
+  'sort.ewasteHandling': [
+    'Hand the whole item over — do not dismantle it.',
+    'इसे पूरा ही सौंपें — खोलें या अलग न करें।',
+    'ഇത് പൂർണ്ണമായി ഏൽപ്പിക്കുക — പൊളിച്ചു വേർതിരിക്കരുത്.',
   ],
   'sort.actionNothing': [
     'Nothing to sort — place one item on the marked base and try again.',
@@ -899,9 +887,9 @@ export const MESSAGES = {
     'ചിത്രത്തിന്റെ നടുഭാഗം ഉപയോഗിക്കുന്നു — ചതുരത്തിനുള്ളിൽ ഒരു വസ്തു വയ്ക്കുക.',
   ],
   'sort.disclosure': [
-    'When you press Check the item, a cropped picture is sent to our cloud AI service to name the item, and a copy is kept on this laptop so the offline model can learn the items shown here. Nothing else leaves this laptop.',
-    '“चीज़ जाँचें” दबाने पर एक कटी हुई तस्वीर चीज़ का नाम जानने के लिए हमारी क्लाउड AI सेवा को भेजी जाती है, और एक प्रति इसी लैपटॉप पर रखी जाती है ताकि ऑफ़लाइन मॉडल यहाँ दिखाई गई चीज़ें सीख सके। इसके अलावा कुछ बाहर नहीं जाता।',
-    '“വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു വെട്ടിയ ചിത്രം വസ്തുവിന്റെ പേര് അറിയാൻ ഞങ്ങളുടെ ക്ലൗഡ് AI സേവനത്തിന് അയക്കുന്നു, ഒരു പകർപ്പ് ഈ ലാപ്ടോപ്പിൽ സൂക്ഷിക്കുന്നു — ഓഫ്‌ലൈൻ മോഡലിന് ഇവിടെ കാണിക്കുന്ന വസ്തുക്കൾ പഠിക്കാൻ. അതല്ലാതെ മറ്റൊന്നും പുറത്തുപോകുന്നില്ല.',
+    'When you press Check the item, a cropped picture is sent to our cloud AI service to name the item, and a copy is kept on this laptop to be used when the offline model is next retrained. Nothing else leaves this laptop.',
+    '“चीज़ जाँचें” दबाने पर एक कटी हुई तस्वीर चीज़ का नाम जानने के लिए हमारी क्लाउड AI सेवा को भेजी जाती है, और एक प्रति इसी लैपटॉप पर रखी जाती है, ताकि ऑफ़लाइन मॉडल के अगली बार प्रशिक्षण में इन चीज़ों का उपयोग हो सके। इसके अलावा कुछ बाहर नहीं जाता।',
+    '“വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു വെട്ടിയ ചിത്രം വസ്തുവിന്റെ പേര് അറിയാൻ ഞങ്ങളുടെ ക്ലൗഡ് AI സേവനത്തിന് അയക്കുന്നു, ഒരു പകർപ്പ് ഈ ലാപ്ടോപ്പിൽ സൂക്ഷിക്കുന്നു — ഓഫ്‌ലൈൻ മോഡൽ അടുത്ത തവണ പരിശീലിപ്പിക്കുമ്പോൾ ഇവ ഉപയോഗിക്കാൻ. അതല്ലാതെ മറ്റൊന്നും പുറത്തുപോകുന്നില്ല.',
   ],
   'sort.guideTitle': [
     'Other waste or unsure where it goes?',
@@ -996,9 +984,9 @@ export const MESSAGES = {
 
   // Said only when a hosted model is configured: the crop leaves the laptop.
   'sort.visionNote': [
-    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. The category is decided from that name, and the crop is kept here to teach the offline model.',
-    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। श्रेणी उसी नाम से तय होती है, और ऑफ़लाइन मॉडल को सिखाने के लिए तस्वीर यहीं रखी जाती है।',
-    'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. ആ പേരിൽ നിന്നാണ് വിഭാഗം തീരുമാനിക്കുന്നത്; ഓഫ്‌ലൈൻ മോഡലിനെ പഠിപ്പിക്കാൻ ചിത്രം ഇവിടെ സൂക്ഷിക്കുന്നു.',
+    'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. The category is decided from that name, and the crop is kept here to be used when the offline model is next retrained.',
+    'चीज़ का नाम जानने के लिए कैमरे वाला वर्ग इंटरनेट की विज़न सेवा को भेजा जाता है और उसका नाम वापस आता है। श्रेणी उसी नाम से तय होती है, और तस्वीर यहीं रखी जाती है ताकि ऑफ़लाइन मॉडल के अगले प्रशिक्षण में काम आए।',
+    'വസ്തുവിന്റെ പേര് അറിയാൻ ക്യാമറ വായിച്ച ചതുരം ഇന്റർനെറ്റിലെ ഒരു വിഷൻ സേവനത്തിന് അയക്കുന്നു, പേര് തിരികെ വരുന്നു. ആ പേരിൽ നിന്നാണ് വിഭാഗം തീരുമാനിക്കുന്നത്; ഓഫ്‌ലൈൻ മോഡൽ അടുത്ത തവണ പരിശീലിപ്പിക്കുമ്പോൾ ഉപയോഗിക്കാൻ ചിത്രം ഇവിടെ സൂക്ഷിക്കുന്നു.',
   ],
   'sort.lateName': [
     'A later reply named it {item}. The answer above was already given and was not changed.',

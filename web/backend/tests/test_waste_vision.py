@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -65,7 +66,7 @@ def test_a_configured_model_names_the_object_and_is_asked_once(
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
     asked: list[bytes] = []
 
-    def fake_ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
+    def fake_ask(candidate: dict, jpeg: bytes, deadline: float) -> str:
         asked.append(jpeg)
         return "A clear plastic lid."
 
@@ -90,7 +91,7 @@ def test_a_failing_model_leaves_the_page_with_the_classifier(
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
 
-    def boom(candidate: dict, jpeg: bytes, timeout: float) -> str:
+    def boom(candidate: dict, jpeg: bytes, deadline: float) -> str:
         raise RuntimeError("HTTP Error 500: upstream")
 
     monkeypatch.setattr(vision, "_ask_candidate", boom)
@@ -123,7 +124,7 @@ async def test_the_route_names_the_object_when_a_provider_is_configured(
 ) -> None:
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
-    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg, timeout: "Remote control")
+    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg, deadline: "Remote control")
 
     settings = make_settings(tmp_path)
     async with client_for(settings) as (client, _gateway, _app):
@@ -150,7 +151,7 @@ def test_the_second_cloudflare_account_is_used_when_the_first_is_spent(
     monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID_2", "acct-two")
     seen: list[str] = []
 
-    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
+    def ask(candidate: dict, jpeg: bytes, deadline: float) -> str:
         seen.append(candidate["token"])
         if candidate["token"] == "cfut_one":
             raise RuntimeError("HTTP Error 429: quota exceeded")
@@ -209,7 +210,7 @@ def test_nothing_visible_is_an_answer_not_a_failure(
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
     monkeypatch.setattr(
-        vision, "_ask_candidate", lambda candidate, jpeg, timeout: "nothing"
+        vision, "_ask_candidate", lambda candidate, jpeg, deadline: "nothing"
     )
 
     answer = vision.identify(CROP)
@@ -222,6 +223,50 @@ def test_nothing_visible_is_an_answer_not_a_failure(
     again = vision.identify(CROP)
     assert again["cached"] is True
     assert again["empty"] is True
+
+
+@pytest.mark.parametrize("phrase", ["nothing", "empty", "nothing visible", "no objects"])
+def test_every_recognised_empty_phrase_reaches_identify_as_empty(
+    phrase: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The finding: `_clean("empty")` returns the string "empty", so the old
+    `name is None and _says_nothing(...)` check missed three of the four phrases
+    and the classifier could then choose a bin for an empty base.  Each phrase
+    is driven through `identify()` itself, not just the helper.
+    """
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
+    monkeypatch.setattr(
+        vision, "_ask_candidate", lambda candidate, jpeg, deadline: phrase
+    )
+
+    answer = vision.identify(CROP)
+    assert answer["object"] is None
+    assert answer["empty"] is True
+
+
+def test_a_cached_answer_keeps_the_provider_that_gave_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provenance survives the cache: a reply from Cloudflare must not be
+    reported as DeepSeek just because the chain moved on before the retry."""
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-test")
+    monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
+    monkeypatch.setattr(
+        vision, "_ask_candidate", lambda candidate, jpeg, deadline: "clear plastic lid"
+    )
+
+    first = vision.identify(CROP)
+    assert first["provider"] == "cloudflare"
+
+    # The chain now starts at the last resort; the same crop is a cache hit.
+    vision._INDEX[0] = len(vision.candidates()) - 1
+    second = vision.identify(CROP)
+    assert second["cached"] is True
+    assert second["provider"] == first["provider"]
+    assert second["model"] == first["model"]
 
 
 @pytest.mark.parametrize("text, empty", [
@@ -252,8 +297,8 @@ def test_the_fallback_provider_gets_the_longer_timeout(
     monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
     seen: list[tuple[str, float]] = []
 
-    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
-        seen.append((candidate["provider"], timeout))
+    def ask(candidate: dict, jpeg: bytes, deadline: float) -> str:
+        seen.append((candidate["provider"], deadline))
         if candidate["provider"] == "cloudflare":
             raise RuntimeError("HTTP Error 429: quota exceeded")
         return "clear plastic lid"
@@ -263,9 +308,22 @@ def test_the_fallback_provider_gets_the_longer_timeout(
     answer = vision.identify(CROP)
     assert answer["provider"] == "opencode"
     assert [provider for provider, _ in seen] == ["cloudflare", "opencode"]
-    # Nothing may be given more time than the whole chain has left.
-    assert all(0 < timeout <= vision.TOTAL_S for _, timeout in seen)
-    assert seen[1][1] <= vision.TIMEOUT_LAST_S
+    # Both attempts share one absolute deadline: the second may not add a fresh
+    # timeout on top of the first.
+    assert seen[0][1] == seen[1][1]
+    assert 0 < seen[0][1] - time.monotonic() <= vision.TOTAL_S + 0.5
+
+    # The provider's own cap is applied inside the request, not by the chain:
+    # with a far-away deadline the last resort still uses 12 s, not 14.
+    timeouts: list[float] = []
+
+    def capture(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        timeouts.append(timeout)
+        return {"choices": [{"message": {"content": "clear plastic lid"}}]}
+
+    monkeypatch.setattr(vision, "_post", capture)
+    vision._opencode(b"jpeg", time.monotonic() + 100)
+    assert timeouts[0] == vision.TIMEOUT_LAST_S
 
 
 def test_a_chain_that_runs_out_of_time_answers_without_a_name(
@@ -279,7 +337,7 @@ def test_a_chain_that_runs_out_of_time_answers_without_a_name(
     monkeypatch.setattr(vision, "TOTAL_S", 0.0)
     asked: list[str] = []
 
-    def ask(candidate: dict, jpeg: bytes, timeout: float) -> str:
+    def ask(candidate: dict, jpeg: bytes, deadline: float) -> str:
         asked.append(candidate["provider"])
         return "clear plastic lid"
 
@@ -289,6 +347,42 @@ def test_a_chain_that_runs_out_of_time_answers_without_a_name(
     assert answer["object"] is None
     assert "ran out of time" in (answer["reason"] or "")
     assert asked == []
+
+
+def test_cloudflare_shape_retry_cannot_outlive_the_chain_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The finding: two 8 s request shapes could take 16 s inside a 14 s chain.
+
+    This drives the real `_cloudflare` (not `_ask_candidate`), stubbing only the
+    HTTP layer, and checks that the second request format is given the time that
+    is *left*, and that no request is made once the deadline has passed.
+    """
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.delenv("VILLAGE_VISION_API_KEY", raising=False)
+    seen: list[float] = []
+
+    def failing_post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        seen.append(timeout)
+        raise RuntimeError("HTTP Error 500: upstream")
+
+    monkeypatch.setattr(vision, "_post", failing_post)
+
+    answer = vision.identify(CROP)
+    assert answer["object"] is None
+    # Both shapes were tried, and neither was given more than the chain has.
+    assert len(seen) == 2
+    assert seen[0] <= vision.TIMEOUT_S
+    assert seen[1] <= seen[0] + 0.01
+
+    # With the budget already spent, not even the first request goes out.
+    seen.clear()
+    monkeypatch.setattr(vision, "TOTAL_S", 0.0)
+    answer = vision.identify("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsL")
+    assert answer["object"] is None
+    assert seen == []
 
 
 def test_any_lead_in_is_stripped_to_the_name() -> None:

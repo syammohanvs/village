@@ -104,7 +104,12 @@ export function SortWaste() {
     crop: string | null;
     cropMode: 'backdrop' | 'centre' | null;
     error: string;
-  }>({ phase: 'idle', identify: 'idle', classify: 'idle', decision: null, crop: null, cropMode: null, error: '' });
+    /** Which service actually named this item, not which one is configured now. */
+    namedBy: { provider: string | null; model: string | null } | null;
+  }>({
+    phase: 'idle', identify: 'idle', classify: 'idle', decision: null,
+    crop: null, cropMode: null, error: '', namedBy: null,
+  });
   const checkSeq = useRef(0);
   // Corrections write into the training tree, so they are an operator action:
   // open the page with ?operator=1 to see them.  A visitor never does.
@@ -173,6 +178,14 @@ export function SortWaste() {
 
   useEffect(() => {
     return () => {
+      // Leaving the page invalidates the check in flight.  Stopping the camera
+      // alone was not enough: a delayed name or classifier answer could still
+      // speak, post a recognition, or file a training crop after navigation.
+      // Bumping the sequence makes every later `seq === checkSeq.current` test
+      // in this page false, which is what those guards already use.
+      checkSeq.current += 1;
+      busyRef.current = false;
+      acceptingRef.current = false;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
@@ -318,18 +331,19 @@ export function SortWaste() {
    */
   const actionSentence = useCallback(
     (decision: Decision): string => {
+      // Three outcomes only: a bin instruction, the ordinary referral, or the
+      // special-handling referral.  The detailed material (glass, metal, cloth,
+      // e-waste …) still decides the route internally and is shown as the
+      // category — it just no longer produces a fifth sentence for a visitor.
       if (decision.status === 'nothing') return t('sort.actionNothing');
       if (decision.reasonId === 'conflict' || decision.reasonId === 'specialCare') {
-        return t('sort.actionConflict');
+        return t('sort.referralSpecial');
       }
-      if (decision.reasonId === 'identificationMissing') return t('sort.actionConfirm');
-      if (decision.status === 'uncertain') return t('sort.actionSeparate');
-      if (decision.routeId === 'collect.ewaste') return t('sort.actionEwaste');
-      if (decision.routeId.startsWith('collect.')) return t('sort.actionCollect');
+      if (decision.status === 'uncertain') return t('sort.referralOrdinary');
       if (decision.bin === 'organic') return t('sort.actionBin', { bin: t('bin.organic.name') });
       if (decision.bin === 'plastic') return t('sort.actionBin', { bin: t('waste.bin.plastic.title') });
       if (decision.bin === 'paper') return t('sort.actionBin', { bin: t('waste.bin.paper.title') });
-      return t('sort.actionSeparate');
+      return t('sort.referralOrdinary');
     },
     [t],
   );
@@ -372,6 +386,9 @@ export function SortWaste() {
     setRecognition(null);
     setLateName(null);
     setClearNote('');
+    // A correction acknowledgement or error belongs to the item it was made
+    // about; left in place it would hide the next item's buttons.
+    setCorrection('');
     // The previous item's lamp must not sit above this answer.  Sent here and
     // awaited before the lamp command below, so the two can never arrive out of
     // order; a controller that refuses is reported in the details and the press
@@ -399,11 +416,19 @@ export function SortWaste() {
       crop: null,
       cropMode: null,
       error: '',
+      namedBy: null,
     });
 
     // `empty` is the model saying "nothing there" — an answer, not a failure.
-    let naming: Promise<{ object: string | null; empty: boolean }> =
-      Promise.resolve({ object: null, empty: false });
+    type Named = {
+      object: string | null;
+      empty: boolean;
+      provider: string | null;
+      model: string | null;
+    };
+    let naming: Promise<Named> = Promise.resolve({
+      object: null, empty: false, provider: null, model: null,
+    });
     // The offline model runs in the background on every press.  It is not the
     // answer any more, but it must keep seeing the booth's own objects: it is
     // what answers if the internet goes, and every press teaches it (below).
@@ -453,9 +478,16 @@ export function SortWaste() {
                 // Late: the decision has already been given.  Record it for the
                 // operator, never as the visitor's answer.
                 if (name && settled && seq === checkSeq.current) setLateName(name);
-                return { object: name, empty: Boolean(answer.empty) };
+                // The provider that answered travels with the answer: a fallback
+                // reply must not be recorded under the configured service.
+                return {
+                  object: name,
+                  empty: Boolean(answer.empty),
+                  provider: answer.provider,
+                  model: answer.model,
+                };
               })
-              .catch(() => ({ object: null, empty: false }));
+              .catch(() => ({ object: null, empty: false, provider: null, model: null }));
           }
           if (lastCropRef.current) {
             const image = lastCropRef.current;
@@ -475,8 +507,8 @@ export function SortWaste() {
         }
       };
 
-      // One frame is enough now: the hosted model names what it sees, and the
-      // local classifier that needed three frames to settle is gone.
+      // One frame is enough: the hosted model names what it sees, and the local
+      // classifier reads the same 224 square in parallel as the fallback.
       await readOnce();
       if (seq !== checkSeq.current) return;
       // Overlapped with the frames, capped so a slow cloud model cannot hold
@@ -484,11 +516,14 @@ export function SortWaste() {
       const named = visionReady
         ? await Promise.race([
             naming,
-            new Promise<{ object: string | null; empty: boolean }>((resolve) =>
-              setTimeout(() => resolve({ object: null, empty: false }), VISION_WAIT_MS),
+            new Promise<Named>((resolve) =>
+              setTimeout(
+                () => resolve({ object: null, empty: false, provider: null, model: null }),
+                VISION_WAIT_MS,
+              ),
             ),
           ])
-        : { object: null, empty: false };
+        : { object: null, empty: false, provider: null, model: null };
       const itemLabel = named.object;
       const predictions = await local;
       if (seq !== checkSeq.current) return;
@@ -511,6 +546,10 @@ export function SortWaste() {
         crop: lastCropRef.current,
         cropMode,
         error: '',
+        namedBy:
+          named.provider || named.model
+            ? { provider: named.provider, model: named.model }
+            : null,
       });
       // From here the answer is final: a name that resolves later is kept in
       // the details only.
@@ -523,7 +562,7 @@ export function SortWaste() {
       if (lastCropRef.current && decision.source === 'vision' && decision.classId) {
         const label = decision.classId.charAt(0).toUpperCase() + decision.classId.slice(1);
         void api
-          .wasteTeach(lastCropRef.current, label, itemLabel ?? '', modelStatus.data?.vision?.model ?? '')
+          .wasteTeach(lastCropRef.current, label, itemLabel ?? '', named.model ?? '')
           .catch(() => undefined);
       }
 
@@ -574,7 +613,7 @@ export function SortWaste() {
           item: decision.itemLabel ?? null,
           route: decision.routeId,
           source: decision.source,
-          namer: modelStatus.data?.vision?.model ?? null,
+          namer: named.model ?? null,
         });
         if (seq !== checkSeq.current) return;
         setRecognition(result);
@@ -630,6 +669,7 @@ export function SortWaste() {
       crop: null,
       cropMode: null,
       error: '',
+      namedBy: null,
     });
     setRecognition(null);
     captureFileRef.current = null;
@@ -875,6 +915,13 @@ export function SortWaste() {
                 <div className="suggested-action" data-testid="waste-action">
                   <span className="suggested-label">{t('sort.labelAction')}</span>
                   <p>{check.decision ? actionSentence(check.decision) : t('sort.stateWaiting')}</p>
+                  {/* E-waste uses the ordinary referral sentence, and keeps the
+                      one handling fact that sentence does not carry. */}
+                  {check.decision?.routeId === 'collect.ewaste' && (
+                    <p className="hint" data-testid="waste-ewaste-handling">
+                      {t('sort.ewasteHandling')}
+                    </p>
+                  )}
                 </div>
               </>
             )}
@@ -918,7 +965,8 @@ export function SortWaste() {
                 )}
                 <p className="hint" data-testid="waste-details-namer">
                   {t('sort.detailsNamer')}:{' '}
-                  {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
+                  {check.namedBy?.model ?? modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
+                  {check.namedBy?.provider ? ` (${check.namedBy.provider})` : ''}
                 </p>
                 <p className="hint" data-testid="waste-details-classifier">
                   {t('sort.detailsClassifier')}: {modelStatus.data?.model ?? 'resnet50'}
@@ -954,10 +1002,22 @@ export function SortWaste() {
                         onClick={() => {
                           const file = captureFileRef.current;
                           if (!file) return;
+                          // Record which check this correction was made on: a
+                          // slow reply must not write its message onto the item
+                          // the operator is already looking at.
+                          const forCheck = checkSeq.current;
                           void api
                             .wasteCorrect(file, actual)
-                            .then(() => setCorrection(t('sort.correctionThanks', { label })))
-                            .catch((cause: unknown) => setCorrection(errorMessage(cause)));
+                            .then(() => {
+                              if (checkSeq.current === forCheck) {
+                                setCorrection(t('sort.correctionThanks', { label }));
+                              }
+                            })
+                            .catch((cause: unknown) => {
+                              if (checkSeq.current === forCheck) {
+                                setCorrection(errorMessage(cause));
+                              }
+                            });
                         }}
                       >
                         {label}

@@ -79,10 +79,12 @@ Stop only this project:
   item**. A hosted vision model names the item (Cloudflare
   `@cf/meta/llama-3.2-11b-vision-instruct` on two accounts, then DeepSeek
   `deepseek-v4.1-flash` as the last resort), and small rules turn that name into
-  a route: organic, plastic and paper light the matching bin LED; cloth,
-  leather, footwear, glass, metal, thermocol and electronic waste say **hand it
-  to our recycling agent and contact the operator** and light no bin. Batteries,
-  syringes, diapers and medicine are refused outright. A local ResNet50 runs on
+  a route: organic, plastic and paper light the matching bin LED; everything
+  else (glass, metal, cloth, leather, footwear, thermocol, pencils, electronics
+  and anything uncertain) says **keep it separate and contact the Gram Sahayak
+  office for further sorting, collection and recycling instructions** and lights
+  no bin. Batteries, sharps and chemicals get their own special-handling
+  sentence instead. A local ResNet50 runs on
   every press as the **offline fallback** — it decides only when no name comes
   back, and every named press saves its crop for a future retrain (saved, not
   learned: the weights change only when the model is retrained and redeployed).

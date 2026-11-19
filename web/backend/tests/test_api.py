@@ -359,11 +359,12 @@ async def test_other_waste_is_referred_without_a_bin_command(tmp_path):
         assert body["recognition"]["category"] == "other"
         assert body["indication"] is None
         assert "bin_alert" not in body
-        assert "recycling agent" in body["note"]
+        assert "Gram Sahayak office" in body["note"]
+        assert "further sorting, collection and recycling instructions" in body["note"]
         # A referral must not touch the controller: no LED can light.
         assert real.calls == []
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]
-        assert any(event["title"] == "Recyclable item recognised" for event in events)
+        assert any(event["title"] == "Item referred for further sorting" for event in events)
         # Confirming a handover records zero points and does not claim a bin deposit.
         disposal = await client.post(
             "/api/v1/waste/disposals",
@@ -372,7 +373,7 @@ async def test_other_waste_is_referred_without_a_bin_command(tmp_path):
         assert disposal.status_code == 200
         assert disposal.json()["disposal"]["points"] == 0
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]
-        assert any(event["title"] == "Recyclable item handed over" for event in events)
+        assert any(event["title"] == "Item handed over for further sorting" for event in events)
 
 
 @pytest.mark.asyncio
@@ -431,10 +432,10 @@ async def test_medical_waste_is_referred_without_a_bin_command(tmp_path):
         assert body["recognition"]["category"] == "medical"
         assert body["indication"] is None
         assert "bin_alert" not in body
-        assert "Hazardous" in body["note"]
+        assert "special handling" in body["note"].lower()
         assert real.calls == []
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]
-        assert any(event["title"] == "Hazardous waste recognised" for event in events)
+        assert any(event["title"] == "Special handling item recognised" for event in events)
 
 
 @pytest.mark.asyncio
@@ -513,10 +514,10 @@ async def test_a_special_care_refusal_is_recorded_as_medical(tmp_path):
         assert response.status_code == 200
         body = response.json()
         assert body["indication"] is None
-        assert "Hazardous" in body["note"]
+        assert "special handling" in body["note"].lower()
         assert real.calls == []
         events = (await client.get("/api/v1/events?mode=live")).json()["events"]
-        event = next(e for e in events if e["title"] == "Hazardous waste recognised")
+        event = next(e for e in events if e["title"] == "Special handling item recognised")
         assert "used AA battery" in event["detail"]
         assert "no bin indicator used" in event["detail"]
 
@@ -788,7 +789,7 @@ async def test_the_material_the_model_named_is_kept_with_the_record(tmp_path):
         assert response.status_code == 200
         events = await client.get("/api/v1/events", params={"mode": "demo", "limit": 5})
         rows = events.json()["events"]
-        titled = [row for row in rows if row["title"] == "Recyclable item recognised"]
+        titled = [row for row in rows if row["title"] == "Item referred for further sorting"]
         assert titled, rows
         meta = titled[0]["meta"]
         assert meta["material"] == "Leather"

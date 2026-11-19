@@ -809,10 +809,13 @@ def create_app(
     async def waste_identify(body: WasteClassifyRequest):
         """Name the object in the same crop, with a hosted vision model.
 
-        The classifier answers with a *material*; a visitor asks what the thing
-        is.  This is that second answer, and it is deliberately only a name: the
-        bin stays the local classifier's decision, because measured on the venue
-        probe a vision model is 53.7 % exact against its 70.7 %.
+        The name is an input to the route, not a caption on it: the page's rules
+        read its material word, so "clear plastic bottle" can light the plastic
+        indicator.  What the hosted model does not do is choose the bin by itself
+        — special-care and object rules run first, and a name with nothing usable
+        falls through to the local classifier's thresholds.  That split exists
+        because a vision model names objects well and materials poorly (measured
+        43.9 % exact against the classifier's 70.7 % on the same probe photos).
 
         Always 200.  When no provider is configured, or the model fails, `object`
         is null and the page shows the classifier alone — the behaviour before
@@ -954,8 +957,9 @@ def create_app(
                 False, body.request_id, body.profile_id,
             )
             await db.add_event(
-                body.mode, "waste", "Hazardous waste recognised",
-                f"{detail}; referred to the Gram Sahayak; no bin indicator used",
+                body.mode, "waste", "Special handling item recognised",
+                f"{detail}; needs special handling; referred to the Gram Sahayak "
+                "office for collection instructions; no bin indicator used",
                 "warning",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
@@ -965,7 +969,10 @@ def create_app(
                 "recognition": record,
                 "indication": None,
                 "physical": snapshot.get("physical", False),
-                "note": "Hazardous waste. Do not put it in the organic, plastic or paper bins. Hand it to the Gram Sahayak.",
+                "note": (
+                    "This item needs special handling. Keep it separate and contact "
+                    "the Gram Sahayak office for collection instructions."
+                ),
             }
         if category == "other":
             # Cloth, leather, footwear, glass, metal, thermocol and electronic
@@ -981,8 +988,8 @@ def create_app(
                 False, body.request_id, body.profile_id,
             )
             await db.add_event(
-                body.mode, "waste", "Recyclable item recognised",
-                f"{detail}; referred to the recycling agent; no bin indicator used",
+                body.mode, "waste", "Item referred for further sorting",
+                f"{detail}; referred to the Gram Sahayak office; no bin indicator used",
                 "info",
                 "camera",
                 {"recognition_id": record.get("id"), "category": category,
@@ -992,7 +999,10 @@ def create_app(
                 "recognition": record,
                 "indication": None,
                 "physical": snapshot.get("physical", False),
-                "note": "Not one of the three bins. Hand it to the recycling agent and contact the Gram Sahayak.",
+                "note": (
+                    "Keep this item separate and contact the Gram Sahayak office for "
+                    "further sorting, collection and recycling instructions."
+                ),
             }
         # Bins have indicator LEDs and nothing else: no level sensing, no fill
         # percentage and no "bin full" alert.  The LED command below is the
@@ -1062,7 +1072,7 @@ def create_app(
         handed_over = disposal["category"] == "other"
         await db.add_event(
             body.mode, "waste",
-            "Recyclable item handed over" if handed_over else "Deposit confirmed",
+            "Item handed over for further sorting" if handed_over else "Deposit confirmed",
             f"{disposal['category'].title()} · {disposal['points']} points"
             + (f" · profile {body.profile_id}" if body.profile_id else " · no profile"),
             "info", "browser", {"disposal_id": disposal["id"]},
