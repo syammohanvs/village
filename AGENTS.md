@@ -1711,6 +1711,12 @@ Calibration.  The calibration endpoints themselves are preserved.
 
 ## Waste classifier
 
+**`docs/waste-approach.md` is the handoff brief (2026-11-19)** — the pipeline,
+the decision rules and every bar in it, both models, the teach/training path,
+the measured numbers, the retrain commands, the rejected experiments and the
+invariants, written for a new agent to work from. Read it before changing
+anything here; this section is the history, that file is the current shape.
+
 **The repository is the master copy of the exhibit (2026-11-17).**  A fresh
 clone on another laptop must run as this one was left, so these are committed
 on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +
