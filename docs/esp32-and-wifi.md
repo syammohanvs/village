@@ -78,6 +78,62 @@ are indicators of what the camera last recognised.
 - The **streetlights** are five lamps on one pin, each with its series resistor.
 - The **waste LEDs** are one per category; the firmware holds at most one lit at
   a time, for `indicate_ms` (8000 default), and `CLEAR_WASTE` ends it early.
+- The **wind circuit** is one branch with the ADC inside it, not a voltage tap
+  across the generator — see 2.3. The LED matters: it is what makes the current
+  measurable, and what makes the reading meaningless while it is dark.
+
+### 2.3 The wind circuit (GPIO 33)
+
+```
+generator +  ──▶|── (blue LED) ──┬── D33 (GPIO 33)
+                                 │
+                                [R] 47 Ω
+                                 │
+generator −  ────────────────────┴── GND
+```
+
+**The ADC measures the resistor, not the generator.** That is the whole point:
+a resistor turns current into a voltage, and one tap then gives three figures.
+
+| quantity | how it is obtained |
+| --- | --- |
+| resistor voltage | `analogReadMilliVolts(33)` at 11 dB, 4 reads averaged |
+| current | `I = V_resistor / 47` |
+| generator voltage | `V = V_resistor + 2.8 V` — **only while current flows** |
+| power | `P = V × I` (V in volts, I in mA → mW) |
+
+The blue LED's forward voltage was **measured at 2.8 V while lit**. It is a
+threshold as well as a constant: below it the LED does not conduct, so there is
+no current, and **this circuit cannot say what the generator's voltage is**. The
+firmware therefore reports `voltage_v: null` there, never 2.8 V.
+
+The three hardware numbers are named defaults in `uc/include/village/core/wind.h`
+and settings in `WindConfig` (NVS JSON), so a different resistor or LED is a
+config change:
+
+| setting | default | refused outside |
+| --- | --- | --- |
+| `wind.sense_ohms` | 47 | 1–10000 Ω |
+| `wind.led_forward_mv` | 2800 | 500–5000 mV |
+| `wind.noise_floor_mv` | 20 | 0–1000 mV |
+
+20 mV across 47 Ω is 0.43 mA — below that the reading is the ADC's own noise.
+The tap is a few tens of millivolts in total, which is why four calibrated reads
+are averaged before the floor is applied.
+
+**What the card shows** (same code path in Live and Simulation):
+
+| state | card |
+| --- | --- |
+| no turbine wired | **Not fitted**, and a sentence saying nothing flows |
+| above the floor | **Generating**, `Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW` |
+| at or below it | **Not generating**, `Voltage — · Current 0.00 mA · Power 0.0 mW`, *No measurable output* |
+| frame missing / stale / offline | chip **Status unknown**, no readings at all — not zeros |
+
+A dash is not zero: the LED is dark, so there is no generator voltage to report.
+And the power is **the electrical power delivered to this LED-and-resistor
+circuit — not the wind's power, and not energy over time**; there is no second
+tap, no wind-speed and no torque measurement.
 
 ---
 
@@ -99,7 +155,10 @@ are indicators of what the camera last recognised.
 8. The test page's outputs, if its master switch is on (session-only).
 
 **Configuration lives in NVS as JSON** (`Preferences`, namespace `village`),
-alongside a `revision`. A missing key keeps its default, so a firmware field can
+alongside a `revision`. The wind block carries the circuit itself
+(`installed`, `sense_ohms`, `led_forward_mv`, `noise_floor_mv`) and is validated
+before it is stored; an older saved config that still names `generate_mv` simply
+keeps the new defaults for the fields it does not have. A missing key keeps its default, so a firmware field can
 be added or removed without wiping calibration; `config_revision` is stored
 beside the settings, not inside them. A boot with no saved configuration adds a
 `CONFIG_DEFAULTS` event so an uncalibrated board says so on the dashboard.
@@ -171,6 +230,12 @@ Served by `WebServer` on port **80** (`uc/src/api.cpp`). Every response is JSON.
 - **`/status` carries identity**: `device_id`, `boot_id`, `firmware`,
   `uptime_ms`, `sample_seq`, `config_revision` — the backend uses `boot_id` to
   notice a reboot and `sample_seq`/`uptime` to notice a frozen board.
+- **`/status` `sensors.wind` is the circuit's answer, not a volts field**:
+  `resistor_millivolts` (the ADC), `measuring`, `voltage_v` /
+  `voltage_millivolts` (nullable), `current_ma`, `power_mw`, plus
+  `sense_ohms`, `led_forward_millivolts`, `noise_floor_millivolts`. `millivolts`
+  is kept as an alias of the resistor voltage; `generate_mv` no longer exists.
+  The page renders these numbers as sent — it does not recompute them.
 - **`/config` PUT** requires the revision that was read; a mismatch is **409**
   with the current revision, and an invalid value is **400** naming the field.
   The board validates *and* saves to NVS before answering.
@@ -289,13 +354,20 @@ back on within ~14 s while the laptop has an uplink to share; a hotspot found
 
 ## 10. What is verified, and what is not
 
-- The board's identity (`firmware 0.2.8` at the time of writing), Wi-Fi join,
-  polling, commands, config save/load and the **bin LED selection** have all been
-  exercised on the physical board. The operator has confirmed the LEDs light for
-  the selected bin.
-- **`CLEAR_WASTE` (firmware 0.2.9) is new** and has been tested on the host and
-  the simulator only; it needs one press on the board. The 8-second automatic
-  switch-off is the existing, verified behaviour and is unchanged.
+- The board's identity, Wi-Fi join, polling, commands, config save/load and the
+  **bin LED selection** have all been exercised on the physical board. The
+  operator has confirmed the LEDs light for the selected bin. The 8-second
+  automatic switch-off is verified behaviour and unchanged.
+- **Two changes are built and waiting for one OTA flash**, because the board is
+  not currently on the hotspot: `CLEAR_WASTE` (0.2.9, needs one physical press to
+  confirm an immediate lamp off) and the **wind circuit reading** (2.3). Both are
+  in `uc/.pio/build/esp32doit-devkit-v1-ota/firmware.bin` (OTA marker = 1).
+  Until it is flashed, Live shows **Status unknown** and no wind readings; an
+  older image's volts are deliberately **not** displayed as zero amps.
+- The wind arithmetic, the no-current state and the unavailable-data state are
+  covered on the host (5 firmware units), in the simulator and in the page
+  tests; what the board still has to confirm is the real sensor at the floor and
+  a real LED lighting.
 - **Not verified here:** USB flashing from this container (the CP210x belongs to
   Windows; WSL does not see it), and OTA while the board is unreachable.
 
@@ -314,6 +386,9 @@ back on within ~14 s while the laptop has an uplink to share; a hotspot found
 8. **OTA image must be able to OTA** (marker = 1) and the pump is forced off
    during an update.
 9. **The hotspot is part of the chain**, not an accessory: no hotspot, no board.
+10. **Wind voltage is not the generator's voltage.** The ADC is across the
+    resistor; 2.8 V may only be added while current flows, and "no current" is
+    a dash, not 0 V.
 
 ---
 
@@ -327,7 +402,8 @@ back on within ~14 s while the laptop has an uplink to share; a hotspot found
 | `uc/src/main.cpp` | the loop and the order of work |
 | `uc/src/net.cpp` | Wi-Fi join, AP fallback, mDNS, OTA service |
 | `uc/src/api.cpp` | the five endpoints, commands, acks, status/health payloads |
-| `uc/src/sensors.cpp` | sampling periods, reservoir state machine |
+| `uc/src/sensors.cpp` | sampling periods, reservoir state machine, the wind tap's 4-read average |
+| `uc/include/village/core/wind.h` | the wind circuit: I = Vr/R, V = Vr + Vled, P = V × I |
 | `uc/src/config_store.cpp`, `config_json.cpp` | NVS JSON, revision, defaults |
 | `uc/test/` | host tests for the portable safety core (68 tests / 513 checks) |
 | `web/backend/app/device.py` | HTTP device client, polling, staleness, commands |

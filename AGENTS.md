@@ -2870,4 +2870,6 @@ real change of what the ADC means, not a relabelled number:
   with **No measurable output**; Malayalam at 390 px with no horizontal
   overflow and zero page errors.  A frame without `measuring` (a board flashed
   before this change) shows **no readings at all** rather than zeros — an absent
-  answer is not "0 mA".
+  answer is not "0 mA".  `docs/esp32-and-wifi.md` carries the circuit as **§2.3**
+  (diagram, arithmetic, config bounds, the card's four states) and the `/status`
+  fields under §5; the desktop copy was refreshed for the reviewer.
