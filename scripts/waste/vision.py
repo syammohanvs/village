@@ -43,7 +43,9 @@ def provider(conf: dict[str, str] | None = None) -> str | None:
     """Which provider is usable, or None when none is configured."""
     conf = conf or settings()
     wanted = (conf.get("VILLAGE_VISION_PROVIDER") or "opencode").strip().lower()
-    has_cf = bool(conf.get("VILLAGE_CF_ACCOUNT_ID")) and bool(conf.get("VILLAGE_CF_API_TOKEN"))
+    # A token alone is enough: the account id is looked up from it when it is
+    # blank (a user API token can list its own accounts).
+    has_cf = bool(conf.get("VILLAGE_CF_API_TOKEN"))
     has_opencode = bool(conf.get("VILLAGE_VISION_API_KEY"))
     if wanted == "cloudflare":
         return "cloudflare" if has_cf else ("opencode" if has_opencode else None)
@@ -81,6 +83,23 @@ def ask_object(
     if which == "opencode":
         return _opencode(jpeg, prompt, model, conf, timeout)
     return ""
+
+
+def _first_account(token: str) -> str:
+    """The account id behind a user API token, when `.env` leaves it blank."""
+    import urllib.request  # noqa: PLC0415
+
+    request = urllib.request.Request(
+        "https://api.cloudflare.com/client/v4/accounts",
+        headers={"Authorization": "Bearer " + token},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = json.load(response)
+    except Exception:  # noqa: BLE001 - the caller reports the failure
+        return ""
+    rows = body.get("result") or []
+    return (rows[0].get("id") or "") if rows else ""
 
 
 def _data_url(jpeg: bytes) -> str:
@@ -132,10 +151,10 @@ def _opencode(jpeg: bytes, prompt: str, model: str, conf: dict[str, str], timeou
 
 
 def _cloudflare(jpeg: bytes, prompt: str, model: str, conf: dict[str, str], timeout: int) -> str:
-    account = conf.get("VILLAGE_CF_ACCOUNT_ID", "")
     token = conf.get("VILLAGE_CF_API_TOKEN", "")
-    if not (account and token):
+    if not token:
         return ""
+    account = conf.get("VILLAGE_CF_ACCOUNT_ID", "") or _first_account(token)
     url = f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}"
     headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
 
