@@ -2215,6 +2215,29 @@ the probe *down* (74.7 % → 73.0 %).  Gather ~15–20 confirmed crops **per cla
 first, keep a held-out slice of booth photos as the judge, and quote that number
 rather than training accuracy.
 
+**RETRAINED ON THEM ANYWAY, TWICE, AND REJECTED BOTH — the shipped model is
+still v18 (2026-11-19).**  The user asked for the retrain, so it was run with
+the documented recipe and with a gentler one, both from the same caches, so the
+rows are comparable with each other:
+
+| model | archive probe (241) | venue probe (227) | 18 booth crops |
+| --- | --- | --- | --- |
+| **v18 (shipped)** | **74.7 / 82.6** | 48.9 / 59.9 | 14/18 |
+| v21 (+18 crops, 20+15, lr 2e-4) | 69.3 / 75.9 | 54.6 / 65.6 | 18/18 |
+| v22 (+18 crops, 20+10, lr 1e-4) | 69.7 / 76.3 | 53.3 / 64.3 | 18/18 |
+
+`~/.cache/waste-train/v21|v22/` keep both heads and reports.  The trade is real
+— the venue condition (one object on a plain field) **gains ~5 points** and the
+241-photo probe **loses 5–6** — and by this project's own rule the probe decides,
+so **neither ships**.  **The 18/18 is circular and must not be quoted**: those
+crops are the training rows.  The cause is the shape of the sample, not the
+recipe: 18 photos over four classes, **13 of them Plastic**, so the head tilts
+toward Plastic and matters less on the classes the probe is made of.  A gentler
+rate did not change the trade (it only shifted it by a point), which is the same
+saturation the two-photo run showed.  **Do not re-run this until there are
+~15–20 crops per class** — and when there are, hold out a slice of *booth*
+photos and report that number, never the training one.
+
 
 **The page now decides from both models, and a conflict refuses the bin
 (2026-11-19, from the review).**  Three faults were named: e-waste was grouped
