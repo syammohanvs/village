@@ -30,6 +30,16 @@ THREADS="${VILLAGE_WHISPER_THREADS:-$(nproc 2>/dev/null || echo 4)}"
 case "$MODEL" in /*) ;; *) MODEL="$ROOT/$MODEL" ;; esac
 PIDFILE="$ROOT/data/run/whisper.pid"
 
+# A second server, for Hindi only, with a bigger model.  Optional: when
+# VILLAGE_WHISPER_MODEL_HI is unset (or its file is missing) one server serves
+# every language, exactly as before.
+MODEL_HI="${VILLAGE_WHISPER_MODEL_HI:-}"
+URL_HI="${VILLAGE_WHISPER_URL_HI:-}"
+THREADS_HI="${VILLAGE_WHISPER_THREADS_HI:-$THREADS}"
+case "$MODEL_HI" in /*|"") ;; *) MODEL_HI="$ROOT/$MODEL_HI" ;; esac
+PIDFILE_HI="$ROOT/data/run/whisper-hi.pid"
+healthy_hi() { [ -n "$URL_HI" ] && curl -fsS -m 2 "$URL_HI/health" >/dev/null 2>&1; }
+
 healthy() { curl -fsS -m 2 "$URL/health" >/dev/null 2>&1; }
 
 # The whisper-server processes belonging to THIS repository (an older one can
@@ -47,12 +57,22 @@ server_pids() {
 
 case "${1:-start}" in
   status)
+    ok=1
     if healthy; then
       printf 'whisper is answering at %s\n' "$URL"
-      exit 0
+    else
+      printf 'whisper is NOT answering at %s\n' "$URL"
+      ok=0
     fi
-    printf 'whisper is NOT answering at %s\n' "$URL"
-    exit 1
+    if [ -n "$URL_HI" ]; then
+      if healthy_hi; then
+        printf 'whisper (Hindi) is answering at %s\n' "$URL_HI"
+      else
+        printf 'whisper (Hindi) is NOT answering at %s\n' "$URL_HI"
+        ok=0
+      fi
+    fi
+    exit $((1 - ok))
     ;;
   stop)
     for pid in $(server_pids); do
@@ -64,6 +84,11 @@ case "${1:-start}" in
       pid="$(cat "$PIDFILE" || true)"
       [ -n "${pid:-}" ] && kill "$pid" 2>/dev/null || true
       rm -f "$PIDFILE"
+    fi
+    if [ -f "$PIDFILE_HI" ]; then
+      pid="$(cat "$PIDFILE_HI" || true)"
+      [ -n "${pid:-}" ] && kill "$pid" 2>/dev/null || true
+      rm -f "$PIDFILE_HI"
     fi
     printf 'whisper stopped\n'
     ;;
@@ -117,6 +142,25 @@ for _ in $(seq 1 120); do
     real="$(server_pids | head -1)"
     [ -n "$real" ] && echo "$real" > "$PIDFILE"
     printf 'whisper started at %s with %s (pid %s)\n' "$URL" "$(basename "$MODEL")" "$(cat "$PIDFILE")"
+    if [ -n "$MODEL_HI" ] && [ -f "$MODEL_HI" ] && [ -n "$URL_HI" ]; then
+      if healthy_hi; then
+        printf 'whisper (Hindi) already answering at %s\n' "$URL_HI"
+        exit 0
+      fi
+      host_hi="${URL_HI#*://}"; host_hi="${host_hi%%:*}"
+      port_hi="${URL_HI##*:}"; port_hi="${port_hi%%/*}"
+      setsid "$BIN" -m "$MODEL_HI" -t "$THREADS_HI" --host "$host_hi" --port "$port_hi" \
+        > data/logs/whisper-hi.log 2>&1 < /dev/null &
+      echo $! > "$PIDFILE_HI"
+      for _ in $(seq 1 240); do
+        if healthy_hi; then
+          printf 'whisper (Hindi) started at %s with %s\n' "$URL_HI" "$(basename "$MODEL_HI")"
+          exit 0
+        fi
+        sleep 0.5
+      done
+      printf 'whisper (Hindi) did not become ready; see data/logs/whisper-hi.log\n' >&2
+    fi
     exit 0
   fi
   sleep 0.5

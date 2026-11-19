@@ -106,7 +106,10 @@
           "गाँव कैसा है",
           "स्टेटस",
           "gaon ki sthiti",
-          "kya ho raha hai"
+          "kya ho raha hai",
+          "गाँव के स्टेटस",
+          "गाँव का स्टेटी",
+          "गाँव के स्टेटी"
         ]
       },
       "response": {
@@ -445,7 +448,8 @@
           "पानी रोको",
           "pani dena band karo",
           "sinchai band karo",
-          "pump band karo"
+          "pump band karo",
+          "पानी बंद करो"
         ]
       },
       "response_pending": {
@@ -1431,7 +1435,9 @@
         "स्थिति",
         "स्टेटस",
         "स्तर",
-        "हालत"
+        "हालत",
+        "स्टेटी",
+        "स्टेटस्"
       ],
       "fillers": [
         "मोड",

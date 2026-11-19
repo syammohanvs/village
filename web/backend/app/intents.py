@@ -69,6 +69,12 @@ class IntentMatcher:
     def normalize(self, text: str) -> str:
         text = unicodedata.normalize("NFKC", (text or "").strip().lower())
         text = text.replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
+        # Indic *punctuation* is not a letter, but it sits inside the Devanagari
+        # block the filter below keeps: Whisper ends a Hindi sentence with "।"
+        # (U+0964), so "करो।" stayed one token and never matched "करो" — every
+        # Hindi command the model punctuated that way was refused (2026-11-19).
+        for mark in ("\u0964", "\u0965", "\u0970", "\u0971"):
+            text = text.replace(mark, " ")
         out = []
         for ch in text:
             if ch.isalnum() or ch.isspace() or "\u0900" <= ch <= "\u0d7f":
@@ -168,6 +174,13 @@ class IntentMatcher:
             return True
         g = self.grammar.get(language, {})
         if self._starts(tokens, g.get("question_starts")):
+            return True
+        # Hindi puts its question word at the *end*: "टंकी में पानी है क्या"
+        # ("is there water in the tank?").  With only the sentence-start rule it
+        # was read as a flat statement, so asking about the tank answered with a
+        # fact instead of the reading (measured 2026-11-19).
+        question_words = g.get("question_starts") or []
+        if tokens and tokens[-1] in question_words and len(tokens) > 1:
             return True
         # Malayalam and Hindi mark a question with a suffix on the verb rather
         # than by moving a question word to the front ("…ഉണ്ടോ", "…क्या").
@@ -307,11 +320,13 @@ class IntentMatcher:
             if others:
                 return self._result("ambiguous", language, "ambiguous_generic")
             devices = ["pump"]
-            # The cue means *start* only when the sentence names no state.  It
-            # used to overwrite the state it found, so "പമ്പ് അഫ്" ("pump off",
-            # heard with the model's own spelling of "off") started watering
-            # instead of stopping it (measured 2026-11-18).
-            if not unique_states:
+            # The cue means *start* only when the sentence names no state — and
+            # not when it is asking a status question.  "पंप का स्टेटस" ("the
+            # pump's status") names the pump, which is also the watering cue, so
+            # the cue used to answer it with IRRIGATION_START: asking about the
+            # pump started it (measured 2026-11-19).  A status word or a question
+            # outranks the cue, exactly as "automatic" does.
+            if not unique_states and not status_hits and not is_question:
                 unique_states = {watering}
         elif len(devices) > 1:
             return self._result("ambiguous", language, "ambiguous_generic")

@@ -101,6 +101,7 @@ class Settings:
     stale_after_ms: int
     disconnect_after_ms: int
     whisper_url: str
+    whisper_url_hi: str
     whisper_model_path: Path
     # A Whisper-small fine-tuned on Malayalam (`models/whisper/ml-asr`).  It is
     # what makes a spoken Malayalam sentence usable — the multilingual base
@@ -200,6 +201,11 @@ class Settings:
             stale_after_ms=_int("VILLAGE_STALE_AFTER_MS", 4000),
             disconnect_after_ms=_int("VILLAGE_DISCONNECT_AFTER_MS", 9000),
             whisper_url=os.getenv("VILLAGE_WHISPER_URL", "http://127.0.0.1:8080").rstrip("/"),
+            # Hindi on its own server, with a bigger model.  Measured 2026-11-19
+            # on the room's clips: base wrote "राट बंद करो" for "लाइट बंद करो"
+            # and refused it; whisper-small wrote "लाइट बंद करो".  Blank = use
+            # the main server (one model for everything).
+            whisper_url_hi=os.getenv("VILLAGE_WHISPER_URL_HI", "").rstrip("/"),
             whisper_model_path=Path(
                 os.getenv("VILLAGE_WHISPER_MODEL", models / "whisper" / "ggml-base.bin")
             ),

@@ -2312,6 +2312,33 @@ hall internet goes we have a reliable fall back with known objects."*  So:
 - The page's disclosure now says the crop is kept on the laptop to teach the
   offline model (en/hi/ml), and `sort.visionNote` says the same.
 
+**Hindi was refused because of the danda, and it now runs on a bigger model
+(2026-11-19, reported as "it is not understanding").**  Three separate faults,
+and the first one alone refused nearly every Hindi sentence:
+
+1. **The Devanagari danda `।` (U+0964) is punctuation, but it sits inside the
+   block the normaliser keeps**, so "करो।" stayed one token and never matched
+   "करो".  Whisper ends every Hindi sentence with it.  `normalize()` now strips
+   U+0964/U+0965/U+0970/U+0971.
+2. **Asking about the pump started it.**  "पंप" is the watering cue as well as the
+   pump's name, so "पंप का स्टेटस" filled in the missing state with *watering* and
+   answered IRRIGATION_START.  A **status word or a question now outranks the
+   cue**, exactly as "automatic" does.
+3. **Hindi puts its question word last** ("टंकी में पानी है क्या"), and only a
+   sentence-*start* rule existed, so a question read as a statement.  A question
+   word in the final token is a question now.
+
+And the model: **whisper-base is too weak for Hindi on this microphone.**
+Measured on the room's own clips, base wrote `राट बंद करो` for "लाइट बंद करो" and
+`बाटाटू` for "लाइट ऑटो"; **whisper-small** wrote `लाइट बंद करो।` and `लाइट अटो`.
+`scripts/whisper.sh` now runs a **second server for Hindi only**
+(`VILLAGE_WHISPER_MODEL_HI`, `VILLAGE_WHISPER_URL_HI`, port 8182, 4 threads so two
+servers do not both claim all eight), `voice.py` routes `hi` there and **falls
+back to the main server** if it is not running, and the Hindi prompt became whole
+phrases like the English one.  English stays on base (**1.1 s** measured) while
+Hindi takes **5–7 s**; that is the price of being understood.  Four of the
+session's Hindi clips now answer correctly through `/voice/transcribe`.
+
 **Malayalam status questions failed on the model's spelling, and the vocabulary
 now carries it (2026-11-19, reported as "a reading mistake").**  One session
 (13:48–13:55) asked the village status four ways and the lamps' status twice, and

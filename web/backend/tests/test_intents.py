@@ -1019,3 +1019,42 @@ def test_the_malayalam_model_s_spellings_are_understood(matcher: IntentMatcher) 
         assert answer["intent"] == "AMBIGUOUS", said
         assert "ഏത് ഉപകരണം" in answer["message"], said
         assert answer["command"] is None
+
+
+def test_a_hindi_sentence_ending_in_a_danda_is_still_a_command(matcher: IntentMatcher) -> None:
+    """Whisper ends every Hindi sentence with "।" (U+0964).
+
+    The normaliser keeps the Devanagari block (so the letters survive), and the
+    danda sits inside it, so "करो।" was one token and never matched "करो" —
+    **every** Hindi command the model punctuated that way was refused (reported
+    2026-11-19 as "Hindi is not understanding").  Punctuation is stripped now.
+    """
+    for said, want in (
+        ("लाइट बंद करो।", "LIGHTS_OFF"),
+        ("लाइट चालू करो।", "LIGHTS_ON"),
+        ("पंप बंद करो।", "IRRIGATION_STOP"),
+        ("लाइट ऑटो करो।", "LIGHTS_AUTO"),
+        ("मिट्टी की नमी।", "SOIL_STATUS"),
+        ("गाँव का स्टेटस।", "VILLAGE_STATUS"),
+    ):
+        assert matcher.match(said, "hi")["intent"] == want, said
+
+
+def test_asking_the_pump_s_status_never_starts_it(matcher: IntentMatcher) -> None:
+    """The pump is also the watering cue, so "पंप का स्टेटस" started watering.
+
+    A status word or a question outranks the cue, exactly as "automatic" does
+    (reported 2026-11-19: asking about the pump moved it).
+    """
+    answer = matcher.match("पंप का स्टेटस।", "hi")
+    assert answer["intent"] == "PUMP_STATUS"
+    assert answer["command"] is None
+
+    # …and the cue still works when it is a request.
+    assert matcher.match("पानी देना", "hi")["intent"] == "IRRIGATION_START"
+    assert matcher.match("पानी बंद करो", "hi")["intent"] == "IRRIGATION_STOP"
+
+
+def test_a_question_word_at_the_end_is_a_question(matcher: IntentMatcher) -> None:
+    """Hindi puts "क्या" last: "टंकी में पानी है क्या" is a question, not a fact."""
+    assert matcher.match("टंकी में पानी है क्या", "hi")["intent"] == "WATER_STATUS"

@@ -42,7 +42,14 @@ from .config import Settings
 # device?" and never actuates.  The page also refuses a silent recording before
 # the model is asked (peakLevel).
 LANGUAGE_PROMPTS = {
-    "hi": "लाइट बंद करो, लाइट चालू करो, पंप चालू करो, पानी, स्ट्रीट लाइट.",
+    # Whole phrases rather than a word list, and for the same measured reason as
+    # English: the list left "लाइट बंद करो" as "राट बंद करो"/"बान्द करो", which
+    # the parser refuses; the phrases give "लाइट बंद करो।" on whisper-small.
+    "hi": (
+        "लाइट चालू करो। लाइट बंद करो। लाइट ऑटो करो। लाइट का स्टेटस। "
+        "पंप चालू करो। पंप बंद करो। पंप ऑटो करो। पंप का स्टेटस। "
+        "पानी देना। पानी बंद करो। मिट्टी की नमी। टंकी में पानी। गाँव का स्टेटस।"
+    ),
     # Whole phrases rather than a word list: the list fixed "Stop Illusion!" and
     # "BOM status!" but still lost the device entirely in "Lights status." ->
     # "Status." (which the page then answered as the *village* status — reported
@@ -204,13 +211,29 @@ class WhisperClient:
                 "model (for example ggml-base.bin or ggml-large-v3-turbo.bin).",
             )
 
+        # Hindi is transcribed by a bigger model when one is configured: base
+        # mishears it badly ("राट बंद करो" for "लाइट बंद करो") and whisper-small
+        # does not (measured 2026-11-19).  If that server is not there, the main
+        # one answers and Hindi behaves exactly as it did before.
+        url = self.settings.whisper_url
+        if language == "hi" and self.settings.whisper_url_hi:
+            url = self.settings.whisper_url_hi
         try:
             async with httpx.AsyncClient(timeout=self.settings.whisper_timeout_s) as client:
-                response = await client.post(
-                    self.settings.whisper_url + "/inference",
-                    files={"file": ("audio.wav", data, "audio/wav")},
-                    data=request_fields(language),
-                )
+                try:
+                    response = await client.post(
+                        url + "/inference",
+                        files={"file": ("audio.wav", data, "audio/wav")},
+                        data=request_fields(language),
+                    )
+                except httpx.HTTPError:
+                    if url == self.settings.whisper_url:
+                        raise
+                    response = await client.post(
+                        self.settings.whisper_url + "/inference",
+                        files={"file": ("audio.wav", data, "audio/wav")},
+                        data=request_fields(language),
+                    )
         except httpx.HTTPError as exc:
             raise VoiceError(
                 503, "WHISPER_UNREACHABLE",
