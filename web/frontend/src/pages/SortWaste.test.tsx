@@ -802,7 +802,9 @@ describe('Sort Waste — two models, one decision', () => {
       );
       expect(within(identifies).getByText(/cloud vision model/i)).toBeInTheDocument();
       expect(within(classifies).getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
-      expect(within(classifies).getByText(/local ResNet50/i)).toBeInTheDocument();
+      // The name decided, so the row says so; the local model's own answer is
+      // in the details rather than being presented as the category.
+      expect(within(classifies).getByText(/from the item name/i)).toBeInTheDocument();
       expect(action).toHaveTextContent(/Suggested action/i);
       expect(action).toHaveTextContent(/plastic bin/i);
 
@@ -819,14 +821,14 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('refuses a bin when the two models disagree', async () => {
-    // The reported shape: a pencil read as Paper.  The classifier's 93% must
-    // not open the paper bin while the name says pencil.
+  it('refuses a bin for a pencil, whatever the picture says', async () => {
+    // The reported shape: a pencil read as Paper 93%.  The name now decides the
+    // category, and a pencil is in none of the three bins.
     const restore = await press({ predictions: predictionsFor('Paper', 0.93), object: 'orange pencil' });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/results need checking/i);
+      expect(action).toHaveTextContent(/keep this item separate/i);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
     } finally {
@@ -939,6 +941,30 @@ describe('Sort Waste — two models, one decision', () => {
       expect(action).toHaveTextContent(/keep this item separate/i);
       expect(screen.getByTestId('waste-result')).toHaveTextContent(/not certain/i);
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('believes the item name over the classifier — the clear plastic bag', async () => {
+    // Reported 2026-11-19: "Clear plastic bag" named correctly while the local
+    // model said Paper.  The name is the answer and the bag goes in the plastic
+    // bin; the classifier's reading stays visible in the details.
+    const restore = await press({
+      predictions: predictionsFor('Paper', 0.78),
+      object: 'Clear plastic bag',
+    });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/plastic bin/i),
+        { timeout: 8000 },
+      );
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(screen.getByText(/from the item name/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByText(/confidence and model details/i));
+      expect(screen.getByTestId('waste-local-reading')).toHaveTextContent(/paper/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
     } finally {
       restore();
     }

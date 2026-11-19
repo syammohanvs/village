@@ -52,6 +52,7 @@ export type ReasonId =
   | 'specialCare'
   | 'identificationMissing'
   | 'corroborated'
+  | 'named'
   | 'unsupported';
 
 export interface DecisionInput {
@@ -71,9 +72,15 @@ export interface Decision {
   status: DecisionStatus;
   routeId: RouteId;
   bin: BinId | null;
-  /** The classifier's own class, kept for the details panel. */
+  /** The class the page decided on — the name's, when the name spoke. */
   classId: string | null;
+  /** The local model's probability for `classId` (0 when it never offered it). */
   classConfidence: number;
+  /** Which model decided.  The name is trusted first; the classifier is the fallback. */
+  source: 'vision' | 'local';
+  /** The classifier's own top class and confidence, always, for the details. */
+  localClassId: string | null;
+  localConfidence: number;
   /** The second guess, so the panel can show that it was close. */
   runnerUpId: string | null;
   runnerUpConfidence: number;
@@ -119,6 +126,30 @@ const BIN_OF: Record<string, BinId> = {
   plastic: 'plastic',
   paper: 'paper',
 };
+
+const CLASS_OF_ROUTE: Record<string, string> = {
+  'bin.organic': 'organic',
+  'bin.plastic': 'plastic',
+  'bin.paper': 'paper',
+  'collect.glass': 'glass',
+  'collect.metal': 'metal',
+  'collect.textile': 'textile',
+  'collect.leather': 'leather',
+  'collect.footwear': 'footwear',
+  'collect.thermocol': 'thermocol',
+  'collect.ewaste': 'ewaste',
+};
+
+/** The classifier's own probability for a class, matched case-insensitively. */
+function probabilityOf(predictions: Prediction[], label: string | null): number {
+  if (!label) return 0;
+  const wanted = label.trim().toLowerCase();
+  const row = predictions.find(
+    (item) => typeof item?.label === 'string' && item.label.trim().toLowerCase() === wanted,
+  );
+  const value = Number(row?.confidence);
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+}
 
 const ROUTE_OF_MATERIAL: Record<string, RouteId> = {
   glass: 'collect.glass',
@@ -245,11 +276,23 @@ export function materialClaimOf(itemLabel: string | null): RouteId | BinId | nul
   const object = objectRouteOf(itemLabel);
   if (object) return object;
   if (!itemLabel) return null;
+  // The FIRST material word in the sentence wins, not the first category in the
+  // list: "glass bottle with a plastic cap" is glass, and a list-ordered scan
+  // would have called it plastic.
   const text = fold(itemLabel);
+  let best: { at: number; long: number; route: RouteId | BinId } | null = null;
   for (const group of MATERIAL_WORDS) {
-    if (hasWord(text, group.words)) return group.route;
+    for (const word of group.words) {
+      for (const variant of [` ${word} `, ` ${word}s `]) {
+        const at = text.indexOf(variant);
+        if (at === -1) continue;
+        if (!best || at < best.at || (at === best.at && word.length > best.long)) {
+          best = { at, long: word.length, route: group.route };
+        }
+      }
+    }
   }
-  return null;
+  return best ? best.route : null;
 }
 
 function base(predictions: Prediction[]): Prediction | null {
@@ -295,6 +338,9 @@ export function decide(input: DecisionInput): Decision {
     bin: null,
     classId: null,
     classConfidence: 0,
+    source: 'local',
+    localClassId: top?.label ?? null,
+    localConfidence: top ? Math.min(1, top.confidence) : 0,
     runnerUpId: null,
     runnerUpConfidence: 0,
     itemLabel: input.itemLabel,
@@ -309,22 +355,15 @@ export function decide(input: DecisionInput): Decision {
   const common = {
     classId,
     classConfidence: confidence,
+    source: 'local' as const,
+    localClassId: top.label,
+    localConfidence: confidence,
     runnerUpId: second?.label ?? null,
     runnerUpConfidence: second ? Math.min(1, second.confidence) : 0,
   };
 
-  if (classId === 'background' || classId === 'unknown' || classId === 'none') {
-    return { ...empty, ...common, status: 'nothing', reasonId: 'ok' };
-  }
-
-  const bin = BIN_OF[classId] ?? null;
-  const materialRoute = ROUTE_OF_MATERIAL[classId] ?? null;
-  if (!bin && !materialRoute) {
-    // A class this build does not know: never guess, never light anything.
-    return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'unsupported' };
-  }
-
-  // 2. a special-care cue in the name refuses every bin and every route.
+  // 1. a special-care cue in the name refuses every bin and every route — before
+  // anything else, because it is a safety rule and not a classification one.
   const special = specialCareOf(input.itemLabel);
   if (special) {
     return {
@@ -337,39 +376,61 @@ export function decide(input: DecisionInput): Decision {
     };
   }
 
-  // 3. the name states another material than the decision we are about to take.
+  // 2. THE NAME DECIDES FIRST (2026-11-19, the operator's instruction).
+  //    The hosted model reads an object far better than this classifier reads a
+  //    material on the booth's base, so when the name states what the item is
+  //    made of, that is the answer — "clear plastic bag" is plastic, whatever the
+  //    local model thinks.  The classifier is the fallback when the name says
+  //    nothing usable, and its own reading is still reported beside the answer.
   const claim = materialClaimOf(input.itemLabel);
-  const chosenRoute: RouteId | BinId | null = bin ? `bin.${bin}` : materialRoute;
-  if (claim && chosenRoute && claim !== chosenRoute) {
+  if (claim && claim !== 'separate.unknown') {
+    const claimedBin = claim.startsWith('bin.') ? (claim.slice(4) as BinId) : null;
+    const claimedClass = CLASS_OF_ROUTE[claim] ?? null;
     return {
       ...empty,
       ...common,
-      status: 'conflict',
-      routeId: 'separate.unknown',
-      reasonId: 'conflict',
-      needsOperator: true,
+      status: 'accepted',
+      routeId: claim as RouteId,
+      bin: claimedBin,
+      classId: claimedClass,
+      classConfidence: probabilityOf(input.predictions, claimedClass),
+      source: 'vision',
+      reasonId: 'named',
+      allowLamp: claimedBin !== null,
     };
+  }
+
+  // A pencil (or crayon) is in none of the three bins, however sure the picture
+  // is about the material — that rule is the operator's, and it is text, not a
+  // fourth class.
+  if (claim === 'separate.unknown') {
+    return {
+      ...empty,
+      ...common,
+      status: 'uncertain',
+      routeId: 'separate.unknown',
+      source: 'vision',
+      reasonId: 'named',
+      allowLamp: false,
+    };
+  }
+
+  if (classId === 'background' || classId === 'unknown' || classId === 'none') {
+    return { ...empty, ...common, status: 'nothing', reasonId: 'ok' };
+  }
+
+  const bin = BIN_OF[classId] ?? null;
+  const materialRoute = ROUTE_OF_MATERIAL[classId] ?? null;
+  if (!bin && !materialRoute) {
+    // A class this build does not know: never guess, never light anything.
+    return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'unsupported' };
   }
 
   if (bin) {
     if (confidence < input.binBar) {
-      // 4b. The picture is not sure enough on its own — but if the name states
-      // the same material, two models agree and the bin is accepted.  Measured,
-      // and still a floor: see CORROBORATED_BIN_FLOOR.
-      if (claim === `bin.${bin}` && confidence >= CORROBORATED_BIN_FLOOR) {
-        return {
-          ...empty,
-          ...common,
-          status: 'accepted',
-          routeId: `bin.${bin}`,
-          bin,
-          reasonId: 'corroborated',
-          allowLamp: true,
-        };
-      }
       return { ...empty, ...common, status: 'uncertain', routeId: 'separate.unknown', reasonId: 'belowBar' };
     }
-    // 4/5. A bin needs the local answer *and*, when a namer is configured, an
+    // A bin needs the local answer *and*, when a namer is configured, an
     // identification that did not fail.  A configured-but-unavailable namer is
     // degraded mode: a person confirms before anything is lit.
     if (input.visionConfigured && !input.itemLabel) {
@@ -404,31 +465,6 @@ export function decide(input: DecisionInput): Decision {
       status: 'accepted',
       routeId: materialRoute,
       reasonId: 'ok',
-      allowLamp: false,
-    };
-  }
-  // 6b. A material the picture already chose, *corroborated by the name*, is
-  // accepted below the material bar.  This is deliberately narrow:
-  //   - only a material, never a bin, so it cannot open a lamp;
-  //   - only when the name's material is the SAME as the classifier's top
-  //     class — the name corroborates, it never overrides;
-  //   - never on a made-up probability: the classifier's own figure is kept.
-  // Measured 2026-11-19: letting the name *promote a different* class gained a
-  // few classes but added false bins, and the gain moved between two runs of the
-  // same probe.  This rule measured as no change at all on the probe, and it
-  // fixes the exhibit's own case (a remote control at Ewaste 0.40 + "remote
-  // control", which used to be "not sure").
-  if (
-    materialRoute &&
-    confidence >= CORROBORATION_FLOOR &&
-    claim === materialRoute
-  ) {
-    return {
-      ...empty,
-      ...common,
-      status: 'accepted',
-      routeId: materialRoute,
-      reasonId: 'corroborated',
       allowLamp: false,
     };
   }

@@ -2284,6 +2284,34 @@ Thermocol, which a person would also call paper.  **The two headline accuracy
 figures are not interchangeable:** 74.7 % / 82.6 % is the unresized path
 (`evaluate_pipeline.py`), 72.2 % / 80.5 % is the 224 crop the page sends.
 
+**The item name decides the category; the classifier is the fallback
+(2026-11-19, the operator's instruction after four of their own items).**  The
+operator saw the hosted namer get *every* item right (a clear plastic bag, a
+business card, a remote) while the local model called the bag Paper, and said so
+plainly: *use the item the vision model names — if "plastic" is anywhere in the
+text, it is plastic*.  `wasteDecision.ts` now runs the name **first**: a
+special-care cue still refuses (safety, before anything), then an object with its
+own route (remote, keyboard, pencil, business card), then the **first** material
+word in the sentence ("glass bottle with a plastic cap" is glass), and only a
+name that says nothing usable falls through to the classifier's 0.70/0.50 bars.
+`Decision` gained `source: 'vision' | 'local'`, `localClassId` and
+`localConfidence`; the page says *From the item name* under the category and
+prints *The local model said Paper (78 %).* in the details, so a wrong name is
+still visible.  The old "the two models disagree → ask" branch is gone for a
+named item — **that is the deliberate cost of this choice**, and the numbers are
+in the next paragraph.
+
+**What the name-first policy scores, measured on both probes.**  Same word map,
+same frames (`/tmp/opencode/measure_namefirst.py`): venue probe **37.0 % exact /
+59.0 % item** with the name deciding (on 70 % of frames) against **45.0 / 61.7**
+for the local model alone; archive probe **53.1 / 66.8** against **72.2 / 83.0**.
+So on synthetic composites the name is the worse *classifier* — it reads an
+object well and a material badly, calling the plastic casing of e-waste "plastic".
+The operator's real items were all named correctly and the booth is judged on
+those, so the name decides; if that turns out wrong at the venue, the fallback is
+one constant in `decide()` (the name-first block) and the probes above say what
+to go back to.
+
 **The classifier has never seen the exhibit's own condition (2026-11-19, the
 operator's point).**  Every accuracy figure this file quotes is measured on
 **archive photographs** — objects on desks, in hands, in rooms — while the booth

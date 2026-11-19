@@ -87,17 +87,26 @@ collapsed technical details.
 
 Order matters, and it is the safety argument:
 
+**The item name decides; the classifier is the fallback** (the operator's
+instruction, 2026-11-19).  The hosted model reads an *object* far better than
+this classifier reads a *material* on the booth's own base, so when the name
+states what the item is, that is the answer — “clear plastic bag” is plastic
+whatever the local model thinks — and the classifier's own reading is reported
+beside it rather than overruling it.
+
 | step | rule | result |
 | --- | --- | --- |
-| 1 | background / unknown class | **nothing to sort**, nothing recorded |
-| 2 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" |
-| 3 | the name states a different *object or material* than the chosen route (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic, plastic lid vs Ewaste) | **conflict** — no bin |
-| 4 | a bin under **70 %** on its own class, name silent or disagreeing | **uncertain** — no bin, "keep separate and ask" |
-| 4b | a bin under 70 % but at/over **50 %**, *corroborated by the name* | **accepted** — the lamp may light, recorded as `corroborated` |
-| 5 | a bin at/over 70 %, identification present | **accepted** — the lamp may light |
-| 6 | a material at/over **50 %** | its own collection route (e-waste ≠ metal ≠ glass), no lamp |
-| 6b | a material under 50 % but at/over **30 %**, *corroborated by the name* | its own collection route, no lamp, recorded as `corroborated` |
-| 7 | anything else | **uncertain** — "keep this item separate and ask" |
+| 1 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" (a safety rule, before anything else) |
+| 2 | the name states an **object** with its own route (remote, keyboard, pencil, business card…) | that route — a bin lights only for the three bins; a pencil is “none of our three bins” |
+| 3 | the name states a **material** — the **first** one in the sentence wins (“glass bottle with a plastic cap” is glass) | that route |
+| 4 | the name says nothing usable | the classifier, as before: background → nothing; a bin needs **70 %**; a material needs **50 %**; else “keep separate and ask” |
+
+Because the name decides, the old “conflict” branch (two models disagree → ask)
+no longer fires for a named item: the name wins.  **The measured cost is stated
+in §7b** — on synthetic venue frames the name is a worse *classifier* than the
+local model (37.0 % against 45.0 % exact), and the operator's own items were all
+named correctly.  The exhibits to watch are the ones where the namer describes a
+casing (“black plastic pen”) rather than the whole item.
 
 **An object in the name outranks the material it is made of.** A remote control
 is made of plastic and is still e-waste, so “Remote control made of plastic”
@@ -273,6 +282,26 @@ fixed base means the margin is plain base rather than a hand. Measured on the
 venue probe, against the 12 % square: 20 % costs **0** exact and **2.7** points
 of item action; 30 % costs 5.3 and 5.3. So 20 % ships, and it can grow once the
 model is retrained on the real base.
+
+### The name decides — what it scores on the two probes
+
+The same two probe sets, with the name allowed to choose the class whenever it
+states one (`/tmp/opencode/measure_namefirst.py`, the page's own word map):
+
+| | exact class | item action |
+| --- | ---: | ---: |
+| venue probe — local model only | **45.0 %** | 61.7 % |
+| venue probe — the name decides (70 % of frames) | 37.0 % | 59.0 % |
+| archive probe — local model only | **72.2 %** | 83.0 % |
+| archive probe — the name decides (77 % of frames) | 53.1 % | 66.8 % |
+
+**This is the cost of the operator's choice, stated plainly**: the hosted model
+names an *object* well and a *material* badly — it calls the plastic casing of an
+e-waste item “plastic”, and on these probes that costs more classes than it wins.
+The operator's own items (a plastic bag, a business card, a remote, a card) were
+all named correctly, and the booth is judged on those, so the name decides. The
+classifier keeps its own answer in the details, and it still decides whenever the
+name says nothing usable.
 
 ## 8. Guidance below the page (restored)
 

@@ -819,6 +819,16 @@ export const MESSAGES = {
   'sort.labelIdentification': ['Item identification', 'वस्तु की पहचान', 'വസ്തുവിന്റെ തിരിച്ചറിയൽ'],
   'sort.labelClassification': ['Waste classification', 'कचरे का वर्गीकरण', 'മാലിന്യ വർഗ്ഗീകരണം'],
   'sort.labelAction': ['Suggested action', 'सुझाया गया कदम', 'നിർദ്ദേശിച്ച നടപടി'],
+  'sort.sourceName': [
+    'From the item name',
+    'वस्तु के नाम से',
+    'വസ്തുവിന്റെ പേരിൽ നിന്ന്',
+  ],
+  'sort.localReading': [
+    'The local model said {category} ({percent}%).',
+    'स्थानीय मॉडल ने {category} कहा ({percent}%)।',
+    'ലോക്കൽ മോഡൽ {category} എന്ന് പറഞ്ഞു ({percent}%).',
+  ],
   'sort.sourceVision': ['Cloud vision model', 'क्लाउड विज़न मॉडल', 'ക്ലൗഡ് വിഷൻ മോഡൽ'],
   'sort.sourceLocal': ['Local ResNet50', 'स्थानीय ResNet50', 'ലോക്കൽ ResNet50'],
   'sort.stateWaiting': ['Waiting', 'प्रतीक्षा', 'കാത്തിരിക്കുന്നു'],

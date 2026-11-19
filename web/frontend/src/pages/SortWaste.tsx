@@ -839,7 +839,9 @@ export function SortWaste() {
             <div className="model-state" data-testid="waste-classify">
               <div className="model-state-head">
                 <span className="model-state-label">{t('sort.labelClassification')}</span>
-                <span className="model-state-source">{t('sort.sourceLocal')}</span>
+                <span className="model-state-source">
+                  {check.decision?.source === 'vision' ? t('sort.sourceName') : t('sort.sourceLocal')}
+                </span>
               </div>
               <p className="model-state-value" data-testid="waste-result">
                 {check.classify === 'checking'
@@ -895,6 +897,14 @@ export function SortWaste() {
                   {t('sort.sourceVision')}: {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
                 </p>
                 <p className="hint">{t('sort.sourceLocal')}: resnet50</p>
+                {check.decision?.source === 'vision' && check.decision.localClassId && (
+                  <p className="hint" data-testid="waste-local-reading">
+                    {t('sort.localReading', {
+                      category: check.decision.localClassId,
+                      percent: Math.round(check.decision.localConfidence * 100),
+                    })}
+                  </p>
+                )}
                 {check.decision && (
                   <p className="hint">
                     {check.decision.routeId} · {Math.round(check.decision.classConfidence * 100)}% ·{' '}
