@@ -25,8 +25,28 @@ from .config import Settings
 #   "வியலகுகள் கட்டிக்குங்கள்" (with a Persian yeh), "மண்ணில் எத்தான்…" and a
 #   bare "യ്മയ്ക്കുക." with it.  Whisper names Malayalam with the *Devanagari*
 # token, so a Malayalam prompt pulls the decoder toward the wrong tokens.
+# **English has one, and it was measured on the exhibit's own clips**
+# (2026-11-19).  Whisper heard "lights status" as "Lead status", "stop
+# irrigation" as "Stop Illusion!" and "pump status" as "BOM status!", and no
+# model fixed that — small and large-v3-turbo failed the same words (large took
+# 18-24 s and was worse).  Priming the decoder with the vocabulary the village
+# listens for fixed four of the five, on the same base model, with no extra
+# latency:
+#   "Stop Illusion!"  -> "Stop irrigation."
+#   "BOM status!"     -> "Pump status."
+#   "Like status."    -> "Light status."
+#   "automatic bomb." -> "Automatic, pump."
+# The risk a prompt carries — inventing a command from noise — was checked on
+# the noise clips: "[Music]" and "[BLANK_AUDIO]" stayed noise, and a cough that
+# read "Oh!" became "Off.", a single word the parser answers with "which
+# device?" and never actuates.  The page also refuses a silent recording before
+# the model is asked (peakLevel).
 LANGUAGE_PROMPTS = {
     "hi": "लाइट बंद करो, लाइट चालू करो, पंप चालू करो, पानी, स्ट्रीट लाइट.",
+    "en": (
+        "Lights, streetlights, pump, irrigation, status, on, off, automatic, "
+        "soil, water, village."
+    ),
 }
 
 

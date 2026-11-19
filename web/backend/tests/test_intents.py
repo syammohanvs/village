@@ -969,6 +969,9 @@ def test_english_fillers_and_the_models_own_spelling_of_led(matcher: IntentMatch
     the whole sentence unaccounted, so a perfectly clear command was refused.
     """
     assert matcher.match("Lead status.", "en")["intent"] == "LIGHTS_STATUS"
+    # The same session's worst clip: with the decoder prompt Whisper still wrote
+    # "Relate status." for "lights status".
+    assert matcher.match("Relate status.", "en")["intent"] == "LIGHTS_STATUS"
     assert matcher.match("LED status.", "en")["intent"] == "LIGHTS_STATUS"
     assert matcher.match("Um, lights on.", "en")["intent"] == "LIGHTS_ON"
     assert matcher.match("Sara, pump auto.", "en")["intent"] == "PUMP_AUTO"

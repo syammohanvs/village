@@ -2312,6 +2312,32 @@ hall internet goes we have a reliable fall back with known objects."*  So:
 - The page's disclosure now says the crop is kept on the laptop to teach the
   offline model (en/hi/ml), and `sort.visionNote` says the same.
 
+**English now gets a decoder prompt, measured on the room's own clips
+(2026-11-19).**  The next English session failed on *words*, not on the grammar:
+`Lead status.`, `Relate status.`, `Like status.`, `Stop Illusion!`, `BOM status!`,
+`automatic bomb.`  Re-transcribing those clips with **base, small and
+large-v3-turbo** showed the model is not the lever: small repeated the errors and
+large-v3-turbo took **18–24 s and was worse** (`Will eat status?`,
+`Stop, Elegísi!`, `PAM SKATUS`).  The audio itself is ordinary speech (16 kHz, no
+band-limiting, no rumble), so the fix is **priming the decoder with the
+vocabulary**, exactly as Hindi is primed for its script: `LANGUAGE_PROMPTS["en"]`
+is `"Lights, streetlights, pump, irrigation, status, on, off, automatic, soil,
+water, village."`.  On the same base model and the same clips that turned
+
+  `Stop Illusion!` → **`Stop irrigation.`** · `BOM status!` → **`Pump status.`**
+  · `Like status.` → **`Light status.`** · `automatic bomb.` → **`Automatic, pump.`**
+
+…with no extra latency.  **The risk a prompt carries was checked on the noise
+clips**: `[Music]` and `[BLANK_AUDIO]` stayed noise, and a cough that read `Oh!`
+became `Off.` — one word, no device, so the parser asks which device and moves
+nothing (the page also refuses a silent recording before the model is asked).
+Malayalam still gets **no** prompt (the recorded finding above stands).  Two
+words joined the vocabulary from the same session: **`relate`** → lights (the
+prompt did not fix that clip) and `lead`/`leads` → lights.  Verified end to end
+through `/voice/transcribe` + `/voice/interpret`: all six failing clips now
+parse (`lights status`, `stop irrigation`, `pump status`, `pump auto`,
+`start irrigation`).
+
 **English speech: fillers and the model's own spelling of LED (2026-11-19, from a
 real session).**  The panel keeps every clip, and one English session read:
 `Lead status.` (the lights), `Automatic um…` (a mode, no device), `Um, lights on.`,

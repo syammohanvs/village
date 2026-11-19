@@ -95,8 +95,16 @@ def test_the_decoder_is_primed_with_the_language_it_should_expect():
     """
     from app.voice import request_fields
 
-    assert "prompt" not in request_fields("en")
+    # **Malayalam still gets NO prompt** — that is the measured finding above.
     assert "prompt" not in request_fields("ml")
+
+    # **English does, since 2026-11-19**, and it is measured on the exhibit's own
+    # clips: "Stop Illusion!" -> "Stop irrigation.", "BOM status!" -> "Pump
+    # status.", "Like status." -> "Light status." on the same base model.
+    english = request_fields("en")
+    assert english["prompt"].strip()
+    for word in ("lights", "pump", "irrigation", "status", "automatic"):
+        assert word in english["prompt"], word
 
     fields = request_fields("hi")
     assert fields["language"] == "hi"
