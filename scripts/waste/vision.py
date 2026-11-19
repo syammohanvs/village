@@ -39,6 +39,25 @@ def settings() -> dict[str, str]:
     return values
 
 
+def candidates(conf: dict[str, str] | None = None) -> list[dict[str, str]]:
+    """The chain the labeller tries, in order: Cloudflare accounts, then DeepSeek."""
+    conf = conf or settings()
+    cloud = []
+    for suffix in ("", "_2", "_3", "_4", "_5"):
+        token = (conf.get(f"VILLAGE_CF_API_TOKEN{suffix}") or "").strip()
+        if not token:
+            continue
+        cloud.append({
+            "provider": "cloudflare",
+            "token": token,
+            "account": (conf.get(f"VILLAGE_CF_ACCOUNT_ID{suffix}") or "").strip(),
+        })
+    key = (conf.get("VILLAGE_VISION_API_KEY") or "").strip()
+    deepseek = [{"provider": "opencode", "token": key, "account": ""}] if key else []
+    wanted = (conf.get("VILLAGE_VISION_PROVIDER") or "cloudflare").strip().lower()
+    return cloud + deepseek if wanted == "cloudflare" else deepseek + cloud
+
+
 def provider(conf: dict[str, str] | None = None) -> str | None:
     """Which provider is usable, or None when none is configured."""
     conf = conf or settings()
@@ -76,12 +95,25 @@ def ask_object(
     answer locally and better.
     """
     conf = conf or settings()
-    which = which or provider(conf)
-    model = model or model_name(conf, which)
+    chain = candidates(conf)
     if which == "cloudflare":
-        return _cloudflare(jpeg, prompt, model, conf, timeout)
-    if which == "opencode":
-        return _opencode(jpeg, prompt, model, conf, timeout)
+        chain = [c for c in chain if c["provider"] == "cloudflare"] or chain
+    elif which == "opencode":
+        chain = [c for c in chain if c["provider"] == "opencode"] or chain
+    if not chain:
+        return ""
+    model = model or model_name(conf, chain[0]["provider"])
+    last: Exception | None = None
+    for candidate in chain:
+        try:
+            if candidate["provider"] == "cloudflare":
+                return _cloudflare(jpeg, prompt, model, conf, timeout, candidate)
+            return _opencode(jpeg, prompt, model, conf, timeout)
+        except Exception as error:  # noqa: BLE001 - try the next account
+            last = error
+            continue
+    if last is not None:
+        print(f"vision: {last}")
     return ""
 
 
@@ -150,11 +182,22 @@ def _opencode(jpeg: bytes, prompt: str, model: str, conf: dict[str, str], timeou
     return (message.get("content") or "").strip()
 
 
-def _cloudflare(jpeg: bytes, prompt: str, model: str, conf: dict[str, str], timeout: int) -> str:
-    token = conf.get("VILLAGE_CF_API_TOKEN", "")
+def _cloudflare(
+    jpeg: bytes,
+    prompt: str,
+    model: str,
+    conf: dict[str, str],
+    timeout: int,
+    candidate: dict[str, str] | None = None,
+) -> str:
+    candidate = candidate or {
+        "token": conf.get("VILLAGE_CF_API_TOKEN", ""),
+        "account": conf.get("VILLAGE_CF_ACCOUNT_ID", ""),
+    }
+    token = candidate.get("token", "")
     if not token:
         return ""
-    account = conf.get("VILLAGE_CF_ACCOUNT_ID", "") or _first_account(token)
+    account = candidate.get("account", "") or _first_account(token)
     url = f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}"
     headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
 

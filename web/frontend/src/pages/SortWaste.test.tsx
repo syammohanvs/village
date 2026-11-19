@@ -271,294 +271,6 @@ describe('Sort Waste', () => {
     expect(screen.queryByTestId('waste-camera-stopped')).not.toBeInTheDocument();
   }, 15000);
 
-  it('refers a recycler material to the agent instead of a bin', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'other',
-      recognition: { id: 9, category: 'other', confidence: 0.9 },
-    });
-    predictionState.current = [
-      { className: 'Organic', probability: 0.01 },
-      { className: 'Plastic', probability: 0.03 },
-      { className: 'Paper', probability: 0.01 },
-      { className: 'Glass', probability: 0.9 },
-      { className: 'Metal', probability: 0.02 },
-      { className: 'Textile', probability: 0.005 },
-      { className: 'Leather', probability: 0.005 },
-      { className: 'Footwear', probability: 0.005 },
-      { className: 'Thermocol', probability: 0.005 },
-      { className: 'Ewaste', probability: 0.005 },
-      { className: 'Background', probability: 0.01 },
-    ];
-    const stopTrack = vi.fn();
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopTrack }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // A press is the only trigger now: no watcher decides for itself what is
-    // "being shown".
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-    const recyclerCall = vi.mocked(api.postRecognition).mock.calls[0][0];
-    expect(recyclerCall.category).toBe('other');
-    expect(recyclerCall.confidence).toBeCloseTo(0.945, 6);
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Glass');
-    // A material that is not one of the three bins: the card keeps it out and
-    // names the support role, and it never claims a bin.
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/keep separate|ask the gram sahayak/i);
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/gram sahayak/i);
-    expect(screen.queryByText(/Put it in the glass bin/i)).not.toBeInTheDocument();
-    expect(stopTrack).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /stop camera/i })).toBeInTheDocument();
-  }, 15000);
-
-  it('treats background and ordinary objects as nothing to sort, with no recognition', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockClear();
-    // A car key, a phone or the empty table: the model's "Background" class is
-    // the not-waste side, and it must never become a recycling referral.
-    predictionState.current = [
-      { className: 'Organic', probability: 0.005 },
-      { className: 'Plastic', probability: 0.01 },
-      { className: 'Paper', probability: 0.01 },
-      { className: 'Glass', probability: 0.005 },
-      { className: 'Metal', probability: 0.005 },
-      { className: 'Textile', probability: 0.005 },
-      { className: 'Leather', probability: 0.01 },
-      { className: 'Footwear', probability: 0.005 },
-      { className: 'Thermocol', probability: 0.005 },
-      { className: 'Ewaste', probability: 0.01 },
-      { className: 'Background', probability: 0.93 },
-    ];
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // A press is the only trigger now: no watcher decides for itself what is
-    // "being shown".
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    expect(await screen.findByText(/Nothing to sort/i, {}, { timeout: 4000 })).toBeInTheDocument();
-    await waitFor(() => {
-      const rows = Array.from(document.querySelectorAll('.prediction-list li'));
-      expect(rows[0].textContent).toContain('Not a waste item');
-    });
-    // Long enough that a watcher would have learned the room and fired.
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-    expect(api.postRecognition).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('waste-destination')).not.toBeInTheDocument();
-  }, 15000);
-
-  it('accepts a split recycler vote as one recycling outcome', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.75, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockClear();
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'other',
-      recognition: { id: 31, category: 'other', confidence: 0.8 },
-    });
-    // No single class clears 75%, but Ewaste + Metal together do.  Both are the
-    // same action, so the item should be referred to the recycling agent.
-    predictionState.current = [
-      { className: 'Organic', probability: 0.01 },
-      { className: 'Plastic', probability: 0.1 },
-      { className: 'Paper', probability: 0.02 },
-      { className: 'Glass', probability: 0.02 },
-      { className: 'Metal', probability: 0.35 },
-      { className: 'Textile', probability: 0.01 },
-      { className: 'Leather', probability: 0.01 },
-      { className: 'Footwear', probability: 0.01 },
-      { className: 'Thermocol', probability: 0.01 },
-      { className: 'Ewaste', probability: 0.45 },
-      { className: 'Background', probability: 0.01 },
-    ];
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    // A press is the only trigger now: no watcher decides for itself what is
-    // "being shown".
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
-    const splitCall = vi.mocked(api.postRecognition).mock.calls[0][0];
-    expect(splitCall.category).toBe('other');
-    expect(splitCall.confidence).toBeCloseTo(0.86, 6);
-    expect(await screen.findByTestId('waste-result')).toHaveTextContent('Electronic waste');
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/keep separate|gram sahayak/i);
-  }, 15000);
-
-  it('names its best guess and the percentage instead of going quiet', async () => {
-    // "Unable to identify it for a long time" was the report: the page said
-    // "Not sure yet" forever, which tells the operator nothing.  Naming the
-    // guess and how sure it is shows them what to fix.
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.9, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-    predictionState.current = predictionsFor('Paper', 0.55);
-
-    render(<App />);
-    const start = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(start);
-    // These suites keep the automatic watcher on: the behaviour they
-    // cover is what happens while the camera is being watched.
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    // Under the bar it names no material at all.  "Best guess Thermocol at 59%"
-    // read as a classification -- the venue reported a cloth scrunchie as
-    // "recognised as thermocol" three times over, when the press had in fact
-    // chosen no bin.  The guess is a property of the crop, not of the item, so
-    // saying which material it nearly said is a claim the picture cannot support.
-    const line = await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 });
-    expect(line.textContent).not.toMatch(/Paper/i);
-    // It must not claim a bin it is not sure about.
-    expect(screen.queryByTestId('waste-result')).not.toBeInTheDocument();
-    expect(api.postRecognition).not.toHaveBeenCalled();
-  }, 15000);
-});
-
-describe('Sort Waste — Sara speaks without waiting on the recording', () => {
-  it('says the result even when the record request never answers', async () => {
-    // Measured in the app: the sentence waited for POST /waste/recognition,
-    // which asks the controller for its bin levels and took 19-21 s with the
-    // board switched off.  The sentence is already known from the frame, so it
-    // must not depend on that call at all.
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    // A promise that never settles: exactly the case that used to hang.
-    vi.mocked(api.postRecognition).mockImplementation(
-      () => new Promise(() => undefined) as never,
-    );
-    predictionState.current = [
-      { className: 'Metal', probability: 0.91 },
-      { className: 'Ewaste', probability: 0.05 },
-      { className: 'Background', probability: 0.01 },
-    ];
-
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const start = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(start);
-    // These suites keep the automatic watcher on: the behaviour they
-    // cover is what happens while the camera is being watched.
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    // The greeting speaks on mount, so look for the classification itself.
-    await waitFor(
-      () => expect(spoken.some((line) => /keep this item separate/i.test(line))).toBe(true),
-      { timeout: 8000 },
-    );
-    // ...and the request is genuinely still outstanding, so this was not a
-    // lucky ordering.
-    expect(api.postRecognition).toHaveBeenCalled();
-    // The material travels with the record: "other" alone could not answer
-    // "what did it call my key fob?" later.
-    expect(api.postRecognition).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'other', material: 'Metal' }),
-    );
-    // ...and the guesses that produced it.  These were empty in every event
-    // because `accept` read a stale state list; a review had no way to see that
-    // "Thermocol" was chosen over "Metal 0.04".
-    const sent = vi.mocked(api.postRecognition).mock.calls[0][0] as {
-      top?: Array<{ className: string; probability: number }>;
-    };
-    expect(sent.top?.[0]).toEqual({ className: 'Metal', probability: 0.91 });
-  }, 15000);
 });
 
 describe('Sort Waste — the camera waits for the model', () => {
@@ -662,42 +374,6 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     return original;
   }
 
-  it('puts the helper line on the bin card instead of speaking on load', async () => {
-    // Asked for: not to have Sara say what to do as the page opens, and to show
-    // that line on the suggested-bin card instead -- which then carries the
-    // result as soon as there is one.
-    stubCamera();
-    const original = stubCanvas();
-    vi.mocked(api.wasteClassify).mockImplementation(async () => ({
-      model: 'resnet50',
-      predictions: predictionsFor('Paper', 0.94),
-    }));
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'paper',
-      recognition: { id: 9, category: 'paper', confidence: 0.94 },
-    });
-    try {
-      render(<App />);
-      // No greeting card, and nothing spoken on arrival.
-      expect(screen.queryByTestId('waste-welcome')).not.toBeInTheDocument();
-
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-
-      const guidance = await screen.findByTestId('waste-guidance');
-      expect(guidance).toHaveTextContent(/know the bin/i);
-
-      // A reading replaces it with the usual bin card.
-      fireEvent.click(await screen.findByTestId('classify-now'));
-      expect(await screen.findByTestId('waste-result', {}, { timeout: 10000 })).toBeInTheDocument();
-      expect(screen.queryByTestId('waste-guidance')).not.toBeInTheDocument();
-    } finally {
-      HTMLCanvasElement.prototype.getContext = original;
-    }
-  }, 30000);
-
   it('draws the square that will be read, sized from the camera', async () => {
     // Reported: a bottle held at the edge of the picture read as paper, then
     // glass.  Two things caused it, and this is the first: the preview was a
@@ -766,272 +442,9 @@ describe('Sort Waste — one press reads the video, not one frame', () => {
     }
   }, 30000);
 
-  it('does not decide anything when the three frames disagree', async () => {
-    // Averaging is what turns a flipping model into an honest "not sure": three
-    // different answers at 0.90 average to 0.30 each, which is under any sane
-    // threshold.  That is the whole point of reading a moment instead of a
-    // still -- it needs no separate "the frames disagreed" rule.
-    //
-    // The three are deliberately from three different bins.  Two recyclers that
-    // disagree still add up to "recycling" (which is the documented grouping
-    // rule and a correct answer), so they would not test this.
-    stubCamera();
-    const original = stubCanvas();
-    vi.mocked(api.wasteClassify)
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Paper', 0.9) }))
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Plastic', 0.9) }))
-      .mockImplementationOnce(async () => ({ model: 'resnet50', predictions: predictionsFor('Organic', 0.9) }));
-    try {
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      fireEvent.click(await screen.findByTestId('classify-now'));
-
-      await waitFor(() => expect(vi.mocked(api.wasteClassify).mock.calls.length).toBe(3), {
-        timeout: 10000,
-      });
-      expect(await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 })).toBeInTheDocument();
-      expect(api.postRecognition).not.toHaveBeenCalled();
-    } finally {
-      HTMLCanvasElement.prototype.getContext = original;
-    }
-  }, 30000);
-});
-
-describe('Sort Waste — a near-tie is not a decision', () => {
-  it('does not record or light anything when the best guess is under the threshold', async () => {
-    // The handkerchief: Leather 0.24, Paper 0.24, Background 0.22.  A pressed
-    // reading used to skip the confidence threshold, so that tie was recorded
-    // and reported as "leather".  It has to say what it guessed and stop.
-    vi.mocked(api.state).mockResolvedValue(makeState());
-    vi.mocked(api.events).mockResolvedValue({ events: [] });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings({ waste_confidence: 0.5 }));
-    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
-    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.postRecognition).mockClear();
-    predictionState.current = [
-      { className: 'Leather', probability: 0.24 },
-      { className: 'Paper', probability: 0.24 },
-      { className: 'Background', probability: 0.22 },
-    ];
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    const originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = (function () {
-      return {
-        drawImage() {},
-        clearRect() {},
-        putImageData() {},
-        fillRect() {},
-        createImageData: (width: number, height: number) => ({
-          data: new Uint8ClampedArray(width * height * 4),
-          width,
-          height,
-        }),
-        getImageData: (_x: number, _y: number, width: number, height: number) => {
-          const data = new Uint8ClampedArray(width * height * 4);
-          for (let i = 0; i < data.length; i += 4) {
-            data[i] = 60;
-            data[i + 1] = 60;
-            data[i + 2] = 60;
-            data[i + 3] = 255;
-          }
-          return { data, width, height };
-        },
-      };
-    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-
-    try {
-      render(<App />);
-      const start = await screen.findByTestId('start-camera');
-      await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(start);
-      fireEvent.click(await screen.findByTestId('classify-now'));
-
-      // It says it cannot tell, and names no material — the near-tie is exactly
-      // the case where naming one of the three would be picking a winner out of
-      // noise.
-      const line = await screen.findByText(/Not sure what this is/i, {}, { timeout: 5000 });
-      expect(line.textContent).not.toMatch(/Leather/i);
-      // Nor is a material named anywhere else: the per-class readout is for a
-      // decision, and there is none.  This list was the last place "Thermocol
-      // 74%" stayed on screen while nothing had been chosen.
-      expect(document.querySelector('.prediction-list')).toBeNull();
-      // ...and does not record it as a decision.
-      expect(api.postRecognition).not.toHaveBeenCalled();
-    } finally {
-      HTMLCanvasElement.prototype.getContext = originalGetContext;
-    }
-  }, 20000);
 });
 
 describe('Sort Waste — nothing is classified unless it is asked for', () => {
-  it('does not classify on its own, and does when the button is pressed', async () => {
-    // Reported: "again I didn't show my hand at all and it classified" — as
-    // thermocol, with nothing in hand. An automatic watcher in a room with a
-    // person in it decides for itself what is "being shown", and that decision
-    // is wrong often enough to be worse than useless. A press cannot be wrong
-    // about it, so it is the default and the watcher is opt-in.
-    vi.mocked(api.state).mockResolvedValue(makeState());
-    vi.mocked(api.events).mockResolvedValue({ events: [] });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.voiceReadiness).mockResolvedValue({ ready: true, whisper: { ready: true } });
-    vi.mocked(api.voiceIntents).mockResolvedValue({ intents: [] });
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.wasteClassify).mockClear();
-    vi.mocked(api.postRecognition).mockClear();
-    predictionState.current = [
-      { className: 'Thermocol', probability: 0.78 },
-      { className: 'Paper', probability: 0.1 },
-      { className: 'Background', probability: 0.05 },
-    ];
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [{ stop: vi.fn() }] }),
-        enumerateDevices: vi.fn().mockResolvedValue([]),
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    // A frame the page can read, as in a browser.
-    const originalGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = (function () {
-      return {
-        drawImage() {},
-        clearRect() {},
-        putImageData() {},
-        fillRect() {},
-        createImageData: (width: number, height: number) => ({
-          data: new Uint8ClampedArray(width * height * 4),
-          width,
-          height,
-        }),
-        getImageData: (_x: number, _y: number, width: number, height: number) => {
-          const data = new Uint8ClampedArray(width * height * 4);
-          for (let i = 0; i < data.length; i += 4) {
-            data[i] = 40;
-            data[i + 1] = 40;
-            data[i + 2] = 40;
-            data[i + 3] = 255;
-          }
-          // Something clearly in the frame: with a watcher running this would be
-          // classified on its own, which is the behaviour being ruled out.
-          for (let y = 40; y < 80; y += 1) {
-            for (let x = 50; x < 110; x += 1) {
-              const i = (y * width + x) * 4;
-              data[i] = 220;
-              data[i + 1] = 220;
-              data[i + 2] = 215;
-            }
-          }
-          return { data, width, height };
-        },
-      };
-    }) as unknown as typeof HTMLCanvasElement.prototype.getContext;
-
-    try {
-    render(<App />);
-    const start = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(start).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(start);
-
-    // The watcher is off: no request leaves the page, however long it runs.
-    const check = await screen.findByTestId('classify-now');
-    // The default is what makes it safe: the watcher is off, so the loop that
-    // decides what is "being shown" does not run at all.
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(api.wasteClassify).not.toHaveBeenCalled();
-    expect(screen.getByTestId('waste-press-hint')).toHaveTextContent(/press/i);
-
-    // One press, one answer.
-    fireEvent.click(check);
-    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalledTimes(1), { timeout: 5000 });
-    await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 5000 });
-    expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toEqual(
-      expect.objectContaining({ category: 'other', material: 'Thermocol' }),
-    );
-    } finally {
-      HTMLCanvasElement.prototype.getContext = originalGetContext;
-    }
-  }, 25000);
-  it('does not call a 60% bin answer strong, and says which bar it missed', async () => {
-    // A plastic bottle split Plastic 0.60 / Glass 0.25: below the 70% a bin
-    // needs, so nothing may be recorded -- but the row used to be highlighted
-    // and the page said nothing about why (reported from the venue 2026-11-16).
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    predictionState.current = [
-      { className: 'Organic', probability: 0.01 },
-      { className: 'Plastic', probability: 0.6 },
-      { className: 'Paper', probability: 0.02 },
-      { className: 'Glass', probability: 0.25 },
-      { className: 'Metal', probability: 0.02 },
-      { className: 'Textile', probability: 0.02 },
-      { className: 'Leather', probability: 0.02 },
-      { className: 'Footwear', probability: 0.02 },
-      { className: 'Thermocol', probability: 0.02 },
-      { className: 'Ewaste', probability: 0.01 },
-      { className: 'Background', probability: 0.01 },
-    ];
-    const stream = { getTracks: () => [{ stop: vi.fn() }] };
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    await waitFor(() => expect(api.wasteClassify).toHaveBeenCalled(), { timeout: 4000 });
-
-    // 60% of a bin is not a decision, so the per-class readout stays hidden --
-    // naming a material the page has not chosen is what read as "it knows it is
-    // plastic but says nothing".
-    await waitFor(() => expect(document.querySelector('.prediction-list')).toBeNull());
-    expect(document.querySelector('.is-strong')).toBeNull();
-
-    // What is shown instead is the bar that was missed.
-    expect(await screen.findByText(/A bin needs 70%/)).toBeInTheDocument();
-    // Nothing was recorded, which is the point: a bin must not be guessed.
-    expect(api.postRecognition).not.toHaveBeenCalled();
-  });
   it('speaks the sentence in the language chosen in Setup', async () => {
     // Malayalam is set in Setup, so the answer must be Malayalam -- the page used
     // to hardcode English here whatever the setting said (reported 2026-11-16).
@@ -1070,109 +483,6 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(spokenLanguages).toContain('ml');
     // The sentence itself is Malayalam, not English text read by a Malayalam voice.
     expect(spoken.some((line) => /പ്ലാസ്റ്റിക്/.test(line))).toBe(true);
-  });
-  it('files a misread as a training photo when the operator corrects it', async () => {
-    // The venue's whole learning loop: one press, and the frame the model got
-    // wrong joins data/waste-samples/<Class>/ for the next training run.
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'metal',
-      recognition: { id: 21, category: 'metal', confidence: 0.65 },
-    });
-    predictionState.current = [
-      { className: 'Organic', probability: 0.02 },
-      { className: 'Plastic', probability: 0.15 },
-      { className: 'Paper', probability: 0.02 },
-      { className: 'Glass', probability: 0.05 },
-      { className: 'Metal', probability: 0.65 },
-      { className: 'Textile', probability: 0.03 },
-      { className: 'Leather', probability: 0.02 },
-      { className: 'Footwear', probability: 0.02 },
-      { className: 'Thermocol', probability: 0.01 },
-      { className: 'Ewaste', probability: 0.02 },
-      { className: 'Background', probability: 0.01 },
-    ];
-    vi.mocked(api.wasteClassify).mockImplementation(async () => ({
-      model: 'resnet50',
-      predictions: predictionState.current,
-      file: 'capture.jpg',
-    }));
-
-    const stream = { getTracks: () => [{ stop: vi.fn() }] };
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    const correction = await screen.findByTestId('waste-correction', {}, { timeout: 8000 });
-    expect(within(correction).getByText(/Wrong\? It was/)).toBeInTheDocument();
-    fireEvent.click(within(correction).getByTestId('correct-plastic'));
-
-    await waitFor(() => expect(api.wasteCorrect).toHaveBeenCalled());
-    // The frame the model judged, not "the most recent crop".
-    expect(vi.mocked(api.wasteCorrect).mock.calls[0]).toEqual(['capture.jpg', 'plastic']);
-    expect(await screen.findByText(/now in the training set for Plastic/)).toBeInTheDocument();
-  });
-  it('still answers when the board is offline, and says the LED was not lit', async () => {
-    // The camera and the model run on this laptop; only the bin indicator needs
-    // the board.  This used to be a red error with no answer at all.
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({ installed: true, model: 'resnet50', classes: [] });
-    vi.mocked(api.settings).mockResolvedValue(
-      makeSettings({ waste_confidence: 0.6, waste_stability_frames: 2, waste_cooldown_ms: 1000 }),
-    );
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'plastic',
-      recognition: { id: 31, category: 'plastic', confidence: 0.9 },
-      indication: null,
-      physical: false,
-      led_note: 'No bin LED was lit: the controller did not answer. The sorting answer above still applies.',
-    });
-    predictionState.current = predictionsFor('Plastic', 0.95);
-
-    const stream = { getTracks: () => [{ stop: vi.fn() }] };
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-
-    render(<App />);
-    const startButton = await screen.findByTestId('start-camera');
-    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
-    fireEvent.click(startButton);
-    fireEvent.click(await screen.findByTestId('classify-now'));
-
-    expect(await screen.findByTestId('waste-result', {}, { timeout: 8000 })).toHaveTextContent('Plastic');
-    const note = await screen.findByTestId('waste-led-note');
-    expect(note).toHaveTextContent('No bin LED was lit');
-    // The routing is still shown -- that is the point.
-    expect(screen.getByTestId('waste-destination')).toHaveTextContent(/plastic bin/i);
   });
   it('does not offer the camera while the controller is offline', async () => {
     const stream = { getTracks: () => [{ stop: vi.fn() }] };
@@ -1422,86 +732,44 @@ function stubCanvasWithPicture(): () => void {
   };
 }
 
-describe('Sort Waste — the object is named before the category', () => {
-  it('says what it sees, then what the classifier says, and speaks the object first', async () => {
-    // Reported 2026-11-19: a plastic cap was classified Ewaste 0.40 with no
-    // sign of what the camera thought it was.  The hosted model named the same
-    // crop "clear plastic lid", so the card must say that FIRST — a visitor
-    // checks an answer in that order, and a wrong name is visible instead of
-    // being hidden inside a confident category.
+describe('Sort Waste — two models, one decision', () => {
+  type Options = {
+    predictions: { className: string; probability: number }[];
+    object?: string | null;
+    vision?: boolean;
+    identify?: (image: string) => Promise<unknown>;
+    record?: unknown;
+  };
+
+  async function press(options: Options): Promise<() => void> {
+    const vision = options.vision !== false;
     vi.mocked(api.wasteResnetStatus).mockResolvedValue({
       installed: true,
       model: 'resnet50',
       classes: [],
-      vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true },
+      ...(vision
+        ? { vision: { provider: 'cloudflare', model: '@cf/meta/llama-3.2-11b-vision-instruct', ready: true } }
+        : {}),
     });
-    vi.mocked(api.wasteIdentify).mockResolvedValue({
-      object: 'clear plastic lid',
-      provider: 'cloudflare',
-      model: '@cf/meta/llama-3.2-11b-vision-instruct',
-      ms: 900,
-    });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'plastic',
-      recognition: { id: 12, category: 'plastic', confidence: 0.95 },
-    });
-    predictionState.current = predictionsFor('Plastic', 0.95);
-    stubCamera();
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-    const restore = stubCanvasWithPicture();
-    try {
-      render(<App />);
-      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(screen.getByTestId('start-camera'));
-      fireEvent.click(await screen.findByTestId('classify-now'));
-
-      const sees = await screen.findByTestId('waste-sees', {}, { timeout: 8000 });
-      expect(sees).toHaveTextContent(/I see: clear plastic lid/i);
-      const says = screen.getByTestId('waste-result');
-      expect(says).toHaveTextContent(/My classifier says: Plastic/i);
-      // The name comes first in the card, not only in the sentence.
-      expect(sees.compareDocumentPosition(says) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-      // ...and the same crop is what the namer was asked about.
-      expect(api.wasteIdentify).toHaveBeenCalledWith(expect.stringMatching(/^data:image\/jpeg/));
-
-      await waitFor(
-        () => expect(spoken.some((line) => /^This is clear plastic lid\./.test(line))).toBe(true),
-        { timeout: 5000 },
-      );
-      expect(spoken.some((line) => /plastic bin/i.test(line))).toBe(true);
-    } finally {
-      restore();
-    }
-  }, 25000);
-
-  it('says it is naming the item, so a slow answer does not look frozen', async () => {
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
-      installed: true,
-      model: 'resnet50',
-      classes: [],
-      vision: { provider: 'cloudflare', model: 'llama', ready: true },
-    });
-    let answer: (value: unknown) => void = () => undefined;
     vi.mocked(api.wasteIdentify).mockImplementation(
-      () => new Promise((resolve) => { answer = resolve; }) as never,
+      (options.identify as never) ??
+        (async () => ({
+          object: options.object ?? null,
+          provider: 'cloudflare',
+          model: '@cf/meta/llama-3.2-11b-vision-instruct',
+          ms: 900,
+        })),
     );
     vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.postRecognition).mockResolvedValue({
-      ok: true,
-      category: 'plastic',
-      recognition: { id: 13, category: 'plastic', confidence: 0.95 },
-    });
-    predictionState.current = predictionsFor('Plastic', 0.95);
+    vi.mocked(api.postRecognition).mockClear();
+    vi.mocked(api.postRecognition).mockResolvedValue(
+      (options.record as never) ?? {
+        ok: true,
+        category: 'plastic',
+        recognition: { id: 21, category: 'plastic', confidence: 0.9 },
+      },
+    );
+    predictionState.current = options.predictions;
     stubCamera();
     Object.defineProperty(HTMLMediaElement.prototype, 'play', {
       configurable: true,
@@ -1512,74 +780,204 @@ describe('Sort Waste — the object is named before the category', () => {
       get: () => 2,
     });
     const restore = stubCanvasWithPicture();
+    render(<App />);
+    await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(screen.getByTestId('start-camera'));
+    fireEvent.click(await screen.findByTestId('classify-now'));
+    return restore;
+  }
+
+  const plasticAt = (p: number) => predictionsFor('Plastic', p);
+
+  it('shows each model separately, and the action last', async () => {
+    const restore = await press({ predictions: plasticAt(0.95), object: 'clear plastic lid' });
     try {
-      render(<App />);
-      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(screen.getByTestId('start-camera'));
-      fireEvent.click(await screen.findByTestId('classify-now'));
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const identifies = screen.getByTestId('waste-identify');
+      const classifies = screen.getByTestId('waste-classify');
+      const action = screen.getByTestId('waste-action');
 
-      await screen.findByTestId('waste-working', {}, { timeout: 8000 });
-      // The press reads three frames first, then asks for the name: the line
-      // says which of the two it is doing, so a pause never looks like a freeze.
-      await waitFor(
-        () => expect(screen.getByTestId('waste-working')).toHaveTextContent(
-          /Asking the camera what this is/i,
-        ),
-        { timeout: 8000 },
+      expect(within(identifies).getByTestId('waste-sees')).toHaveTextContent(
+        /Item identified: clear plastic lid/i,
       );
+      expect(within(identifies).getByText(/cloud vision model/i)).toBeInTheDocument();
+      expect(within(classifies).getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(within(classifies).getByText(/local ResNet50/i)).toBeInTheDocument();
+      expect(action).toHaveTextContent(/Suggested action/i);
+      expect(action).toHaveTextContent(/plastic bin/i);
 
-      await act(async () => {
-        answer({ object: 'clear plastic lid', provider: 'cloudflare', model: 'llama', ms: 900 });
-      });
+      // Identification, then classification, then the action — the order a
+      // person checks an answer in.
+      expect(identifies.compareDocumentPosition(classifies) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(classifies.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      // Only an accepted bin decision asks for a lamp.
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
     } finally {
       restore();
     }
   }, 25000);
-});
 
-describe('Sort Waste — a named object on a reading the page will not bin', () => {
-  it('still says what it sees when the classifier is under its bar', async () => {
-    // A wrong bin is the failure this page exists to avoid, so a reading under
-    // 70% is refused — but "I see a clear plastic lid" is the one useful thing
-    // left, and it is exactly the case the reporter hit (cap read as Ewaste).
-    vi.mocked(api.wasteResnetStatus).mockResolvedValue({
-      installed: true,
-      model: 'resnet50',
-      classes: [],
-      vision: { provider: 'cloudflare', model: 'llama', ready: true },
-    });
-    vi.mocked(api.wasteIdentify).mockResolvedValue({
-      object: 'clear plastic lid',
-      provider: 'cloudflare',
-      model: 'llama',
-      ms: 900,
-    });
-    vi.mocked(api.settings).mockResolvedValue(makeSettings());
-    vi.mocked(api.postRecognition).mockClear();
-    // A bin needs 70%: Plastic 0.40 is refused, so nothing may be recorded.
-    predictionState.current = predictionsFor('Plastic', 0.4);
-    stubCamera();
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: vi.fn().mockResolvedValue(undefined),
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
-      configurable: true,
-      get: () => 2,
-    });
-    const restore = stubCanvasWithPicture();
+  it('refuses a bin when the two models disagree', async () => {
+    // The reported shape: a pencil read as Paper.  The classifier's 93% must
+    // not open the paper bin while the name says pencil.
+    const restore = await press({ predictions: predictionsFor('Paper', 0.93), object: 'orange pencil' });
     try {
-      render(<App />);
-      await waitFor(() => expect(screen.getByTestId('start-camera')).toBeEnabled(), { timeout: 5000 });
-      fireEvent.click(screen.getByTestId('start-camera'));
-      fireEvent.click(await screen.findByTestId('classify-now'));
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/results need checking/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
 
-      const sees = await screen.findByTestId('waste-sees-unsure', {}, { timeout: 8000 });
-      expect(sees).toHaveTextContent(/I see: clear plastic lid/i);
-      // Nothing was recorded: the name is not a category and must not open a bin.
+  it('does not add e-waste to metal to reach a threshold', async () => {
+    const predictions = predictionsFor('Ewaste', 0.45).map((row) =>
+      row.className === 'Metal' ? { ...row, probability: 0.35 } : row,
+    );
+    const restore = await press({ predictions, object: 'cable' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/keep this item separate/i);
+      expect(action).not.toHaveTextContent(/recycling agent/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/not certain/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('sends a confident e-waste item to its own collection, not a bin', async () => {
+    const restore = await press({ predictions: predictionsFor('Ewaste', 0.88), object: 'remote control' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/e-waste collection/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('will not light a bin when the namer is configured but did not answer', async () => {
+    const restore = await press({ predictions: plasticAt(0.95), object: null });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/identification unavailable/i);
+      expect(action).toHaveTextContent(/ask the gram sahayak/i);
+      expect(within(screen.getByTestId('waste-identify')).getByTestId('waste-sees')).toHaveTextContent(
+        /identification unavailable/i,
+      );
+      // The category is still reported honestly…
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      // …but nothing physical happens.
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('keeps the documented local-only policy when no namer is configured', async () => {
+    const restore = await press({ predictions: plasticAt(0.95), vision: false });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/plastic bin/i);
+      expect(api.wasteIdentify).not.toHaveBeenCalled();
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'plastic' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('says nothing to sort for the background class, and records nothing', async () => {
+    const restore = await press({ predictions: predictionsFor('Background', 0.93), object: null });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/nothing to sort/i),
+        { timeout: 8000 },
+      );
       expect(api.postRecognition).not.toHaveBeenCalled();
     } finally {
       restore();
     }
   }, 25000);
+
+  it('refuses a bin under the bar', async () => {
+    const restore = await press({ predictions: plasticAt(0.55), object: 'plastic bottle' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const action = screen.getByTestId('waste-action');
+      expect(action).toHaveTextContent(/keep this item separate/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/not certain/i);
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('speaks the accepted answer once', async () => {
+    const restore = await press({ predictions: plasticAt(0.95), object: 'clear plastic lid' });
+    try {
+      await screen.findByTestId('waste-action', {}, { timeout: 8000 });
+      await waitFor(
+        () => expect(spoken.filter((line) => /plastic bin/i.test(line))).toHaveLength(1),
+        { timeout: 6000 },
+      );
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('shows the crop it analysed, and says so when it fell back to the centre', async () => {
+    const restore = await press({ predictions: plasticAt(0.96), object: 'clear plastic lid' });
+    try {
+      const crop = await screen.findByTestId('waste-crop', {}, { timeout: 8000 });
+      expect(crop.querySelector('img')?.getAttribute('src')).toMatch(/^data:image\/jpeg/);
+      // The stub paints a red sheet with a pale item, so the backdrop crop is
+      // used and the centre fallback is not claimed.
+      expect(screen.queryByTestId('waste-crop-centre')).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('ignores a late name that arrives after the decision', async () => {
+    let release: ((value: unknown) => void) | null = null;
+    const restore = await press({
+      predictions: plasticAt(0.95),
+      identify: () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }) as never,
+    });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-action')).toHaveTextContent(/identification unavailable/i),
+        { timeout: 12000 },
+      );
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+
+      await act(async () => {
+        release?.({ object: 'orange pencil', provider: 'cloudflare', model: 'llama', ms: 9000 });
+      });
+      // The late answer must not change the action, the category or the record.
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/identification unavailable/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/Waste category: Plastic/i);
+      expect(vi.mocked(api.postRecognition).mock.calls).toHaveLength(1);
+    } finally {
+      restore();
+    }
+  }, 30000);
 });

@@ -807,6 +807,173 @@ export const MESSAGES = {
     'ക്യാമറ മാലിന്യം തിരിച്ചറിയുന്നു; ആളുകളെ തിരിച്ചറിയുന്നില്ല, ഭാരം അളക്കുന്നില്ല, ബിന്നിൽ എന്തെങ്കിലും ഇട്ടുവെന്ന് തെളിയിക്കുന്നുമില്ല. ബിന്നുകളിൽ സൂചന LED-കൾ മാത്രമാണ്; അതിനാൽ ബിൻ എത്ര നിറഞ്ഞുവെന്ന് ഇവിടെ അളക്കുന്നില്ല.',
   ],
 
+  // ------------------------------------------- the two-model result panel ---
+  'sort.panelTitle': ['Result', 'नतीजा', 'ഫലം'],
+  'bin.organic.name': ['Wet waste', 'गीला कचरा', 'നനവുള്ള മാലിന്യം'],
+  'bin.organic.sub': ['Food & organic waste', 'भोजन और जैविक कचरा', 'ഭക്ഷണവും ജൈവ മാലിന്യവും'],
+  'sort.lampUnavailable': [
+    'Physical indicator unavailable — the controller is not connected. The answer above still stands.',
+    'भौतिक संकेत उपलब्ध नहीं — कंट्रोलर जुड़ा नहीं है। ऊपर का उत्तर फिर भी मान्य है।',
+    'ഭൗതിക സൂചന ലഭ്യമല്ല — കൺട്രോളർ ബന്ധിപ്പിച്ചിട്ടില്ല. മുകളിലെ ഉത്തരം അതേപടി സാധുവാണ്.',
+  ],
+  'sort.labelIdentification': ['Item identification', 'वस्तु की पहचान', 'വസ്തുവിന്റെ തിരിച്ചറിയൽ'],
+  'sort.labelClassification': ['Waste classification', 'कचरे का वर्गीकरण', 'മാലിന്യ വർഗ്ഗീകരണം'],
+  'sort.labelAction': ['Suggested action', 'सुझाया गया कदम', 'നിർദ്ദേശിച്ച നടപടി'],
+  'sort.sourceVision': ['Cloud vision model', 'क्लाउड विज़न मॉडल', 'ക്ലൗഡ് വിഷൻ മോഡൽ'],
+  'sort.sourceLocal': ['Local ResNet50', 'स्थानीय ResNet50', 'ലോക്കൽ ResNet50'],
+  'sort.stateWaiting': ['Waiting', 'प्रतीक्षा', 'കാത്തിരിക്കുന്നു'],
+  'sort.stateIdentifying': [
+    'AI is identifying the item.…',
+    'AI वस्तु की पहचान कर रहा है…',
+    'AI വസ്തു തിരിച്ചറിയുന്നു…',
+  ],
+  'sort.stateClassifying': ['Checking the material…', 'सामग्री जाँची जा रही है…', 'വസ്തുവക ജാതി പരിശോധിക്കുന്നു…'],
+  'sort.stateUnavailable': [
+    'Item identification unavailable',
+    'वस्तु की पहचान उपलब्ध नहीं',
+    'വസ്തുവിന്റെ തിരിച്ചറിയൽ ലഭ്യമല്ല',
+  ],
+  'sort.stateUncertain': ['Not certain', 'पक्का नहीं', 'ഉറപ്പില്ല'],
+  'sort.identified': ['Item identified: {item}', 'पहचानी गई वस्तु: {item}', 'തിരിച്ചറിഞ്ഞ വസ്തു: {item}'],
+  'sort.category': ['Waste category: {category}', 'कचरे का वर्ग: {category}', 'മാലിന്യ വിഭാഗം: {category}'],
+  'sort.actionBin': ['Use the {bin} bin.', '{bin} बिन में डालें।', '{bin} ബിന്നിൽ ഇടുക.'],
+  'sort.actionCollect': [
+    'Hand it to the recycling agent.',
+    'इसे रीसाइक्लिंग एजेंट को दें।',
+    'ഇത് റീസൈക്ലിംഗ് ഏജന്റിന് നൽകുക.',
+  ],
+  'sort.actionEwaste': [
+    'Take it to the authorised e-waste collection.',
+    'इसे अधिकृत ई-कचरा संग्रह केंद्र में दें।',
+    'ഇത് അംഗീകൃത ഇ-മാലിന്യ ശേഖരണ കേന്ദ്രത്തിൽ ഏൽപ്പിക്കുക.',
+  ],
+  'sort.actionSeparate': [
+    'Keep this item separate and ask the Gram Sahayak.',
+    'इसे अलग रखें और ग्राम सहायक से पूछें।',
+    'ഇത് വേർതിരിച്ച് സൂക്ഷിച്ച് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  ],
+  'sort.actionConflict': [
+    'The results need checking. Please ask the Gram Sahayak.',
+    'नतीजों की जाँच ज़रूरी है। कृपया ग्राम सहायक से पूछें।',
+    'ഫലങ്ങൾ പരിശോധിക്കേണ്ടതുണ്ട്. ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  ],
+  'sort.actionConfirm': [
+    'Item identification unavailable. Ask the Gram Sahayak before using a bin.',
+    'वस्तु की पहचान उपलब्ध नहीं। बिन में डालने से पहले ग्राम सहायक से पूछें।',
+    'വസ്തുവിന്റെ തിരിച്ചറിയൽ ലഭ്യമല്ല. ബിന്നിൽ ഇടുന്നതിന് മുൻപ് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  ],
+  'sort.actionNothing': [
+    'Nothing to sort — show one item against the plain background.',
+    'छाँटने को कुछ नहीं — सादे बैकग्राउंड के सामने एक चीज़ दिखाएँ।',
+    'തരംതിരിക്കാൻ ഒന്നുമില്ല — പ്ലെയിൻ പശ്ചാത്തലത്തിൽ ഒരു വസ്തു കാണിക്കുക.',
+  ],
+  'sort.plainBackground': [
+    'Show one item against the plain background.',
+    'सादे बैकग्राउंड के सामने एक चीज़ दिखाएँ।',
+    'പ്ലെയിൻ പശ്ചാത്തലത്തിൽ ഒരു വസ്തു കാണിക്കുക.',
+  ],
+  'sort.cropLabel': ['What the camera read', 'कैमरे ने क्या पढ़ा', 'ക്യാമറ വായിച്ചത്'],
+  'sort.cropCentre': [
+    'Using the middle of the picture — place one item inside the square.',
+    'तस्वीर के बीच का हिस्सा लिया जा रहा है — चौकोर के अंदर एक चीज़ रखें।',
+    'ചിത്രത്തിന്റെ നടുഭാഗം ഉപയോഗിക്കുന്നു — ചതുരത്തിനുള്ളിൽ ഒരു വസ്തു വയ്ക്കുക.',
+  ],
+  'sort.disclosure': [
+    'When you press Check the item, a cropped picture is sent to our configured cloud AI service for identification. Waste classification runs on this laptop.',
+    '“चीज़ जाँचें” दबाने पर एक कटी हुई तस्वीर पहचान के लिए हमारी क्लाउड AI सेवा को भेजी जाती है। कचरे का वर्गीकरण इसी लैपटॉप पर होता है।',
+    '“വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു വെട്ടിയ ചിത്രം തിരിച്ചറിയലിനായി ഞങ്ങളുടെ ക്ലൗഡ് AI സേവനത്തിന് അയക്കുന്നു. മാലിന്യ വർഗ്ഗീകരണം ഈ ലാപ്ടോപ്പിൽ തന്നെ നടക്കുന്നു.',
+  ],
+  'sort.guideTitle': [
+    'Other waste or unsure where it goes?',
+    'दूसरा कचरा या पता नहीं कहाँ जाए?',
+    'മറ്റ് മാലിന്യമോ എവിടെയാണെന്ന് ഉറപ്പില്ലേ?',
+  ],
+  'sort.guideDemo': [
+    'Our three demonstration bins do not cover every waste type.',
+    'हमारे तीन प्रदर्शन बिन हर तरह का कचरा नहीं लेते।',
+    'ഞങ്ങളുടെ മൂന്ന് പ്രദർശന ബിന്നുകൾ എല്ലാ മാലിന്യവും ഉൾക്കൊള്ളുന്നില്ല.',
+  ],
+  'sort.guideLocal': [
+    'Recycling depends on the item and on the collection facilities near you.',
+    'रीसाइक्लिंग इस बात पर निर्भर है कि चीज़ क्या है और आपके आसपास कौन-सी संग्रह सुविधा है।',
+    'റീസൈക്ലിംഗ് വസ്തുവിനെയും നിങ്ങളുടെ പ്രദേശത്തെ ശേഖരണ സൗകര്യങ്ങളെയും ആശ്രയിച്ചിരിക്കുന്നു.',
+  ],
+  'sort.guideWet': [
+    'Wet waste: suitable food scraps, peels and flowers. Being damp does not make an item wet waste.',
+    'गीला कचरा: उपयुक्त खाने के अवशेष, छिलके और फूल। नम होना किसी चीज़ को गीला कचरा नहीं बनाता।',
+    'നനവുള്ള മാലിന്യം: അനുയോജ്യമായ ഭക്ഷണാവശിഷ്ടങ്ങൾ, തൊലികൾ, പൂക്കൾ. നനവുള്ളത് എന്നത് കൊണ്ട് മാത്രം ഒരു വസ്തു നനവുള്ള മാലിന്യമാകുന്നില്ല.',
+  ],
+  'sort.guidePaper': [
+    'Paper and cardboard: clean, dry paper and cardboard. Pencils are not paper.',
+    'कागज़ और कार्डबोर्ड: साफ़, सूखा कागज़ और कार्डबोर्ड। पेंसिल कागज़ नहीं है।',
+    'കടലാസും കാർഡ്ബോർഡും: വൃത്തിയുള്ള, ഉണങ്ങിയ കടലാസും കാർഡ്ബോർഡും. പെൻസിൽ കടലാസല്ല.',
+  ],
+  'sort.guidePlastic': [
+    'Plastic: ordinary suitable plastic items. Chemical containers need separate handling.',
+    'प्लास्टिक: सामान्य उपयुक्त प्लास्टिक चीज़ें। रसायन के डिब्बों को अलग तरीके से संभालें।',
+    'പ്ലാസ്റ്റിക്: സാധാരണ അനുയോജ്യമായ പ്ലാസ്റ്റിക് വസ്തുക്കൾ. രാസവസ്തു പാത്രങ്ങൾ പ്രത്യേകം കൈകാര്യം ചെയ്യണം.',
+  ],
+  'sort.guideGlass': [
+    'Glass: accepted glass collection. Broken glass needs safe handling, and bulbs are not ordinary glass recycling.',
+    'काँच: स्वीकार्य काँच संग्रह। टूटा काँच सावधानी से संभालें, और बल्ब सामान्य काँच रीसाइक्लिंग नहीं है।',
+    'ഗ്ലാസ്: അംഗീകൃത ഗ്ലാസ് ശേഖരണം. പൊട്ടിയ ഗ്ലാസ് സുരക്ഷിതമായി കൈകാര്യം ചെയ്യണം; ബൾബുകൾ സാധാരണ ഗ്ലാസ് റീസൈക്ലിംഗ് അല്ല.',
+  ],
+  'sort.guideMetal': [
+    'Metal: accepted metal collection. Batteries and contaminated containers are exceptions.',
+    'धातु: स्वीकार्य धातु संग्रह। बैटरी और गंदे डिब्बे अपवाद हैं।',
+    'ലോഹം: അംഗീകൃത ലോഹ ശേഖരണം. ബാറ്ററികളും മലിനമായ പാത്രങ്ങളും ഒഴിവാക്കണം.',
+  ],
+  'sort.guideTextile': [
+    'Textile, leather and footwear: reuse, repair or donate if suitable; otherwise check the locally accepted collection route.',
+    'कपड़ा, चमड़ा और जूते: अगर ठीक हों तो दोबारा इस्तेमाल करें, ठीक करें या दान करें; वरना स्थानीय स्वीकृत संग्रह मार्ग पूछें।',
+    'തുണി, തോൽ, ചെരിപ്പ്: അനുയോജ്യമെങ്കിൽ വീണ്ടും ഉപയോഗിക്കുക, നന്നാക്കുക അല്ലെങ്കിൽ ദാനം ചെയ്യുക; അല്ലെങ്കിൽ പ്രാദേശിക ശേഖരണ മാർഗം അന്വേഷിക്കുക.',
+  ],
+  'sort.guideThermocol': [
+    'Thermocol: keep separate and check whether your collector accepts it. We do not guarantee recyclability.',
+    'थर्मोकोल: अलग रखें और देखें कि आपका संग्राहक इसे लेता है या नहीं। हम रीसाइक्लिंग की गारंटी नहीं देते।',
+    'തെർമോകോൾ: വേർതിരിച്ച് സൂക്ഷിച്ച് നിങ്ങളുടെ ശേഖരണ കേന്ദ്രം സ്വീകരിക്കുന്നോ എന്ന് പരിശോധിക്കുക. റീസൈക്ലിംഗ് ഉറപ്പില്ല.',
+  ],
+  'sort.guideEwaste': [
+    'Electronic waste: authorised e-waste collection.',
+    'इलेक्ट्रॉनिक कचरा: अधिकृत ई-कचरा संग्रह।',
+    'ഇലക്ട്രോണിക് മാലിന്യം: അംഗീകൃത ഇ-മാലിന്യ ശേഖരണം.',
+  ],
+  'sort.guideBattery': [
+    'Batteries: designated battery collection, never a bin.',
+    'बैटरी: निर्धारित बैटरी संग्रह, किसी बिन में नहीं।',
+    'ബാറ്ററികൾ: നിശ്ചിത ബാറ്ററി ശേഖരണം, ബിന്നിൽ ഇടരുത്.',
+  ],
+  'sort.guideSanitary': [
+    'Sanitary waste: wrap securely and keep separate for designated collection.',
+    'सैनिटरी कचरा: अच्छी तरह लपेटकर अलग रखें, निर्धारित संग्रह के लिए।',
+    'സാനിറ്ററി മാലിന്യം: നന്നായി പൊതിഞ്ഞ് നിശ്ചിത ശേഖരണത്തിനായി വേർതിരിച്ച് സൂക്ഷിക്കുക.',
+  ],
+  'sort.guidePencil': [
+    'A pencil is not paper: it is wood, graphite and clay. Keep using it, and ask the Gram Sahayak about disposal.',
+    'पेंसिल कागज़ नहीं है: वह लकड़ी, ग्रेफाइट और मिट्टी है। इसे इस्तेमाल करते रहें, और निपटान के लिए ग्राम सहायक से पूछें।',
+    'പെൻസിൽ കടലാസല്ല: അത് മരം, ഗ്രാഫൈറ്റ്, കളിമണ്ണ് എന്നിവയാണ്. ഉപയോഗിച്ചു തീരുന്നതുവരെ ഉപയോഗിക്കുക; വിനിയോഗത്തെക്കുറിച്ച് ഗ്രാം സഹായകിനോട് ചോദിക്കുക.',
+  ],
+  'sort.guideSharps': [
+    'Sharps: never handle these for a demonstration. Ask an adult or the Gram Sahayak about authorised collection.',
+    'नुकीली चीज़ें: प्रदर्शन के लिए इन्हें कभी न छुएँ। अधिकृत संग्रह के लिए किसी बड़े या ग्राम सहायक से पूछें।',
+    'മൂർച്ചയുള്ളവ: പ്രദർശനത്തിനായി ഒരിക്കലും തൊടരുത്. അംഗീകൃത ശേഖരണത്തെക്കുറിച്ച് മുതിർന്നയാളിനോടോ ഗ്രാം സഹായകിനോടോ ചോദിക്കുക.',
+  ],
+  'sort.guideSpecial': [
+    'Special care: medicines, chemical containers, some bulbs and household sharps need authorised handling through the Gram Sahayak.',
+    'विशेष सावधानी: दवाइयाँ, रसायन के डिब्बे, कुछ बल्ब और घरेलू नुकीली चीज़ें ग्राम सहायक के माध्यम से अधिकृत हैंडलिंग चाहती हैं।',
+    'പ്രത്യേക ശ്രദ്ധ: മരുന്നുകൾ, രാസവസ്തു പാത്രങ്ങൾ, ചില ബൾബുകൾ, ഗാർഹിക മൂർച്ചയുള്ളവ എന്നിവ ഗ്രാം സഹായകൻ വഴി അംഗീകൃതമായി കൈകാര്യം ചെയ്യണം.',
+  ],
+  'sort.guideOtherDry': [
+    'Other dry waste: pencils, erasers and mixed-material items. Ask about the accepted local route.',
+    'अन्य सूखा कचरा: पेंसिल, इरेज़र और मिली-जुली सामग्री की चीज़ें। स्थानीय स्वीकृत मार्ग पूछें।',
+    'മറ്റ് ഉണങ്ങിയ മാലിന്യം: പെൻസിൽ, ഇറേസർ, കലർന്ന വസ്തുക്കൾ. പ്രാദേശിക അംഗീകൃത മാർഗം അന്വേഷിക്കുക.',
+  ],
+  'sort.guideUnknown': [
+    'Unknown, several items or a closed bag: show one visible item at a time, or ask for assistance.',
+    'अनजान, कई चीज़ें या बंद थैला: एक बार में एक दिखने वाली चीज़ दिखाएँ, या मदद माँगें।',
+    'അജ്ഞാതം, പല വസ്തുക്കൾ അല്ലെങ്കിൽ അടച്ച സഞ്ചി: ഒരു സമയം ഒരു വസ്തു കാണിക്കുക, അല്ലെങ്കിൽ സഹായം തേടുക.',
+  ],
+
   // Said only when a hosted model is configured: the crop leaves the laptop.
   'sort.visionNote': [
     'To name the object, the square the camera read is sent to a vision service on the internet and its name comes back. Nothing else is sent, and the bin is still decided on this laptop.',

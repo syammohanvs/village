@@ -172,3 +172,41 @@ async def test_classify_names_the_crop_it_kept(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json()["file"] == "20261116T101500-metal-0.60.jpg"
+
+
+def test_crops_are_not_kept_unless_an_operator_asks(tmp_path: Path) -> None:
+    """Retention is a training decision, and it is off by default.
+
+    A visitor's press must not silently write a picture of them to disk; the
+    exhibit operator turns `VILLAGE_WASTE_SAVE_CROPS` on when the session is
+    meant to produce training data.
+    """
+    from dataclasses import replace
+
+    settings = replace(make_settings(tmp_path), waste_save_crops=False)
+    original = waste_resnet._settings
+    waste_resnet._settings = lambda: settings  # type: ignore[assignment]
+    try:
+        kept = waste_resnet._capture(  # type: ignore[attr-defined]
+            b"\xff\xd8\xff\xd9",
+            [{"className": "Plastic", "probability": 0.91}],
+        )
+    finally:
+        waste_resnet._settings = original  # type: ignore[assignment]
+
+    assert kept is None
+    assert not settings.waste_capture_dir.exists()
+
+    # ...and with the setting on, the same call does keep it.
+    settings = replace(settings, waste_save_crops=True)
+    waste_resnet._settings = lambda: settings  # type: ignore[assignment]
+    try:
+        kept = waste_resnet._capture(  # type: ignore[attr-defined]
+            b"\xff\xd8\xff\xd9",
+            [{"className": "Plastic", "probability": 0.91}],
+        )
+    finally:
+        waste_resnet._settings = original  # type: ignore[assignment]
+
+    assert kept is not None
+    assert kept.is_file()

@@ -2184,6 +2184,64 @@ a `reuse` line per language.  **Do not promote the pencil frame to Paper or
 Organic** — that teaches the model the mistake the button prevents.
 
 
+**The page now decides from both models, and a conflict refuses the bin
+(2026-11-19, from the review).**  Three faults were named: e-waste was grouped
+with ordinary recycling, the special-waste guidance had gone, and a confident
+classification could open a bin while the namer said something else.  All three
+are closed in one pure module, `web/frontend/src/lib/wasteDecision.ts` (19
+tests), so the page cannot drift from the rule:
+
+- **No outcome grouping.**  Ewaste 45 % + Metal 35 % is **not** 80 % recycling —
+  `wasteActions.groupedPrediction` is no longer used by the page.  The decision
+  uses the strongest class's own probability (bins 0.70, materials 0.50), and a
+  material under the bar is *"keep it separate and ask"*, not a named recyclable.
+- **Conflicts refuse the bin.**  Before any route: a **special-care cue** in the
+  name (diaper, syringe, battery, medicine, chemical, bulb, mask) or a **material
+  disagreement** (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic,
+  plastic lid vs Ewaste) gives `status: conflict` — no lamp, no bin record,
+  *"The results need checking. Please ask the Gram Sahayak."*
+- **Degraded mode.**  A namer that is configured but answers nothing (quota,
+  timeout, offline) **does not light a bin**: *"Item identification unavailable.
+  Ask the Gram Sahayak before using a bin."*  Only a deployment with **no namer
+  at all** keeps the documented local-only policy.
+- **One check identity** (`checkSeq`): a late or superseded result cannot change
+  the action, the record or the lamp; one `postRecognition` per press; Sara
+  speaks the action once.
+- **The panel shows the two models separately** — *Item identification* (cloud)
+  and *Waste classification* (local) with their own states, then a prominent
+  *Suggested action*; provider/model names and scores live in the collapsed
+  details.  A 72-px crop of what was analysed is shown, and a centre-crop
+  fallback is **said out loud** rather than called "no guessing".
+- **The guidance is back**, as a collapsed *"Other waste or unsure where it
+  goes?"* section with the pencil, sanitary and sharps paragraphs and the rest —
+  text, not new model classes, and **no physical "Other" bin**.
+- **Retention is an operator setting, off by default**
+  (`VILLAGE_WASTE_SAVE_CROPS`), and corrections live behind `?operator=1`.
+  The cloud disclosure is shown before any call, in the reader's language.
+
+**The provider chain is now: Cloudflare account 1 → account 2 → DeepSeek.**  The
+free Workers AI allowance is per account per day, so `VILLAGE_CF_API_TOKEN_2`
+(+ `…_ACCOUNT_ID_2`) is tried when the first answers quota, **stickily**; with
+every account spent, `VILLAGE_VISION_API_KEY` (OpenCode Go, ~7 s) is the last
+resort.  `status().chain` reports how many chances there are.  Two backend tests
+pin the rotation and the last-resort fallback.
+
+**Measured after the review, and the numbers that matter**
+(`scripts/waste/evaluate_pipeline.py`, 241 probe photos, the served checkpoint):
+exact **74.7 %**, item action **82.6 %**, **abstentions 92**, and **false bins
+25** — i.e. 25 photos where the local model alone would have opened the wrong
+physical bin (Glass→Plastic 0.82/0.80, Ewaste→Paper 0.73, Leather→Paper 0.71,
+Metal→Paper 0.65, Metal→Plastic 0.58).  **Metal is 17.6 % (3/17)**, mostly read
+as **Ewaste (10)**, then Paper/Thermocol.  No accuracy was improved this round:
+the one metal photo added is one photo, and the two-photo retrain measured
+earlier took the probe *down* from 74.7 % to 73.0 %.
+
+**The acceptance rule is one rule, and the old copy was wrong.**  A press reads
+**three frames 250 ms apart and averages them**, then takes **one** decision
+against the bar — there is no "two consecutive frames" rule any more (that
+belonged to the removed watcher), and the three frames are related observations,
+not independent confirmations.
+
 **The Sort Waste page is camera · start · check, and the item is found
 automatically (2026-11-19, the user's instruction).**  "Ease of use for children
 and audience is the goal" — and the right-hand card already says where each kind

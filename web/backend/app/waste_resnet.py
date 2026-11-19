@@ -163,6 +163,10 @@ def _capture(raw: bytes, predictions: list[dict[str, Any]]) -> Path | None:
     from .config import Settings  # local import: keeps the module importable alone
 
     settings = _settings()
+    if settings is not None and not getattr(settings, "waste_save_crops", False):
+        # Off by default: saving every judged crop is an operator decision for
+        # training, not something a visitor's press should do silently.
+        return None
     folder = settings.waste_capture_dir if settings else None
     if folder is None:
         return None

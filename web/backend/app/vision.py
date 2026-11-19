@@ -12,10 +12,17 @@ container"** (2026-11-19).  Saying the object out loud before the category is
 what lets a visitor — and the operator — see a wrong answer instead of being
 told one.
 
-Two providers, chosen by `VILLAGE_VISION_PROVIDER`:
+**A chain, not one provider.**  The free Workers AI allowance is per account
+per day, so the exhibit can carry more than one: `VILLAGE_CF_API_TOKEN`,
+`VILLAGE_CF_API_TOKEN_2`, … each with its own account id (resolved from the
+token when blank).  When one answers "quota/limit/expired", the next is used —
+stickily, so the rest of the session does not keep hitting the exhausted one.
+If every Cloudflare account is spent, `VILLAGE_VISION_API_KEY` (DeepSeek on
+OpenCode Go) is the last resort: ~7 s instead of ~1 s, but an answer rather
+than an "unavailable".
 
-  cloudflare  Workers AI, ~1 s on this account, free tier
-  opencode    DeepSeek on OpenCode Go, ~7 s
+  VILLAGE_VISION_PROVIDER=cloudflare  →  cf token 1, cf token 2, …, opencode
+  VILLAGE_VISION_PROVIDER=opencode    →  opencode, then any cf tokens
 
 Nothing here runs unless a key is configured: `status()["ready"]` is False and
 `identify()` answers `object: None` in microseconds, so the page behaves exactly
@@ -48,15 +55,40 @@ _CACHE_ORDER: list[str] = []
 _CACHE_MAX = 256
 
 
+# Which candidate answered last.  Sticky on purpose: once account 1 is spent,
+# every later request should start at account 2 instead of re-failing on 1.
+_INDEX = [0]
+
+
+def _cloudflare_candidates() -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    for suffix in ("", "_2", "_3", "_4", "_5"):
+        token = (os.getenv(f"VILLAGE_CF_API_TOKEN{suffix}") or "").strip()
+        if not token:
+            continue
+        out.append({
+            "provider": "cloudflare",
+            "token": token,
+            "account": (os.getenv(f"VILLAGE_CF_ACCOUNT_ID{suffix}") or "").strip(),
+        })
+    return out
+
+
+def candidates() -> list[dict[str, str]]:
+    """The provider chain, in the order it is tried."""
+    cloud = _cloudflare_candidates()
+    opencode = (os.getenv("VILLAGE_VISION_API_KEY") or "").strip()
+    deepseek = [{"provider": "opencode", "token": opencode, "account": ""}] if opencode else []
+    wanted = (os.getenv("VILLAGE_VISION_PROVIDER") or "cloudflare").strip().lower()
+    # The configured provider first; the other one is the fallback either way.
+    return cloud + deepseek if wanted == "cloudflare" else deepseek + cloud
+
+
 def provider() -> str | None:
-    wanted = (os.getenv("VILLAGE_VISION_PROVIDER") or "opencode").strip().lower()
-    if wanted == "cloudflare":
-        if os.getenv("VILLAGE_CF_API_TOKEN"):
-            return "cloudflare"
-        return "opencode" if os.getenv("VILLAGE_VISION_API_KEY") else None
-    if os.getenv("VILLAGE_VISION_API_KEY"):
-        return "opencode"
-    return "cloudflare" if os.getenv("VILLAGE_CF_API_TOKEN") else None
+    chain = candidates()
+    if not chain:
+        return None
+    return chain[min(_INDEX[0], len(chain) - 1)]["provider"]
 
 
 def model_name(which: str | None = None) -> str:
@@ -67,11 +99,15 @@ def model_name(which: str | None = None) -> str:
 
 
 def status() -> dict[str, Any]:
+    chain = candidates()
     which = provider()
     return {
         "provider": which,
         "model": model_name(which) if which else None,
-        "ready": which is not None,
+        "ready": bool(chain),
+        # How many accounts/providers can answer before the page must say
+        # "identification unavailable".
+        "chain": len(chain),
         "timeout_s": TIMEOUT_S,
     }
 
@@ -97,15 +133,31 @@ def identify(image: str) -> dict[str, Any]:
     if jpeg is None:
         return {**base, "object": None, "ms": 0, "reason": "the crop could not be read"}
 
-    try:
-        text = _ask(jpeg, which)
-    except Exception as exc:  # noqa: BLE001 - a namer must never fail a press
-        return {**base, "object": None, "ms": int((time.time() - started) * 1000),
-                "reason": str(exc)[:200]}
-
-    name = _clean(text)
-    _remember(key, name)
-    return {**base, "object": name, "ms": int((time.time() - started) * 1000)}
+    chain = candidates()
+    first_error: Exception | None = None
+    start = min(_INDEX[0], len(chain) - 1)
+    for offset in range(len(chain)):
+        index = (start + offset) % len(chain)
+        candidate = chain[index]
+        try:
+            text = _ask_candidate(candidate, jpeg)
+        except Exception as exc:  # noqa: BLE001 - try the next account
+            first_error = first_error or exc
+            # Move on: this one is spent, expired or broken.  The index is
+            # sticky so the next press does not pay for the same failure.
+            _INDEX[0] = (index + 1) % len(chain)
+            continue
+        _INDEX[0] = index
+        name = _clean(text)
+        _remember(key, name)
+        return {
+            "provider": candidate["provider"],
+            "model": model_name(candidate["provider"]),
+            "object": name,
+            "ms": int((time.time() - started) * 1000),
+        }
+    return {**base, "object": None, "ms": int((time.time() - started) * 1000),
+            "reason": str(first_error)[:200] if first_error else "no provider answered"}
 
 
 # --------------------------------------------------------------------- helpers ---
@@ -158,8 +210,18 @@ def _post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
 
 
 def _ask(jpeg: bytes, which: str) -> str:
+    """Ask one provider with the primary key (kept for tests and callers)."""
     if which == "cloudflare":
-        return _cloudflare(jpeg)
+        chain = _cloudflare_candidates()
+        if not chain:
+            return ""
+        return _cloudflare(jpeg, chain[0])
+    return _opencode(jpeg)
+
+
+def _ask_candidate(candidate: dict[str, str], jpeg: bytes) -> str:
+    if candidate["provider"] == "cloudflare":
+        return _cloudflare(jpeg, candidate)
     return _opencode(jpeg)
 
 
@@ -197,11 +259,15 @@ def _opencode(jpeg: bytes) -> str:
     return (message.get("content") or "").strip()
 
 
-def _cloudflare(jpeg: bytes) -> str:
-    token = os.getenv("VILLAGE_CF_API_TOKEN", "")
+def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None) -> str:
+    candidate = candidate or {
+        "token": os.getenv("VILLAGE_CF_API_TOKEN", ""),
+        "account": os.getenv("VILLAGE_CF_ACCOUNT_ID", "").strip(),
+    }
+    token = candidate.get("token", "")
     if not token:
         return ""
-    account = os.getenv("VILLAGE_CF_ACCOUNT_ID", "").strip() or _first_account(token)
+    account = candidate.get("account", "") or _first_account(token)
     if not account:
         return ""
     model = model_name("cloudflare")

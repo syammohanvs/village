@@ -31,6 +31,7 @@ def no_provider(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv(name, raising=False)
     vision._CACHE.clear()
     vision._CACHE_ORDER.clear()
+    vision._INDEX[0] = 0
     yield
 
 
@@ -60,11 +61,11 @@ def test_a_configured_model_names_the_object_and_is_asked_once(
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
     asked: list[bytes] = []
 
-    def fake_ask(jpeg: bytes, which: str) -> str:
+    def fake_ask(candidate: dict, jpeg: bytes) -> str:
         asked.append(jpeg)
         return "A clear plastic lid."
 
-    monkeypatch.setattr(vision, "_ask", fake_ask)
+    monkeypatch.setattr(vision, "_ask_candidate", fake_ask)
 
     first = vision.identify(CROP)
     second = vision.identify(CROP)
@@ -85,10 +86,10 @@ def test_a_failing_model_leaves_the_page_with_the_classifier(
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
 
-    def boom(jpeg: bytes, which: str) -> str:
+    def boom(candidate: dict, jpeg: bytes) -> str:
         raise RuntimeError("HTTP Error 500: upstream")
 
-    monkeypatch.setattr(vision, "_ask", boom)
+    monkeypatch.setattr(vision, "_ask_candidate", boom)
 
     answer = vision.identify(CROP)
     assert answer["object"] is None
@@ -118,7 +119,7 @@ async def test_the_route_names_the_object_when_a_provider_is_configured(
 ) -> None:
     monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
     monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
-    monkeypatch.setattr(vision, "_ask", lambda jpeg, which: "Remote control")
+    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg: "Remote control")
 
     settings = make_settings(tmp_path)
     async with client_for(settings) as (client, _gateway, _app):
@@ -129,3 +130,64 @@ async def test_the_route_names_the_object_when_a_provider_is_configured(
     assert body["object"] == "Remote control"
     assert body["provider"] == "cloudflare"
     assert body["model"]
+
+
+def test_the_second_cloudflare_account_is_used_when_the_first_is_spent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Two free accounts, each with its own daily allowance.  The first answers
+    # "quota", so the same press must be answered by the second — and the next
+    # press must go straight to the second instead of failing on the first
+    # again.
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN_2", "cfut_two")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID_2", "acct-two")
+    seen: list[str] = []
+
+    def ask(candidate: dict, jpeg: bytes) -> str:
+        seen.append(candidate["token"])
+        if candidate["token"] == "cfut_one":
+            raise RuntimeError("HTTP Error 429: quota exceeded")
+        return "clear plastic lid"
+
+    monkeypatch.setattr(vision, "_ask_candidate", ask)
+
+    first = vision.identify(CROP)
+    assert first["object"] == "clear plastic lid"
+    assert seen == ["cfut_one", "cfut_two"]
+
+    second = vision.identify(
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsL"
+    )
+    assert second["object"] == "clear plastic lid"
+    # Sticky: the spent account is not tried again.
+    assert seen == ["cfut_one", "cfut_two", "cfut_two"]
+
+
+def test_deepseek_is_the_last_resort_when_every_cloudflare_account_is_spent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN_2", "cfut_two")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID_2", "acct-two")
+    monkeypatch.setenv("VILLAGE_VISION_API_KEY", "oc_sk_test")
+    seen: list[str] = []
+
+    def ask(candidate: dict, jpeg: bytes) -> str:
+        seen.append(candidate["provider"])
+        if candidate["provider"] == "cloudflare":
+            raise RuntimeError("HTTP Error 429: quota exceeded")
+        return "clear plastic lid"
+
+    monkeypatch.setattr(vision, "_ask_candidate", ask)
+
+    answer = vision.identify(CROP)
+    assert answer["object"] == "clear plastic lid"
+    assert answer["provider"] == "opencode"
+    assert seen == ["cloudflare", "cloudflare", "opencode"]
+    # The page is told how many chances there are, not a guess.
+    assert vision.status()["chain"] == 3

@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, errorMessage } from '../lib/api';
-import { cx } from '../lib/format';
 import { useApi } from '../lib/useApi';
-import {
-  averageFrames,
-  createWasteStabilizer,
-  type Prediction,
-  type StableEvent,
-} from '../lib/wasteStabilizer';
+import { averageFrames, createWasteStabilizer, type Prediction } from '../lib/wasteStabilizer';
 import { BinLeds } from '../components/BinLeds';
 import { Card, Notice } from '../components/ui';
-import { IconCamera, IconCheck, IconInfo, IconRefresh, IconStop } from '../components/Icons';
+import { IconCamera, IconCheck, IconStop } from '../components/Icons';
 import { centreCrop, cropGuide, scaleBox } from '../lib/focus';
 import { backdropBox } from '../lib/backdrop';
-import { groupedPrediction } from '../lib/wasteActions';
+import { MATERIAL_BAR, decide, type Decision } from '../lib/wasteDecision';
 import { speakText } from '../lib/speech';
 import {
   CAMERA_STORAGE_KEY,
@@ -23,10 +16,9 @@ import {
   readStoredCamera,
   waitForFrames,
 } from '../lib/camera';
-import { SUPPORT, confidenceBar, guideFor, spokenFor } from '../lib/wasteGuide';
+import { BIN_CONFIDENCE, SUPPORT } from '../lib/wasteGuide';
 import { useT } from '../lib/i18n';
 import type { MessageKey } from '../lib/messages';
-import { LIA_COPY } from '../lib/lia';
 import { useVoiceUi } from '../lib/voiceUi';
 import { useDemo } from '../lib/demo';
 import { useVillage } from '../lib/village';
@@ -115,77 +107,13 @@ function CardActions({ onScanAnother, support }: { onScanAnother: () => void; su
   );
 }
 
-const DEFAULT_PATH = '/models/waste/';
-
-function modelBase(path: string | undefined): string {
-  const base = (path || DEFAULT_PATH).trim();
-  return base.endsWith('/') ? base : `${base}/`;
-}
-
 function modelInstalled(status: { installed?: boolean; available?: boolean; present?: boolean } | null): boolean {
   return Boolean(status?.installed ?? status?.available ?? status?.present);
 }
 
-function capitalise(value: string): string {
-  return value.replace(/^\w/, (c) => c.toUpperCase());
-}
-
-// The model's last class is the "nothing to sort" side of the camera: the empty
-// table, the room, and ordinary objects (a car key, a phone, a wallet) that are
-// not waste.  "Background" is the engineering name; the Gram Sahayak needs the
-// plain-English one.
-/** The classifier's class, as a translation key — `null` when it is not one we name. */
-const LABEL_KEYS: Record<string, MessageKey> = {
-  organic: 'waste.item.organic',
-  plastic: 'waste.item.plastic',
-  paper: 'waste.item.paper',
-  glass: 'waste.item.glass',
-  metal: 'waste.item.metal',
-  textile: 'waste.item.textile',
-  leather: 'waste.item.leather',
-  footwear: 'waste.item.footwear',
-  thermocol: 'waste.item.thermocol',
-  ewaste: 'waste.item.ewaste',
-  background: 'waste.item.background',
-};
-
-function labelKey(label: string): MessageKey | null {
-  return LABEL_KEYS[label.trim().toLowerCase()] ?? null;
-}
-
-// The model names the recycler material so it can learn each one, but the app
-// has one outcome for all of them: hand it to the recycling agent.  Anything
-// in this set is posted to the backend as category "other" and lights no LED.
-const RECYCLING_NAMES: Record<string, string> = {
-  glass: 'Glass',
-  metal: 'Metal',
-  textile: 'Cloth or textile',
-  leather: 'Leather',
-  footwear: 'Footwear',
-  thermocol: 'Thermocol',
-  ewaste: 'Electronic waste',
-};
-
-const HAZARDOUS_NAMES: Record<string, string> = {
-  medical: 'Medical waste',
-  hazardous: 'Hazardous waste',
-};
-
-function recyclingMaterial(label: string): string | null {
-  return RECYCLING_NAMES[label.trim().toLowerCase()] ?? null;
-}
-
-function hazardousMaterial(label: string): string | null {
-  return HAZARDOUS_NAMES[label.trim().toLowerCase()] ?? null;
-}
 
 export function SortWaste() {
   const t = useT();
-  /** A classifier class in the visitor's language. */
-  const displayName = (label: string) => {
-    const key = labelKey(label);
-    return key ? t(key) : label;
-  };
   const settings = useApi(['settings'], () => api.settings(), {});
   const modelStatus = useApi(['waste-resnet'], () => api.wasteResnetStatus(), {});
 
@@ -203,7 +131,6 @@ export function SortWaste() {
   // The loop runs on an interval, and `accept` is a callback whose identity must
   // not change per frame, so it read a stale empty list -- which is why every
   // recorded event said `top: []`.  A ref is the frame's guesses as of now.
-  const predictionsRef = useRef<Prediction[]>([]);
   const { language: voiceLanguage } = useVoiceUi();
   // Classifying ends at a bin LED, so the page is offered only while the board
   // can light one -- Simulation mode is the way to show the model without it
@@ -212,13 +139,25 @@ export function SortWaste() {
   const { demo } = useDemo();
   const boardOffline = !connected && !demo;
   const [recognition, setRecognition] = useState<WasteRecognitionResult | null>(null);
-  const [referralLabel, setReferralLabel] = useState<string | null>(null);
-  const [hazardousLabel, setHazardousLabel] = useState<string | null>(null);
-  const [recognitionError, setRecognitionError] = useState('');
+  // One press = one check.  `phase` drives the panel, `decision` is what the
+  // page acts on, and `seq` (a ref) makes a late result from an older press
+  // harmless.
+  const [check, setCheck] = useState<{
+    phase: 'idle' | 'identifying' | 'done';
+    identify: 'idle' | 'checking' | 'done' | 'unavailable';
+    classify: 'idle' | 'checking' | 'done' | 'uncertain';
+    decision: Decision | null;
+    crop: string | null;
+    cropMode: 'backdrop' | 'centre' | null;
+    error: string;
+  }>({ phase: 'idle', identify: 'idle', classify: 'idle', decision: null, crop: null, cropMode: null, error: '' });
+  const checkSeq = useRef(0);
+  // Corrections write into the training tree, so they are an operator action:
+  // open the page with ?operator=1 to see them.  A visitor never does.
+  const operatorMode =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('operator') === '1';
+  const [correction, setCorrection] = useState('');
   const [alert, setAlert] = useState('');
-  const [note, setNote] = useState('');
-  const [disposalMessage, setDisposalMessage] = useState('');
-  const [disposalError, setDisposalError] = useState('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -234,19 +173,15 @@ export function SortWaste() {
   const [reading, setReading] = useState(false);
   // The hosted model's name for the object in front of the camera.  It is a
   // name only: the bin is the classifier's decision (see vision.py).
-  const [objectName, setObjectName] = useState<string | null>(null);
-  const [naming, setNaming] = useState(false);
   const lastCropRef = useRef<string | null>(null);
   // The camera's own shape, so the frame shows the WHOLE picture.  A fixed 4:3
   // box with `object-fit: cover` silently hid the left and right edges of a
   // 16:9 camera, so an item could be in shot and not on screen -- and the read
   // did not match what the Gram Sahayak could see.
   const [videoAspect, setVideoAspect] = useState<number | null>(null);
-  const [groupedTop, setGroupedTop] = useState<Prediction | null>(null);
   // The crop behind the current answer, and what the operator said it really
   // was.  One press per mistake is the venue's whole learning loop.
   const captureFileRef = useRef<string | null>(null);
-  const [correction, setCorrection] = useState<string>('');
   const [frameWarning, setFrameWarning] = useState('');
 
   const installed = modelInstalled(modelStatus.data);
@@ -261,8 +196,6 @@ export function SortWaste() {
     Boolean(navigator.mediaDevices) &&
     typeof navigator.mediaDevices.getUserMedia === 'function';
   const modelKnown = !modelStatus.loading && !modelStatus.error;
-  const previewOnly = !installed;
-  const base = modelBase(settings.data?.waste_model_path);
   const confidence = settings.data?.waste_confidence ?? 0.50;
   const stabilityFrames = settings.data?.waste_stability_frames ?? 2;
   const cooldownMs = settings.data?.waste_cooldown_ms ?? 3000;
@@ -290,7 +223,6 @@ export function SortWaste() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
     setPredictions([]);
-    setGroupedTop(null);
     setFrameWarning('');
     stabilizerRef.current.reset();
   }, []);
@@ -311,27 +243,6 @@ export function SortWaste() {
     [],
   );
 
-  /**
-   * Ask the hosted model what the object is, and remember the answer.
-   *
-   * Resolves with the name (or null), so a caller can decide whether to wait for
-   * it.  Used twice: on an accepted reading the card and Sara say it first, and
-   * on a reading *under* the bar — where the page refuses to name a bin — the
-   * name is the one useful thing it can still offer.
-   */
-  const nameTheItem = useCallback(async (): Promise<string | null> => {
-    const crop = lastCropRef.current;
-    if (!crop || !visionReady) return null;
-    setNaming(true);
-    try {
-      const answer = await api.wasteIdentify(crop).catch(() => null);
-      const name = answer?.object ?? null;
-      if (lastCropRef.current === crop) setObjectName(name);
-      return name;
-    } finally {
-      setNaming(false);
-    }
-  }, [visionReady]);
 
   const loadModel = useCallback(async () => {
     if (!installed || modelState === 'loading' || modelState === 'ready') return;
@@ -454,8 +365,7 @@ export function SortWaste() {
         }
       }
       setCameraOn(true);
-      setGroupedTop(null);
-      setFrameWarning('');
+        setFrameWarning('');
       const list = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       setDevices(list.filter((device) => device.kind === 'videoinput'));
       if (installed) void loadModel();
@@ -466,150 +376,84 @@ export function SortWaste() {
     }
   };
 
-  const accept = useCallback(async (event: StableEvent) => {
-    if (acceptingRef.current) return;
-    acceptingRef.current = true;
-    setRecognitionError('');
-    setDisposalMessage('');
-    setDisposalError('');
-    setNote('');
-    const material = recyclingMaterial(event.category);
-    const hazardous = hazardousMaterial(event.category);
-    setReferralLabel(material);
-    setHazardousLabel(hazardous);
-
-    // What the object *is*, from the hosted model, when one is configured.  It
-    // is asked about the very crop the classifier saw, in parallel with the
-    // record, and the visitor hears it **before** the category -- the order a
-    // person checks an answer in, and the reason it exists: on 2026-11-19 this
-    // same crop was called Ewaste by the classifier and "clear plastic lid" by
-    // the namer.
-    //
-    // The name never moves the item out of a bin or into one.  The category is
-    // still the local classifier's, because on the venue probe a vision model
-    // scored 53.7% exact against its 70.7%.
-    let named: string | null = null;
-    if (visionReady) {
-      // A late answer still names the card -- `nameTheItem` stores it itself --
-      // but the visitor is not kept waiting for it beyond this window.
-      named = await Promise.race([
-        nameTheItem(),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
-      ]);
-    } else {
-      setObjectName(null);
-    }
-
-    // Sara speaks from what was just decided, not from the reply.  Waiting for
-    // the recording held her sentence for as long as the round trip took --
-    // measured at 19-21 s with the controller switched off, because the record
-    // asked the board for its fill levels.  The sentence is already known here:
-    // a bin name for the three bins, a referral for anything else.
-    // Lia says what the card says, because both read the one routing table.
-    const spoken = spokenFor(guideFor(hazardous ? 'medical' : event.label || event.category), voiceLanguage);
-    // The language chosen in Setup, the same one the invitation and the voice
-    // panel use.  This was hardcoded 'en' because the sentences were English and
-    // a Hindi voice reading English was worse than English text in an English
-    // voice; `spokenFor()` is now translated, so the sentence and the voice agree
-    // again (reported from the venue 2026-11-16: Malayalam set, English spoken).
-    // A named object is read first, in the page's own sentence, so a visitor
-    // hears "This is a clear plastic lid." before the category.
-    const says = named ? `${t('sort.saysObject', { object: named })} ` : '';
-    void speakText(says + spoken, voiceLanguage, 0.95);
-
-    try {
-      const result = await api.postRecognition({
-        // One referral category for every recycler material and one for
-        // hazardous material, so the backend records one outcome and never sends
-        // a bin command for either.
-        category: material ? 'other' : hazardous ? 'medical' : event.category,
-        confidence: event.confidence,
-        model: 'teachable-machine',
-        // Keep what was actually named: "other" alone cannot answer "what did
-        // it call my key fob?" when the session is reviewed afterwards.
-        material: event.label || event.category,
-        top: predictionsRef.current.map((row) => ({
-          className: row.label,
-          probability: row.confidence,
-        })),
-      });
-      setRecognition(result);
-      // Bin fullness is not measured on this model (three bins, no distance
-      // sensors), so the only alert worth showing is the one the board itself
-      // raises for a bin it cannot use.
-      setAlert(result.alert ?? '');
-    } catch (cause) {
-      setRecognitionError(errorMessage(cause));
-    } finally {
-      acceptingRef.current = false;
-      setNaming(false);
-      // The camera deliberately stays on.  The stabilizer waits for the item to
-      // be removed and then re-arms, so the next item is classified without
-      // pressing Start Camera again.
-    }
-  }, [t, nameTheItem, visionReady, voiceLanguage]);
+  /**
+   * The one sentence a decision is spoken and written as.
+   *
+   * The status comes before the route: a conflicting answer has a route that
+   * looks ordinary, and saying it would be the confident-wrong-answer this page
+   * exists to avoid.
+   */
+  const actionSentence = useCallback(
+    (decision: Decision): string => {
+      if (decision.status === 'nothing') return t('sort.actionNothing');
+      if (decision.reasonId === 'conflict' || decision.reasonId === 'specialCare') {
+        return t('sort.actionConflict');
+      }
+      if (decision.reasonId === 'identificationMissing') return t('sort.actionConfirm');
+      if (decision.status === 'uncertain') return t('sort.actionSeparate');
+      if (decision.routeId === 'collect.ewaste') return t('sort.actionEwaste');
+      if (decision.routeId.startsWith('collect.')) return t('sort.actionCollect');
+      if (decision.bin === 'organic') return t('sort.actionBin', { bin: t('bin.organic.name') });
+      if (decision.bin === 'plastic') return t('sort.actionBin', { bin: t('waste.bin.plastic.title') });
+      if (decision.bin === 'paper') return t('sort.actionBin', { bin: t('waste.bin.paper.title') });
+      return t('sort.actionSeparate');
+    },
+    [t],
+  );
 
   /**
-   * Classify once, on demand.
+   * One press, one check, one decision.
    *
-   * The automatic path decides for itself what is being shown, and in a room
-   * with a person in it that decision is wrong often enough to be worse than
-   * useless: reported as "it classified as thermocol" with nothing in hand. A
-   * press cannot be wrong about whether an item is being shown, because the
-   * person pressing it knows.
+   * The two models answer different questions and run **in parallel**: the
+   * local ResNet50 gives a material distribution in ~70 ms, the hosted model
+   * gives a name in ~1 s.  Neither is an input to the other, and the decision
+   * below waits for both (or the name's timeout) before anything physical
+   * happens — so a bin is never lit and then reconsidered.
    *
-   * It crops the middle of the picture — where an item held up to the camera
-   * sits — and classifies that, with no reference to the room at all.
+   * `checkSeq` is the request identity.  A result belonging to an older press —
+   * a late cloud answer, a frame that finished after the button was pressed
+   * again — is dropped rather than overwriting the newer answer.
    */
-  const classifyNow = useCallback(async () => {
+  const runCheck = useCallback(async () => {
     const video = videoRef.current;
     const classifier = classifierRef.current;
     if (!video || !classifier || busyRef.current || video.readyState < 2) return;
+    const seq = ++checkSeq.current;
     busyRef.current = true;
     setReading(true);
-    setFrameWarning('');
+    setAlert('');
     setRecognition(null);
-    setObjectName(null);
-    setReferralLabel(null);
-    setHazardousLabel(null);
-    setCorrection('');
-    captureFileRef.current = null;
+    setPredictions([]);
+    setCheck({
+      phase: 'identifying',
+      identify: visionReady ? 'checking' : 'idle',
+      classify: 'checking',
+      decision: null,
+      crop: null,
+      cropMode: null,
+      error: '',
+    });
+
+    let naming: Promise<string | null> = Promise.resolve(null);
+    let asked = false;
     try {
       const analysis = ensureCanvas(analysisCanvasRef, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
       const analysisContext = analysis.getContext('2d');
       const crop = ensureCanvas(cropCanvasRef, CROP_SIZE, CROP_SIZE);
       const cropContext = crop.getContext('2d');
       if (!analysisContext || !cropContext) return;
-
       const videoWidth = video.videoWidth || ANALYSIS_WIDTH;
       const videoHeight = video.videoHeight || ANALYSIS_HEIGHT;
+      let cropMode: 'backdrop' | 'centre' = 'centre';
 
-      /**
-       * The crop for this frame: the item found on the backdrop, or the middle
-       * of the picture when there is no plain backdrop to find it against.
-       *
-       * This is the "auto focus" the booth needs.  A fixed centre square made a
-       * visitor centre an item that a hand or a sleeve then filled the edge of;
-       * the backdrop is one flat colour, so the item is simply the part that is
-       * not that colour -- and when the scene is genuinely busy (a wooden table,
-       * no sheet) `backdropBox` refuses and the old centre crop is used, so
-       * nothing regresses on a plain table.
-       */
-      const boxFor = (frame: ImageData) =>
-        backdropBox(frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT).box ??
-        centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
-
-      /** One look at the item: crop the frame now and read it. */
+      /** One look at the item: find it on the sheet, crop it, read it. */
       const readOnce = async (): Promise<Prediction[]> => {
         analysisContext.drawImage(video, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
         const frame = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
-        const source = scaleBox(
-          boxFor(frame),
-          ANALYSIS_WIDTH,
-          ANALYSIS_HEIGHT,
-          videoWidth,
-          videoHeight,
-        );
+        const found = backdropBox(frame.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
+        cropMode = found.box ? 'backdrop' : 'centre';
+        const box = found.box ?? centreCrop(ANALYSIS_WIDTH, ANALYSIS_HEIGHT, PRESS_CROP_SHARE);
+        const source = scaleBox(box, ANALYSIS_WIDTH, ANALYSIS_HEIGHT, videoWidth, videoHeight);
         cropContext.clearRect(0, 0, CROP_SIZE, CROP_SIZE);
         cropContext.drawImage(
           video,
@@ -622,13 +466,23 @@ export function SortWaste() {
           CROP_SIZE,
           CROP_SIZE,
         );
-        drawPreview(crop, { x: 0, y: 0, width: CROP_SIZE, height: CROP_SIZE });
+        if (!asked) {
+          asked = true;
+          lastCropRef.current = crop.toDataURL('image/jpeg', 0.92);
+          // The namer is asked about the same square the classifier is handed,
+          // and asked once — its answer is a name, never a bin.
+          if (visionReady && lastCropRef.current) {
+            const image = lastCropRef.current;
+            naming = api.wasteIdentify(image).then((answer) => answer.object).catch(() => null);
+          }
+        }
         const raw = await classifier.predict(crop);
         return raw.map((row) => ({ label: row.className, confidence: row.probability }));
       };
 
-      // Three looks at what the hand is holding, averaged.  A crop is redrawn
-      // for each, so this is a reading of the video rather than of one still.
+      // Three frames 250 ms apart, averaged: one reading of the video rather
+      // than one still.  They are related observations, not three independent
+      // confirmations — the bar below is what decides, not the count.
       const shots: Prediction[][] = [];
       for (let shot = 0; shot < PRESS_FRAMES; shot += 1) {
         if (shot > 0) {
@@ -636,49 +490,71 @@ export function SortWaste() {
           if (video.readyState < 2) break;
         }
         shots.push(await readOnce());
+        if (seq !== checkSeq.current) return;
       }
 
       const averaged = averageFrames(shots);
-      const all = averaged;
-      const grouped = groupedPrediction(all);
-      predictionsRef.current = all.slice(0, 3);
-      setPredictions(predictionsRef.current);
-      setGroupedTop(grouped);
-      if (!grouped) return;
-      const isBackground = grouped.label.trim().toLowerCase() === 'background';
-      if (isBackground) {
-        return;
+      // Overlapped with the frames, capped so a slow cloud model cannot hold
+      // the answer hostage.
+      const itemLabel = visionReady
+        ? await Promise.race([
+            naming,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), VISION_WAIT_MS)),
+          ])
+        : null;
+      if (seq !== checkSeq.current) return;
+
+      const decision = decide({
+        predictions: averaged,
+        itemLabel,
+        visionConfigured: visionReady,
+        binBar: BIN_CONFIDENCE,
+        materialBar: MATERIAL_BAR,
+      });
+      setCheck({
+        phase: 'done',
+        identify: visionReady ? (itemLabel ? 'done' : 'unavailable') : 'idle',
+        classify: decision.status === 'uncertain' ? 'uncertain' : 'done',
+        decision,
+        crop: lastCropRef.current,
+        cropMode,
+        error: '',
+      });
+      setPredictions(averaged.slice(0, 3));
+
+      // Sara says the accepted answer once, in the language it began in.
+      void speakText(actionSentence(decision), voiceLanguage, 0.95);
+      if (decision.status === 'nothing') return;
+
+      // Only an accepted handling decision may ask the board for a lamp.
+      // Everything else is recorded as "other", which sends no INDICATE_WASTE.
+      if (acceptingRef.current) return;
+      acceptingRef.current = true;
+      try {
+        const result = await api.postRecognition({
+          category: decision.allowLamp && decision.bin ? decision.bin : 'other',
+          confidence: decision.classConfidence,
+          model: 'teachable-machine',
+          material: decision.classId ?? 'unknown',
+          top: averaged
+            .slice(0, 3)
+            .map((row) => ({ className: row.label, probability: row.confidence })),
+        });
+        if (seq !== checkSeq.current) return;
+        setRecognition(result);
+        setAlert(result.alert ?? '');
+      } finally {
+        acceptingRef.current = false;
       }
-      // The threshold applies here too.  A pressed reading used to skip it, so a
-      // three-way tie -- a handkerchief read as Leather 0.24, Paper 0.24,
-      // Background 0.22 -- was recorded and lit nothing, as if the model had
-      // chosen leather. Under the threshold the page names its best guess and
-      // asks for a better look instead.
-      //
-      // A bin is held to a higher bar than a referral (BIN_CONFIDENCE): a wrong
-      // bin has a physical consequence, a wrong "keep it separate" does not.
-      if (grouped.confidence < confidenceBar(confidence, guideFor(grouped.material ?? grouped.label))) {
-        // Too unsure to name a bin -- but "I see a clear plastic lid" is still
-        // the most useful thing on the page, so it is asked for anyway.  It
-        // never becomes a category; the card says it is not sure.
-        void nameTheItem();
-        return;
-      }
-      const event: StableEvent = {
-        label: grouped.material ?? grouped.label,
-        category: (grouped.material ?? grouped.label).trim().toLowerCase(),
-        confidence: grouped.confidence,
-        at: Date.now(),
-        material: grouped.material,
-      };
-      await accept(event);
     } catch (cause) {
-      setRecognitionError(errorMessage(cause));
+      if (seq === checkSeq.current) {
+        setCheck((old) => ({ ...old, phase: 'done', error: errorMessage(cause) }));
+      }
     } finally {
+      if (seq === checkSeq.current) setReading(false);
       busyRef.current = false;
-      setReading(false);
     }
-  }, [accept, nameTheItem]);
+  }, [actionSentence, visionReady, voiceLanguage]);
 
 
   // The model is loaded when the page opens rather than when the camera starts,
@@ -712,58 +588,42 @@ export function SortWaste() {
     return () => clearInterval(timer);
   }, [cameraOn, drawPreview]);
 
-  const recognitionId = recognition?.recognition?.id ?? recognition?.recognition_id ?? null;
-  const targetCategory =
-    recognition?.category ?? recognition?.recognition?.category ?? recognition?.indicator?.category ?? null;
-
-  const confirmDeposit = async () => {
-    if (recognitionId === null) return;
-    setDisposalError('');
-    setDisposalMessage('');
-    try {
-      await api.postDisposal(recognitionId, note);
-      setDisposalMessage('A separate deposit confirmation was recorded.');
-    } catch (cause) {
-      setDisposalError(errorMessage(cause));
-    }
+  const CLASS_KEY: Record<string, MessageKey> = {
+    organic: 'waste.item.organic',
+    plastic: 'waste.item.plastic',
+    paper: 'waste.item.paper',
+    glass: 'waste.item.glass',
+    metal: 'waste.item.metal',
+    textile: 'waste.item.textile',
+    leather: 'waste.item.leather',
+    footwear: 'waste.item.footwear',
+    thermocol: 'waste.item.thermocol',
+    ewaste: 'waste.item.ewaste',
+    background: 'waste.item.background',
   };
 
-  const top = groupedTop
-    ? { label: groupedTop.material ?? groupedTop.label, confidence: groupedTop.confidence }
-    : predictions[0];
-  // "Strong" means the bar that would actually ACCEPT this answer, not the
-  // generic referral bar.  At 60% a plastic bottle was called strong (the
-  // referral bar is 50%) and its row was highlighted while a bin needs 70%, so
-  // the page looked like it had decided and was refusing to say so (reported
-  // from the venue 2026-11-16).
-  const strong = Boolean(
-    top && !(top.label.trim().toLowerCase() === 'background') &&
-      top.confidence >= confidenceBar(confidence, guideFor(top.label)),
-  );
-  const topIsBackground = Boolean(
-    groupedTop
-      ? groupedTop.label.trim().toLowerCase() === 'background'
-      : top && top.label.trim().toLowerCase() === 'background',
-  );
-  // The camera stays on between items; there is no watcher waiting for one to
-  // be taken away, so "removing" is only ever false now.
-  const removing = false;
+  /** The class name a decision is shown with, in the page's language. */
+  const categoryName = (decision: Decision): string => {
+    const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
+    return key ? t(key) : t('sort.stateUncertain');
+  };
 
-  const resultCategory = targetCategory ? capitalise(String(targetCategory)) : null;
-  const referred = Boolean(referralLabel) || String(targetCategory ?? '').toLowerCase() === 'other';
-  const hazardous = Boolean(hazardousLabel) || String(targetCategory ?? '').toLowerCase() === 'medical';
-  const shownCategory = hazardous
-    ? (hazardousLabel ?? 'Hazardous waste')
-    : referred
-      ? (referralLabel ?? 'Recycling agent')
-      : resultCategory;
-
-  // A recommendation is a decision about the item, not about the material, so
-  // it comes from the one routing table -- and special-care waste is asked for
-  // by what it is, never by what the classifier named.
-  const disposal = recognition
-    ? guideFor(hazardous ? 'medical' : referred ? (referralLabel ?? '') : (resultCategory ?? ''))
-    : null;
+  /** Back to waiting: a new press starts a new check with a new identity. */
+  const resetCheck = useCallback(() => {
+    checkSeq.current += 1;
+    setCheck({
+      phase: 'idle',
+      identify: 'idle',
+      classify: 'idle',
+      decision: null,
+      crop: null,
+      cropMode: null,
+      error: '',
+    });
+    setRecognition(null);
+    setPredictions([]);
+    captureFileRef.current = null;
+  }, []);
 
   return (
     <div className="page sort-waste">
@@ -867,7 +727,7 @@ export function SortWaste() {
               <button
                 type="button"
                 className="btn btn--primary btn--large"
-                onClick={() => void classifyNow()}
+                onClick={() => void runCheck()}
                 disabled={!installed || modelState !== 'ready' || reading}
                 title={
                   installed && modelState === 'ready'
@@ -943,226 +803,186 @@ export function SortWaste() {
               }
             />
           )}
-          <Card
-            className="result-card"
-            kicker={
-              disposal && disposal.separate ? t('sort.kickerKeepOut') : t('sort.kickerBin')
-            }
-            title={
-              disposal
-                ? t(disposal.titleKey)
-                : removing
-                  ? t('sort.titleRemove')
-                  : naming
-                    ? t('sort.titleNaming')
-                    : reading
-                      ? t('sort.titleReading')
-                      : t('sort.titleWaiting')
-            }
-          >
-            {(reading || naming) && (
-              // The press takes a moment: three frames, the classifier, and --
-              // when one is configured -- the hosted model's name.  Saying so is
-              // the difference between "it is working" and "it has frozen".
-              <p className="hint" data-testid="waste-working">
-                {naming ? t('sort.naming') : t('sort.reading')}
+          {visionReady && (
+            <p className="hint" data-testid="waste-disclosure">
+              {t('sort.disclosure')}
+            </p>
+          )}
+          <Card className="result-card" title={t('sort.panelTitle')}>
+            {/*
+              Two models, two questions, shown as two states.  The local
+              classifier answers "what material"; the hosted model answers
+              "what is this".  Neither feeds the other, and the action below is
+              the only thing that may move an item.
+            */}
+            <div className="model-state" data-testid="waste-identify">
+              <div className="model-state-head">
+                <span className="model-state-label">{t('sort.labelIdentification')}</span>
+                <span className="model-state-source">{t('sort.sourceVision')}</span>
+              </div>
+              <p className="model-state-value" data-testid="waste-sees">
+                {check.identify === 'checking'
+                  ? t('sort.stateIdentifying')
+                  : check.identify === 'done' && check.decision?.itemLabel
+                    ? t('sort.identified', { item: check.decision.itemLabel })
+                    : t('sort.stateUnavailable')}
+              </p>
+            </div>
+
+            <div className="model-state" data-testid="waste-classify">
+              <div className="model-state-head">
+                <span className="model-state-label">{t('sort.labelClassification')}</span>
+                <span className="model-state-source">{t('sort.sourceLocal')}</span>
+              </div>
+              <p className="model-state-value" data-testid="waste-result">
+                {check.classify === 'checking'
+                  ? t('sort.stateClassifying')
+                  : check.decision
+                    ? check.classify === 'uncertain'
+                      // The class is still reported — with its uncertainty, not
+                      // instead of it.
+                      ? `${t('sort.category', { category: categoryName(check.decision) })} · ${t('sort.stateUncertain')}`
+                      : t('sort.category', { category: categoryName(check.decision) })
+                    : t('sort.stateWaiting')}
+              </p>
+            </div>
+
+            <div className="suggested-action" data-testid="waste-action">
+              <span className="suggested-label">{t('sort.labelAction')}</span>
+              <p>
+                {check.decision
+                  ? actionSentence(check.decision)
+                  : t('sort.plainBackground')}
+              </p>
+            </div>
+
+            {check.crop && (
+              <figure className="crop-thumb" data-testid="waste-crop">
+                <img src={check.crop} alt="" width={72} height={72} />
+                <figcaption>{t('sort.cropLabel')}</figcaption>
+              </figure>
+            )}
+            {check.cropMode === 'centre' && (
+              <p className="hint" data-testid="waste-crop-centre">
+                {t('sort.cropCentre')}
               </p>
             )}
-            {recognition ? (
-              <>
-                {/*
-                  The object first, the category second.  A visitor checks an
-                  answer in that order, and a wrong name is visible instead of
-                  being hidden inside a confident category -- the classifier
-                  called a plastic cap "Ewaste", the namer "clear plastic lid".
-                  With no hosted model configured this is exactly the old card.
-                */}
-                {objectName && (
-                  <p className="result-big" data-testid="waste-sees">
-                    {t('sort.sees', { object: objectName })}
-                  </p>
-                )}
-                <p className={objectName ? 'result-sub' : 'result-big'} data-testid="waste-result">
-                  {objectName ? t('sort.classifierSays', { category: shownCategory ?? '' }) : shownCategory}
-                </p>
-                <p className="result-sub" data-testid="waste-destination">
-                  {disposal ? (
-                    <>
-                      <strong>
-                        {disposal.separate
-                          ? t(disposal.titleKey)
-                          : t('sort.putInBin', { bin: t(disposal.titleKey) })}
-                        .
-                      </strong>{' '}
-                      {t(disposal.reasonKey)}
-                    </>
-                  ) : (
-                    t('sort.noDestination')
-                  )}
-                </p>
-                {recognition.led_note && (
-                  <p className="hint" data-testid="waste-led-note">
-                    {recognition.led_note}
-                  </p>
-                )}
-                {disposal?.support && (
-                  <p className="hint" data-testid="waste-support">
-                    {SUPPORT.contact
-                      ? `${t('sort.contactSahayak')}: ${SUPPORT.contact}`
-                      : t('sort.supportDesk')}
-                  </p>
-                )}
-                {alert && <Notice tone="warn">{alert}</Notice>}
-                <CardActions
-                  onScanAnother={() => {
-                    setRecognition(null);
-                    setPredictions([]);
-                    setCorrection('');
-                    captureFileRef.current = null;
-                    stabilizerRef.current.reset();
-                  }}
-                  support={SUPPORT}
-                />
-                <p className="hint">{t('sort.notProof')}</p>
-                {captureFileRef.current && (
-                  <div className="correction-row" data-testid="waste-correction">
-                    {correction ? (
-                      <p className="hint">{correction}</p>
-                    ) : (
-                      <>
-                        <span className="correction-prompt">{t('sort.wrongItWas')}</span>
-                        {(
-                          [
-                            ['organic', t('sort.correctOrganic')],
-                            ['plastic', t('sort.correctPlastic')],
-                            ['paper', t('sort.correctPaper')],
-                            ['separate', t('sort.correctSeparate')],
-                          ] as const
-                        ).map(([actual, label]) => (
-                          <button
-                            key={actual}
-                            type="button"
-                            className="chip chip--neutral correction-chip"
-                            data-testid={`correct-${actual}`}
-                            onClick={() => {
-                              const file = captureFileRef.current;
-                              if (!file) return;
-                              void api
-                                .wasteCorrect(file, actual)
-                                .then(() => {
-                                  setCorrection(t('sort.correctionThanks', { label }));
-                                })
-                                .catch((cause: unknown) => {
-                                  setCorrection(errorMessage(cause));
-                                });
-                            }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                )}
-                {!cameraOn && (
-                  <p className="hint" data-testid="waste-camera-stopped">
-                    {t('sort.cameraStopped')}
-                  </p>
-                )}
-              </>
-            ) : !recognition && !top ? (
-              <>
-                {/*
-                  Sara used to say this out loud as soon as the page opened, which
-                  is a greeting nobody asked for and a voice competing with the
-                  camera.  The same sentence is now on the card, where the answer
-                  appears, and it goes as soon as there is an item to report.
-                */}
-                <p className="result-sub" data-testid="waste-guidance">
-                  {LIA_COPY[voiceLanguage].wasteWelcome}
-                </p>
-                <p className="result-sub" data-testid="waste-press-hint">
-                  {t('sort.pressHint')}
-                </p>
-              </>
-            ) : removing ? (
-              <p className="result-sub" data-testid="waste-remove">
-                {t('sort.removeHint')}
+
+            {check.error && <Notice tone="bad">{check.error}</Notice>}
+            {recognition?.led_note && (
+              <p className="hint" data-testid="waste-led-note">
+                {recognition.led_note}
               </p>
-            ) : cameraOn ? (
-              <>
-                <p className="result-sub">
-                  {top
-                    ? topIsBackground
-                      ? t('sort.nothingToSort')
-                      : strong
-                        ? t('sort.lookingAt', { item: displayName(top.label) })
-                        : t('sort.notSure', {
-                            percent: Math.round(confidenceBar(confidence, guideFor(top.label)) * 100),
-                            frames: stabilityFrames,
-                          })
-                    : t('sort.waitingSee')}
-                </p>
-                {objectName && !recognition && (
-                  // Named but not sorted: the page may not choose a bin under the
-                  // bar, so the name is what it can honestly give.
-                  <p className="result-sub" data-testid="waste-sees-unsure">
-                    {t('sort.sees', { object: objectName })}
-                  </p>
-                )}
-              </>
-            ) : cameraOn && previewOnly ? (
-              <p className="result-sub" data-testid="waste-preview-only">
-                {t('sort.previewOnlyNote')}
+            )}
+            {alert && <Notice tone="warn">{alert}</Notice>}
+            {!connected && !demo && (
+              <p className="hint" data-testid="waste-lamp-unavailable">
+                {t('sort.lampUnavailable')}
               </p>
-            ) : (
-              <p className="result-sub">{t('sort.startThenShow')}</p>
             )}
 
-            {recognitionError && <Notice tone="bad">{recognitionError}</Notice>}
-
-            {recognition && (
-              <details className="advanced">
-                <summary>
-                  {hazardous
-                    ? t('sort.recordSahayak')
-                    : referred
-                      ? t('sort.recordRecycling')
-                      : t('sort.recordBin')}
-                </summary>
-                <div className="advanced-body">
+            <details className="advanced">
+              <summary>{t('sort.confidenceDetails')}</summary>
+              <div className="advanced-body">
+                <p className="hint">
+                  {t('sort.sourceVision')}: {modelStatus.data?.vision?.model ?? t('sort.stateUnavailable')}
+                </p>
+                <p className="hint">{t('sort.sourceLocal')}: resnet50</p>
+                {check.decision && (
                   <p className="hint">
-                    {t('sort.depositHint')}
+                    {check.decision.routeId} · {Math.round(check.decision.classConfidence * 100)}% ·{' '}
+                    {check.decision.reasonId}
                   </p>
-                  <label className="field">
-                    <span>{t('sort.note')}</span>
-                    <input
-                      className="input"
-                      value={note}
-                      maxLength={200}
-                      onChange={(event) => setNote(event.target.value)}
-                      placeholder={t('sort.notePlaceholder')}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--small"
-                    onClick={() => void confirmDeposit()}
-                    disabled={recognitionId === null || Boolean(disposalMessage)}
-                  >
-                    <IconCheck size={15} />{' '}
-                    {hazardous
-                      ? t('sort.confirmReported')
-                      : referred
-                        ? t('sort.confirmHanded')
-                        : t('sort.confirmDeposited')}
-                  </button>
-                  {disposalMessage && <p className="ok-text">{disposalMessage}</p>}
-                  {disposalError && <p className="error-text">{disposalError}</p>}
-                </div>
-              </details>
+                )}
+                {predictions.length === 0 ? (
+                  <p className="hint">No predictions yet.</p>
+                ) : (
+                  <ul className="prediction-list">
+                    {predictions.map((row) => (
+                      <li key={row.label}>
+                        <span>{row.label}</span>
+                        <span>{Math.round(row.confidence * 100)}%</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
+
+            {operatorMode && captureFileRef.current && (
+              <div className="correction-row" data-testid="waste-correction">
+                {correction ? (
+                  <p className="hint">{correction}</p>
+                ) : (
+                  <>
+                    <span className="correction-prompt">{t('sort.wrongItWas')}</span>
+                    {(
+                      [
+                        ['organic', t('sort.correctOrganic')],
+                        ['plastic', t('sort.correctPlastic')],
+                        ['paper', t('sort.correctPaper')],
+                        ['separate', t('sort.correctSeparate')],
+                      ] as const
+                    ).map(([actual, label]) => (
+                      <button
+                        key={actual}
+                        type="button"
+                        className="chip chip--neutral correction-chip"
+                        data-testid={`correct-${actual}`}
+                        onClick={() => {
+                          const file = captureFileRef.current;
+                          if (!file) return;
+                          void api
+                            .wasteCorrect(file, actual)
+                            .then(() => setCorrection(t('sort.correctionThanks', { label })))
+                            .catch((cause: unknown) => setCorrection(errorMessage(cause)));
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
             )}
+            <CardActions onScanAnother={resetCheck} support={SUPPORT} />
+            <p className="hint">{t('sort.plainBackground')}</p>
           </Card>
+
+          {/*
+            The help that used to be a row of buttons.  It is text, because it
+            is guidance about waste, not a claim that the model recognises a new
+            class — and it is collapsed, because the card already answers the
+            common case.
+          */}
+          <details className="waste-guide" data-testid="waste-guide">
+            <summary>{t('sort.guideTitle')}</summary>
+            <div className="waste-guide-body">
+              <p className="hint">{t('sort.guideDemo')}</p>
+              <ul>
+                {[
+                  'sort.guideWet',
+                  'sort.guidePaper',
+                  'sort.guidePlastic',
+                  'sort.guideGlass',
+                  'sort.guideMetal',
+                  'sort.guideTextile',
+                  'sort.guideThermocol',
+                  'sort.guideEwaste',
+                  'sort.guideBattery',
+                  'sort.guideSanitary',
+                  'sort.guidePencil',
+                  'sort.guideSharps',
+                  'sort.guideSpecial',
+                  'sort.guideOtherDry',
+                  'sort.guideUnknown',
+                ].map((key) => (
+                  <li key={key}>{t(key as MessageKey)}</li>
+                ))}
+              </ul>
+              <p className="hint">{t('sort.guideLocal')}</p>
+            </div>
+          </details>
 
           {modelStatus.error ? (
             <Notice tone="warn" title={t('sort.modelStatusUnknown')}>
@@ -1183,69 +1003,6 @@ export function SortWaste() {
             </Notice>
           ) : null}
 
-          <details className="advanced">
-            <summary>{t('sort.confidenceDetails')}</summary>
-            <div className="advanced-body">
-              <div className="prediction-meta">
-                <span>Confidence threshold {Math.round(confidence * 100)}%</span>
-                <span>{stabilityFrames} frames to accept</span>
-                <span>Auto-crops the item on the backdrop</span>
-              </div>
-              {predictions.length === 0 ? (
-                <p className="hint">No predictions yet.</p>
-              ) : strong || topIsBackground ? (
-                // The per-class readout is shown only when the page has reached a
-                // decision.  While it is unsure this list was the only place a
-                // material was still named ("Thermocol 74%") about a crop that is
-                // mostly a face -- reported from the venue as the app insisting on
-                // thermocol when it had in fact chosen nothing.
-                <ul className="prediction-list">
-                  {predictions.map((row) => (
-                    <li
-                      key={row.label}
-                      className={cx(
-                        // The bar that would ACCEPT this row.  It used to be the
-                        // generic referral bar, so a Plastic row at 60% was
-                        // highlighted while a bin needs 70% -- which reads as "it
-                        // knows it is plastic but says nothing" (2026-11-16).
-                        (row.confidence >= confidenceBar(confidence, guideFor(row.label)) ||
-                          (strong && groupedTop?.material === row.label)) &&
-                          'is-strong',
-                      )}
-                    >
-                      <div className="prediction-head">
-                        <span>{displayName(row.label)}</span>
-                        <span className="prediction-value">{Math.round(row.confidence * 100)}%</span>
-                      </div>
-                      <div className="prediction-bar">
-                        <span style={{ width: `${Math.min(100, Math.max(0, row.confidence * 100))}%` }} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="camera-controls">
-                {installed && modelState !== 'ready' && (
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--small"
-                    onClick={() => void loadModel()}
-                    disabled={modelState === 'loading'}
-                  >
-                    <IconRefresh size={14} /> {modelState === 'loading' ? 'Loading model…' : 'Load model'}
-                  </button>
-                )}
-              </div>
-              <p className="hint">
-                Model folder <code>{base}</code>. Recognition settings live in{' '}
-                <Link to="/setup#voice-camera">Setup</Link>.
-              </p>
-              <p className="hint">
-                <IconInfo size={13} /> Camera frames stay in this browser tab. Only the recognised
-                label and its confidence are posted to the local backend.
-              </p>
-            </div>
-          </details>
 
           <details className="advanced">
             <summary>{t('sort.howItWorks')}</summary>

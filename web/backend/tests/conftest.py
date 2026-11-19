@@ -97,6 +97,9 @@ def make_settings(tmp_path: Path) -> Settings:
         # A venue correction writes into this tree, so keep it inside tmp_path
         # rather than next to the repository's real samples.
         waste_capture_dir=tmp_path / "captures",
+        # The capture log is a training aid and is off by default; these tests are
+        # about that log, so they turn it on.  One test below checks the default.
+        waste_save_crops=True,
         waste_samples_dir=tmp_path / "samples",
         # The last few voice recordings are written on every transcription, so
         # the suite must never write into the exhibit's own `data/voice-clips`.

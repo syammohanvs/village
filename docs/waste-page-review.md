@@ -1,172 +1,215 @@
 # The Sort Waste page — a briefing for review
 
-*Written 2026-11-19 for an AI reviewer. Everything here is measured or read out
-of the code; nothing is aspirational. Where a number is a limit, it is stated as
-one.*
+*Rewritten 2026-11-19 after the review of the two-model pipeline. Everything here
+is measured or read out of the code; the limits are stated as limits.*
 
 ## 1. What the page is for
 
-The exhibit has **three physical bins** — organic, plastic, paper/cardboard —
-each with one indicator LED (D21 green, D22 red, D23 blue). A visitor holds an
-item up to a camera, presses **Check the item**, and the page says **what it is**
-and **where it goes**, out loud in English, Hindi or Malayalam.
+Three physical bins — wet (organic), plastic, paper/cardboard — each with one
+indicator LED (D21 green, D22 red, D23 blue). A visitor puts one item on a plain
+red, green or white sheet, presses **Check the item**, and the page says **what
+it is**, **what the local model thinks it is made of**, and **what to do with
+it**, out loud in English, Hindi or Malayalam.
 
-It is **an aid, not the authority**: the card on the right already lists what
-goes where, and the wording for special items. The camera exists for someone who
-cannot read that, or wants a quick answer. That is why the page has three
-controls and nothing else.
+It is an **aid, not the authority**: the card says so itself, and a collapsed
+guidance section under it covers everything the three bins do not.
 
-## 2. What a visitor sees
+## 2. The two models, kept apart on purpose
+
+```
+                    ┌─────────────────────────────────────────┐
+   one press ──────►│ local ResNet50     ~70 ms   11 classes  │──► material + scores
+                    │ (this laptop, no internet)              │
+                    └─────────────────────────────────────────┘
+                    ┌─────────────────────────────────────────┐
+                    │ cloud vision model  ~1 s    a NAME      │──► "clear plastic lid"
+                    │ (Workers AI, one 224 crop per press)    │
+                    └─────────────────────────────────────────┘
+                                      │
+                                      ▼
+                    ┌─────────────────────────────────────────┐
+                    │ decision (wasteDecision.ts)             │
+                    │  accepted · uncertain · conflict · none │
+                    └─────────────────────────────────────────┘
+                                      │
+                        only "accepted" may open a bin
+```
+
+- **They run in parallel and neither feeds the other.** The namer is not an input
+  to ResNet50; the classifier is not an input to the namer. The page says so in
+  the panel ("Cloud vision model" / "Local ResNet50") and in the docs.
+- **The decision waits for both**, or for the namer's 4 s cap, before anything
+  physical happens. A bin is never lit and then reconsidered.
+- **Only an accepted handling decision** posts a bin category; everything else is
+  recorded as `other`, which sends no `INDICATE_WASTE`. A raw classifier result
+  never lights a lamp.
+
+## 3. What a visitor sees
 
 ```
   [ Camera: USB Video Device ▾ ]   [ Start camera ]   [ Check the item ]
-  ┌───────────────────────────┐   ┌──────────────────────────────────────┐
-  │                           │   │  I see: clear plastic lid            │
-  │      live camera          │   │  My classifier says: Plastic         │
-  │   (whole frame, uncropped)│   │  Put it in the plastic bin.          │
-  │                           │   │  ○ organic  ● plastic  ○ paper       │
-  └───────────────────────────┘   └──────────────────────────────────────┘
+  ┌──────────────────────┐   ┌──────────────────────────────────────────────┐
+  │   live camera        │   │  Item identification      Cloud vision model │
+  │                      │   │    Item identified: clear plastic lid        │
+  │                      │   │  Waste classification     Local ResNet50     │
+  │                      │   │    Waste category: Plastic                   │
+  │                      │   │  ─────────────────────────────────────────   │
+  │                      │   │  Suggested action                            │
+  │                      │   │    Use the plastic bin.                      │
+  └──────────────────────┘   └──────────────────────────────────────────────┘
+      [ 72 px crop of what was read ]     [ technical details ▸ ]
+      [ Other waste or unsure where it goes? ▸ ]
 ```
 
-States of the card, in order:
-
-| state | card says |
-| --- | --- |
-| camera off | the welcome sentence and *“Hold the item up and press Check the item.”* |
-| camera on, nothing read | *“Waiting for the camera to see something.”* |
-| pressed, reading | title **Reading the item…**, line *“Hold the item still — I am reading three frames.”* |
-| naming | title **Naming the item…**, line *“Asking the camera what this is…”* |
-| accepted | **I see: …** (if a namer is configured) then **My classifier says: X** and the instruction; a bin lamp lights |
-| under the bar | *“Not sure what this is — a bin needs 70% on 2 frames in a row.”* plus **I see: …** if a name came back; nothing recorded |
-| nothing shown | *“Nothing to sort — this does not look like waste.”* |
-| network/board failure | the error in place, and the card still says what it knows |
-
-## 3. The interaction, step by step
-
-1. The operator picks a camera once. The choice is remembered per browser and the
-   list refreshes when a camera is plugged in. Device names only appear after the
-   page has been allowed a camera once (a browser rule, and the page says so).
-2. **Start camera** acquires the stream (`getUserMedia`, a ladder that tolerates a
-   missing rear camera or a vanished deviceId), waits for a real frame, and keeps
-   the camera on until **Stop camera**.
-3. The visitor places the item on the **red, green or white sheet** and presses
-   **Check the item**.
-4. Three frames are read 250 ms apart and averaged, so a wobble cannot decide.
-5. The card fills in as described above; Sara says the sentence.
-6. The camera stays on. The next item is one press away.
+States per row: identification — *waiting / AI is identifying the item / Item
+identified … / Item identification unavailable*; classification — *waiting /
+checking the material / Waste category … / … · Not certain*. Exact provider and
+model names, the per-class scores and the internal route id live in the
+collapsed technical details.
 
 ## 4. What happens on a press
 
-```
-video frame (160×120)  ──►  backdrop.ts: find the item on the sheet
-                              │  (sheet colour = median of a 3-px border band;
-                              │   item = pixels >48/channel from it; box grown
-                              │   12 %, squared; refuses if <2 %, >85 %, or the
-                              │   scene has no plain backdrop)
-                              ▼
-                     224×224 JPEG q=0.92  ──►  POST /api/v1/waste/classify
-                              │                   ResNet50, 11 classes, 50–85 ms
-                              │                   (the crop is kept for training)
-                              ▼
-                    group by action  ──►  accept?  ──►  POST /api/v1/waste/recognition
-                              │                               │
-                              │                               ├─ stored in `recognitions`
-                              │                               └─ INDICATE_WASTE → board
-                              ▼
-              POST /api/v1/waste/identify  (the same crop, in parallel)
-              Cloudflare Workers AI, llama-3.2-11b-vision, ~1 s, 4 s cap,
-              cached by crop hash — a NAME only, never a bin
-```
+1. **One check identity.** `checkSeq` is incremented; every result carries it.
+   A late answer, or a frame that finished after the button was pressed again, is
+   **dropped** — it cannot change the action, the record or the lamp.
+2. Three frames, 250 ms apart, averaged. They are **related observations, not
+   three independent confirmations**; the bar is what decides, not the count.
+3. Each frame is cropped by `lib/backdrop.ts` (the sheet's colour from a 3-px
+   border band, the item is what differs from it, box grown 12 % and squared) or
+   by the **centre square** when there is no plain backdrop — and the centre
+   fallback is **shown**, not hidden, with the guide square on the preview.
+4. The first crop goes to the classifier and, in parallel, to the namer.
+5. `decide()` combines them. Only `status: accepted` with a bin may open a lamp.
+6. One `POST /waste/recognition` per check (guarded by `acceptingRef`), and Sara
+   speaks the action **once**.
 
-## 5. The decision rules
+## 5. The decision rules (`web/frontend/src/lib/wasteDecision.ts`)
 
-The classifier has **11 classes**; the page turns them into **four outcomes**:
+Order matters, and it is the safety argument:
 
-| class | outcome | lamp |
+| step | rule | result |
 | --- | --- | --- |
-| Organic | organic bin | D21 |
-| Plastic | plastic bin | D22 |
-| Paper | paper/cardboard bin | D23 |
-| Glass, Metal, Textile, Leather, Footwear, Thermocol | hand to the recycling agent / keep separate | none |
-| Ewaste | keep separate, authorised e-waste collection | none |
-| Background | nothing to sort, nothing recorded | none |
+| 1 | background / unknown class | **nothing to sort**, nothing recorded |
+| 2 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" |
+| 3 | the name states a different material than the chosen route (metal pipe vs Plastic, pencil vs Paper, cardboard vs Organic, plastic lid vs Ewaste) | **conflict** — no bin |
+| 4 | a bin under **70 %** on its own class | **uncertain** — no bin, "keep separate and ask" |
+| 5 | a bin at/over 70 %, identification present | **accepted** — the lamp may light |
+| 6 | a material at/over **50 %** | its own collection route (e-waste ≠ metal ≠ glass), no lamp |
+| 7 | anything else | **uncertain** — "keep this item separate and ask" |
 
-- **A bin needs 70 %** on its own class (`BIN_CONFIDENCE`) — a wrong bin has a
-  physical consequence.
-- **A referral needs 50 %**, and the seven recycler materials are grouped into one
-  action: Ewaste 45 % + Metal 35 % is “recycling” at 80 %, named by the stronger
-  material.
-- **Below the bar nothing is recorded and no lamp lights.** The page names its best
-  guess and the bar it missed, so the operator can improve the framing.
-- Routing is decided by `wasteGuide.ts` from the **English** label only, so
-  switching the page to Hindi cannot change where an item is sent.
+**There is no grouping by outcome any more.** Ewaste 45 % + Metal 35 % is *not*
+80 % recycling: the decision uses the strongest class's own probability. Two
+materials are never added together, and a sum is never presented as confidence in
+a material. `wasteActions.ts` (the old grouping) is no longer used by the page.
 
-## 6. What it deliberately does not do
+**Degraded mode.** If a namer is configured but answers nothing (timeout, quota,
+offline), a bin is **not** lit: the page says *"Item identification unavailable.
+Ask the Gram Sahayak before using a bin."* — the category is still shown, the
+action is not taken. A deployment with **no namer at all** keeps the documented
+local-only policy and accepts bins on the classifier alone.
 
-- **It does not measure bin fullness.** Three LEDs, no distance sensor. The card
-  says so.
-- **It does not identify people, weight, or prove an item was binned.**
-- **It does not let the vision model choose a bin.** Measured on the venue's 241-photo
-  probe: local ResNet50 **74.7 % exact / 82.6 % item-action**; the hosted model
-  **53.7 % / 75.6 %**. The name is context for the visitor, the category is local.
-- **It does not guess when the scene is not a booth.** With no plain sheet (a wooden
-  table) the auto-crop refuses and the middle square is used, which is what the
-  page always did.
+## 6. Provider chain
 
-## 7. Data and privacy
+`VILLAGE_CF_API_TOKEN`, `VILLAGE_CF_API_TOKEN_2`, … (each with its own account id,
+resolved from the token when blank) are tried in order and the choice is
+**sticky**: once account 1 answers quota, the session stays on account 2. If every
+Workers AI account is spent, `VILLAGE_VISION_API_KEY` (DeepSeek on OpenCode Go,
+~7 s) is the last resort, so the exhibit gets an answer rather than
+"unavailable". `status().chain` reports how many chances there are.
 
-- **Every crop the classifier judged is kept** in `data/waste-captures/`, bounded
-  at 20 000 files with an index; a misread is one press from becoming training
-  data (**Wrong? It was…** → `POST /api/v1/waste/correction` → `data/waste-samples/<Class>/`).
-- **No audio is kept by this page.** Voice is a different page (Talk to Sara).
-- **With a hosted namer configured, the 224 square is sent to Cloudflare** and a
-  name comes back. The panel says so, in the reader's language, **only when one is
-  configured**; on a deployment with no key the note is absent and nothing leaves
-  the machine.
-- The page records a recognition (category, material, confidence, top-3) in
-  `data/village.db`.
+## 7. Measured behaviour — the numbers to judge this by
 
-## 8. Language and accessibility
+`scripts/waste/evaluate_pipeline.py`, 241 held-out probe photos, the served
+checkpoint:
 
-- **English · हिन्दी · മലയാളം**, one selector for the page *and* Sara's voice.
-- Every sentence is a key in `messages.ts`; the three languages are checked for
-  completeness and for matching `{placeholders}` by a test.
-- The answer is **spoken** as well as written: the object first, then the
-  instruction (`/api/v1/voice/speak`, Piper).
-- Numbers and units are never translated; only the words around them.
+| | value |
+| --- | --- |
+| exact class | **74.7 %** (180/241) |
+| item action | **82.6 %** (199/241) |
+| **abstentions** (page would say "not sure") | **92** (38 %) |
+| **false bins** (a bin for another material) | **25** (10 %) |
 
-## 9. Known limits and open questions — the honest list
+Per class: Plastic 85.0 %, Paper 84.7 %, Ewaste 82.5 %, Leather 80.0 %,
+Thermocol 55.6 %, Glass 53.8 %, **Metal 17.6 %** (Metal is read as Ewaste 10
+times, Paper 1, Thermocol 1). False bins include Glass→Plastic at 0.82 and 0.80,
+Ewaste→Paper 0.73, Leather→Paper 0.71, Metal→Paper 0.65, Metal→Plastic 0.58.
 
-1. **The classifier is a material classifier at 74.7 % exact.** Its weakest class
-   is **Metal** (0/6 on a probe sample, and `data/waste-samples/Metal/` held no
-   photos until 2026-11-19). A metal pipe is read as Plastic.
-2. **The namer is good, not reliable**: 3 of 4 unambiguous venue items named
-   correctly, ~1 s each; a torn brown cardboard piece is called “bread” by every
-   model tried (the operator judged the item itself ambiguous).
-3. **Auto-crop needs the sheet.** On a busy scene it falls back to the centre
-   square; the sheet's colour does not matter, but a pattern or a wooden table
-   defeats it.
-4. **The pencil / sanitary / sharps routes have no button any more** (removed for
-   simplicity, 2026-11-19). The rules remain in `wasteGuide.ts`; nothing on the
-   page asks the visitor for them.
-5. **A name that arrives after 4 s is shown but not spoken**, to keep the answer
-   prompt.
+**No accuracy has been improved in this round.** Metal did not move: the metal
+pipe added to `data/waste-samples` is one training photo, and the probe is
+untouched by design (training never sees it). Adding photos of one object to this
+pipeline has already been measured to move the probe *down* (a two-photo retrain
+took it from 74.7 % to 73.0 %), so the honest statement is: **Metal needs a batch
+of venue photos and a probe comparison, not a threshold change.**
 
-## 10. Where to look
+**Why the false-bin number matters:** 25 of 241 photos would have opened the
+wrong physical bin with the local model alone. That is exactly the case the namer
+and the conflict rules exist for — and exactly why a deployment with no namer is
+a deliberate, documented choice rather than the default.
+
+## 8. Guidance below the page (restored)
+
+A collapsed **"Other waste or unsure where it goes?"** section carries, in all
+three languages: wet waste (damp ≠ wet waste), paper (pencils are not paper),
+plastic (chemical containers separate), glass (broken glass; bulbs are not
+ordinary glass), metal (batteries and contaminated containers excepted), textile/
+leather/footwear (reuse, repair, donate, else local route), thermocol (check
+acceptance; no recyclability promise), e-waste, batteries, sanitary waste,
+pencils, sharps (never handle for a demonstration), special-care waste, other dry
+waste, and unknown/several items/closed bags. It closes with *"Our three
+demonstration bins do not cover every waste type"* and *"Recycling depends on the
+item and on the collection facilities near you."*
+
+**There is no physical "Other" bin**, and the guidance is text — it is not a
+claim that the model recognises a new class.
+
+## 9. Data handling
+
+- **Every judged crop is kept only if an operator turns it on**
+  (`VILLAGE_WASTE_SAVE_CROPS=1`, **off by default**). Visitor presses do not
+  silently write pictures to disk; the retention limit and the delete path are
+  the existing capture folder (`VILLAGE_WASTE_CAPTURE_KEEP`, the Data page's
+  capture list).
+- **Corrections are an operator action**: `?operator=1` on the page reveals the
+  **Wrong? It was…** row. A visitor never writes into `data/waste-samples/`.
+- **The disclosure is shown before any cloud call**, in the reader's language:
+  *"When you press Check the item, a cropped picture is sent to our configured
+  cloud AI service for identification. Waste classification runs on this laptop."*
+- Only the 224 crop is sent — never the stream.
+- **No claim is made about provider-side retention or deletion.** The panel does
+  not promise either.
+- The recognition metadata (category, material, confidence, top-3) is stored in
+  `data/village.db`, separately from any image.
+
+## 10. Honest limits — the list a reviewer should attack
+
+1. **Metal is 17.6 %** on the probe (mostly read as Ewaste) and the pipe was read
+   as Plastic at the venue. One photo does not fix a class.
+2. **25 false bins in 241 probe photos** with the local model alone — the reason
+   degraded mode refuses to light a bin.
+3. **The namer is fallible**: it calls a torn brown cardboard piece "bread"
+   (a human would too), and it named a pipe "foam roller". Its 4 s cap trades
+   completeness for a prompt answer.
+4. **Auto-crop needs the plain sheet**; on a busy scene it falls back to the
+   centre square, which the page now says out loud.
+5. **The conflict rules are a small, conservative word list** — they catch the
+   cases listed in §5 and **cannot detect every hazardous or misclassified
+   object**. They are a demonstration aid, not a waste authority.
+6. **No physical lamp is claimed without the board**: the lamp state comes from
+   the board's own telemetry, and with the ESP32 disconnected the page says
+   *"Physical indicator unavailable"* while the answer still stands.
+
+## 11. Where to look
 
 | file | what it owns |
 | --- | --- |
-| `web/frontend/src/pages/SortWaste.tsx` | the page: camera, press, card, speech |
-| `web/frontend/src/lib/backdrop.ts` | finding the item on the sheet (6 unit tests) |
-| `web/frontend/src/lib/wasteGuide.ts` | the routing table: label → destination + sentence |
-| `web/frontend/src/lib/wasteActions.ts` | the seven recycler labels grouped into one action |
-| `web/frontend/src/lib/messages.ts` | every visitor-facing sentence, three languages |
-| `web/backend/app/waste_resnet.py` | the local classifier, the crop log, the learning loop |
-| `web/backend/app/vision.py` | the hosted namer (name only), cache, 8 s timeout |
+| `web/frontend/src/pages/SortWaste.tsx` | camera, press, the two-model panel, speech |
+| `web/frontend/src/lib/wasteDecision.ts` | the decision (19 unit tests) |
+| `web/frontend/src/lib/backdrop.ts` | finding the item on the sheet (6 tests) |
+| `web/frontend/src/lib/messages.ts` | every sentence, three languages |
+| `web/backend/app/waste_resnet.py` | local classifier, crop log (off by default) |
+| `web/backend/app/vision.py` | provider chain, name only, cache, 8 s timeout |
 | `web/backend/app/main.py` | `/waste/classify`, `/waste/identify`, `/waste/recognition`, `/waste/correction` |
-| `scripts/waste/*.py` | training, evaluation, the labeller |
-| `docs/waste-model.md` | how the model was built and what it scores |
+| `scripts/waste/evaluate_pipeline.py` | the table in §7 |
+| `scripts/waste/vision_bench.py` | naming accuracy per model |
 
-Tests: **412 frontend** (vitest + jsdom, including the page driven end to end) and
-**160 backend** (pytest, including the namer's cache, failure and unconfigured
-paths).
+Tests: **427 frontend**, **162 backend**.

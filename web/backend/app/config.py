@@ -114,6 +114,7 @@ class Settings:
     # afterwards.  Empty disables it.
     waste_capture_dir: Path | None
     waste_capture_keep: int
+    waste_save_crops: bool
     # Where a corrected crop is filed, one folder per class.  This is the tree
     # `train_handheld_head.py --extra-train` reads, so a venue mistake becomes a
     # training photo with one press.
@@ -208,6 +209,10 @@ class Settings:
             waste_capture_dir=_capture_dir("VILLAGE_WASTE_CAPTURE_DIR",
                                           root / "data" / "waste-captures"),
             waste_capture_keep=_int("VILLAGE_WASTE_CAPTURE_KEEP", 20000),
+            # Keeping every judged crop is a *training* decision, so it is off
+            # unless an operator turns it on.  A visitor's frames are not
+            # silently retained by default.
+            waste_save_crops=_bool("VILLAGE_WASTE_SAVE_CROPS", False),
             waste_samples_dir=_path("VILLAGE_WASTE_SAMPLES_DIR",
                                     root / "data" / "waste-samples"),
             auth_enabled=_bool("VILLAGE_AUTH_ENABLED", True),
