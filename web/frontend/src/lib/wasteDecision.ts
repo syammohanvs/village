@@ -53,6 +53,8 @@ export type ReasonId =
   | 'specialCare'
   | 'identificationMissing'
   | 'named'
+  /** Still useful (a pencil, a crayon, an eraser): no bin, nothing to sort. */
+  | 'reuse'
   | 'unnamed'
   | 'unsupported';
 
@@ -175,6 +177,16 @@ const SPECIAL_CARE: { words: string[]; reason: ReasonId }[] = [
  * stay material questions, where the material word decides and a model
  * disagreement is never a reason to refuse.
  */
+/**
+ * Objects that are **not waste yet** — still useful, and in none of our bins.
+ *
+ * A pencil is the exhibit's own example (wood, graphite and clay, with paint, a
+ * metal band and an eraser), and the sentence for it is not "keep it separate":
+ * the honest advice is to keep using it.  A crayon and an eraser fail the same
+ * way, so they share the route and the sentence.
+ */
+const REUSE_WORDS = ['pencil', 'crayon', 'eraser'];
+
 const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
   {
     route: 'collect.ewaste',
@@ -186,7 +198,7 @@ const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
     ],
   },
   // Still useful after its working life, and in none of the three bins.
-  { route: 'separate.unknown', words: ['pencil', 'crayon', 'eraser'] },
+  { route: 'separate.unknown', words: REUSE_WORDS },
   // A business card is paper by definition, and it is what the exhibit's own
   // Paper samples are.  Only the two-word name is here: the bare word "card"
   // could be a credit card, which is electronic, and an object route would send
@@ -289,6 +301,11 @@ export function specialCareOf(itemLabel: string | null): ReasonId | null {
  * Checked before any material word, on purpose: "Remote control made of
  * plastic" is e-waste, and only a photograph of a casing could say otherwise.
  */
+export function isReuseItem(itemLabel: string | null): boolean {
+  if (!itemLabel) return false;
+  return hasWord(fold(itemLabel), REUSE_WORDS);
+}
+
 export function objectRouteOf(itemLabel: string | null): RouteId | BinId | null {
   if (!itemLabel) return null;
   const text = fold(itemLabel);
@@ -482,7 +499,7 @@ export function decide(input: DecisionInput): Decision {
       classId: null,
       classConfidence: 0,
       source: 'vision',
-      reasonId: 'named',
+      reasonId: isReuseItem(input.itemLabel) ? 'reuse' : 'named',
       allowLamp: false,
     };
   }

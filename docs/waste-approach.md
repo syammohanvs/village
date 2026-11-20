@@ -251,7 +251,10 @@ Model disagreement alone never refuses an answer: the route is the name's word,
 or the classifier's own threshold when there is no word.
 
 **Object before material** is what makes a plastic remote e-waste, a metal watch
-e-waste, and a pencil "none of the bins". The object list is deliberately small
+e-waste, and a pencil "none of the bins". **A pencil, a crayon and an eraser are
+"not waste yet"** and get the reuse advice ("Use it for as long as possible…"),
+not the ordinary referral: they are still useful, and there is nothing to sort.
+The object list is deliberately small
 — a word belongs in it only if it has a route **of its own**; `keychain` and
 `bottle` are not there, because either can be three materials, so they are left
 to the material word rather than guessed from the object.

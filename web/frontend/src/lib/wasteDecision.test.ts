@@ -124,6 +124,20 @@ describe('the item name decides, and the classifier is the fallback', () => {
     // own guess must not be filed as training data under a name-derived label.
     expect(decision.classId).toBeNull();
     expect(decision.localClassId).toBe('Paper');
+    // Still useful, so the page can say that rather than "keep it separate".
+    expect(decision.reasonId).toBe('reuse');
+  });
+
+  it('gives a crayon and an eraser the same still-useful route as a pencil', () => {
+    for (const name of ['blue crayon', 'white eraser', 'red pencil with a blue eraser']) {
+      const decision = named(name, 'Plastic', 0.9);
+      expect(decision.reasonId).toBe('reuse');
+      expect(decision.bin).toBeNull();
+      expect(decision.allowLamp).toBe(false);
+    }
+    // A named object that is *not* still useful keeps 'named', so the two
+    // sentences stay apart.
+    expect(named('business card', 'Plastic', 0.9).reasonId).toBe('named');
   });
 
   it('keeps a special-care cue before everything else', () => {

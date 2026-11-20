@@ -851,6 +851,14 @@ export const MESSAGES = {
     'बिन पता है? तो ठीक है। पक्का नहीं? चीज़ कैमरे के सामने दिखाएँ, मैं मदद करूँगी।',
     'ബിൻ അറിയാമോ? എങ്കിൽ ഇട്ടേക്കാം. ഉറപ്പില്ലേ? വസ്തു ക്യാമറയ്ക്ക് മുന്നിൽ കാണിക്കുക, ഞാൻ സഹായിക്കാം.',
   ],
+  // The same sentence without a material: used when the answer is a refusal
+  // ("It is Special handling." / "It is Not one of our three bins." reads
+  // badly), so the visitor hears what the item is and what to do with it.
+  'sort.spokenPlain': [
+    'This is {item}. {action}',
+    'यह {item} है। {action}',
+    'ഇത് {item} ആണ്. {action}',
+  ],
   'sort.spoken': [
     'This is {item}. It is {category}. {action}',
     'यह {item} है। यह {category} है। {action}',

@@ -329,7 +329,12 @@ export function SortWaste() {
    */
   const categoryName = (decision: Decision): string => {
     if (decision.reasonId === 'specialCare') return t('sort.categorySpecial');
-    if (decision.reasonId === 'named' && !decision.classId) return t('waste.item.notInBins');
+    if (
+      (decision.reasonId === 'named' || decision.reasonId === 'reuse') &&
+      !decision.classId
+    ) {
+      return t('waste.item.notInBins');
+    }
     if (decision.status === 'uncertain') return t('sort.stateUncertain');
     const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
     if (key) return t(key);
@@ -354,6 +359,9 @@ export function SortWaste() {
       if (decision.reasonId === 'conflict' || decision.reasonId === 'specialCare') {
         return t('sort.referralSpecial');
       }
+      // Still useful: a pencil, a crayon, an eraser.  Not "keep it separate" —
+      // there is nothing to sort yet, and the honest advice is to keep using it.
+      if (decision.reasonId === 'reuse') return t('waste.word.reuse');
       if (decision.status === 'uncertain') return t('sort.referralOrdinary');
       if (decision.bin === 'organic') return t('sort.actionBin', { bin: t('bin.organic.name') });
       if (decision.bin === 'plastic') return t('sort.actionBin', { bin: t('waste.bin.plastic.title') });
@@ -383,7 +391,11 @@ export function SortWaste() {
       (language === 'en' ? decision.itemLabel?.trim() : undefined);
     const category = categoryName(decision);
     const action = actionSentence(decision);
-    if (!item) return `${category}. ${action}`;
+    // A refusal has no material to name, so "It is Special handling." is not a
+    // sentence; speak what it is and what to do with it instead.
+    const hasCategory = Boolean(decision.classId);
+    if (!item) return hasCategory ? `${category}. ${action}` : action;
+    if (!hasCategory) return t('sort.spokenPlain', { item, action });
     return t('sort.spoken', { item, category, action });
   };
 

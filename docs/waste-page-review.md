@@ -70,7 +70,9 @@ says only that, never the material it was unsure about ("Plastic · Not certain"
 reads as a decision the page did not make; the per-class scores are in the
 details). An item refused on purpose says what the refusal is: a battery or a
 syringe reads **Special handling**, a pencil **Not one of our three bins**
-(reported 2026-11-21).
+(reported 2026-11-21). A pencil, a crayon or an eraser is **still useful**, so
+its action is “Use it for as long as possible…” rather than the ordinary
+referral — there is nothing to sort yet.
 
 ## 4. What happens on a press
 
@@ -102,7 +104,7 @@ beside it rather than overruling it.
 | step | rule | result |
 | --- | --- | --- |
 | 1 | a special-care cue in the name (diaper, syringe, battery, medicine, chemical, bulb, mask…) | **conflict** — no bin, "ask the Gram Sahayak" (a safety rule, before anything else) |
-| 2 | the name states an **object** with its own route (remote, keyboard, pencil, business card…) | that route — a bin lights only for the three bins; a pencil is “none of our three bins” |
+| 2 | the name states an **object** with its own route (remote, keyboard, pencil, business card…) | that route — a bin lights only for the three bins; a pencil is “none of our three bins” and reads “use it for as long as possible” (a crayon and an eraser too) |
 | 3 | the name states a **material** — the **first** one in the sentence wins (“glass bottle with a plastic cap” is glass) | that route |
 | 4 | the name says nothing usable | the classifier, as before: background → nothing; a bin needs **70 %**; a material needs **50 %**; else “keep separate and ask” |
 

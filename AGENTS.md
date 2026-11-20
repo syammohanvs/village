@@ -3212,3 +3212,32 @@ certain"; a pencil says not-one-of-our-three-bins; a weak reading says only
 "Not certain", without naming the material).  Verified in Chromium with a
 faked camera: EN "Special handling", HI "विशेष हैंडलिंग", both over the correct
 name and the special-handling referral.
+
+**A pencil, a crayon and an eraser get the "still useful" exit route (2026-11-21,
+asked what the route is).**  The document (`docs/waste-approach.md` §2,
+`wasteGuide.ts`) had said since 2026-11-19 that a pencil is answered with *"Use
+it for as long as possible. It does not belong in our food, plastic or paper
+bins. Please contact the Gram Sahayak for disposal guidance."* — but only
+`wasteGuide` could say it (the manual button and the sample presets), and the
+**camera page never called it**: a named pencil fell through to the ordinary
+referral ("Keep this item separate … for further sorting, collection and
+recycling instructions"), which is wrong for a thing that is not waste yet.
+
+- `wasteDecision` now carries `REUSE_WORDS` (**pencil, crayon, eraser**) once,
+  used by both the object route and a new `isReuseItem()`, and the pencil branch
+  sets `reasonId: 'reuse'` (status still `uncertain`, route still
+  `separate.unknown`, `classId` still cleared — nothing is filed for training).
+- The page's action sentence for `'reuse'` is `waste.word.reuse` in all three
+  languages; the classification row stays **Not one of our three bins**.
+- **The spoken sentence was ungrammatical for every refusal** — it filled
+  `"It is {category}."` with "It is Special handling." / "It is Not one of our
+  three bins."  A refusal now uses `sort.spokenPlain` ("This is {item}. …") and,
+  with no translated name, speaks only the action.  The measured crayon line:
+  *"This is blue crayon. Use it for as long as possible. …"*
+
+No bin, no lamp, no crop filed; the record is unchanged (`category: other`,
+`route: separate.unknown`).  Frontend **473** (a pencil no longer says "keep it
+separate"; a crayon gets the same sentence and a grammatical spoken line; the
+decision unit pins `reasonId: 'reuse'` for all three words).  Verified in
+Chromium: EN crayon, HI and ML pencil all show and speak the translated reuse
+sentence.

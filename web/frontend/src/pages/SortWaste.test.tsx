@@ -886,16 +886,52 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
-  it('refuses a bin for a pencil, whatever the picture says', async () => {
-    // The reported shape: a pencil read as Paper 93%.  The name now decides the
-    // category, and a pencil is in none of the three bins.
-    const restore = await press({ predictions: predictionsFor('Paper', 0.93), object: 'orange pencil' });
+  it('refuses a bin for a pencil, and says to keep using it', async () => {
+    // The reported shape: a pencil read as Paper 93%.  The name decides the
+    // category, and a pencil is in none of the three bins — but "keep it
+    // separate" is the wrong advice for something that is still useful.
+    const restore = await press({
+      predictions: predictionsFor('Paper', 0.93),
+      object: 'orange pencil',
+    });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       const action = screen.getByTestId('waste-action');
-      expect(action).toHaveTextContent(/keep this item separate/i);
+      expect(action).toHaveTextContent(
+        'Use it for as long as possible. It does not belong in our food, plastic or paper bins. Please contact the Gram Sahayak for disposal guidance.',
+      );
+      expect(action).not.toHaveTextContent(/recycling instructions/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Not one of our three bins$/);
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 6000 });
       expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({ category: 'other' });
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('gives a crayon the same "keep using it" route as a pencil', async () => {
+    // The user asked what the exit route is for a crayon.  It is wax, not
+    // waste: the same sentence, no bin and no lamp — and it is spoken without
+    // the ungrammatical "It is …" a refusal would produce.
+    const restore = await press({
+      predictions: predictionsFor('Paper', 0.9),
+      object: 'blue crayon',
+    });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/use it for as long as possible/i);
+      expect(screen.getByTestId('waste-result')).toHaveTextContent(/^Not one of our three bins$/);
+      await waitFor(
+        () => expect(spoken.filter((line) => /use it for as long as possible/i.test(line))).toHaveLength(1),
+        { timeout: 8000 },
+      );
+      const line = spoken.find((text) => /use it for as long as possible/i.test(text)) ?? '';
+      expect(line).toMatch(/^This is blue crayon\./);
+      expect(line).not.toMatch(/it is not one of our three bins/i);
+      expect(vi.mocked(api.postRecognition).mock.calls[0][0]).toMatchObject({
+        category: 'other',
+        route: 'separate.unknown',
+      });
     } finally {
       restore();
     }
@@ -1311,8 +1347,9 @@ describe('Sort Waste — two models, one decision', () => {
   }, 25000);
 
   it('gives an ordinary referral one sentence, and no bin', async () => {
-    // Glass, metal, cloth, leather, footwear, thermocol, pencils … all reach the
-    // visitor as this one sentence.  The material stays in the classification.
+    // Glass, metal, cloth, leather, footwear, thermocol … all reach the visitor
+    // as this one sentence.  The material stays in the classification.  (A
+    // pencil or crayon does not: it is still useful, and gets its own advice.)
     const restore = await press({ predictions: predictionsFor('Glass', 0.9), object: 'glass jar' });
     try {
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
