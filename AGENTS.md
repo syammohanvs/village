@@ -3192,3 +3192,21 @@ translates the *phrase* the namer gave, so a scene description like "hand holdin
 a leaf" becomes a participle phrase ("കൈകൊണ്ട് ഒരു ഇല പിടിച്ച്") that reads a
 little oddly after "ഇത് … ആണ്"; a plain object name ("ഉള്ളി", "പ്ലാസ്റ്റിക്
 കുപ്പി") reads naturally.
+
+**A correct name beside "Not certain" was the wrong word (2026-11-21, reported
+with a battery).**  The classification row read its word from `classId` alone,
+and a special-care refusal deliberately clears `classId` (a battery is not one
+of the eleven materials) — so the card showed **Waste classification: Not certain**
+under a perfectly correct name, which reads as the classifier having failed.
+The row now says what the refusal is: a special-care cue reads **Special
+handling** (`sort.categorySpecial`, en/hi/ml), a named item outside the three
+bins (a pencil) reads **Not one of our three bins**, and **"Not certain" is
+kept for a weak reading** (the `· Not certain` suffix now only appears when the
+classifier did name a material, e.g. "Plastic · Not certain" at 0.55).  The
+action sentence and the record are unchanged: `category: medical`,
+`route: separate.unknown`, no bin and no lamp.
+
+Frontend **470** (two new: a battery says Special handling and never "not
+certain"; a pencil says not-one-of-our-three-bins).  Verified in Chromium with a
+faked camera: EN "Special handling", HI "विशेष हैंडलिंग", both over the correct
+name and the special-handling referral.

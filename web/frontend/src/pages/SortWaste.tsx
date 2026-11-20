@@ -319,10 +319,21 @@ export function SortWaste() {
     background: 'waste.item.background',
   };
 
-  /** The class name a decision is shown with, in the page's language. */
+  /**
+   * What the classification line says.
+   *
+   * A material that was decided keeps its own name, and a weak reading keeps
+   * "Not certain" beside it.  The two refusals are a different fact: a battery
+   * or a pencil was read correctly — only not as one of the eleven materials —
+   * so "Not certain" beside a correct name reads as a failed classification
+   * (reported 2026-11-21, with a battery).
+   */
   const categoryName = (decision: Decision): string => {
     const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
-    return key ? t(key) : t('sort.stateUncertain');
+    if (key) return t(key);
+    if (decision.reasonId === 'specialCare') return t('sort.categorySpecial');
+    if (decision.reasonId === 'named') return t('waste.item.notInBins');
+    return t('sort.stateUncertain');
   };
 
   /**
@@ -938,7 +949,7 @@ export function SortWaste() {
                   <p className="model-state-value" data-testid="waste-result">
                     {!check.decision || check.classify === 'checking'
                       ? t('sort.stateClassifying')
-                      : check.classify === 'uncertain'
+                      : check.classify === 'uncertain' && check.decision.classId
                         ? `${categoryName(check.decision)} · ${t('sort.stateUncertain')}`
                         : categoryName(check.decision)}
                   </p>

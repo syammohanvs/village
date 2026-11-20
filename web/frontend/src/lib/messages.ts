@@ -885,6 +885,11 @@ export const MESSAGES = {
     'വസ്തുവിന്റെ തിരിച്ചറിയൽ ലഭ്യമല്ല',
   ],
   'sort.stateUncertain': ['Not certain', 'पक्का नहीं', 'ഉറപ്പില്ല'],
+  // The classification line for an item this build refuses on purpose — a
+  // battery, a syringe, a paint tin.  The name was read correctly; the answer
+  // is that the item is outside the three bins, so "Not certain" beside a
+  // correct name is the wrong word (reported 2026-11-21).
+  'sort.categorySpecial': ['Special handling', 'विशेष हैंडलिंग', 'പ്രത്യേക കൈകാര്യം'],
   'sort.identified': ['Item identified: {item}', 'पहचानी गई वस्तु: {item}', 'തിരിച്ചറിഞ്ഞ വസ്തു: {item}'],
   'sort.category': ['Waste category: {category}', 'कचरे का वर्ग: {category}', 'മാലിന്യ വിഭാഗം: {category}'],
   'sort.actionBin': ['Use the {bin} bin.', '{bin} बिन में डालें।', '{bin} ബിന്നിൽ ഇടുക.'],

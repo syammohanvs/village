@@ -65,7 +65,10 @@ States per row: identification — *waiting / AI is identifying the item / Item
 identified … / Item identification unavailable*; classification — *waiting /
 checking the material / Waste category … / … · Not certain*. Exact provider and
 model names, the per-class scores and the internal route id live in the
-collapsed technical details.
+collapsed technical details. **"Not certain" is only for a weak reading.** An
+item refused on purpose says what the refusal is: a battery or a syringe reads
+**Special handling**, a pencil **Not one of our three bins** — a correct name
+beside "Not certain" reads as a classifier that gave up (reported 2026-11-21).
 
 ## 4. What happens on a press
 

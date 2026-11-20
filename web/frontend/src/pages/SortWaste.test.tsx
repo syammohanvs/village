@@ -1333,6 +1333,37 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
+  it('names a battery as special handling, not as a classification that failed', async () => {
+    // Reported 2026-11-21: the name was right ("Battery, copper and metal")
+    // and the card still said "Not certain" — which reads as the classifier
+    // giving up, when the answer is that a battery is outside the three bins.
+    const restore = await press({ predictions: plasticAt(0.5), object: 'Battery, copper and metal' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const result = screen.getByTestId('waste-result');
+      expect(result).toHaveTextContent(/^Special handling$/);
+      expect(result).not.toHaveTextContent(/not certain/i);
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/needs special handling/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('says a pencil is not one of the three bins, rather than "not certain"', async () => {
+    const restore = await press({
+      predictions: plasticAt(0.72),
+      object: 'red pencil with a blue eraser',
+    });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const result = screen.getByTestId('waste-result');
+      expect(result).toHaveTextContent(/^Not one of our three bins$/);
+      expect(result).not.toHaveTextContent(/not certain/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
   it('records the provider that actually named the item, not the one configured', async () => {
     // Workers AI out of quota, DeepSeek answered.  The record and the details
     // must say DeepSeek — attributing a fallback answer to Cloudflare is a
