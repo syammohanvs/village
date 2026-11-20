@@ -2926,23 +2926,29 @@ comments in `uc/include/village/pins.h`, `build_config.h`, `outputs.h`,
 
 Gate: firmware **560 checks / 0 failed** (comments only, rebuilt).
 
-**Exhibition timings for automatic watering (2026-11-20).**  Four values only,
-so a visitor sees a full cycle in one demonstration:
-`dry_confirm_ms 30000→3000`, `pulse_ms` stays **4000** (2 s was tried first
-and the operator found it too slow for the pump; 4 s is the exhibition value),
-`soak_ms 45000→8000`,
-`cooldown_ms 300000→15000`.  Firmware defaults (`config.h`), the simulator's
-config and the operator docs (`docs/operation.md` → **Exhibition timings
-(automatic watering)**) now carry them; `test_config` pins the defaults and
-`irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down` walks the
-real controller through 3 s confirm → 4 s pulse → 8 s soak → second pulse →
-completion → 15 s cooldown (firmware **596 checks**).  The simulator has its own
-sequence test, and both assertions that it still uses its own safety limits
-(**197 backend**).
+**Exhibition timings for automatic watering (2026-11-20).**  `dry_confirm_ms`
+**3000**, `pulse_ms` **4000** (2 s was tried first and the operator found it too
+slow for the pump), `soak_ms` **8000**, and **no cooldown**: `cooldown_ms` **0**,
+`max_pulses` **10**, `max_cumulative_ms` **45000**.  The operator asked for this
+explicitly after seeing "Waiting before the next watering session." on the
+board: the exhibit must run **3 s dry → 4 s pump → 8 s soak → check**, then
+repeat with no wait while the soil is still dry, and stop only when it reads
+wet.  Firmware defaults (`config.h`), the simulator's config and
+`docs/operation.md` → **Exhibition timings (automatic watering)** carry them.
+`test_config` pins the defaults and
+`irrigation_exhibition_sequence_confirms_pulses_soaks_and_restarts_without_a_cooldown`
+walks the real controller through 3 s confirm → 4 s pulse → 8 s soak → second
+pulse → completion → **immediate** re-arm and the next pulse 3 s later
+(firmware **596 checks**); the simulator has the matching test (**198 backend**).
+**The hidden 30-minute failure cooldown is gone from the firmware and the
+simulator**: `effectiveCooldown()` now returns the configured `cooldown_ms`
+(it used to return at least `kFailureLockoutMs` = 30 min), so a safety stop
+waits only as long as the operator configured.  The failure *latch* remains:
+ten dry pulses stop the session, and only a genuinely wet reading clears it, so
+a probe that never wets cannot run the pump forever.
 
-Everything else is untouched: 5 s boot guard, 35/55 % thresholds, 4-pulse
-maximum, 15 s cumulative cap, low-water stop, no-rise lockout, tank check and
-manual On/Off.  **The board's saved configuration has NOT been written:** the
+What is still untouched: 5 s boot guard, 35/55 % thresholds, the cumulative
+runtime cap, low-water stop, tank check and manual On/Off.  **The board's saved configuration has NOT been written:** the
 Windows hotspot was Off, was switched on, and no board answered on
 `192.168.137.0/24` (`GET /api/v1/device/config` → 503 `DEVICE_UNREACHABLE`), so
 the change is **pending**.  Apply it with a GET → merge four fields → PUT of the

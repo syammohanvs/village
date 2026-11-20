@@ -56,15 +56,18 @@ struct IrrigationConfig {
   uint16_t dry_start_pct = 35;
   uint16_t stop_pct = 55;
   // Exhibition timings (2026-11-20): short enough that a visitor sees a whole
-  // automatic cycle -- dry confirmation, pulse, soak, re-check, cooldown -- in
-  // one demonstration.  The safety numbers around them are unchanged.
+  // automatic cycle -- dry confirmation, pulse, soak, re-check -- in one
+  // demonstration, and there is deliberately **no cooldown**, so a soil that
+  // stays dry is watered again after the 3 s confirmation.  Only the pulse and
+  // cumulative limits stop a session; a probe that never gets wet latches the
+  // safety lockout until it reads wet again.
   uint32_t dry_confirm_ms = 3000;   // 3 s
   uint32_t pulse_ms = 4000;         // 4 s ON
   uint32_t max_pulse_ms = 8000;
   uint32_t soak_ms = 8000;          // 8 s OFF between pulses
-  uint32_t max_cumulative_ms = 15000;
-  uint8_t max_pulses = 4;
-  uint32_t cooldown_ms = 15000;     // 15 s after a cycle
+  uint32_t max_cumulative_ms = 45000;
+  uint8_t max_pulses = 10;
+  uint32_t cooldown_ms = 0;         // no wait between sessions (exhibition)
   uint32_t link_timeout_ms = 30000;
 };
 

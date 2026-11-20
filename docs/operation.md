@@ -180,21 +180,29 @@ water physically flowed. The dashboard keeps the two statements separate.
 ### Exhibition timings (automatic watering)
 
 The exhibit deliberately runs **shorter automatic-watering timings** than a
-normal installation, so one visitor sees a whole cycle — dry check, pulse, soak,
-re-check, cooldown — inside a single demonstration. These are the values the
-board's **saved configuration** carries:
+normal installation, and **no cooldown**, so one visitor sees the whole cycle —
+dry check, pulse, soak, re-check — repeat while the soil stays dry. These are
+the values the board's **saved configuration** carries:
 
 | setting | exhibition value | what the visitor sees |
 | --- | ---: | --- |
 | `irrigation.dry_confirm_ms` | **3000 ms** | dry soil must hold for 3 seconds |
 | `irrigation.pulse_ms` | **4000 ms** | the pump runs for 4 seconds |
 | `irrigation.soak_ms` | **8000 ms** | an 8-second pause to let water spread |
-| `irrigation.cooldown_ms` | **15000 ms** | 15 seconds before the rules may start again |
+| `irrigation.cooldown_ms` | **0 ms** | no wait: 3 seconds after the soak, the next pulse |
+| `irrigation.max_pulses` | **10** | up to ten pulses before a session stops |
+| `irrigation.max_cumulative_ms` | **45000 ms** | 45 seconds of pumping in one session |
 
-**Nothing else about the watering is relaxed.** The 5-second startup guard, the
-35 % / 55 % moisture thresholds, the 4-pulse maximum, the 15-second cumulative
-runtime cap, the low-water stop, the 30-minute no-rise lockout, the tank check
-on a manual On and the manual On/Off switch all behave as before.
+So the loop a visitor watches is: **3 s dry → 4 s pump → 8 s soak → check**;
+if the soil still reads dry, the next pulse follows (no wait); if it reads wet,
+watering stops and waits for the soil to dry again. A probe that **never** gets
+wet stops after ten pulses and latches the safety lockout, which only a wet
+reading clears — so a disconnected probe cannot run the pump forever.
+
+**What is still not relaxed:** the 5-second startup guard, the 35 % / 55 %
+moisture thresholds, the cumulative runtime cap, the low-water stop, the tank
+check on a manual On, the manual On/Off switch, and the no-rise lockout (it is
+cleared by a wet reading, not by a timer).
 
 The firmware defaults and Simulation use the same four values. On a board that
 already has a saved configuration, **changing the firmware defaults is not

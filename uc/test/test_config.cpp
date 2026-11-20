@@ -19,10 +19,12 @@ TEST(config_defaults_are_valid_and_conservative) {
   CHECK(c.irrigation.dry_confirm_ms == 3000);
   CHECK(c.irrigation.pulse_ms == 4000);
   CHECK(c.irrigation.soak_ms == 8000);
-  CHECK(c.irrigation.cooldown_ms == 15000);
+  // No cooldown at all: a visitor sees the next pulse 3 s after the soak when
+  // the soil is still dry (asked for 2026-11-20).
+  CHECK(c.irrigation.cooldown_ms == 0);
   CHECK(c.irrigation.max_pulse_ms == 8000);
-  CHECK(c.irrigation.max_cumulative_ms == 15000);
-  CHECK(c.irrigation.max_pulses == 4);
+  CHECK(c.irrigation.max_cumulative_ms == 45000);
+  CHECK(c.irrigation.max_pulses == 10);
   CHECK(c.reservoir.calibrated == false);
   CHECK(!soilCalibrated(c.soil));
   c.soil.calibrated = true;

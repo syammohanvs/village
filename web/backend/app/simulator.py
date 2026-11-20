@@ -126,9 +126,11 @@ def default_config() -> dict[str, Any]:
             "pulse_ms": 4000,
             "max_pulse_ms": 4000,
             "soak_ms": 8000,
-            "max_cumulative_ms": 12000,
-            "max_pulses": 3,
-            "cooldown_ms": 15000,
+            "max_cumulative_ms": 45000,
+            "max_pulses": 10,
+            # No wait between sessions: the exhibit keeps watering while the
+            # soil stays dry, one 4 s pulse per 8 s soak, until it reads wet.
+            "cooldown_ms": 0,
             "link_timeout_ms": 30000,
         },
         "waste": {"indicate_ms": 8000},
@@ -267,7 +269,7 @@ class SimulatedDevice:
                 self._add_event(*reason("IRRIGATION_SOAKING"))
                 if self.cumulative_ms >= self.config["irrigation"]["max_cumulative_ms"]:
                     self.failure_lockout = True
-                    self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", 1_800_000)
+                    self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
         elif self.state == "soaking":
             if self.now_ms - self.soak_started >= self.config["irrigation"]["soak_ms"]:
                 irr = self.config["irrigation"]
@@ -275,10 +277,10 @@ class SimulatedDevice:
                     self._stop("IRRIGATION_COMPLETE_MOISTURE", irr["cooldown_ms"])
                 elif self.pulses >= irr["max_pulses"]:
                     self.failure_lockout = True
-                    self._stop("IRRIGATION_STOPPED_MAX_PULSES", 1_800_000)
+                    self._stop("IRRIGATION_STOPPED_MAX_PULSES", self.config["irrigation"]["cooldown_ms"])
                 elif self.cumulative_ms >= irr["max_cumulative_ms"]:
                     self.failure_lockout = True
-                    self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", 1_800_000)
+                    self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
                 else:
                     self._start_pulse(manual=False)
         else:
@@ -317,13 +319,13 @@ class SimulatedDevice:
         irr = self.config["irrigation"]
         if self.pulses >= irr["max_pulses"] or self.cumulative_ms >= irr["max_cumulative_ms"]:
             self.failure_lockout = True
-            self._stop("IRRIGATION_STOPPED_MAX_PULSES", 1_800_000)
+            self._stop("IRRIGATION_STOPPED_MAX_PULSES", self.config["irrigation"]["cooldown_ms"])
             return
         remaining = irr["max_cumulative_ms"] - self.cumulative_ms
         self.pulse_len = min(irr["pulse_ms"], irr["max_pulse_ms"], remaining)
         if self.pulse_len < 500:
             self.failure_lockout = True
-            self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", 1_800_000)
+            self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
             return
         self.pulse_started = self.now_ms
         self.state = "pumping"

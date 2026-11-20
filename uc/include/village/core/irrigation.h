@@ -338,8 +338,13 @@ class IrrigationController {
   }
 
   uint32_t effectiveCooldown() const {
-    return cfg_.cooldown_ms > kFailureLockoutMs ? cfg_.cooldown_ms
-                                                : kFailureLockoutMs;
+    // The exhibition runs with no cooldown, so the configured value is the
+    // whole story -- including after a safety stop.  A failure stop still
+    // latches `failure_lockout_`, and only a genuinely wet reading clears that
+    // (see updateIdle), so a probe that never gets wet cannot water forever.
+    // Before 2026-11-20 this returned at least 30 minutes, which put the
+    // exhibit into a half-hour wait after four dry pulses.
+    return cfg_.cooldown_ms;
   }
 
   void startSession(uint32_t now, SessionKind kind) {

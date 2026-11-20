@@ -249,7 +249,8 @@ TEST(irrigation_max_cumulative_accounts_exactly_once) {
   CHECK(s.cumulative_pump_ms == 6000);
   CHECK(s.last.pumped_ms == 6000);  // not double-counted
   CHECK(s.failure_lockout);
-  CHECK(s.cooldown_remaining_ms >= IrrigationController::kFailureLockoutMs);
+  // The configured cooldown, not a hidden 30-minute one.
+  CHECK(s.cooldown_remaining_ms == cfg.cooldown_ms);
 }
 
 TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
@@ -281,7 +282,8 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
   wet.soil_percent = 60.0f;
   c.tick(20000, wet);
   CHECK(!c.status(20000).failure_lockout);
-  // The long safety cooldown is still in force.
+  // A wet reading clears the latch, but the configured cooldown still holds
+  // until it expires (here 60 s, because this fixture sets one).
   CHECK(c.status(20000).reason == &reasons::kIdleCooldown);
 
   c.clearFailureLockout(20000);
@@ -291,18 +293,19 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
 
 // The exhibition timings, end to end on the real controller: 3 s dry
 // confirmation, a 4 s pulse, an 8 s soak, a reassessment that starts a further
-// pulse, then completion and a 15 s cooldown.  These are the values the board's
-// saved configuration is given, so the sequence a visitor sees is this one.
-TEST(irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down) {
+// pulse, then completion when the soil reads wet -- and **no cooldown**, so a
+// soil that is dry again is watered 3 s later (asked for 2026-11-20).  These
+// are the values the board's saved configuration is given.
+TEST(irrigation_exhibition_sequence_confirms_pulses_soaks_and_restarts_without_a_cooldown) {
   IrrigationConfig cfg = manualCfg();
   cfg.auto_enabled = true;
   cfg.dry_confirm_ms = 3000;
   cfg.pulse_ms = 4000;
   cfg.max_pulse_ms = 8000;
   cfg.soak_ms = 8000;
-  cfg.max_cumulative_ms = 15000;
-  cfg.max_pulses = 4;
-  cfg.cooldown_ms = 15000;
+  cfg.max_cumulative_ms = 45000;
+  cfg.max_pulses = 10;
+  cfg.cooldown_ms = 0;
 
   IrrigationController c;
   c.begin(0, cfg);
@@ -347,7 +350,7 @@ TEST(irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down) {
   CHECK(!c.pumpOn());
   CHECK(c.status(25000).state == IrrigationState::Soaking);
 
-  // The next soak ends with wet-enough soil: completion and a 15 s cooldown.
+  // The next soak ends with wet-enough soil: completion, and **no** wait.
   IrrigationInputs wet = dryInputs();
   wet.soil_percent = 60.0f;
   c.tick(33000, wet);
@@ -355,20 +358,20 @@ TEST(irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down) {
   CHECK(!s.pump_on);
   CHECK(s.state == IrrigationState::Idle);
   CHECK(s.reason == &reasons::kCompleteMoisture);
-  CHECK(s.cooldown_remaining_ms == 15000);
+  CHECK(s.cooldown_remaining_ms == 0);
   CHECK(s.cumulative_pump_ms == 8000);
 
-  c.tick(47999, dryInputs());
+  // The soil dries again.  With no cooldown the dry timer arms on the next
+  // tick and only the 3 s confirmation stands between the visitor and the
+  // next pulse.
+  c.tick(34000, dryInputs());
   CHECK(!c.pumpOn());
-  CHECK(c.status(47999).reason == &reasons::kIdleCooldown);
-
-  // The cooldown expires, the dry timer arms again, and 3 s later a new
-  // session begins.
-  c.tick(48000, dryInputs());
+  CHECK(c.status(34000).reason == &reasons::kIdleSoilDryWaiting);
+  c.tick(36999, dryInputs());
   CHECK(!c.pumpOn());
-  c.tick(51000, dryInputs());
+  c.tick(37000, dryInputs());
   CHECK(c.pumpOn());
-  CHECK(c.status(51000).pulses_done == 1);
+  CHECK(c.status(37000).pulses_done == 1);
 }
 
 TEST(irrigation_completes_when_soil_reaches_stop_level) {
