@@ -39,14 +39,15 @@ TEST(wind_below_the_noise_floor_has_no_voltage_at_all) {
 }
 
 TEST(wind_just_above_the_floor_is_a_real_reading) {
-  // One millivolt over the floor is measurable: 21 mV / 47 = 0.4468 mA,
-  // 2.821 V, 1.26 mW.
-  const WindPower p = measure(21);
+  // One millivolt over the new 150 mV floor: 160 mV / 47 = 3.404 mA,
+  // 2.960 V, 10.08 mW.  The floor moved up because this board's ADC rests at
+  // 142 mV in the dark; anything below that is not current.
+  const WindPower p = measure(160);
   CHECK(p.measuring);
   CHECK(p.has_voltage);
-  CHECK_NEAR(p.current_ma, 0.4468f, 0.001f);
-  CHECK(p.voltage_mv == 2821);
-  CHECK_NEAR(p.power_mw, 1.26f, 0.02f);
+  CHECK_NEAR(p.current_ma, 3.404f, 0.001f);
+  CHECK(p.voltage_mv == 2960);
+  CHECK_NEAR(p.power_mw, 10.08f, 0.02f);
 }
 
 TEST(wind_scale_is_linear_in_the_resistor_voltage) {

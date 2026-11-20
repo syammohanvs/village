@@ -122,11 +122,12 @@ config change:
 | --- | --- | --- |
 | `wind.sense_ohms` | 47 | 1–10000 Ω |
 | `wind.led_forward_mv` | 2800 | 500–5000 mV |
-| `wind.noise_floor_mv` | 20 | 0–1000 mV |
+| `wind.noise_floor_mv` | 150 | 0–1000 mV |
 
-20 mV across 47 Ω is 0.43 mA — below that the reading is the ADC's own noise.
-The tap is a few tens of millivolts in total, which is why four calibrated reads
-are averaged before the floor is applied.
+150 mV is this board's measured resting offset (the solar tap reads the same
+142 mV in the dark) — anything at or below it is the ADC's own noise, not
+current. The tap is a few tens of millivolts of real signal, which is why four
+calibrated reads are averaged before the floor is applied.
 
 **What the card shows** (same code path in Live and Simulation):
 

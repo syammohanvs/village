@@ -31,7 +31,7 @@ inline constexpr uint16_t kDefaultWindLedForwardMv = 2800;
 // deliberate: 20 mV across 47 Ω is 0.43 mA, and anything at or below it is shown
 // as "no measurable output" rather than as a generator voltage invented from
 // the LED's forward voltage.
-inline constexpr uint16_t kDefaultWindNoiseFloorMv = 20;
+inline constexpr uint16_t kDefaultWindNoiseFloorMv = 150;
 
 struct WindPower {
   /** The configuration is usable (a non-zero resistor). */

@@ -85,14 +85,18 @@ async def test_guessing_is_slowed_after_five_tries(tmp_path: Path) -> None:
 
 
 def test_the_default_password_is_flagged_so_startup_can_warn(monkeypatch, tmp_path: Path) -> None:
+    # `repo_root=tmp_path` keeps this test honest: it must not depend on the
+    # real `.env` on disk (which sets VILLAGE_ADMIN_PASSWORD and would make the
+    # default-password flag read as False for reasons that have nothing to do
+    # with the code).
     monkeypatch.delenv("VILLAGE_ADMIN_PASSWORD", raising=False)
     monkeypatch.delenv("VILLAGE_ADMIN_PASSWORD_HASH", raising=False)
-    assert Settings.load().admin_password_default is True
+    assert Settings.load(repo_root=tmp_path).admin_password_default is True
 
     # An explicit hash is taken as already hashed -- re-hashing it would make a
     # correct password fail for reasons nobody could see.
     monkeypatch.setenv("VILLAGE_ADMIN_PASSWORD_HASH", hash_password("chosen-by-the-operator"))
-    loaded = Settings.load()
+    loaded = Settings.load(repo_root=tmp_path)
     assert loaded.admin_password_default is False
     assert verify_password("chosen-by-the-operator", loaded.admin_password_hash)
 

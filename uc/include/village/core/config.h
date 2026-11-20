@@ -88,7 +88,7 @@ struct WindConfig {
   // voltage, and the noise floor below which nothing is flowing.
   uint16_t sense_ohms = 47;
   uint16_t led_forward_mv = 2800;
-  uint16_t noise_floor_mv = 20;
+  uint16_t noise_floor_mv = 150;
 };
 
 struct SolarConfig {

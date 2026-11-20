@@ -2862,7 +2862,8 @@ real change of what the ADC means, not a relabelled number:
 
 - **Firmware:** `uc/include/village/core/wind.h` holds the arithmetic
   (`I = Vr / R`, `V = Vr + Vled`, `P = V × I`) and `WindConfig` carries the
-  hardware (`sense_ohms` 47, `led_forward_mv` 2800, `noise_floor_mv` 20) in NVS
+  hardware (`sense_ohms` 47, `led_forward_mv` 2800, `noise_floor_mv` 150 — this
+  board's measured resting offset) in NVS
   as JSON, with `validateConfig` bounds.  The pin is read with
   `analogReadMilliVolts` and four reads are averaged (the whole signal is tens
   of millivolts).  **Below the floor nothing is added:** `voltage_v` is `null`,

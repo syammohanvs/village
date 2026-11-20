@@ -137,7 +137,7 @@ TEST(config_wind_carries_the_circuit_and_refuses_impossible_values) {
   CHECK(c.wind.installed == false);
   CHECK(c.wind.sense_ohms == 47);
   CHECK(c.wind.led_forward_mv == 2800);
-  CHECK(c.wind.noise_floor_mv == 20);
+  CHECK(c.wind.noise_floor_mv == 150);
 
   c.wind.sense_ohms = 47;
   c.wind.led_forward_mv = 3000;

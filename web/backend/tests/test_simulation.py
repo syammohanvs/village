@@ -80,7 +80,9 @@ def test_wind_is_the_led_and_resistor_circuit_at_every_speed() -> None:
         (fast["voltage_millivolts"] / 1000.0) * fast["current_ma"]
     )
 
-    device.scenario({"wind_speed": 0.5})
+    # 0.6 -> 156 mV, just above the 150 mV noise floor; the rest of the
+    # speed range is below it and reads as "no measurable output".
+    device.scenario({"wind_speed": 0.6})
     half = status(device)["sensors"]["wind"]
     assert 0 < half["current_ma"] < fast["current_ma"]
 

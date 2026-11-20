@@ -689,7 +689,7 @@ be measured and entered without a firmware change:
 | `wind.installed` | false | a turbine is wired |
 | `wind.sense_ohms` | **47** | the resistor the ADC is across |
 | `wind.led_forward_mv` | **2800** | the blue LED's measured forward voltage |
-| `wind.noise_floor_mv` | **20** | below this the reading is ADC noise, not current |
+| `wind.noise_floor_mv` | **150** | this board's measured resting offset (142 mV) |
 
 ```
 current_ma  = resistor_mv / sense_ohms

@@ -112,7 +112,7 @@ def default_config() -> dict[str, Any]:
             # GND.  Simulation uses the same three hardware numbers as the board.
             "sense_ohms": 47,
             "led_forward_mv": 2800,
-            "noise_floor_mv": 20,
+            "noise_floor_mv": 150,
         },
         "irrigation": {
             "auto_enabled": True,
@@ -558,7 +558,7 @@ class SimulatedDevice:
         cfg = self.config.get("wind", {})
         sense = int(cfg.get("sense_ohms", 47)) or 47
         led = int(cfg.get("led_forward_mv", 2800))
-        floor = int(cfg.get("noise_floor_mv", 20))
+        floor = int(cfg.get("noise_floor_mv", 150))
         measuring = resistor_mv > floor
         current_ma = (resistor_mv / sense) if measuring else 0.0
         voltage_mv = (resistor_mv + led) if measuring else None
