@@ -3200,13 +3200,15 @@ of the eleven materials) — so the card showed **Waste classification: Not cert
 under a perfectly correct name, which reads as the classifier having failed.
 The row now says what the refusal is: a special-care cue reads **Special
 handling** (`sort.categorySpecial`, en/hi/ml), a named item outside the three
-bins (a pencil) reads **Not one of our three bins**, and **"Not certain" is
-kept for a weak reading** (the `· Not certain` suffix now only appears when the
-classifier did name a material, e.g. "Plastic · Not certain" at 0.55).  The
-action sentence and the record are unchanged: `category: medical`,
-`route: separate.unknown`, no bin and no lamp.
+bins (a pencil) reads **Not one of our three bins**, and a genuinely weak
+reading reads **only "Not certain"** — the material it was *not* sure about is
+never printed beside it ("Plastic · Not certain" at 0.55 was asked away the same
+day: it reads as a decision the page did not make; the per-class scores stay in
+the technical details).  The action sentence and the record are unchanged:
+`category: medical`, `route: separate.unknown`, no bin and no lamp.
 
-Frontend **470** (two new: a battery says Special handling and never "not
-certain"; a pencil says not-one-of-our-three-bins).  Verified in Chromium with a
+Frontend **471** (three new: a battery says Special handling and never "not
+certain"; a pencil says not-one-of-our-three-bins; a weak reading says only
+"Not certain", without naming the material).  Verified in Chromium with a
 faked camera: EN "Special handling", HI "विशेष हैंडलिंग", both over the correct
 name and the special-handling referral.

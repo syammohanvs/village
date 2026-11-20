@@ -322,16 +322,17 @@ export function SortWaste() {
   /**
    * What the classification line says.
    *
-   * A material that was decided keeps its own name, and a weak reading keeps
-   * "Not certain" beside it.  The two refusals are a different fact: a battery
-   * or a pencil was read correctly — only not as one of the eleven materials —
-   * so "Not certain" beside a correct name reads as a failed classification
-   * (reported 2026-11-21, with a battery).
+   * A decision keeps its material's name; a refusal says what the refusal is;
+   * a weak reading says only that it is weak.  The material a weak reading was
+   * *not* sure about is never printed beside it — "Plastic · Not certain"
+   * reads as a decision the page did not make (asked 2026-11-21).
    */
   const categoryName = (decision: Decision): string => {
+    if (decision.reasonId === 'specialCare') return t('sort.categorySpecial');
+    if (decision.reasonId === 'named' && !decision.classId) return t('waste.item.notInBins');
+    if (decision.status === 'uncertain') return t('sort.stateUncertain');
     const key = decision.classId ? CLASS_KEY[decision.classId] : undefined;
     if (key) return t(key);
-    if (decision.reasonId === 'specialCare') return t('sort.categorySpecial');
     if (decision.reasonId === 'named') return t('waste.item.notInBins');
     return t('sort.stateUncertain');
   };
@@ -949,9 +950,7 @@ export function SortWaste() {
                   <p className="model-state-value" data-testid="waste-result">
                     {!check.decision || check.classify === 'checking'
                       ? t('sort.stateClassifying')
-                      : check.classify === 'uncertain' && check.decision.classId
-                        ? `${categoryName(check.decision)} · ${t('sort.stateUncertain')}`
-                        : categoryName(check.decision)}
+                      : categoryName(check.decision)}
                   </p>
                 </div>
 

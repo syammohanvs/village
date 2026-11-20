@@ -901,6 +901,21 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
+  it('says only "Not certain" for a weak reading, without naming the material', async () => {
+    // Asked 2026-11-21: "Plastic · Not certain" reads as a decision the page
+    // did not make.  The reading was weak; the material it nearly picked is
+    // kept for the technical details and not printed as the answer.
+    const restore = await press({ predictions: plasticAt(0.55), object: 'white bottle' });
+    try {
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      const result = screen.getByTestId('waste-result');
+      expect(result).toHaveTextContent(/^Not certain$/);
+      expect(result).not.toHaveTextContent(/plastic/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
+
   it('does not add e-waste to metal to reach a threshold', async () => {
     const predictions = predictionsFor('Ewaste', 0.45).map((row) =>
       row.className === 'Metal' ? { ...row, probability: 0.35 } : row,
@@ -1587,8 +1602,11 @@ describe('Sort Waste — two models, one decision', () => {
 
   it('leaves the name out rather than printing English on a Malayalam page', async () => {
     window.localStorage.setItem('village.voiceLanguage', 'ml');
+    // A confident classifier reading, so the card has a category and an action
+    // to translate — a weak reading says only "Not certain" (see below), and
+    // this test is about the name, not the confidence.
     const restore = await press({
-      predictions: plasticAt(0.42),
+      predictions: plasticAt(0.9),
       object: 'Large yellowish widget',
     });
     try {
@@ -1597,7 +1615,8 @@ describe('Sort Waste — two models, one decision', () => {
       // noun is left out instead of being shown to a Malayalam reader.
       await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
       expect(screen.queryByTestId('waste-identify')).not.toBeInTheDocument();
-      expect(screen.getByTestId('waste-classify')).toHaveTextContent(/പ്ലാസ്റ്റിക്|plastic/i);
+      expect(screen.getByTestId('waste-classify')).toHaveTextContent(/പ്ലാസ്റ്റിക്/i);
+      expect(screen.getByTestId('waste-action')).toHaveTextContent(/ബിന്നിൽ ഇടുക/);
     } finally {
       restore();
     }
