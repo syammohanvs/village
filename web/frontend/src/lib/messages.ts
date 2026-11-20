@@ -704,6 +704,33 @@ export const MESSAGES = {
     'कैमरे से पूछ रहे हैं कि यह क्या है…',
     'ഇത് എന്താണെന്ന് ക്യാമറയോട് ചോദിക്കുന്നു…',
   ],
+  'sort.checkItem': ['Check the item', 'चीज़ जाँचें', 'വസ്തു പരിശോധിക്കുക'],
+  'sort.readingItem': ['Reading…', 'पढ़ रहे हैं…', 'വായിക്കുന്നു…'],
+  'sort.checkTitle': [
+    'Name whatever is on the base right now.',
+    'अभी आधार पर जो चीज़ है, उसका नाम लें।',
+    'ഇപ്പോൾ തട്ടിൽ ഉള്ള വസ്തുവിന്റെ പേര് നോക്കുക.',
+  ],
+  'sort.checkTitleUnavailable': [
+    'The item-naming model is not available.',
+    'वस्तु का नाम बताने वाला मॉडल उपलब्ध नहीं है।',
+    'വസ്തുവിന്റെ പേര് പറയുന്ന മോഡൽ ലഭ്യമല്ല.',
+  ],
+  'sort.cameraStillWorks': [
+    'The camera preview still works; recognition stays off until the model can be confirmed.',
+    'कैमरा अभी भी दिखता है; मॉडल की पुष्टि होने तक पहचान बंद रहेगी।',
+    'ക്യാമറ ഇപ്പോഴും കാണാം; മോഡൽ സ്ഥിരീകരിക്കുന്നതുവരെ തിരിച്ചറിയൽ ഓഫ് ആയിരിക്കും.',
+  ],
+  'sort.cameraWaitingModel': [
+    'The camera preview is available. Recognition starts only after the model is confirmed.',
+    'कैमरा उपलब्ध है। मॉडल की पुष्टि के बाद ही पहचान शुरू होगी।',
+    'ക്യാമറ ലഭ്യമാണ്. മോഡൽ സ്ഥിരീകരിച്ചതിന് ശേഷം മാത്രം തിരിച്ചറിയൽ തുടങ്ങും.',
+  ],
+  'sort.howItWorksBody': [
+    'One picture is taken when you press Check the item, and a hosted vision model names what it sees. The waste category comes from that name — if the name says plastic, the item is plastic — and the three demonstration bins light their own lamp. Nothing is read until you press.',
+    'जब आप “चीज़ जाँचें” दबाते हैं तब एक तस्वीर ली जाती है, और एक होस्टेड विज़न मॉडल देखी गई चीज़ का नाम बताता है। कचरे की श्रेणी उसी नाम से तय होती है — अगर नाम में प्लास्टिक है तो चीज़ प्लास्टिक है — और तीन प्रदर्शन बिन अपनी बत्ती जलाते हैं। दबाने तक कुछ नहीं पढ़ा जाता।',
+    'നിങ്ങൾ “വസ്തു പരിശോധിക്കുക” അമർത്തുമ്പോൾ ഒരു ഫോട്ടോ എടുക്കുന്നു, ഒരു ഹോസ്റ്റഡ് വിഷൻ മോഡൽ കാണുന്നതിന്റെ പേര് പറയുന്നു. ആ പേരിൽ നിന്നാണ് മാലിന്യ വിഭാഗം തീരുമാനിക്കുന്നത് — പേരിൽ പ്ലാസ്റ്റിക് ഉണ്ടെങ്കിൽ വസ്തു പ്ലാസ്റ്റിക് ആണ് — മൂന്ന് പ്രദർശന ബിന്നുകൾ അവയുടെ വിളക്ക് കത്തിക്കുന്നു. അമർത്തുന്നതുവരെ ഒന്നും വായിക്കുന്നില്ല.',
+  ],
   // The object is named before the category, so a visitor can check the answer.
   'sort.sees': ['I see: {object}', 'मुझे यह दिखता है: {object}', 'എനിക്ക് ഇത് കാണുന്നു: {object}'],
   'sort.classifierSays': [

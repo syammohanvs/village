@@ -19,6 +19,7 @@ import {
 } from '../lib/camera';
 import { BIN_CONFIDENCE, SUPPORT } from '../lib/wasteGuide';
 import { useT } from '../lib/i18n';
+import { translateItemName } from '../lib/wasteName';
 import type { MessageKey } from '../lib/messages';
 import { useVoiceUi } from '../lib/voiceUi';
 import { useDemo } from '../lib/demo';
@@ -675,6 +676,16 @@ export function SortWaste() {
     captureFileRef.current = null;
   }, []);
 
+  // The model's name is English.  In Hindi/Malayalam it is shown only when the
+  // whole name can be said in that language; otherwise the line is left out
+  // rather than printing an English noun on a Hindi page.
+  const shownItem =
+    check.identify === 'checking'
+      ? t('sort.stateIdentifying')
+      : check.identify === 'done' && check.decision?.itemLabel
+        ? translateItemName(check.decision.itemLabel, voiceLanguage)
+        : t('sort.stateUnavailable');
+
   return (
     <div className="page sort-waste">
       <div className="waste-layout">
@@ -774,14 +785,10 @@ export function SortWaste() {
                 className="btn btn--primary btn--large"
                 onClick={() => void runCheck()}
                 disabled={!installed || reading}
-                title={
-                  installed
-                    ? 'Name whatever is on the base right now.'
-                    : 'The item-naming model is not available.'
-                }
+                title={installed ? t('sort.checkTitle') : t('sort.checkTitleUnavailable')}
                 data-testid="classify-now"
               >
-                <IconCheck size={18} /> {reading ? 'Reading…' : 'Check the item'}
+                <IconCheck size={18} /> {reading ? t('sort.readingItem') : t('sort.checkItem')}
               </button>
             )}
             <div className="camera-picker" data-testid="camera-picker">
@@ -882,19 +889,17 @@ export function SortWaste() {
               </div>
             ) : (
               <>
-                <div className="model-state" data-testid="waste-identify">
-                  <div className="model-state-head">
-                    <span className="model-state-label">{t('sort.labelIdentification')}</span>
-                    <span className="model-state-source">{t('sort.sourceVision')}</span>
+                {shownItem && (
+                  <div className="model-state" data-testid="waste-identify">
+                    <div className="model-state-head">
+                      <span className="model-state-label">{t('sort.labelIdentification')}</span>
+                      <span className="model-state-source">{t('sort.sourceVision')}</span>
+                    </div>
+                    <p className="model-state-value" data-testid="waste-sees">
+                      {shownItem}
+                    </p>
                   </div>
-                  <p className="model-state-value" data-testid="waste-sees">
-                    {check.identify === 'checking'
-                      ? t('sort.stateIdentifying')
-                      : check.identify === 'done' && check.decision?.itemLabel
-                        ? check.decision.itemLabel
-                        : t('sort.stateUnavailable')}
-                  </p>
-                </div>
+                )}
 
                 <div className="model-state model-state--class" data-testid="waste-classify">
                   <div className="model-state-head">
@@ -1068,12 +1073,11 @@ export function SortWaste() {
 
           {modelStatus.error ? (
             <Notice tone="warn" title={t('sort.modelStatusUnknown')}>
-              {errorMessage(modelStatus.error)}. The camera preview still works; recognition stays
-              off until the model can be confirmed.
+              {errorMessage(modelStatus.error)}. {t('sort.cameraStillWorks')}
             </Notice>
           ) : modelStatus.loading ? (
             <Notice tone="info" title={t('sort.checkingModel')}>
-              The camera preview is available. Recognition starts only after the model is confirmed.
+              {t('sort.cameraWaitingModel')}
             </Notice>
           ) : !installed ? (
             <Notice tone="warn" title={t('sort.modelMissing')}>
@@ -1085,12 +1089,7 @@ export function SortWaste() {
           <details className="advanced">
             <summary>{t('sort.howItWorks')}</summary>
             <div className="advanced-body">
-              <p>
-                One picture is taken when you press <strong>Check the item</strong>, and a hosted
-                vision model names what it sees. The waste category comes from that name — if the
-                name says plastic, the item is plastic — and the three demonstration bins light
-                their own lamp. Nothing is read until you press.
-              </p>
+              <p>{t('sort.howItWorksBody')}</p>
               <p className="hint">
                 {t('sort.safetyNote')}
               </p>

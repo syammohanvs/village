@@ -1475,4 +1475,37 @@ describe('Sort Waste — two models, one decision', () => {
       restore();
     }
   }, 25000);
+
+  it('says the button and a known item name in the chosen language', async () => {
+    // Reported 2026-11-20: the button stayed English, and so did the name.
+    window.localStorage.setItem('village.voiceLanguage', 'hi');
+    const restore = await press({ predictions: plasticAt(0.42), object: 'Onion' });
+    try {
+      expect(screen.getByTestId('classify-now')).toHaveTextContent('चीज़ जाँचें');
+      await waitFor(
+        () => expect(screen.getByTestId('waste-sees')).toHaveTextContent('प्याज़'),
+        { timeout: 8000 },
+      );
+    } finally {
+      restore();
+    }
+  }, 25000);
+
+  it('leaves the name out rather than printing English on a Malayalam page', async () => {
+    window.localStorage.setItem('village.voiceLanguage', 'ml');
+    const restore = await press({
+      predictions: plasticAt(0.42),
+      object: 'Large yellowish widget',
+    });
+    try {
+      expect(screen.getByTestId('classify-now')).toHaveTextContent('വസ്തു പരിശോധിക്കുക');
+      // The category and the action are translated; the untranslatable English
+      // noun is left out instead of being shown to a Malayalam reader.
+      await waitFor(() => expect(api.postRecognition).toHaveBeenCalled(), { timeout: 8000 });
+      expect(screen.queryByTestId('waste-identify')).not.toBeInTheDocument();
+      expect(screen.getByTestId('waste-classify')).toHaveTextContent(/പ്ലാസ്റ്റിക്|plastic/i);
+    } finally {
+      restore();
+    }
+  }, 25000);
 });
