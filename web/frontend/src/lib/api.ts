@@ -540,8 +540,13 @@ export const api = {
    * different fact from an unavailable service, and the page treats it as
    * "nothing to sort" rather than falling back.
    */
-  wasteIdentify(image: string): Promise<{
+  wasteIdentify(
+    image: string,
+    language: 'en' | 'hi' | 'ml' = 'en',
+  ): Promise<{
     object: string | null;
+    /** The same name in the page's language, when the translator answered. */
+    object_local?: string | null;
     /** The model saw no object.  A distinct outcome from a failed call. */
     empty?: boolean;
     provider: string | null;
@@ -551,12 +556,17 @@ export const api = {
   }> {
     return request<{
       object: string | null;
+      object_local?: string | null;
       empty?: boolean;
       provider: string | null;
       model: string | null;
       ms: number;
       reason?: string;
-    }>('/waste/identify', { method: 'POST', body: { image }, mode: undefined });
+    }>('/waste/identify', {
+      method: 'POST',
+      body: { image, language },
+      mode: undefined,
+    });
   },
 
   /**

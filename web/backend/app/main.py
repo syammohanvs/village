@@ -46,6 +46,7 @@ from .protocol import (
     VoiceInterpretRequest,
     LoginRequest,
     WasteClassifyRequest,
+    WasteIdentifyRequest,
     WasteClearRequest,
     WasteCorrectionRequest,
     WasteTeachRequest,
@@ -806,7 +807,7 @@ def create_app(
         return {"model": "resnet50", "predictions": predictions, "file": waste_resnet.last_capture()}
 
     @app.post("/api/v1/waste/identify")
-    async def waste_identify(body: WasteClassifyRequest):
+    async def waste_identify(body: WasteIdentifyRequest):
         """Name the object in the same crop, with a hosted vision model.
 
         The name is an input to the route, not a caption on it: the page's rules
@@ -821,7 +822,7 @@ def create_app(
         is null and the page shows the classifier alone — the behaviour before
         this existed.
         """
-        return await asyncio.to_thread(vision.identify, body.image)
+        return await asyncio.to_thread(vision.identify, body.image, body.language)
 
     @app.post("/api/v1/waste/correction")
     async def waste_correction(body: WasteCorrectionRequest):

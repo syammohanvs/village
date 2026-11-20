@@ -249,3 +249,16 @@ class WasteClassifyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     image: str = Field(min_length=32, max_length=2_000_000)
+
+
+class WasteIdentifyRequest(BaseModel):
+    """The same frame, to be *named* — and the visitor's language for that name.
+
+    `language` is a display preference, never an input to a decision: the rules
+    read the English name, and `object_local` is only what the page prints.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    image: str = Field(min_length=32, max_length=2_000_000)
+    language: str = Field(default="en", pattern="^(en|hi|ml)$")

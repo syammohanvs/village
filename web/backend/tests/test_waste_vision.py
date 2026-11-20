@@ -36,6 +36,8 @@ def no_provider(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.delenv(name, raising=False)
     vision._CACHE.clear()
     vision._CACHE_ORDER.clear()
+    vision._TRANSLATIONS.clear()
+    vision._TRANSLATION_ORDER.clear()
     vision._INDEX[0] = 0
     yield
 
@@ -435,3 +437,110 @@ def test_the_cloudflare_payload_asks_for_one_deterministic_name(
     assert payload["max_tokens"] <= 64
     url = payload["messages"][0]["content"][1]["image_url"]["url"]
     assert url.startswith("data:image/jpeg;base64,")
+
+
+def _translate_setup(monkeypatch, name: str = "banana peel"):
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.delenv("VILLAGE_VISION_API_KEY", raising=False)
+    monkeypatch.setattr(vision, "_ask_candidate", lambda c, j, d: name)
+
+
+def test_the_name_is_translated_for_a_hindi_page(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The visitor's page needs the name in its own language.
+
+    Measured 2026-11-20: IndicTrans2 on Workers AI answers in 0.5–0.9 s and
+    keeps the grammar a word table cannot ("banana peel" ->
+    "വാഴപ്പഴത്തിന്റെ തൊലി").  The English name is still what every rule reads.
+    """
+    _translate_setup(monkeypatch)
+    seen: list[str] = []
+
+    def fake_post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        seen.append(url)
+        assert payload["target_language"] == "hin_Deva"
+        return {"success": True, "result": {"translations": ["केले का छिलका"]}}
+
+    monkeypatch.setattr(vision, "_post", fake_post)
+
+    answer = vision.identify(CROP, "hi")
+    assert answer["object"] == "banana peel"
+    assert answer["object_local"] == "केले का छिलका"
+    assert len(seen) == 1 and "indictrans" in seen[0]
+
+
+def test_an_english_page_never_calls_the_translator(monkeypatch: pytest.MonkeyPatch) -> None:
+    _translate_setup(monkeypatch)
+    seen: list[str] = []
+    monkeypatch.setattr(
+        vision, "_post",
+        lambda url, payload, headers, timeout: seen.append(url) or {"success": True},
+    )
+
+    answer = vision.identify(CROP)
+    assert answer["object"] == "banana peel"
+    assert answer["object_local"] is None
+    assert seen == []
+
+
+def test_a_failed_translation_leaves_the_name_and_never_fails_the_press(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _translate_setup(monkeypatch)
+
+    def failing(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        raise RuntimeError("HTTP Error 500: upstream")
+
+    monkeypatch.setattr(vision, "_post", failing)
+
+    answer = vision.identify(CROP, "ml")
+    assert answer["object"] == "banana peel"
+    assert answer["object_local"] is None
+
+
+def test_the_translation_is_cached_per_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    _translate_setup(monkeypatch)
+    calls: list[dict] = []
+
+    def fake_post(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        calls.append(payload)
+        word = "प्याज़" if payload["target_language"] == "hin_Deva" else "സവാള"
+        return {"success": True, "result": {"translations": [word]}}
+
+    monkeypatch.setattr(vision, "_post", fake_post)
+
+    assert vision.identify(CROP, "hi")["object_local"] == "प्याज़"
+    assert vision.identify(CROP, "hi")["object_local"] == "प्याज़"   # cached
+    assert len(calls) == 1
+    ml = vision.identify(CROP, "ml")["object_local"]
+    assert ml == "സവാള"
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_route_takes_a_language_and_returns_the_local_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_test")
+    monkeypatch.setattr(vision, "_ask_candidate", lambda candidate, jpeg, deadline: "onion")
+    monkeypatch.setattr(
+        vision,
+        "translate_name",
+        lambda text, language, deadline=None: "प्याज़" if language == "hi" else None,
+    )
+
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, _gateway, _app):
+        response = await client.post(
+            "/api/v1/waste/identify", json={"image": CROP, "language": "hi"}
+        )
+        bad = await client.post(
+            "/api/v1/waste/identify", json={"image": CROP, "language": "fr"}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["object"] == "onion"
+    assert response.json()["object_local"] == "प्याज़"
+    assert bad.status_code == 422

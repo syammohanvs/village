@@ -107,9 +107,11 @@ export function SortWaste() {
     error: string;
     /** Which service actually named this item, not which one is configured now. */
     namedBy: { provider: string | null; model: string | null } | null;
+    /** The model's name in the visitor's language; null when it was not said. */
+    itemLocal: string | null;
   }>({
     phase: 'idle', identify: 'idle', classify: 'idle', decision: null,
-    crop: null, cropMode: null, error: '', namedBy: null,
+    crop: null, cropMode: null, error: '', namedBy: null, itemLocal: null,
   });
   const checkSeq = useRef(0);
   // Corrections write into the training tree, so they are an operator action:
@@ -381,6 +383,10 @@ export function SortWaste() {
     const video = videoRef.current;
     if (!video || busyRef.current || video.readyState < 2) return;
     const seq = ++checkSeq.current;
+    // A request finishes in the language it began in: the translator is asked
+    // for the language chosen at the press, not whichever one is selected when
+    // the answer lands.
+    const languageAtPress = voiceLanguage;
     busyRef.current = true;
     setReading(true);
     setAlert('');
@@ -418,11 +424,14 @@ export function SortWaste() {
       cropMode: null,
       error: '',
       namedBy: null,
+      itemLocal: null,
     });
 
     // `empty` is the model saying "nothing there" — an answer, not a failure.
     type Named = {
       object: string | null;
+      /** The same name in the language the press began in, when translated. */
+      object_local?: string | null;
       empty: boolean;
       provider: string | null;
       model: string | null;
@@ -473,7 +482,7 @@ export function SortWaste() {
           if (visionReady && lastCropRef.current) {
             const image = lastCropRef.current;
             naming = api
-              .wasteIdentify(image)
+              .wasteIdentify(image, languageAtPress)
               .then((answer) => {
                 const name = answer.object;
                 // Late: the decision has already been given.  Record it for the
@@ -483,6 +492,7 @@ export function SortWaste() {
                 // reply must not be recorded under the configured service.
                 return {
                   object: name,
+                  object_local: answer.object_local ?? null,
                   empty: Boolean(answer.empty),
                   provider: answer.provider,
                   model: answer.model,
@@ -551,6 +561,7 @@ export function SortWaste() {
           named.provider || named.model
             ? { provider: named.provider, model: named.model }
             : null,
+        itemLocal: named.object_local ?? null,
       });
       // From here the answer is final: a name that resolves later is kept in
       // the details only.
@@ -671,6 +682,7 @@ export function SortWaste() {
       cropMode: null,
       error: '',
       namedBy: null,
+      itemLocal: null,
     });
     setRecognition(null);
     captureFileRef.current = null;
@@ -683,7 +695,7 @@ export function SortWaste() {
     check.identify === 'checking'
       ? t('sort.stateIdentifying')
       : check.identify === 'done' && check.decision?.itemLabel
-        ? translateItemName(check.decision.itemLabel, voiceLanguage)
+        ? (check.itemLocal ?? translateItemName(check.decision.itemLabel, voiceLanguage))
         : t('sort.stateUnavailable');
 
   return (

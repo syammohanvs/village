@@ -3130,3 +3130,29 @@ leaves`, `coffee grounds`, `cooked rice`) are listed instead, and two tests pin
 it: nine food-waste names open the organic bin, while "milk carton" stays paper
 and "orange plastic bottle" stays plastic.  `wasteName.ts` gained the same
 kitchen words for display.
+
+**The item name is now translated by IndicTrans2 (2026-11-21, operator's
+suggestion).**  The hosted vision model names objects only in English, and the
+hand-written word table could not cover everything.  Workers AI has
+**`@cf/ai4bharat/indictrans2-en-indic-1B`**, measured at **0.5–0.9 s** per name
+on the exhibit's account — inside the page's 15 s wait — and it keeps the
+grammar the table cannot ("banana peel" → "വാഴപ്പഴത്തിന്റെ തൊലി", "blue plastic
+bottle" → "नीली प्लास्टिक की बोतल").
+
+- `/api/v1/waste/identify` gained an optional `language` (`en|hi|ml`, default
+  `en`; anything else is 422) and returns **`object_local`** beside `object`.
+- `vision.translate_name()` uses the **same Cloudflare account** that named the
+  item, caches per `(name, language)` (512 entries), and is **fail-soft**: no
+  account, a timeout (`VILLAGE_CF_TRANSLATE_TIMEOUT_SECS`, 6 s) or a bad reply
+  returns None and the page falls back to the word table.
+- **Display only.**  Every rule reads `object` (English), so a translation can
+  never change a bin; the page prefers `object_local`, then the table, then
+  leaves the line out.  The language is captured when the press begins, so a
+  mid-press switch cannot re-read an item.
+- `docs/voice-languages.md` now states the single exception to "no machine
+  translation in the conversation path": the Sort Waste item name, display-only.
+- Honest limit: "clear plastic lid" came back as "प्लास्टिक के ढक्कन को साफ
+  करें" ("clean the plastic lid") — English "clear" is ambiguous; the category
+  and the action are unaffected.
+
+Gates: backend **204**, frontend **467**.

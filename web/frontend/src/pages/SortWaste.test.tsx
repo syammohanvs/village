@@ -1491,6 +1491,32 @@ describe('Sort Waste — two models, one decision', () => {
     }
   }, 25000);
 
+  it('asks in the press language and shows the translated name the backend returns', async () => {
+    window.localStorage.setItem('village.voiceLanguage', 'hi');
+    const restore = await press({
+      predictions: plasticAt(0.42),
+      object: 'onion',
+      identify: (async (_image: string, language: string) => ({
+        object: 'onion',
+        object_local: language === 'hi' ? 'कांदा' : null,
+        provider: 'cloudflare',
+        model: '@cf/meta/llama-3.2-11b-vision-instruct',
+        ms: 700,
+      })) as never,
+    });
+    try {
+      await waitFor(
+        () => expect(screen.getByTestId('waste-sees')).toHaveTextContent('कांदा'),
+        { timeout: 8000 },
+      );
+      // The language travels with the request, so the translator is asked for
+      // the page's language rather than English.
+      expect(api.wasteIdentify).toHaveBeenCalledWith(expect.stringMatching(/^data:image/), 'hi');
+    } finally {
+      restore();
+    }
+  }, 25000);
+
   it('leaves the name out rather than printing English on a Malayalam page', async () => {
     window.localStorage.setItem('village.voiceLanguage', 'ml');
     const restore = await press({

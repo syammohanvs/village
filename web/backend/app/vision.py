@@ -62,6 +62,18 @@ PROMPT = (
     "If there is no object, answer exactly: nothing"
 )
 
+# The item name is English (the model names objects well and materials badly in
+# any language).  The visitor's page needs the name in Hindi or Malayalam, so
+# the **IndicTrans2** model on Workers AI translates that short phrase after the
+# name arrives — measured 2026-11-20 at 0.5–0.9 s per name, well inside the
+# page's 15 s wait, and it keeps the grammar a word table cannot ("banana peel"
+# -> "വാഴപ്പഴത്തിന്റെ തൊലി").  English never calls it.
+TRANSLATE_MODEL = os.getenv(
+    "VILLAGE_CF_TRANSLATE_MODEL", "@cf/ai4bharat/indictrans2-en-indic-1B"
+)
+TRANSLATE_TIMEOUT_S = float(os.getenv("VILLAGE_CF_TRANSLATE_TIMEOUT_SECS", "6"))
+TRANSLATE_TARGETS = {"hi": "hin_Deva", "ml": "mal_Mlym"}
+
 TIMEOUT_S = float(os.getenv("VILLAGE_VISION_TIMEOUT_SECS", "8"))
 # The last resort is a reasoning model on a slower lane: measured 8.1 s, 10.2 s
 # and 0.9 s (warm) for three calls on 2026-11-19, so the 8 s used for Workers AI
@@ -154,12 +166,85 @@ def status() -> dict[str, Any]:
     }
 
 
-def identify(image: str) -> dict[str, Any]:
-    """`{object, provider, model, ms, cached, reason}` for one crop.
+# Translations are cached by (name, language): the same item is checked again
+# and again at a booth, and a repeat must not pay for the model twice.  Bounded
+# like the name cache so a long session cannot grow without limit.
+_TRANSLATIONS: dict[tuple[str, str], str] = {}
+_TRANSLATION_ORDER: list[tuple[str, str]] = []
+_TRANSLATION_KEEP = 512
+
+
+def _cache_translation(key: tuple[str, str], text: str) -> None:
+    _TRANSLATIONS[key] = text
+    _TRANSLATION_ORDER.append(key)
+    while len(_TRANSLATION_ORDER) > _TRANSLATION_KEEP:
+        old = _TRANSLATION_ORDER.pop(0)
+        _TRANSLATIONS.pop(old, None)
+
+
+def translate_name(text: str | None, language: str, deadline: float | None = None) -> str | None:
+    """The item name in `hi` or `ml`, or None when it cannot be said.
+
+    Fail-soft on purpose: a translation that does not arrive must leave the page
+    exactly as it is today (the English name, or the caller's word table), never
+    hold up the answer or invent a word.  The same cloudflare account that named
+    the object is used; with no Cloudflare account configured there is nothing
+    to translate with and the caller falls back.
+    """
+    if not text or language not in TRANSLATE_TARGETS:
+        return None
+    key = (text, language)
+    if key in _TRANSLATIONS:
+        return _TRANSLATIONS[key]
+
+    candidate = next((c for c in _cloudflare_candidates() if c.get("token")), None)
+    if candidate is None:
+        return None
+    account = candidate.get("account") or _first_account(candidate["token"], deadline)
+    if not account:
+        return None
+    timeout = min(TRANSLATE_TIMEOUT_S, _remaining(deadline)) if deadline is not None else TRANSLATE_TIMEOUT_S
+    if timeout <= 0:
+        return None
+
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{TRANSLATE_MODEL}"
+    payload = {
+        "text": text,
+        "target_language": TRANSLATE_TARGETS[language],
+        "source_language": "eng_Latn",
+    }
+    try:
+        body = _post(
+            url,
+            payload,
+            {"Authorization": "Bearer " + candidate["token"], "Content-Type": "application/json"},
+            timeout,
+        )
+    except Exception:  # noqa: BLE001 - fail-soft, see the docstring
+        return None
+    if not body.get("success", True):
+        return None
+    result = body.get("result") or {}
+    rows = result.get("translations") if isinstance(result, dict) else None
+    if not isinstance(rows, list) or not rows:
+        return None
+    out = str(rows[0]).strip()
+    if not out:
+        return None
+    _cache_translation(key, out)
+    return out
+
+
+def identify(image: str, language: str = "en") -> dict[str, Any]:
+    """`{object, object_local, provider, model, ms, cached, reason}` for one crop.
 
     `object` is None when no provider is configured, the model answered nothing,
     or the call failed — the page then says nothing about the object and shows
     only the classifier, which is the behaviour before this feature existed.
+
+    `object_local` is the same name in `hi` or `ml`, translated after the fact by
+    IndicTrans2 (see `translate_name`).  It is a **display** field only: every
+    rule reads `object`, so a translation can never change a bin.
     """
     started = time.time()
     # One absolute deadline for the whole operation: account discovery, the two
@@ -173,7 +258,10 @@ def identify(image: str) -> dict[str, Any]:
 
     key = hashlib.sha256(image.encode("utf-8")).hexdigest()
     if key in _CACHE:
-        return {**base, **_CACHE[key], "ms": 0, "cached": True}
+        entry = _CACHE[key]
+        cached = {**base, **entry, "ms": 0, "cached": True}
+        cached["object_local"] = translate_name(entry.get("object"), language)
+        return cached
 
     jpeg = _decode(image)
     if jpeg is None:
@@ -214,6 +302,10 @@ def identify(image: str) -> dict[str, Any]:
             "provider": candidate["provider"],
             "model": model_name(candidate["provider"]),
             "object": name,
+            # Display only.  Translation is best-effort: with no Cloudflare
+            # account, a timeout or a bad reply this stays None and the page
+            # falls back to its own word table.
+            "object_local": translate_name(name, language, deadline),
             "ms": int((time.time() - started) * 1000),
         }
         # "Nothing visible" is an ANSWER, not a failure.  The page must be able

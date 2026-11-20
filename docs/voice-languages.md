@@ -22,14 +22,19 @@ decision. Where something is an assumption it says so.
    command/question or is refused.
 4. The reply is a **hand-written sentence per language** from one table; Sara
    speaks it with a **local neural voice** for that language.
-5. There is **no machine translation anywhere in the running app**. "Translation"
+5. There is **no machine translation in the conversation path**. "Translation"
    here means a three-column message catalogue written by a person, plus a parser
-   that has vocabulary in all three languages.
+   that has vocabulary in all three languages.  **One exception, added
+   2026-11-21:** the *item name* the hosted vision model returns on the Sort
+   Waste card ("onion", "blue plastic bottle") is translated for **display** by
+   **IndicTrans2** on Workers AI (`@cf/ai4bharat/indictrans2-en-indic-1B`,
+   0.5–0.9 s measured).  It is never an input to a decision — every rule reads
+   the English name — and it falls back to the hand-written word table, then to
+   leaving the line out.
 
-That last point is the most important thing for a reviewer to hold on to: nothing
-at runtime translates one language into another, so a sentence that is not in a
-table cannot be invented in another language. It falls back to English, or is
-refused.
+That last point is still the important thing for a reviewer to hold on to: a
+sentence that is not in a table cannot be invented in another language. It falls
+back to English, or is refused.
 
 ---
 
@@ -244,8 +249,11 @@ project was made.
    sentence; it is never mapped onto the nearest command.
 6. **Never show a raw key or a percentage**, and never speak the controller's
    English reason instead of the translated sentence.
-7. **Translations are hand-written.** Do not add a machine-translation call, and
-   do not "fill in" a missing language at runtime.
+7. **Conversation translations are hand-written.** Do not add a
+   machine-translation call to a sentence, a command or a reply, and do not
+   "fill in" a missing language at runtime.  The single machine call is the
+   Sort Waste **item name** (`vision.translate_name`), which is display-only and
+   never reaches a decision.
 8. **The UI language and Sara's language are one setting**, not two.
 
 ---
