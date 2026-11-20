@@ -1,10 +1,13 @@
-# Local configuration and device secrets ARE committed (2026-11-17).
-# This repository is the private master copy of the exhibit: a fresh clone on
-# another laptop must run exactly as this one was left.  Nothing here is a
-# shared credential — it is one private board and one laptop.  Do not publish
-# this repository.
+# Local configuration and device secrets are NOT committed (2026-11-20).
+# The exhibit's secrets (board token, OTA password, Wi-Fi, API keys) live on
+# the machine that runs it and are never pushed.  A fresh clone needs a filled
+# `.env` and `uc/include/village/secrets.h` (copy from the *.example files and
+# fill them in); the rest of the exhibit state (database, models, samples)
+# still travels with the repository.
+.env
 .env.*
 !.env.example
+uc/include/village/secrets.h
 !uc/include/village/secrets.example.h
 *.pem
 *.key

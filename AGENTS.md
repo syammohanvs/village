@@ -1,16 +1,17 @@
 # AGENTS.md — working notes for this repository
 
-> **This repository is the master copy — commit and push normally.** The user
-> changed this on 2026-11-17: *"commit everything including secrets.h in github.
-> If laptop has a problem I should simply be able to use another laptop and run
-> the app as is."* So the code, the models, the settings and the secrets are all
-> committed and pushed to `origin/main` (`git@github.com:syammohanvs/village.git`,
-> **private**). Do not publish it, and do not paste its credentials anywhere
-> public. **Pushing still triggers a Cloudflare Pages build** of the dashboard —
-> that is a deploy of `web/dist` only and contains no token (verified: the built
-> bundle carries no `VILLAGE_*` value), so it is a side effect to be aware of,
-> not a reason to hold commits back. Earlier history: the user preferred local
-> commits (2026-11-12) for exactly that reason.
+> **Secrets are per-machine now (2026-11-20).** After an incident with the
+> OpenCode account, the user asked that **no secret keys live in GitHub**. So
+> `.env` and `uc/include/village/secrets.h` are **git-ignored** and are **not**
+> in the repository; a fresh clone must be given both (copy from `*.example`
+> and fill in). The code, the models, the settings and the village database
+> still travel with the repository. **Do not publish it, and do not paste
+> credentials anywhere public.** Pushing still triggers a Cloudflare Pages build
+> of the dashboard — that is a deploy of `web/dist` only and contains no token
+> (verified: the built bundle carries no `VILLAGE_*` value), so it is a side
+> effect to be aware of, not a reason to hold commits back. Earlier history
+> (2026-11-12) preferred local commits; (2026-11-17) committed everything
+> including secrets; (2026-11-20) removed the secrets again.
 
 Smart Green Village: ESP32 firmware (`uc/`), FastAPI backend
 (`web/backend/`), React/Vite dashboard (`web/frontend/`), Whisper voice and a
@@ -46,6 +47,11 @@ cd village
 ```bash
 ./scripts/setup.sh             # .venv, backend, classifier, node_modules
 ./scripts/download_models.sh   # whisper ggml-base.bin (~142 MB)
+cp .env.example .env           # then fill in the device token, OTA password,
+                               # Wi-Fi name, and any API keys you use
+cp uc/include/village/secrets.example.h uc/include/village/secrets.h
+                               # then fill in the Wi-Fi name/password, the
+                               # device token and the OTA password
 ```
 
 `setup.sh` installs three requirement files: the API (`requirements.txt`), the
@@ -54,6 +60,11 @@ without it the app starts and cannot sort waste), and the test tools. It creates
 the Python environment in `.venv` beside the checkout when `.env` names one that
 does not exist on this machine — `scripts/venv.sh` is the single rule, shared by
 `setup.sh`, `launch.sh`, `dev.sh` and `test_all.sh`.
+
+The two secret files are **not in the repository** (see the banner above), so a
+fresh clone will not sign in, reach the board or sort waste until they are
+filled in. The rest of the exhibit (database, models, samples) still travels
+with the clone.
 
 **4. Run**:
 
@@ -85,11 +96,12 @@ answering `Plastic 0.924`. That is the standard this setup is held to.
 
 **6. What is per-machine, and repairs itself**
 
-- `.env` carries this laptop's paths. `VILLAGE_VENV` falls back to `.venv` as
-  above; `VILLAGE_DEVICE_URL` is the relay on the **Windows host**, whose WSL
-  address changes every boot — `./scripts/relay.sh ensure` (called by both start
-  scripts) rewrites it, and `./scripts/relay.sh status` says whether the board is
-  reachable (hotspot on, relay running, board's lease).
+- `.env` carries this laptop's paths and secrets (it is **not** in git).  `VILLAGE_VENV`
+  falls back to `.venv` as above; `VILLAGE_DEVICE_URL` is the relay on the
+  **Windows host**, whose WSL address changes every boot — `./scripts/relay.sh
+  ensure` (called by both start scripts) rewrites it, and `./scripts/relay.sh
+  status` says whether the board is reachable (hotspot on, relay running, board's
+  lease).
 - The board needs the **Windows Mobile Hotspot** on; its Wi-Fi credentials are in
   `uc/include/village/secrets.h` (committed). Moving laptops reflashes nothing —
   the board keeps its own NVS calibration.
@@ -1918,13 +1930,16 @@ the special sentence and its own event.  The physical LED selection and the 8 s
 auto-off remain the operator's verified behaviour; **`CLEAR_WASTE` is still the
 one hardware item awaiting a press on the board.**
 
-**The repository is the master copy of the exhibit (2026-11-17).**  A fresh
-clone on another laptop must run as this one was left, so these are committed
-on purpose: `models/piper/` (Sara's voice, 293 MB), `models/waste/` +
-`models/waste-resnet50/` (104 MB), `models/whisper/whisper-server`,
-`data/village.db`, `data/waste-samples/` (1134 corrected photos — the only copy)
-and the credentials `.env` + `uc/include/village/secrets.h`.  It is a **private**
-repository: it holds one board's tokens.  **Do not publish it.**
+**The repository is the master copy of the exhibit's code, models and state
+(2026-11-17, updated 2026-11-20).**  A fresh clone on another laptop must run
+as this one was left, so these are committed on purpose: `models/piper/` (Sara's
+voice, 293 MB), `models/waste/` + `models/waste-resnet50/` (104 MB),
+`models/whisper/whisper-server`, `data/village.db`, `data/waste-samples/` (1134
+corrected photos — the only copy).  **The credentials (`.env` and
+`uc/include/village/secrets.h`) are deliberately NOT committed any more** — they
+are per-machine secrets, and a fresh clone must supply them from the `*.example`
+files.  The repository is **private** and holds one board's tokens in
+`data/village.db`; **do not publish it.**
 
 The only thing that cannot be committed is the whisper **weights** —
 `ggml-base.bin` is 142 MB and GitHub refuses any file over 100 MB (`small` is
