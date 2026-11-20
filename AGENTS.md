@@ -2976,3 +2976,10 @@ relay watcher keeps the link repaired. `CLEAR_WASTE` is now available on the
 board; one press confirms an immediate lamp off. The OTA image was copied to
 the Windows flash folder. Physical verification remaining: a 4-second pulse
 delivering water through the tubing.
+
+**Soil sensor calibrated (2026-11-20).** The probe was reading 2421 in dry air
+and 851 in moist soil. Config updated (revision 3 → 4): `dry_raw` 1674,
+`wet_raw` 3244 (inverted domain, `rises_with_moisture` false), `calibrated`
+true. Read-back confirms 100% in moist soil. The earlier 0% reading was because
+the restored endpoints (2498/3325) no longer matched the probe's actual
+resistance — the original NVS calibration was lost in the flash.

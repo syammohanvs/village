@@ -699,7 +699,9 @@ export function OurVillage() {
           )}
         </header>
         {stateLine(
-          solarVolts ? `${solarVolts} V · ${solarCurrent ?? '0.00'} mA · ${solarPower ?? '0.0'} mW` : '',
+          solarVolts
+            ? `${t('solar.voltage')} ${solarVolts} V · ${t('solar.current')} ${solarCurrent ?? '0.00'} mA · ${t('solar.power')} ${solarPower ?? '0.0'} mW`
+            : '',
           'neutral',
         )}
         {/* The picture is worth having in both modes: in Simulation it follows

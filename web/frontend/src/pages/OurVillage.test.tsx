@@ -273,7 +273,7 @@ describe('solar pill', () => {
     const chip = card.getByText('Not generating');
     expect(chip).toHaveClass('chip', 'chip--neutral');
     expect(chip).not.toHaveClass('chip--live');
-    expect(card.getByText(/0.14 V · 0.00 mA · 0.0 mW/)).toBeInTheDocument();
+    expect(card.getByText(/Voltage 0.14 V · Current 0.00 mA · Power 0.0 mW/)).toBeInTheDocument();
     expect(card.queryByText(/milliwatts/i)).not.toBeInTheDocument();
   });
 
@@ -285,7 +285,7 @@ describe('solar pill', () => {
     const card = within(await screen.findByTestId('card-solar'));
     const chip = card.getByText('Generating');
     expect(chip).toHaveClass('chip--live');
-    expect(card.getByText(/3\.20 V · 4\.55 mA · 14\.6 mW/)).toBeInTheDocument();
+    expect(card.getByText(/Voltage 3.20 V · Current 4.55 mA · Power 14.6 mW/)).toBeInTheDocument();
   });
 
   it('says where the two taps go when there is no reading at all', async () => {
