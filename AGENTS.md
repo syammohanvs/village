@@ -2949,3 +2949,14 @@ whole config + `config_revision` (do not send a partial config), then read it
 back.  The OTA image was rebuilt with the new defaults.  **Not physically
 verified:** a 4 s pulse delivering water through the tubing is the operator's
 check, not something the software tests can claim.
+
+**Exhibition timings applied to the board (2026-11-20, revision 27 → 28).** The
+board came back on the hotspot (192.168.137.115) and the revision-checked
+GET → merge → PUT → read-back succeeded. The saved configuration now carries
+`dry_confirm_ms 3000`, `pulse_ms 4000`, `soak_ms 8000`, `cooldown_ms 15000`,
+with `pump_enabled false`, `auto_enabled true`, thresholds 35/55, max pulse 8000,
+cumulative 15000 and max pulses 4 all unchanged. Calibration and unrelated
+settings were preserved. The firmware is still **0.2.8**, so the board ignores
+the new wind fields and runs the old wind logic; the **CLEAR_WASTE** command and
+the new wind reading still need the OTA flash of `0.2.9`. Physical verification
+of a 4-second pulse delivering water remains the operator's.
