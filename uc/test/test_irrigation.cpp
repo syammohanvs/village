@@ -289,6 +289,88 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
   CHECK(c.status(20000).reason == &reasons::kIdleSoilAdequate);
 }
 
+// The exhibition timings, end to end on the real controller: 3 s dry
+// confirmation, a 2 s pulse, an 8 s soak, a reassessment that starts a further
+// pulse, then completion and a 15 s cooldown.  These are the values the board's
+// saved configuration is given, so the sequence a visitor sees is this one.
+TEST(irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down) {
+  IrrigationConfig cfg = manualCfg();
+  cfg.auto_enabled = true;
+  cfg.dry_confirm_ms = 3000;
+  cfg.pulse_ms = 2000;
+  cfg.max_pulse_ms = 8000;
+  cfg.soak_ms = 8000;
+  cfg.max_cumulative_ms = 15000;
+  cfg.max_pulses = 4;
+  cfg.cooldown_ms = 15000;
+
+  IrrigationController c;
+  c.begin(0, cfg);
+
+  // Past the 5 s boot guard: the dry timer arms, the pump does not start.
+  c.tick(6000, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(6000).state == IrrigationState::Idle);
+
+  // 2.999 s of dry confirmation is not enough.
+  c.tick(8999, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(8999).pulses_done == 0);
+
+  // 3 s: 2 s pulse.
+  c.tick(9000, dryInputs());
+  CHECK(c.pumpOn());
+  CHECK(c.status(9000).state == IrrigationState::Pumping);
+  CHECK(c.status(9000).pulse_remaining_ms == 2000);
+  CHECK(c.status(9000).pulses_done == 1);
+
+  c.tick(10999, dryInputs());
+  CHECK(c.pumpOn());
+
+  // 2 s of pumping ends; 8 s of soak follows.
+  c.tick(11000, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(11000).state == IrrigationState::Soaking);
+  CHECK(c.status(11000).soak_remaining_ms == 8000);
+  CHECK(c.status(11000).cumulative_pump_ms == 2000);
+
+  c.tick(18999, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(18999).state == IrrigationState::Soaking);
+
+  // Reassessment while still dry: a further 2 s pulse.
+  c.tick(19000, dryInputs());
+  CHECK(c.pumpOn());
+  CHECK(c.status(19000).pulses_done == 2);
+
+  c.tick(21000, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(21000).state == IrrigationState::Soaking);
+
+  // The next soak ends with wet-enough soil: completion and a 15 s cooldown.
+  IrrigationInputs wet = dryInputs();
+  wet.soil_percent = 60.0f;
+  c.tick(29000, wet);
+  IrrigationStatus s = c.status(29000);
+  CHECK(!s.pump_on);
+  CHECK(s.state == IrrigationState::Idle);
+  CHECK(s.reason == &reasons::kCompleteMoisture);
+  CHECK(s.cooldown_remaining_ms == 15000);
+  CHECK(s.cumulative_pump_ms == 4000);
+
+  c.tick(43999, dryInputs());
+  CHECK(!c.pumpOn());
+  CHECK(c.status(43999).reason == &reasons::kIdleCooldown);
+
+  // The cooldown expires, the dry timer arms again, and 3 s later a new
+  // session begins.
+  c.tick(44000, dryInputs());
+  CHECK(!c.pumpOn());
+  c.tick(47000, dryInputs());
+  CHECK(c.pumpOn());
+  CHECK(c.status(47000).pulses_done == 1);
+}
+
 TEST(irrigation_completes_when_soil_reaches_stop_level) {
   IrrigationController c;
   c.begin(0, manualCfg());

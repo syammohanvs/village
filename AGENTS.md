@@ -2909,3 +2909,26 @@ comments in `uc/include/village/pins.h`, `build_config.h`, `outputs.h`,
 `web/frontend/src/components/TestModeDialog.tsx`.
 
 Gate: firmware **560 checks / 0 failed** (comments only, rebuilt).
+
+**Exhibition timings for automatic watering (2026-11-20).**  Four values only,
+so a visitor sees a full cycle in one demonstration:
+`dry_confirm_ms 30000→3000`, `pulse_ms 4000→2000`, `soak_ms 45000→8000`,
+`cooldown_ms 300000→15000`.  Firmware defaults (`config.h`), the simulator's
+config and the operator docs (`docs/operation.md` → **Exhibition timings
+(automatic watering)**) now carry them; `test_config` pins the defaults and
+`irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down` walks the
+real controller through 3 s confirm → 2 s pulse → 8 s soak → second pulse →
+completion → 15 s cooldown (firmware **596 checks**).  The simulator has its own
+sequence test, and both assertions that it still uses its own safety limits
+(**197 backend**).
+
+Everything else is untouched: 5 s boot guard, 35/55 % thresholds, 4-pulse
+maximum, 15 s cumulative cap, low-water stop, no-rise lockout, tank check and
+manual On/Off.  **The board's saved configuration has NOT been written:** the
+Windows hotspot was Off, was switched on, and no board answered on
+`192.168.137.0/24` (`GET /api/v1/device/config` → 503 `DEVICE_UNREACHABLE`), so
+the change is **pending**.  Apply it with a GET → merge four fields → PUT of the
+whole config + `config_revision` (do not send a partial config), then read it
+back.  The OTA image was rebuilt with the new defaults.  **Not physically
+verified:** a 2 s pulse delivering water through the tubing is the operator's
+check, not something the software tests can claim.

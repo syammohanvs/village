@@ -119,13 +119,16 @@ def default_config() -> dict[str, Any]:
             "pump_enabled": True,
             "dry_start_pct": 35,
             "stop_pct": 55,
-            "dry_confirm_ms": 6000,
-            "pulse_ms": 4000,
+            # Exhibition timings, the same four the board's saved configuration
+            # will carry: a whole cycle fits inside a demonstration.  The rest
+            # of the lab's protections keep their own values.
+            "dry_confirm_ms": 3000,
+            "pulse_ms": 2000,
             "max_pulse_ms": 4000,
             "soak_ms": 8000,
             "max_cumulative_ms": 12000,
             "max_pulses": 3,
-            "cooldown_ms": 20000,
+            "cooldown_ms": 15000,
             "link_timeout_ms": 30000,
         },
         "waste": {"indicate_ms": 8000},

@@ -177,6 +177,39 @@ water physically flowed. The dashboard keeps the two statements separate.
    *(There is no "Fill a bin" scenario: nothing measures bin fullness — the bins
    have indicator LEDs only.)*
 
+### Exhibition timings (automatic watering)
+
+The exhibit deliberately runs **shorter automatic-watering timings** than a
+normal installation, so one visitor sees a whole cycle — dry check, pulse, soak,
+re-check, cooldown — inside a single demonstration. These are the values the
+board's **saved configuration** carries:
+
+| setting | exhibition value | what the visitor sees |
+| --- | ---: | --- |
+| `irrigation.dry_confirm_ms` | **3000 ms** | dry soil must hold for 3 seconds |
+| `irrigation.pulse_ms` | **2000 ms** | the pump runs for 2 seconds |
+| `irrigation.soak_ms` | **8000 ms** | an 8-second pause to let water spread |
+| `irrigation.cooldown_ms` | **15000 ms** | 15 seconds before the rules may start again |
+
+**Nothing else about the watering is relaxed.** The 5-second startup guard, the
+35 % / 55 % moisture thresholds, the 4-pulse maximum, the 15-second cumulative
+runtime cap, the low-water stop, the 30-minute no-rise lockout, the tank check
+on a manual On and the manual On/Off switch all behave as before.
+
+The firmware defaults and Simulation use the same four values. On a board that
+already has a saved configuration, **changing the firmware defaults is not
+enough** — the saved values win. Write them through **Setup → Advanced → Pulse,
+runtime and cooldown**, or with the revision-checked API:
+
+```
+GET  /api/v1/device/config?mode=live          # read config + config_revision
+PUT  /api/v1/device/config                    # {mode, config_revision, config}
+```
+
+Merge the four fields into the config you just read and send the whole object,
+so calibration and every unrelated setting are preserved. The board answers
+`409` if another writer got there first; re-read rather than forcing it.
+
 ## Buttons and what they mean
 
 | Control | Effect |

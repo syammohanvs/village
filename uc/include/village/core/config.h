@@ -55,13 +55,16 @@ struct IrrigationConfig {
   bool pump_enabled = false;
   uint16_t dry_start_pct = 35;
   uint16_t stop_pct = 55;
-  uint32_t dry_confirm_ms = 30000;
-  uint32_t pulse_ms = 4000;
+  // Exhibition timings (2026-11-20): short enough that a visitor sees a whole
+  // automatic cycle -- dry confirmation, pulse, soak, re-check, cooldown -- in
+  // one demonstration.  The safety numbers around them are unchanged.
+  uint32_t dry_confirm_ms = 3000;   // 3 s
+  uint32_t pulse_ms = 2000;         // 2 s ON
   uint32_t max_pulse_ms = 8000;
-  uint32_t soak_ms = 45000;
+  uint32_t soak_ms = 8000;          // 8 s OFF between pulses
   uint32_t max_cumulative_ms = 15000;
   uint8_t max_pulses = 4;
-  uint32_t cooldown_ms = 300000;    // 5 minutes
+  uint32_t cooldown_ms = 15000;     // 15 s after a cycle
   uint32_t link_timeout_ms = 30000;
 };
 

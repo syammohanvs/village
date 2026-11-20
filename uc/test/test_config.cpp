@@ -13,6 +13,16 @@ TEST(config_defaults_are_valid_and_conservative) {
   CHECK(validateConfig(c, err));
   CHECK(c.irrigation.pump_enabled == false);
   CHECK(c.irrigation.auto_enabled == true);
+  // Exhibition timings (2026-11-20) -- a whole automatic cycle inside one
+  // demonstration.  The protection values around them are deliberately left
+  // alone and are asserted beside them.
+  CHECK(c.irrigation.dry_confirm_ms == 3000);
+  CHECK(c.irrigation.pulse_ms == 2000);
+  CHECK(c.irrigation.soak_ms == 8000);
+  CHECK(c.irrigation.cooldown_ms == 15000);
+  CHECK(c.irrigation.max_pulse_ms == 8000);
+  CHECK(c.irrigation.max_cumulative_ms == 15000);
+  CHECK(c.irrigation.max_pulses == 4);
   CHECK(c.reservoir.calibrated == false);
   CHECK(!soilCalibrated(c.soil));
   c.soil.calibrated = true;
