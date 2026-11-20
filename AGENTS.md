@@ -3156,3 +3156,16 @@ bottle" → "नीली प्लास्टिक की बोतल").
   and the action are unaffected.
 
 Gates: backend **204**, frontend **467**.
+
+**Simulation holds the bin lamp for 30 s (2026-11-21, asked for).**  "In
+simulation light the three leds in the app": the on-screen lamps already follow
+a bin decision (measured 2026-11-20 — they light within one 2 s poll and go out
+after the board's 8 s), but 8 s is easy to miss while reading the answer card.
+A **demo** recognition now asks for `WASTE_LAMP_DEMO_MS` = **30000**, the board's
+own maximum (`indicate_ms` range 1–30 s), and the simulator's ceiling is 30 s;
+**Live stays 8000**.  Verified in Chromium with a faked camera and intercepted
+model calls: lit at 2/10/20/28 s and out by 32 s.  The start-of-check
+`CLEAR_WASTE` still ends it early, and a referral/uncertain answer still lights
+nothing — only Organic/Plastic/Paper do.  Tests: backend **205** (a demo
+recognition asks for 30 s and the state reports > 25 s left; the live route test
+still pins 8000).

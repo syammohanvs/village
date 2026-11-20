@@ -1114,3 +1114,30 @@ async def test_the_pump_switch_is_a_command_the_board_understands(tmp_path):
         assert status["actuators"]["pump"]["mode"] == "auto"
         # Wet soil, so the rules keep it off.
         assert status["actuators"]["pump"]["commanded"] is False
+
+
+@pytest.mark.asyncio
+async def test_simulation_holds_the_bin_lamp_long_enough_to_point_at(tmp_path):
+    """Asked for 2026-11-21: "in simulation light the three leds in the app".
+
+    Live keeps the board's 8 s.  Simulation asks for the board's own maximum
+    (30 s) so the lamp is still lit while a presenter talks about the answer;
+    the clear at the start of the next check still puts it out immediately.
+    """
+    settings = make_settings(tmp_path)
+    async with client_for(settings) as (client, _gateway, _app):
+        response = await client.post(
+            "/api/v1/waste/recognition",
+            json={
+                "mode": "demo", "category": "plastic", "confidence": 0.9,
+                "request_id": "lamp-demo-thirty-seconds",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["indication"]["ack"]["result"] == "ACCEPTED"
+
+        state = (await client.get("/api/v1/state?mode=demo")).json()
+        lit = state["status"]["actuators"]["waste_indicator"]
+        assert lit["active"] is True
+        assert lit["category"] == "plastic"
+        assert lit["remaining_ms"] > 25000

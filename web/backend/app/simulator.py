@@ -133,7 +133,9 @@ def default_config() -> dict[str, Any]:
             "cooldown_ms": 0,
             "link_timeout_ms": 30000,
         },
-        "waste": {"indicate_ms": 8000},
+        # The board allows up to 30 s; the simulation uses the whole window so
+        # a presenter can point at the lamp after reading the answer.
+        "waste": {"indicate_ms": 30000},
     }
 
 

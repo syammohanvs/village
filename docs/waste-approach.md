@@ -108,12 +108,16 @@ The page also never claims more than it can see: no bin fullness, no
    *name* decided and there is a class to file. See §7: this saves a photograph,
    it does not change the model.
 
-**The bin LEDs: one at a time, lit for eight seconds, then auto-off.** A bin
-answer sends `INDICATE_WASTE` with `duration_ms = WASTE_LAMP_MS` (**8000**, a named
-constant in the backend), and the **board's own timer** is what ends it — long
-enough for a visitor to look at the lamp and then at the bin. The firmware treats
-its stored `waste.indicate_ms` (8000 by default) as the ceiling for that request,
-so the two numbers are the same unless that setting was changed on the board.
+**The bin LEDs: one at a time, lit for eight seconds on the board, then auto-off.**
+A bin answer sends `INDICATE_WASTE` with `duration_ms = WASTE_LAMP_MS` (**8000**, a
+named constant in the backend), and the **board's own timer** is what ends it —
+long enough for a visitor to look at the lamp and then at the bin. The firmware
+treats its stored `waste.indicate_ms` (8000 by default) as the ceiling for that
+request, so the two numbers are the same unless that setting was changed on the
+board. **Simulation asks for 30 s instead** (`WASTE_LAMP_DEMO_MS`, the board's own
+maximum): there is no physical lamp to protect and a presenter needs to be able
+to point at the on-screen lamps after reading the answer (asked 2026-11-21). The
+clear at the start of the next check still ends it early.
 `CLEAR_WASTE` (firmware 0.2.9, `WasteIndicator::clear`) is the explicit *early*
 clear the page sends when a **new check starts sooner than that**, so the previous
 item's lamp cannot sit above the new answer; a non-bin answer sends no lamp

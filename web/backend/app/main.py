@@ -65,7 +65,14 @@ BIN_IDS = ("organic", "plastic", "paper")
 # matters when the next check starts sooner than this.  The firmware treats its
 # `waste.indicate_ms` (8000 by default) as the ceiling for a request, so the two
 # numbers are the same unless that stored setting was changed.
+# How long a bin lamp stays lit.  On the board it is 8 s: long enough to see,
+# short enough not to hide the next item's lamp.  **Simulation holds it for
+# 30 s** (the board's own maximum `indicate_ms`) because there is no physical
+# lamp to protect and a presenter needs to be able to point at the screen after
+# the answer has been read (asked 2026-11-21: "in simulation light the three
+# leds in the app").  Live is unchanged at 8 s.
 WASTE_LAMP_MS = 8000
+WASTE_LAMP_DEMO_MS = 30000
 
 
 def _now() -> str:
@@ -1015,7 +1022,12 @@ def create_app(
             indication = await gateway.send_command(
                 mode=body.mode,
                 command_type="INDICATE_WASTE",
-                parameters={"category": category, "duration_ms": WASTE_LAMP_MS},
+                parameters={
+                    "category": category,
+                    "duration_ms": (
+                        WASTE_LAMP_DEMO_MS if body.mode == "demo" else WASTE_LAMP_MS
+                    ),
+                },
                 request_id=body.request_id,
                 source="camera",
             )
