@@ -214,8 +214,11 @@ const MATERIAL_WORDS: { route: RouteId | BinId; words: string[] }[] = [
     words: [
       'food', 'banana', 'peel', 'vegetable', 'fruit', 'leaf', 'flower', 'leftover',
       'carrot', 'onion', 'potato', 'tomato', 'cucumber', 'chilli', 'chili',
-      'brinjal', 'eggplant', 'cabbage', 'cauliflower', 'pumpkin', 'ginger',
-      'garlic', 'coconut', 'mango', 'grapes', 'watermelon', 'pineapple', 'apple',
+      'brinjal', 'eggplant', 'aubergine', 'cabbage', 'cauliflower', 'pumpkin',
+      'ginger', 'garlic', 'coconut', 'mango', 'grapes', 'watermelon', 'pineapple',
+      'apple', 'beetroot', 'radish', 'turnip', 'spinach', 'okra', 'ladies finger',
+      'bitter gourd', 'bottle gourd', 'ridge gourd', 'snake gourd', 'drumstick',
+      'papaya', 'guava', 'pomegranate', 'jackfruit', 'sugarcane', 'maize',
     ],
   },
   { route: 'bin.paper', words: ['paper', 'cardboard', 'carton', 'newspaper', 'notebook', 'envelope'] },

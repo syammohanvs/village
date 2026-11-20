@@ -49,6 +49,18 @@ describe('the item name decides, and the classifier is the fallback', () => {
     expect(named('Large, yellowish, round fruit or vegetable', 'Glass', 0.27).routeId).toBe('bin.organic');
   });
 
+  it('opens the organic bin for every vegetable the exhibit has tried', () => {
+    // These are the exact names the camera produced on 2026-11-20, when the
+    // page was still running the build from before the produce words existed:
+    // "Onion", "Potato" and "Carrot" were all referred.  A named vegetable is
+    // food, and food is the organic bin.
+    for (const name of ['Onion', 'Potato', 'Carrot', 'Onion peel', 'Tomato', 'Brinjal', 'Ladies finger']) {
+      const decision = named(name, 'Plastic', 0.45);
+      expect(decision.routeId, name).toBe('bin.organic');
+      expect(decision.allowLamp, name).toBe(true);
+    }
+  });
+
   it('keeps a material named before the object', () => {
     // "plastic carrot" must stay plastic: the first word is the material, and
     // the produce list must not outrank it.

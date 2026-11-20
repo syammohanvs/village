@@ -3070,3 +3070,27 @@ local classifier's bars when the name says nothing usable.  What changed today
 is that names are arriving again (the account id was missing), so the
 name-first rules run where previously every press was classifier-only.
 Gates: backend **199**, frontend **454**.
+
+**The vegetable rules were right; the tab was running the previous build
+(2026-11-20, second report).**  "Last few vegetables again classification issue
+even though name was correct" — the stored events are the evidence, and they are
+exactly the old build:
+
+| time (UTC) | name | route | source |
+| --- | --- | --- | --- |
+| 16:32:23 | Carrot | `separate.unknown` | local |
+| 16:32:49 | Potato | `separate.unknown` | local |
+| 16:33:05 | Onion | `separate.unknown` | local |
+| 16:33:26 | Onion peel | **`bin.organic`** | vision |
+
+"Onion peel" took the organic bin because **`peel` was already in the old
+list** — the give-away that the browser was running the bundle from before the
+produce words landed (built 22:00 IST).  `index.html` is served `no-store`, so a
+reload is all it takes; the Setup page prints **"Dashboard build: <time>"**, which
+is how to tell a stale tab from a stale deploy.  The produce list was widened at
+the same time (aubergine, beetroot, radish, turnip, spinach, okra, ladies finger,
+bitter/bottle/ridge/snake gourd, drumstick, papaya, guava, pomegranate,
+jackfruit, sugarcane, maize) and a test now pins the exact names the camera
+produced: Onion, Potato, Carrot, Onion peel, Tomato, Brinjal, Ladies finger →
+**bin.organic**, lamp allowed.  Frontend **455**.  Served bundle
+`assets/index-4wF5CNtf.js` verified to contain the new list.
