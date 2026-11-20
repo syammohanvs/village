@@ -1180,8 +1180,10 @@ def create_app(
     ):
         """Parse typed text with the parser speech uses.
 
-        Kept separate from /translate so a keyboard user is not forced through
-        the microphone, and so both paths provably share one set of rules.
+        Kept separate from the microphone path so a keyboard user is not forced
+        through a recording, and so both paths provably share one set of rules.
+        (The comment used to name a `/translate` route; there has never been
+        one — nothing is machine-translated at runtime.)
         """
         result = matcher.match(body.text, body.language)
         await db.add_event(
