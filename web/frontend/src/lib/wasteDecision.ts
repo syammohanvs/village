@@ -203,7 +203,21 @@ const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
  * word (a keyset, a figurine) never creates a conflict by itself.
  */
 const MATERIAL_WORDS: { route: RouteId | BinId; words: string[] }[] = [
-  { route: 'bin.organic', words: ['food', 'banana', 'peel', 'vegetable', 'fruit', 'leaf', 'flower', 'leftover'] },
+  {
+    route: 'bin.organic',
+    // Food waste, by the words a namer uses for it.  The produce nouns were
+    // added after a carrot was read as Plastic 0.42 and referred: "Carrot with
+    // top cut off" names no material, so it fell through to the offline model
+    // (2026-11-20).  Colours that are also fruit ("orange", "lemon") are
+    // deliberately absent — the FIRST word wins, and "orange plastic bottle"
+    // must stay plastic.
+    words: [
+      'food', 'banana', 'peel', 'vegetable', 'fruit', 'leaf', 'flower', 'leftover',
+      'carrot', 'onion', 'potato', 'tomato', 'cucumber', 'chilli', 'chili',
+      'brinjal', 'eggplant', 'cabbage', 'cauliflower', 'pumpkin', 'ginger',
+      'garlic', 'coconut', 'mango', 'grapes', 'watermelon', 'pineapple', 'apple',
+    ],
+  },
   { route: 'bin.paper', words: ['paper', 'cardboard', 'carton', 'newspaper', 'notebook', 'envelope'] },
   { route: 'bin.plastic', words: ['plastic', 'pvc', 'bottle cap', 'polythene', 'acrylic', 'silicone'] },
   { route: 'collect.glass', words: ['glass', 'jar'] },

@@ -3034,3 +3034,39 @@ with `override=True`; `.env` now carries a comment above those keys saying so.
 `.env.secrets` (0600) holds all four values.  Still unset:
 `VILLAGE_VISION_API_KEY` (the DeepSeek last resort), so when both accounts hit
 their free limit naming honestly reports unavailable.
+
+**A vegetable had no "material", so the namer answered "nothing" (2026-11-20,
+reported with a big onion and a carrot).**  Two separate faults, both measured:
+
+1. **The prompt asked for the material.**  `PROMPT` said *"Name the single
+   object … including what it is made of"*, and an onion has no material, so
+   `llama-3.2-11b-vision` answered **"nothing"** on a clear photo of onions (two
+   independent onion images, at temperature 0 and 0.4).  The page then correctly
+   said "nothing to sort" — the model really had said that.  The prompt now
+   names food as the food itself (*"For food, name the vegetable or fruit itself
+   (onion, carrot, tomato, banana)"*) and keeps the material hint for objects.
+   Measured after: **"onion, vegetable"** and **"onions"**, while a plastic
+   bottle still reads "Blue plastic bottle.", paper "Paper bag.", and a blank
+   frame still answers exactly "nothing".  `temperature` is now **0** (the same
+   onion photo had come back "nothing" once and "Onions." the next time at the
+   API default), `max_tokens` 60.
+2. **The category was the offline model's, because the name stated no material.**
+   "Carrot with top cut off" reached `decide()` with no material word, so it fell
+   through to ResNet50 — Plastic 0.42, under the 0.50 material bar — and the
+   item was *referred*, with "Plastic (42 %)" printed in the details.  The
+   produce nouns (carrot, onion, potato, tomato, cucumber, chilli, brinjal,
+   cabbage, cauliflower, pumpkin, ginger, garlic, coconut, mango, grapes,
+   watermelon, pineapple, apple) joined the **organic** material words, so a
+   named vegetable opens the organic bin at any confidence.  Colours that are
+   also fruit ("orange", "lemon") are deliberately absent — the **first** word
+   wins, and "orange plastic bottle" must stay plastic (pinned by a test).
+   `llava-1.5-7b` is **deprecated** on Workers AI (HTTP 410), so the default
+   stays `llama-3.2-11b-vision`.
+
+**The architecture did not change: the cloud model names, ResNet classifies.**
+`/waste/identify` is a name only; `wasteDecision.decide()` reads the name first
+(special care → object route → first material word) and only falls back to the
+local classifier's bars when the name says nothing usable.  What changed today
+is that names are arriving again (the account id was missing), so the
+name-first rules run where previously every press was classifier-only.
+Gates: backend **199**, frontend **454**.

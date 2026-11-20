@@ -403,3 +403,35 @@ def test_any_lead_in_is_stripped_to_the_name() -> None:
     assert vision._clean("Clear plastic lid") == "Clear plastic lid"
     # ...and silence stays silent.
     assert vision._clean("nothing") is None
+
+
+def test_the_cloudflare_payload_asks_for_one_deterministic_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Temperature 0 and a small token cap, measured 2026-11-20.
+
+    The same onion photo came back "nothing" on one call and "Onions." on the
+    next at the API's default temperature, so a visitor saw "did not recognise
+    it" for an object the model can name.  A name is a few words; asking for one
+    deterministically is the whole request.
+    """
+    monkeypatch.setenv("VILLAGE_VISION_PROVIDER", "cloudflare")
+    monkeypatch.setenv("VILLAGE_CF_API_TOKEN", "cfut_one")
+    monkeypatch.setenv("VILLAGE_CF_ACCOUNT_ID", "acct-one")
+    monkeypatch.delenv("VILLAGE_VISION_API_KEY", raising=False)
+    seen: list[dict] = []
+
+    def capture(url: str, payload: dict, headers: dict, timeout: float) -> dict:
+        seen.append(payload)
+        return {"success": True, "result": {"response": "onion"}}
+
+    monkeypatch.setattr(vision, "_post", capture)
+
+    answer = vision.identify(CROP)
+    assert answer["object"] == "onion"
+    assert len(seen) == 1
+    payload = seen[0]
+    assert payload["temperature"] == 0
+    assert payload["max_tokens"] <= 64
+    url = payload["messages"][0]["content"][1]["image_url"]["url"]
+    assert url.startswith("data:image/jpeg;base64,")

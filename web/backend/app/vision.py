@@ -49,8 +49,16 @@ from typing import Any
 # Ask for the object **and its material**, because "plastic cap" is what lets a
 # person check the category; "cap" alone does not.
 PROMPT = (
-    "Name the single object in this photo in two to four words, including what "
-    "it is made of when you can see it (for example 'clear plastic bottle'). "
+    # Measured 2026-11-20 on two real onion photos: the old prompt asked for
+    # "including what it is made of", and a vegetable has no material, so the
+    # model answered **"nothing"** for a clear photo of onions — which the page
+    # correctly showed as "nothing to sort".  Naming food as the food itself
+    # fixes it ("onion", "onion pile") while the material hint still names a
+    # "Blue plastic bottle" and a "Paper bag", and a blank frame still answers
+    # exactly "nothing".
+    "Name the object in this photo in one to three words. For food, name the "
+    "vegetable or fruit itself (onion, carrot, tomato, banana). Add what it is "
+    "made of only when that is clear (for example 'clear plastic bottle'). "
     "If there is no object, answer exactly: nothing"
 )
 
@@ -408,10 +416,17 @@ def _cloudflare(jpeg: bytes, candidate: dict[str, str] | None = None,
                         {"type": "image_url", "image_url": {"url": _data_url(jpeg)}},
                     ],
                 }],
-                "max_tokens": 512,
+                # A name is two to four words.  A small cap bounds a chatty
+                # answer, and temperature 0 makes the same crop answer the same
+                # way twice: measured 2026-11-20, the same onion photo came back
+                # "nothing" once and "Onions." the next time at the default
+                # temperature, which reads to a visitor as "it did not
+                # recognise it".
+                "max_tokens": 60,
+                "temperature": 0,
             }
             if wants_chat
-            else {"image": list(jpeg), "prompt": PROMPT, "max_tokens": 512}
+            else {"image": list(jpeg), "prompt": PROMPT, "max_tokens": 60, "temperature": 0}
         )
         # Each shape gets only what is left of the chain budget, so trying the
         # other request format cannot double the time this provider may take.

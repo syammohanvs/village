@@ -33,6 +33,29 @@ describe('the item name decides, and the classifier is the fallback', () => {
     expect(decision.localConfidence).toBeCloseTo(0.72);
   });
 
+  it('routes a named vegetable to the organic bin, whatever the classifier says', () => {
+    // Reported 2026-11-20: the namer said "Carrot with top cut off", which
+    // states no material, so the decision fell through to the offline model
+    // (Plastic 0.42) and referred the carrot.  A produce noun is a route of its
+    // own, like "remote" or "pencil".
+    const carrot = named('Carrot with top cut off', 'Plastic', 0.42);
+    expect(carrot.routeId).toBe('bin.organic');
+    expect(carrot.bin).toBe('organic');
+    expect(carrot.allowLamp).toBe(true);
+    expect(carrot.source).toBe('vision');
+    expect(carrot.localClassId).toBe('Plastic');
+
+    expect(named('Onion', 'Glass', 0.27).routeId).toBe('bin.organic');
+    expect(named('Large, yellowish, round fruit or vegetable', 'Glass', 0.27).routeId).toBe('bin.organic');
+  });
+
+  it('keeps a material named before the object', () => {
+    // "plastic carrot" must stay plastic: the first word is the material, and
+    // the produce list must not outrank it.
+    expect(named('plastic carrot toy', 'Organic', 0.8).routeId).toBe('bin.plastic');
+    expect(named('orange plastic bottle', 'Organic', 0.9).routeId).toBe('bin.plastic');
+  });
+
   it('opens the paper bin for a business card, at any confidence', () => {
     const decision = named('White paper with red and black text', 'Paper', 0.61);
     expect(decision.routeId).toBe('bin.paper');
