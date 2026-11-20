@@ -58,7 +58,7 @@ LANGUAGE_PROMPTS = {
     # clip stays "[Music]" instead of being invented into "Water status.".
     "en": (
         "Lights on. Lights off. Lights status. Streetlights. Pump on. Pump off. "
-        "Pump status. Start irrigation. Stop irrigation. Automatic."
+        "Pump status. Start irrigation. Stop irrigation. Automatic. Help."
     ),
 }
 
