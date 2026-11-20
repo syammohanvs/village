@@ -3020,3 +3020,17 @@ read **after** `.env` with override, so the operator's edit in `.env` was being
 shadowed until the move.  `.env.example` now says both are required.  Still
 unset: `VILLAGE_VISION_API_KEY` (the DeepSeek last resort), so when both
 accounts hit their free limit naming will honestly report unavailable.
+
+**Both Cloudflare accounts are in the chain (2026-11-20, operator added the
+second token).**  Account 1 `3a69…` (the first token) and account 2 `79cd…` (the
+new token, whose `/accounts` lookup confirms it belongs to that account) both
+answer Workers AI **HTTP 200**, and both answer through `vision._cloudflare` in
+the app's own code path (937 ms / 669 ms).  Live `/waste/identify` named a
+ceramic cup in 1.23 s and a grey tube in 0.85 s.  The older token for the same
+`79cd…` account was dropped — two tokens on one account share one daily
+allowance, so keeping both would add no capacity.  **The operator's edit went
+into `.env` again and was shadowed**, because `.env.secrets` is loaded after it
+with `override=True`; `.env` now carries a comment above those keys saying so.
+`.env.secrets` (0600) holds all four values.  Still unset:
+`VILLAGE_VISION_API_KEY` (the DeepSeek last resort), so when both accounts hit
+their free limit naming honestly reports unavailable.
