@@ -52,7 +52,7 @@ export interface StateOptions {
 function windReading(resistorMv: number, installed: boolean): WindReading {
   const senseOhms = 47;
   const ledForwardMv = 2800;
-  const noiseFloorMv = 20;
+  const noiseFloorMv = 150;
   const measuring = resistorMv > noiseFloorMv;
   const currentMa = measuring ? resistorMv / senseOhms : 0;
   const voltageMv = measuring ? resistorMv + ledForwardMv : null;

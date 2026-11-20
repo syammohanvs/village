@@ -618,13 +618,13 @@ describe('Our Village — the words on the page', () => {
 
   it('reports all three readings from the board and explains the circuit', async () => {
     vi.mocked(api.state).mockResolvedValue(
-      makeState({ windMillivolts: 120, windInstalled: true }),
+      makeState({ windMillivolts: 230, windInstalled: true }),
     );
     await renderReady();
 
     const card = within(await screen.findByTestId('card-wind'));
     expect(card.getByTestId('wind-readings')).toHaveTextContent(
-      'Voltage 2.92 V · Current 2.55 mA · Power 7.5 mW',
+      'Voltage 3.03 V · Current 4.89 mA · Power 14.8 mW',
     );
     // The sentence names the resistor and the LED's measured forward voltage, so
     // the reader can check the arithmetic rather than trust a number.
