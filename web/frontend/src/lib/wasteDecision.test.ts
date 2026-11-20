@@ -61,6 +61,37 @@ describe('the item name decides, and the classifier is the fallback', () => {
     }
   });
 
+  it('opens the organic bin for food waste beyond vegetables', () => {
+    // Asked for 2026-11-20: the exhibit's items are mostly food, so the bin
+    // should be named from the words a namer uses for it, not only produce.
+    for (const name of [
+      'Banana peel',
+      'Leftover rice',
+      'Egg shell',
+      'Tea leaves',
+      'Fish bone',
+      'Mango',
+      'Grass clippings',
+      'Cooked food',
+      'Onion scraps',
+    ]) {
+      const decision = named(name, 'Plastic', 0.45);
+      expect(decision.routeId, name).toBe('bin.organic');
+      expect(decision.allowLamp, name).toBe(true);
+    }
+  });
+
+  it('does not read a contents word as the item when the packet is the item', () => {
+    // "milk carton" is paper and "bread packet" is not food waste: both words
+    // are deliberately absent from the organic list, so the material word that
+    // names the packaging decides.
+    expect(named('milk carton', 'Organic', 0.9).routeId).toBe('bin.paper');
+    expect(named('juice carton', 'Organic', 0.9).routeId).toBe('bin.paper');
+    // A bare "bottle" is not a material word (it can be glass or plastic), so a
+    // name that only says "orange juice bottle" still needs the classifier.
+    expect(named('orange plastic bottle', 'Organic', 0.9).routeId).toBe('bin.plastic');
+  });
+
   it('keeps a material named before the object', () => {
     // "plastic carrot" must stay plastic: the first word is the material, and
     // the produce list must not outrank it.

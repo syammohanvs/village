@@ -205,20 +205,54 @@ const OBJECT_ROUTES: { route: RouteId | BinId; words: string[] }[] = [
 const MATERIAL_WORDS: { route: RouteId | BinId; words: string[] }[] = [
   {
     route: 'bin.organic',
-    // Food waste, by the words a namer uses for it.  The produce nouns were
-    // added after a carrot was read as Plastic 0.42 and referred: "Carrot with
-    // top cut off" names no material, so it fell through to the offline model
-    // (2026-11-20).  Colours that are also fruit ("orange", "lemon") are
-    // deliberately absent — the FIRST word wins, and "orange plastic bottle"
-    // must stay plastic.
+    // Food waste, by the words a namer uses for it.
+    //
+    // It began with the produce nouns, after a carrot was read as Plastic 0.42
+    // and referred: "Carrot with top cut off" names no material, so it fell
+    // through to the offline model (2026-11-20).  The operator then asked for
+    // the rest of the organic bin — peels, cooked food, garden waste — to be
+    // named too, because the exhibit's own items are mostly food.
+    //
+    // Two kinds of word are deliberately absent:
+    //   * a colour that is also a fruit ("orange", "lemon", "lime") — the FIRST
+    //     word wins, so "orange plastic bottle" must stay plastic;
+    //   * a contents word whose packet is the real item ("milk", "curd",
+    //     "juice", "oil", "sauce", "bread", "biscuit", "chocolate", "chips",
+    //     "tea", "coffee", "sugar", "flour", "rice", "dal") — "milk carton" is
+    //     paper and "bread packet" is plastic, and the first word wins.  The
+    //     phrases that are certainly waste ("tea leaves", "coffee grounds",
+    //     "cooked rice") are listed instead.
     words: [
-      'food', 'banana', 'peel', 'vegetable', 'fruit', 'leaf', 'flower', 'leftover',
+      // fruit
+      'food', 'fruit', 'vegetable', 'leaf', 'leaves', 'flower', 'flowers',
+      'banana', 'apple', 'mango', 'grapes', 'grape', 'papaya', 'guava',
+      'pomegranate', 'jackfruit', 'watermelon', 'muskmelon', 'cantaloupe',
+      'melon', 'pineapple', 'sapota', 'chikoo', 'custard apple', 'strawberry',
+      'blueberry', 'raspberry', 'cherry', 'peach', 'pear', 'plum', 'apricot',
+      'kiwi', 'coconut', 'fig', 'avocado', 'dates', 'amla', 'jamun', 'ber',
+      'star fruit', 'dragon fruit',
+      // vegetable
       'carrot', 'onion', 'potato', 'tomato', 'cucumber', 'chilli', 'chili',
       'brinjal', 'eggplant', 'aubergine', 'cabbage', 'cauliflower', 'pumpkin',
-      'ginger', 'garlic', 'coconut', 'mango', 'grapes', 'watermelon', 'pineapple',
-      'apple', 'beetroot', 'radish', 'turnip', 'spinach', 'okra', 'ladies finger',
-      'bitter gourd', 'bottle gourd', 'ridge gourd', 'snake gourd', 'drumstick',
-      'papaya', 'guava', 'pomegranate', 'jackfruit', 'sugarcane', 'maize',
+      'ginger', 'garlic', 'beetroot', 'radish', 'turnip', 'spinach', 'okra',
+      'ladies finger', 'bitter gourd', 'bottle gourd', 'ridge gourd',
+      'snake gourd', 'drumstick', 'maize', 'corn', 'baby corn', 'peas',
+      'green peas', 'beans', 'french beans', 'broad beans', 'lettuce',
+      'broccoli', 'mushroom', 'sweet potato', 'yam', 'taro', 'capsicum',
+      'bell pepper', 'celery', 'parsley', 'coriander', 'curry leaves', 'mint',
+      'spring onion', 'leek', 'zucchini', 'asparagus', 'sprouts', 'sugarcane',
+      // what a kitchen throws away
+      'peel', 'peels', 'rind', 'scrap', 'scraps', 'core', 'stalk', 'stem',
+      'husk', 'shell', 'eggshell', 'egg shell', 'seed', 'seeds', 'leftover',
+      'leftovers', 'tea leaves', 'coffee grounds', 'tea bag',
+      // cooked food
+      'cooked food', 'meal', 'curry', 'sambar', 'rasam', 'roti', 'chapati',
+      'paratha', 'idli', 'dosa', 'vada', 'upma', 'poha', 'biryani',
+      'cooked rice', 'noodles', 'pasta', 'pizza', 'sandwich', 'burger',
+      'cake', 'sweet',
+      // animal and garden
+      'meat', 'chicken', 'fish', 'bone', 'bones', 'egg', 'eggs', 'seafood',
+      'prawn', 'mutton', 'grass', 'weeds', 'twig', 'plant', 'garden waste',
     ],
   },
   { route: 'bin.paper', words: ['paper', 'cardboard', 'carton', 'newspaper', 'notebook', 'envelope'] },

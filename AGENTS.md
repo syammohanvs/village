@@ -3094,3 +3094,39 @@ jackfruit, sugarcane, maize) and a test now pins the exact names the camera
 produced: Onion, Potato, Carrot, Onion peel, Tomato, Brinjal, Ladies finger →
 **bin.organic**, lamp allowed.  Frontend **455**.  Served bundle
 `assets/index-4wF5CNtf.js` verified to contain the new list.
+
+**Sort Waste's button and item name now speak the visitor's language
+(2026-11-20, reported).**  The big **Check the item** button was hard-coded
+English (`Reading…` / `Check the item`) and so was its tooltip — the one control
+on the page that was never translated.  It now uses `sort.checkItem` /
+`sort.readingItem` / `sort.checkTitle`, and the two model-status notices plus the
+collapsed *How it works* paragraph gained keys too (`sort.cameraStillWorks`,
+`sort.cameraWaitingModel`, `sort.howItWorksBody`).
+
+The **item name** is the hosted model's English noun, and this app deliberately
+does **not** machine-translate at runtime.  A new `lib/wasteName.ts` keeps the
+names the booth actually produces (`onion`, `carrot`, `potato`, `bottle`, `bag`,
+`paper`, `brown`, `blue`, …) with Hindi and Malayalam, and applies them
+**word by word**: a name is shown only when *every* word is known, otherwise the
+identification line is **left out** rather than printing a half-Hindi
+"भूरा paper bag" on a Hindi page.  Pinnned by `wasteName.test.ts` (7) and two
+`SortWaste.test.tsx` cases — the Hindi button + "प्याज़", and Malayalam with an
+untranslatable name where the line is absent and the category/action are still
+translated.  Frontend **466**.
+
+**The rest of the organic bin is named (2026-11-20, asked for).**  "As labelling
+is correct … add the name of a lot of other items that can also go into the
+organic bin like food waste": the organic list now covers fruit and vegetables
+beyond the first eight, kitchen waste (peel, rind, scraps, core, husk, eggshell,
+tea leaves, coffee grounds, leftovers), cooked food (curry, sambar, roti, idli,
+dosa, biryani, noodles, pizza, cake …), meat/fish/bone/egg, and garden waste
+(grass, weeds, twig, plant).  **Two classes are deliberately absent, and the
+reason is the first-word rule:** a colour that is also a fruit (`orange`,
+`lemon`, `lime` — "orange plastic bottle" must stay plastic) and a contents word
+whose *packet* is the real item (`milk`, `curd`, `juice`, `oil`, `bread`,
+`biscuit`, `chocolate`, `chips`, `tea`, `coffee`, `rice`, `dal` — "milk carton"
+is paper and "bread packet" is plastic).  The certain waste phrases (`tea
+leaves`, `coffee grounds`, `cooked rice`) are listed instead, and two tests pin
+it: nine food-waste names open the organic bin, while "milk carton" stays paper
+and "orange plastic bottle" stays plastic.  `wasteName.ts` gained the same
+kitchen words for display.
