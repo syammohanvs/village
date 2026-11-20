@@ -3003,3 +3003,20 @@ checked too: a probe in air reads 4095 -> 0 % and the card shows
 "Soil: dry · 0 %" (387 dry frames at 0.0 % are in the stored live history), so
 an empty card at that moment means no frame (the API was down), not a lost
 reading. 452 frontend tests.
+
+**Cloudflare naming is live again — the account id was the missing half
+(2026-11-20, operator added a token).**  Both `cfut_…` tokens were valid, but
+**no account id was set**, and the Workers AI URL is
+`/accounts/{account_id}/ai/run/…` — so every name failed and an item photo came
+back with no "I see: …" line (reported with an onion).  The operator's new pair
+(account `3a69…`, token ending 4ff0) is now **account 1**; the older working pair
+(account `79cd…`) is **account 2**, kept for the per-account daily allowance.
+Both answer: verified directly (HTTP 200) and through `vision._cloudflare` on a
+real 224 crop (772 ms / 610 ms), and `/waste/identify` on a real photo returned
+"Banana leaves" in 1008 ms.  A third token that had been in `.env.secrets` now
+answers **401/403 invalid** and was removed.  All four values live in
+**`.env.secrets`** (0600) and `.env` keeps the keys blank — `.env.secrets` is
+read **after** `.env` with override, so the operator's edit in `.env` was being
+shadowed until the move.  `.env.example` now says both are required.  Still
+unset: `VILLAGE_VISION_API_KEY` (the DeepSeek last resort), so when both
+accounts hit their free limit naming will honestly report unavailable.
