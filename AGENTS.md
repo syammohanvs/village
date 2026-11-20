@@ -3169,3 +3169,26 @@ model calls: lit at 2/10/20/28 s and out by 32 s.  The start-of-check
 nothing — only Organic/Plastic/Paper do.  Tests: backend **205** (a demo
 recognition asks for 30 s and the state reports > 25 s left; the live route test
 still pins 8000).
+
+**Sara no longer reads an English noun in a Malayalam sentence (2026-11-21,
+reported as "sara malayalam rendering seems incorrect").**  The spoken sentence
+was `sort.spoken` in the page's language with `{item}` filled from the **English**
+model name, so a Malayalam voice pronounced "clear plastic bag" inside a
+Malayalam sentence.  `spokenAnswer()` now takes the translated name
+(`object_local` from IndicTrans2) and, when that is unavailable, **leaves the
+name out** rather than mixing languages: `"{category}. {action}"`.  English still
+uses the name it always did.  The language spoken is the one captured at the
+press (`languageAtPress`), not whichever is selected when the answer lands.
+
+Two tests pin it: a Malayalam press with `object_local` speaks the Malayalam noun
+and **not** the English one, and a Malayalam press with no translation speaks a
+sentence with no English word in it.  Frontend **468**.
+
+The voice itself is fine — a round trip through the real routes
+(`/voice/speak` → resample 16 kHz → `/voice/transcribe`, Malayalam model) heard
+`ഇത് കൈകൊണ്ട് ഒരു ഇല പിടിച്ച് ആണ്.` back as `ഇത് കായികൊണ്ട് ഒരു ഇലപ്പിടിച്ച്
+ആണ്.`, i.e. the words and script survive the voice.  Honest limit: IndicTrans2
+translates the *phrase* the namer gave, so a scene description like "hand holding
+a leaf" becomes a participle phrase ("കൈകൊണ്ട് ഒരു ഇല പിടിച്ച്") that reads a
+little oddly after "ഇത് … ആണ്"; a plain object name ("ഉള്ളി", "പ്ലാസ്റ്റിക്
+കുപ്പി") reads naturally.

@@ -426,6 +426,7 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     });
     vi.mocked(api.wasteIdentify).mockResolvedValue({
       object: 'clear plastic bag',
+      object_local: 'സുതാര്യമായ പ്ലാസ്റ്റിക് ബാഗ്',
       provider: 'cloudflare',
       model: 'llama',
       ms: 900,
@@ -441,6 +442,42 @@ describe('Sort Waste — nothing is classified unless it is asked for', () => {
     expect(spokenLanguages).toContain('ml');
     // The sentence itself is Malayalam, not English text read by a Malayalam voice.
     expect(spoken.some((line) => /പ്ലാസ്റ്റിക്/.test(line))).toBe(true);
+    // And the name is the translated one: an English noun inside a Malayalam
+    // sentence is what a Malayalam voice then mispronounces.
+    const line = spoken.join(' ');
+    expect(line).toContain('സുതാര്യമായ');
+    expect(line).not.toMatch(/clear plastic bag/i);
+  });
+
+  it('leaves the English name out of the spoken sentence when it cannot be translated', async () => {
+    // Better a sentence without the name than an English noun read by a
+    // Malayalam voice.
+    window.localStorage.setItem('village.voiceLanguage', 'ml');
+    const stream = { getTracks: () => [{ stop: vi.fn() }] };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue(stream), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true, value: vi.fn().mockResolvedValue(undefined),
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'readyState', {
+      configurable: true, get: () => 2,
+    });
+    vi.mocked(api.wasteIdentify).mockResolvedValue({
+      object: 'mystery widget', provider: 'cloudflare', model: 'llama', ms: 900,
+    });
+
+    render(<App />);
+    const startButton = await screen.findByTestId('start-camera');
+    await waitFor(() => expect(startButton).toBeEnabled(), { timeout: 5000 });
+    fireEvent.click(startButton);
+    fireEvent.click(await screen.findByTestId('classify-now'));
+
+    await waitFor(() => expect(spoken.length).toBeGreaterThan(0), { timeout: 8000 });
+    const line = spoken.join(' ');
+    expect(line).not.toMatch(/mystery widget/i);
+    expect(line).toMatch(/പ്ലാസ്റ്റിക്|ജൈവ|പേപ്പർ/);
   });
   it('does not offer the camera while the controller is offline', async () => {
     const stream = { getTracks: () => [{ stop: vi.fn() }] };

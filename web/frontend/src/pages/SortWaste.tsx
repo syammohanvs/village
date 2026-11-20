@@ -357,8 +357,18 @@ export function SortWaste() {
    * Spoken once per press, and only for the decision that was actually taken —
    * a late name is dropped before this is reached.
    */
-  const spokenAnswer = (decision: Decision): string => {
-    const item = decision.itemLabel?.trim();
+  const spokenAnswer = (
+    decision: Decision,
+    itemLocal: string | null,
+    language: typeof voiceLanguage,
+  ): string => {
+    // The model's name is English.  Speaking it inside a Malayalam sentence is
+    // the one thing Sara must not do: the visitor hears a Malayalam voice
+    // pronouncing an English noun.  Use the translated name when there is one;
+    // otherwise leave the name out of the sentence rather than mix languages.
+    const item =
+      itemLocal?.trim() ||
+      (language === 'en' ? decision.itemLabel?.trim() : undefined);
     const category = categoryName(decision);
     const action = actionSentence(decision);
     if (!item) return `${category}. ${action}`;
@@ -579,8 +589,13 @@ export function SortWaste() {
       }
 
       // Sara says the whole answer once, in the language it began in: what the
-      // item is, what it is made of, and where it goes.
-      void speakText(spokenAnswer(decision), voiceLanguage, 0.95);
+      // item is, what it is made of, and where it goes.  The name is the
+      // translated one, so a Malayalam sentence carries a Malayalam noun.
+      void speakText(
+        spokenAnswer(decision, named.object_local ?? null, languageAtPress),
+        languageAtPress,
+        0.95,
+      );
       if (decision.status === 'nothing') return;
 
       // Only a bin decision may ask the board for a lamp.  Everything else is
