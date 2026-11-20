@@ -2960,3 +2960,18 @@ settings were preserved. The firmware is still **0.2.8**, so the board ignores
 the new wind fields and runs the old wind logic; the **CLEAR_WASTE** command and
 the new wind reading still need the OTA flash of `0.2.9`. Physical verification
 of a 4-second pulse delivering water remains the operator's.
+
+**Board flashed and restored (2026-11-20).**  The board answered on the hotspot
+(192.168.137.115) and the USB flash of `0.2.9` succeeded (boot id
+`b-eedd02b0`). The flash wiped NVS, so the saved configuration was restored
+through the revision-checked API (rev 1 → 2): installed flags (light, solar,
+wind), the tuned light thresholds (2100/2500), the reservoir thresholds
+(2850/3000), the soil endpoints (2498/3325, `rises_with_moisture` false) and
+the exhibition timings (3000/4000/8000/15000), with `pump_enabled` false,
+`auto_enabled` true and calibration marked calibrated. Read-back confirms all
+of it. Live now reports `firmware 0.2.9` and the wind circuit as
+`Voltage 2.94 V · Current 3.02 mA · Power 8.9 mW`, chip **Generating**. The
+relay watcher keeps the link repaired. `CLEAR_WASTE` is now available on the
+board; one press confirms an immediate lamp off. The OTA image was copied to
+the Windows flash folder. Physical verification remaining: a 4-second pulse
+delivering water through the tubing.
