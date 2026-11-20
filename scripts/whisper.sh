@@ -42,6 +42,33 @@ healthy_hi() { [ -n "$URL_HI" ] && curl -fsS -m 2 "$URL_HI/health" >/dev/null 2>
 
 healthy() { curl -fsS -m 2 "$URL/health" >/dev/null 2>&1; }
 
+# Start the Hindi-only second server when it is configured and not already up.
+# This lives in its own function because the main path below returns early when
+# the base server is already answering — which used to skip the Hindi server
+# entirely, so after any restart the Hindi model was silently absent and Hindi
+# fell back to base (garbled).  Found 2026-11-20 from the stored clips.
+start_hi() {
+  [ -n "$MODEL_HI" ] && [ -f "$MODEL_HI" ] && [ -n "$URL_HI" ] || return 0
+  if healthy_hi; then
+    printf 'whisper (Hindi) already answering at %s\n' "$URL_HI"
+    return 0
+  fi
+  host_hi="${URL_HI#*://}"; host_hi="${host_hi%%:*}"
+  port_hi="${URL_HI##*:}"; port_hi="${port_hi%%/*}"
+  setsid "$BIN" -m "$MODEL_HI" -t "$THREADS_HI" --host "$host_hi" --port "$port_hi" \
+    > data/logs/whisper-hi.log 2>&1 < /dev/null &
+  echo $! > "$PIDFILE_HI"
+  for _ in $(seq 1 240); do
+    if healthy_hi; then
+      printf 'whisper (Hindi) started at %s with %s\n' "$URL_HI" "$(basename "$MODEL_HI")"
+      return 0
+    fi
+    sleep 0.5
+  done
+  printf 'whisper (Hindi) did not become ready; see data/logs/whisper-hi.log\n' >&2
+  return 1
+}
+
 # The whisper-server processes belonging to THIS repository (an older one can
 # outlive its PID file, and two would each hold a model in memory).
 server_pids() {
@@ -107,6 +134,7 @@ if [ -f "$PIDFILE" ]; then
     running="$(tr '\0' ' ' < "/proc/$old/cmdline" 2>/dev/null || true)"
     if printf '%s' "$running" | grep -Fq -- "$MODEL" && healthy; then
       printf 'whisper already running at %s with %s\n' "$URL" "$(basename "$MODEL")"
+      start_hi || true
       exit 0
     fi
     printf 'whisper is running a different model (or is wedged); restarting with %s\n' "$(basename "$MODEL")"
@@ -119,6 +147,7 @@ fi
 
 if healthy; then
   printf 'whisper is answering at %s (started elsewhere; its model was not checked)\n' "$URL"
+  start_hi || true
   exit 0
 fi
 
@@ -142,25 +171,7 @@ for _ in $(seq 1 120); do
     real="$(server_pids | head -1)"
     [ -n "$real" ] && echo "$real" > "$PIDFILE"
     printf 'whisper started at %s with %s (pid %s)\n' "$URL" "$(basename "$MODEL")" "$(cat "$PIDFILE")"
-    if [ -n "$MODEL_HI" ] && [ -f "$MODEL_HI" ] && [ -n "$URL_HI" ]; then
-      if healthy_hi; then
-        printf 'whisper (Hindi) already answering at %s\n' "$URL_HI"
-        exit 0
-      fi
-      host_hi="${URL_HI#*://}"; host_hi="${host_hi%%:*}"
-      port_hi="${URL_HI##*:}"; port_hi="${port_hi%%/*}"
-      setsid "$BIN" -m "$MODEL_HI" -t "$THREADS_HI" --host "$host_hi" --port "$port_hi" \
-        > data/logs/whisper-hi.log 2>&1 < /dev/null &
-      echo $! > "$PIDFILE_HI"
-      for _ in $(seq 1 240); do
-        if healthy_hi; then
-          printf 'whisper (Hindi) started at %s with %s\n' "$URL_HI" "$(basename "$MODEL_HI")"
-          exit 0
-        fi
-        sleep 0.5
-      done
-      printf 'whisper (Hindi) did not become ready; see data/logs/whisper-hi.log\n' >&2
-    fi
+    start_hi || true
     exit 0
   fi
   sleep 0.5

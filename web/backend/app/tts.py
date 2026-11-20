@@ -64,7 +64,14 @@ class PiperTts:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.cache_dir = settings.piper_cache_dir
+        # Absolute on purpose: the cache directory comes from
+        # `VILLAGE_DB_PATH`'s parent, and that setting is relative in `.env`
+        # (`data/village.db`).  Piper is started with `cwd` set to the voices
+        # directory, so a relative `-f` path would be written *under* that
+        # directory instead of the cache, and every uncached sentence (Hindi
+        # and Malayalam in practice, since English phrases were already
+        # cached) came back as "Piper produced no audio".  Found 2026-11-20.
+        self.cache_dir = Path(settings.piper_cache_dir).resolve()
 
     # ------------------------------------------------------------------
     def english_variants(self) -> list[str]:

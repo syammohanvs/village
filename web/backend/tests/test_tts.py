@@ -173,3 +173,22 @@ def test_english_offers_both_voices_and_falls_back_to_sara(tmp_path):
     assert tts.voice_for("en", "indian") == "en_IN-spicor-medium"
     assert tts.voice_for("en", "sara") == "en_US-lessac-medium"
     assert tts.readiness()["english_voices"] == ["sara", "indian"]
+
+
+def test_the_cache_directory_is_absolute_so_piper_writes_where_it_is_read(tmp_path):
+    """Regression: the cache came from a relative ``VILLAGE_DB_PATH``.
+
+    Piper is started with ``cwd`` set to the voices directory, so a relative
+    ``-f`` path put the audio under ``models/piper/voices/data/cache/tts``
+    while the server looked in ``data/cache/tts`` — every uncached sentence
+    (Hindi and Malayalam) came back as "Piper produced no audio", and only
+    already-cached English replies worked.  Found 2026-11-20 from the stored
+    voice clips.
+    """
+    from dataclasses import replace
+
+    settings = make_settings(tmp_path)
+    relative = replace(settings, piper_cache_dir=Path("data/cache/tts"))
+    cache = PiperTts(relative).cache_dir
+    assert cache.is_absolute()
+    assert str(cache).endswith("data/cache/tts")
