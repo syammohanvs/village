@@ -2912,12 +2912,14 @@ Gate: firmware **560 checks / 0 failed** (comments only, rebuilt).
 
 **Exhibition timings for automatic watering (2026-11-20).**  Four values only,
 so a visitor sees a full cycle in one demonstration:
-`dry_confirm_ms 30000→3000`, `pulse_ms 4000→2000`, `soak_ms 45000→8000`,
+`dry_confirm_ms 30000→3000`, `pulse_ms` stays **4000** (2 s was tried first
+and the operator found it too slow for the pump; 4 s is the exhibition value),
+`soak_ms 45000→8000`,
 `cooldown_ms 300000→15000`.  Firmware defaults (`config.h`), the simulator's
 config and the operator docs (`docs/operation.md` → **Exhibition timings
 (automatic watering)**) now carry them; `test_config` pins the defaults and
 `irrigation_exhibition_sequence_confirms_pulses_soaks_and_cools_down` walks the
-real controller through 3 s confirm → 2 s pulse → 8 s soak → second pulse →
+real controller through 3 s confirm → 4 s pulse → 8 s soak → second pulse →
 completion → 15 s cooldown (firmware **596 checks**).  The simulator has its own
 sequence test, and both assertions that it still uses its own safety limits
 (**197 backend**).
@@ -2930,5 +2932,5 @@ Windows hotspot was Off, was switched on, and no board answered on
 the change is **pending**.  Apply it with a GET → merge four fields → PUT of the
 whole config + `config_revision` (do not send a partial config), then read it
 back.  The OTA image was rebuilt with the new defaults.  **Not physically
-verified:** a 2 s pulse delivering water through the tubing is the operator's
+verified:** a 4 s pulse delivering water through the tubing is the operator's
 check, not something the software tests can claim.

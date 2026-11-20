@@ -59,7 +59,7 @@ struct IrrigationConfig {
   // automatic cycle -- dry confirmation, pulse, soak, re-check, cooldown -- in
   // one demonstration.  The safety numbers around them are unchanged.
   uint32_t dry_confirm_ms = 3000;   // 3 s
-  uint32_t pulse_ms = 2000;         // 2 s ON
+  uint32_t pulse_ms = 4000;         // 4 s ON
   uint32_t max_pulse_ms = 8000;
   uint32_t soak_ms = 8000;          // 8 s OFF between pulses
   uint32_t max_cumulative_ms = 15000;

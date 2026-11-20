@@ -123,7 +123,7 @@ def default_config() -> dict[str, Any]:
             # will carry: a whole cycle fits inside a demonstration.  The rest
             # of the lab's protections keep their own values.
             "dry_confirm_ms": 3000,
-            "pulse_ms": 2000,
+            "pulse_ms": 4000,
             "max_pulse_ms": 4000,
             "soak_ms": 8000,
             "max_cumulative_ms": 12000,

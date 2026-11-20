@@ -187,7 +187,7 @@ board's **saved configuration** carries:
 | setting | exhibition value | what the visitor sees |
 | --- | ---: | --- |
 | `irrigation.dry_confirm_ms` | **3000 ms** | dry soil must hold for 3 seconds |
-| `irrigation.pulse_ms` | **2000 ms** | the pump runs for 2 seconds |
+| `irrigation.pulse_ms` | **4000 ms** | the pump runs for 4 seconds |
 | `irrigation.soak_ms` | **8000 ms** | an 8-second pause to let water spread |
 | `irrigation.cooldown_ms` | **15000 ms** | 15 seconds before the rules may start again |
 

@@ -105,7 +105,7 @@ def test_the_exhibition_timings_are_what_simulation_rehearses() -> None:
     """
     irr = default_config()["irrigation"]
     assert irr["dry_confirm_ms"] == 3000
-    assert irr["pulse_ms"] == 2000
+    assert irr["pulse_ms"] == 4000
     assert irr["soak_ms"] == 8000
     assert irr["cooldown_ms"] == 15000
     # The demonstrations keep their own limits; nothing here is a bypass.
@@ -123,17 +123,17 @@ def test_the_exhibition_sequence_runs_confirm_pulse_soak_pulse_complete_cooldown
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "idle", irrigation["reason"]
 
-    # 3 s of dry soil: a 2 s pulse.
+    # 3 s of dry soil: a 4 s pulse.
     device.advance(1)
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "pumping", irrigation["reason"]
-    assert irrigation["pulse_remaining_ms"] == 2000
+    assert irrigation["pulse_remaining_ms"] == 4000
 
-    # 2 s ON, then 8 s of soak.
-    device.advance(2000)
+    # 4 s ON, then 8 s of soak.
+    device.advance(4000)
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "soaking", irrigation["reason"]
-    assert irrigation["cumulative_pump_ms"] == 2000
+    assert irrigation["cumulative_pump_ms"] == 4000
 
     device.advance(7999)
     assert status(device)["irrigation"]["state"] == "soaking"
@@ -144,7 +144,7 @@ def test_the_exhibition_sequence_runs_confirm_pulse_soak_pulse_complete_cooldown
 
     # The second pulse ends, and the next soak is judged with wet-enough soil:
     # the cycle completes with the 15 s cooldown.
-    device.advance(2000)
+    device.advance(4000)
     assert status(device)["irrigation"]["state"] == "soaking"
     device.scenario({"soil_pct": 60})
     device.advance(8000)

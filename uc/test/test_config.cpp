@@ -17,7 +17,7 @@ TEST(config_defaults_are_valid_and_conservative) {
   // demonstration.  The protection values around them are deliberately left
   // alone and are asserted beside them.
   CHECK(c.irrigation.dry_confirm_ms == 3000);
-  CHECK(c.irrigation.pulse_ms == 2000);
+  CHECK(c.irrigation.pulse_ms == 4000);
   CHECK(c.irrigation.soak_ms == 8000);
   CHECK(c.irrigation.cooldown_ms == 15000);
   CHECK(c.irrigation.max_pulse_ms == 8000);
