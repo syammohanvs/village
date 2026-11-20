@@ -189,9 +189,11 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
       },
       actuators: {
         pump: {
-          commanded: pumpCommanded,
+          // A running session and a manual On both put the pad high; the
+          // fixture keeps the two facts consistent so a test can say either.
+          commanded: pumpCommanded || watering,
           mode: pumpMode,
-          pin_high: pumpCommanded,
+          pin_high: pumpCommanded || watering,
           commissioned: pumpCommissioned,
           feedback: 'none',
         },

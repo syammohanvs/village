@@ -578,6 +578,22 @@ describe('the pump switch', () => {
     );
   });
 
+  it('shows the pump running when the manual switch holds it on, not the rules', async () => {
+    // Reported 2026-11-20: with the switch on On the pump runs, but the card
+    // said "Pump off" and the watering animation never drew, because both were
+    // keyed on the controller's session state (which is idle for a manual On).
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ pumpMode: 'on', pumpCommanded: true, watering: false, soilPercent: 62 }),
+    );
+    await renderReady();
+
+    const pump = screen.getByTestId('pump-state');
+    expect(pump).toHaveAttribute('data-on', 'true');
+    expect(pump).toHaveTextContent('Pump running');
+    expect(document.querySelector('.sim-picture--plant')?.getAttribute('data-pumping')).toBe('true');
+    expect(screen.getByTestId('water-why')).toHaveTextContent(/on/i);
+  });
+
   it('shows the switch with the board away and in Simulation, and reads the frame', async () => {
     vi.mocked(api.state).mockResolvedValue(makeState({ watering: true }));
     await renderReady();
@@ -1057,6 +1073,21 @@ describe('every card has a picture, in both modes', () => {
     const plant = document.querySelector('.sim-picture--plant');
     expect(plant?.getAttribute('data-moisture')).toBe('0.18');
     expect(plant?.getAttribute('data-pumping')).toBe('true');
+  });
+
+  it('shows a probe in air as dry at 0 %, and draws the soil dry', async () => {
+    // The probe reads the ADC maximum in air, which the calibration maps to
+    // 0 %.  The card must say so rather than hiding the line (reported
+    // 2026-11-20).
+    vi.mocked(api.state).mockResolvedValue(
+      makeState({ soilState: 'dry', soilCalibrated: true, soilPercent: 0, watering: false }),
+    );
+    await renderReady();
+
+    const card = within(await screen.findByTestId('card-plants'));
+    expect(card.getByText(/Soil: dry · 0%/)).toBeInTheDocument();
+    expect(document.querySelector('.sim-picture--plant')?.getAttribute('data-moisture')).toBe('0.00');
+    expect(document.querySelector('.sim-picture--plant')?.getAttribute('data-pumping')).toBe('false');
   });
 
   it('lights the bin the camera named, and nothing when it named none', async () => {

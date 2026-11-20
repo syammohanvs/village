@@ -2989,3 +2989,17 @@ and 851 in moist soil. Config updated (revision 3 → 4): `dry_raw` 1674,
 true. Read-back confirms 100% in moist soil. The earlier 0% reading was because
 the restored endpoints (2498/3325) no longer matched the probe's actual
 resistance — the original NVS calibration was lost in the flash.
+
+**The pump picture follows the pad, not the session (2026-11-20, reported).**
+"The watering animation is not working now when pump is on": the card and the
+plant picture keyed on `irrigation.state === 'pumping'`, which is the *rules*
+session — a manual **On** holds D19 high while the session state is idle, so the
+chip said "Pump off" and no water was drawn while the pump really ran. Both now
+read `actuators.pump.pin_high` (the pad), falling back to `commanded` and then
+to the session state for an older payload; `watering` in the test fixture now
+also raises `pin_high`, so the two facts cannot drift in a test. Verified live:
+On -> "Pump running" + `data-pumping="true"`, Auto -> off. The soil line was
+checked too: a probe in air reads 4095 -> 0 % and the card shows
+"Soil: dry · 0 %" (387 dry frames at 0.0 % are in the stored live history), so
+an empty card at that moment means no frame (the API was down), not a lost
+reading. 452 frontend tests.

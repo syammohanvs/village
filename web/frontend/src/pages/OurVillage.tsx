@@ -109,7 +109,19 @@ export function OurVillage() {
 
   // "Known" is a fact about the frame we hold, never about the hardware.
   const hasStatus = Boolean(status);
-  const pumpOn = irrigation?.state === 'pumping';
+  // Is the pump actually moving water?  The **pad** answers that, not the
+  // controller's session state: a manual On holds D19 high while the rules are
+  // idle, and keying the picture (and the chip) on `irrigation.state` meant the
+  // watering animation never ran for the switch the operator actually uses
+  // (reported 2026-11-20).  Older payloads without `pin_high` fall back to
+  // `commanded`, then to the session state.
+  const pumpActuator = status?.actuators?.pump;
+  const pumpOn =
+    typeof pumpActuator?.pin_high === 'boolean'
+      ? pumpActuator.pin_high
+      : typeof pumpActuator?.commanded === 'boolean'
+        ? pumpActuator.commanded
+        : irrigation?.state === 'pumping';
   const physicalDisabled = !connected && !demo;
 
   const lightMode: 'auto' | 'on' | 'off' | null =
