@@ -58,9 +58,10 @@ struct IrrigationConfig {
   // Exhibition timings (2026-11-20): short enough that a visitor sees a whole
   // automatic cycle -- dry confirmation, pulse, soak, re-check -- in one
   // demonstration, and there is deliberately **no cooldown**, so a soil that
-  // stays dry is watered again after the 3 s confirmation.  Only the pulse and
-  // cumulative limits stop a session; a probe that never gets wet latches the
-  // safety lockout until it reads wet again.
+  // stays dry is watered again after the 3 s confirmation.  The pulse and
+  // cumulative limits end a session; **there is no failure lockout** (removed
+  // 2026-11-21 for the exhibition), so the next session starts after the dry
+  // confirmation instead of the controller refusing to water.
   uint32_t dry_confirm_ms = 3000;   // 3 s
   uint32_t pulse_ms = 4000;         // 4 s ON
   uint32_t max_pulse_ms = 8000;

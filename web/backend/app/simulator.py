@@ -27,7 +27,6 @@ REASONS: dict[str, tuple[str, str]] = {
     "IDLE_COOLDOWN": ("IDLE_COOLDOWN", "Waiting before the next watering session."),
     "IDLE_PUMP_DISABLED": ("IDLE_PUMP_DISABLED", "Soil is dry and water is available, but irrigation is switched off in the configuration."),
     "IDLE_ALREADY_STOPPED": ("IDLE_ALREADY_STOPPED", "Irrigation is already stopped. The pump is off."),
-    "IDLE_FAILURE_LOCKOUT": ("IDLE_FAILURE_LOCKOUT", "Irrigation is locked out after repeated watering with no moisture rise. Check the probe, the water and the soil."),
     "IRRIGATION_STARTED": ("IRRIGATION_STARTED", "Soil is dry and water is available. Watering for a short pulse."),
     "IRRIGATION_PULSE": ("IRRIGATION_PULSE", "Soil is dry and water is available. Watering for a short pulse."),
     "IRRIGATION_SOAKING": ("IRRIGATION_SOAKING", "Waiting for water to soak into the soil."),
@@ -56,7 +55,6 @@ REASONS: dict[str, tuple[str, str]] = {
     "PUMP_MANUAL_ACTIVE": ("PUMP_MANUAL_ACTIVE", "The pump is on the manual switch. Set it back to Auto to water by the rules."),
     "IRRIGATION_BLOCKED_ALREADY_ACTIVE": ("IRRIGATION_BLOCKED_ALREADY_ACTIVE", "Irrigation blocked: a watering session is already running."),
     "IRRIGATION_BLOCKED_COOLDOWN": ("IRRIGATION_BLOCKED_COOLDOWN", "Irrigation blocked: the post-session lockout is still active."),
-    "IRRIGATION_BLOCKED_LOCKOUT": ("IRRIGATION_BLOCKED_LOCKOUT", "Irrigation blocked: repeated watering produced no moisture rise, so the controller is locked out."),
     "IRRIGATION_BLOCKED_BOOT_GUARD": ("IRRIGATION_BLOCKED_BOOT_GUARD", "Irrigation blocked: the controller is still in its post-boot guard."),
     "LIGHTS_AUTO_DARK": ("LIGHTS_AUTO_DARK", "It is dark. Streetlights switched on."),
     "LIGHTS_AUTO_BRIGHT": ("LIGHTS_AUTO_BRIGHT", "It is bright. Streetlights are off."),
@@ -196,7 +194,6 @@ class SimulatedDevice:
         self.cooldown_until = 0
         self.boot_guard_until = 5000
         self.dry_since: int | None = None
-        self.failure_lockout = False
         self.last_session: dict[str, Any] | None = None
         self.light_mode = "auto"
         # auto = the soil decides; on / off = the lab switch (demo only).
@@ -270,7 +267,6 @@ class SimulatedDevice:
                 self.soak_started = self.now_ms
                 self._add_event(*reason("IRRIGATION_SOAKING"))
                 if self.cumulative_ms >= self.config["irrigation"]["max_cumulative_ms"]:
-                    self.failure_lockout = True
                     self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
         elif self.state == "soaking":
             if self.now_ms - self.soak_started >= self.config["irrigation"]["soak_ms"]:
@@ -278,22 +274,17 @@ class SimulatedDevice:
                 if self.soil_pct >= irr["stop_pct"]:
                     self._stop("IRRIGATION_COMPLETE_MOISTURE", irr["cooldown_ms"])
                 elif self.pulses >= irr["max_pulses"]:
-                    self.failure_lockout = True
                     self._stop("IRRIGATION_STOPPED_MAX_PULSES", self.config["irrigation"]["cooldown_ms"])
                 elif self.cumulative_ms >= irr["max_cumulative_ms"]:
-                    self.failure_lockout = True
                     self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
                 else:
                     self._start_pulse(manual=False)
         else:
             # Slow drying while idle.  The demo should not drift too fast.
             self.soil_pct = max(0.0, self.soil_pct - dt * 0.000015)
-            if self.failure_lockout and self.soil_pct >= self.config["irrigation"]["stop_pct"]:
-                self.failure_lockout = False
             if (
                 self.auto_enabled
                 and self.pump_enabled
-                and not self.failure_lockout
                 and self.reservoir == "available"
                 and self.sensor_fault not in {"soil", "reservoir"}
                 and self.soil_pct <= self.config["irrigation"]["dry_start_pct"]
@@ -313,20 +304,17 @@ class SimulatedDevice:
         self.session = kind
         self.pulses = 0
         self.cumulative_ms = 0
-        self.failure_lockout = False
         self.dry_since = None
         self._start_pulse(manual=(kind == "manual"))
 
     def _start_pulse(self, *, manual: bool) -> None:
         irr = self.config["irrigation"]
         if self.pulses >= irr["max_pulses"] or self.cumulative_ms >= irr["max_cumulative_ms"]:
-            self.failure_lockout = True
             self._stop("IRRIGATION_STOPPED_MAX_PULSES", self.config["irrigation"]["cooldown_ms"])
             return
         remaining = irr["max_cumulative_ms"] - self.cumulative_ms
         self.pulse_len = min(irr["pulse_ms"], irr["max_pulse_ms"], remaining)
         if self.pulse_len < 500:
-            self.failure_lockout = True
             self._stop("IRRIGATION_STOPPED_MAX_RUNTIME", self.config["irrigation"]["cooldown_ms"])
             return
         self.pulse_started = self.now_ms
@@ -426,8 +414,6 @@ class SimulatedDevice:
             return reason("IRRIGATION_PULSE")
         if self.state == "soaking":
             return reason("IRRIGATION_SOAKING")
-        if self.failure_lockout:
-            return reason("IDLE_FAILURE_LOCKOUT")
         if not self.pump_enabled:
             return reason("IDLE_PUMP_NOT_COMMISSIONED")
         if self.now_ms < self.boot_guard_until:
@@ -452,7 +438,6 @@ class SimulatedDevice:
             "auto_enabled": self.auto_enabled,
             "pump_enabled": self.pump_enabled,
             "commissioned": True,
-            "failure_lockout": self.failure_lockout,
             "state": self.state,
             "session": self.session,
             "pulses_done": self.pulses,
@@ -821,8 +806,6 @@ class SimulatedDevice:
             return "REJECTED", *reason("IRRIGATION_BLOCKED_PUMP_NOT_COMMISSIONED")
         if self.now_ms < self.boot_guard_until:
             return "REJECTED", *reason("IRRIGATION_BLOCKED_BOOT_GUARD")
-        if self.failure_lockout:
-            return "REJECTED", *reason("IRRIGATION_BLOCKED_LOCKOUT")
         if self.now_ms < self.cooldown_until:
             return "REJECTED", *reason("IRRIGATION_BLOCKED_COOLDOWN")
         if self.sensor_fault == "soil":
@@ -840,14 +823,13 @@ class SimulatedDevice:
     def scenario(self, values: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             self.advance()
-            # A scenario is a fresh demonstration, so the controller's own
-            # "no moisture rise" lockout and its 30-minute cooldown are cleared
-            # with it.  Without this the lab could be left in a state where
-            # "Dry soil" changes nothing and the watering picture never moves —
-            # which is exactly how "the watering animation is not visible" was
-            # reported (2026-11-18), after a few demonstrations had exhausted
-            # the simulated session limits.
-            self.failure_lockout = False
+            # A scenario is a fresh demonstration, so the post-session cooldown
+            # and the dry timer are cleared with it.  Without this the lab could
+            # be left in a state where "Dry soil" changes nothing and the
+            # watering picture never moves — which is exactly how "the watering
+            # animation is not visible" was reported (2026-11-18), after a few
+            # demonstrations had exhausted the simulated session limits.  There
+            # is no failure lockout any more (2026-11-21).
             self.cooldown_until = 0
             self.dry_since = None
             if values.get("soil_pct") is not None:
@@ -938,7 +920,6 @@ class SimulatedDevice:
             self.cooldown_until = 0
             self.boot_guard_until = self.now_ms + 5000
             self.dry_since = None
-            self.failure_lockout = False
             self.last_session = None
             self.light_mode = "auto"
             self.pump_manual = "auto"

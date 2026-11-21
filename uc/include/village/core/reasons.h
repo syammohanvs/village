@@ -35,9 +35,6 @@ inline constexpr Reason kIdleSensorInvalid{
     "IDLE_SENSOR_INVALID", "Irrigation blocked: a required sensor reading is invalid."};
 inline constexpr Reason kIdleCooldown{
     "IDLE_COOLDOWN", "Waiting before the next watering session."};
-inline constexpr Reason kIdleFailureLockout{
-    "IDLE_FAILURE_LOCKOUT",
-    "Irrigation is locked out after repeated watering with no moisture rise. Check the probe, the water and the soil."};
 inline constexpr Reason kIdlePumpDisabled{
     "IDLE_PUMP_DISABLED",
     "Soil is dry and water is available, but irrigation is switched off in the configuration."};
@@ -66,10 +63,7 @@ inline constexpr Reason kBlockedAlreadyActive{
     "Irrigation blocked: a watering session is already running."};
 inline constexpr Reason kBlockedCooldown{
     "IRRIGATION_BLOCKED_COOLDOWN",
-    "Irrigation blocked: the post-session lockout is still active."};
-inline constexpr Reason kBlockedLockout{
-    "IRRIGATION_BLOCKED_LOCKOUT",
-    "Irrigation blocked: repeated watering produced no moisture rise, so the controller is locked out."};
+    "Irrigation blocked: waiting before the next watering session."};
 inline constexpr Reason kBlockedBootGuard{
     "IRRIGATION_BLOCKED_BOOT_GUARD",
     "Irrigation blocked: the controller is still in its post-boot guard."};

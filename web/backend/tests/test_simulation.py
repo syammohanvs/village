@@ -253,18 +253,16 @@ def test_a_demo_answer_says_it_is_simulated() -> None:
     assert not plain_ack["reason"].startswith("Simulated: ")
 
 
-def test_a_scenario_clears_the_controller_lockout_so_the_demo_can_water_again() -> None:
-    """A demonstration that cannot demonstrate is a broken control.
+def test_the_demo_has_no_failure_lockout_so_a_scenario_always_waters() -> None:
+    """The exhibition has no failure lockout (asked for 2026-11-21).
 
-    The simulated controller locks itself out after repeated watering with no
-    moisture rise (30 minutes of cooldown).  A presenter who had played with the
-    lab could then press "Dry soil" and see nothing happen for the rest of the
-    session — reported as "the watering animation is not visible" (2026-11-18).
-    Every scenario is a fresh experiment, so it clears the lockout with it.
+    The pulse and cumulative limits still end a *session* (the pump cannot run
+    forever), but nothing latches: the payload no longer carries a
+    `failure_lockout`, and a fresh scenario waters straight away because it
+    clears the only wait left -- the cooldown and the dry timer.
     """
     device = SimulatedDevice(demo=True)
     with device._lock:
-        device.failure_lockout = True
         device.cooldown_until = device.now_ms + 30 * 60 * 1000
         device.dry_since = device.now_ms
 
@@ -272,6 +270,7 @@ def test_a_scenario_clears_the_controller_lockout_so_the_demo_can_water_again() 
     device.advance(6000)
     device.advance(6100)
     irrigation = status(device)["irrigation"]
-    assert irrigation["failure_lockout"] is False, irrigation["reason"]
+    assert "failure_lockout" not in irrigation, irrigation
     assert irrigation["cooldown_remaining_ms"] == 0, irrigation["reason"]
     assert irrigation["state"] == "pumping", irrigation["reason"]
+

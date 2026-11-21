@@ -104,9 +104,10 @@ The controller refuses with a reason. Check, in order:
 - `a required sensor reading is stale or invalid` — check the probe wiring and
   the age shown in **Setup → Sensors & Calibration**.
 - `a watering session is already running` — press Stop first.
-- `the post-session lockout is still active` — wait for the cooldown; after a
-  no-rise failure it is 30 minutes. Fix the probe and/or wet the soil to clear
-  the failure lockout.
+- `waiting before the next watering session` — the configured cooldown has not
+  elapsed. The exhibition runs with **no cooldown**, and firmware 0.2.10 has
+  **no failure lockout**: a session that reaches its pulse or runtime limit
+  simply ends and the next one starts after the dry confirmation.
 
 ### The dashboard says it started, but the pump does not turn
 

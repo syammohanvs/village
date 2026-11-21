@@ -35,7 +35,6 @@ struct IrrigationStatus {
   bool auto_enabled = true;
   bool pump_enabled = false;   // configuration
   PumpMode mode = PumpMode::Auto;
-  bool failure_lockout = false;
   bool pump_on = false;
   IrrigationState state = IrrigationState::Idle;
   SessionKind session = SessionKind::None;
@@ -85,7 +84,6 @@ class IrrigationController {
     boot_guard_until_ms_ = now + kBootGuardMs;
     dry_timer_active_ = false;
     dry_since_ms_ = 0;
-    failure_lockout_ = false;
     last_ = IrrigationLastSession{};
     reason_ = &reasons::kIdleBoot;
   }
@@ -126,7 +124,6 @@ class IrrigationController {
     if (active()) return reject(reasons::kBlockedAlreadyActive);
     if (!effectivePump()) return reject(reasons::kBlockedPumpDisabled);
     if (bootGuardActive(now)) return reject(reasons::kBlockedBootGuard);
-    if (failure_lockout_) return reject(reasons::kBlockedLockout);
     if (cooldownActive(now)) return reject(reasons::kBlockedCooldown);
     if (!in.soil_valid || !std::isfinite(in.soil_percent)) {
       return reject(reasons::kBlockedSensorInvalid);
@@ -197,7 +194,6 @@ class IrrigationController {
         // A config change can lower the cumulative limit mid-session.  Act on
         // it immediately instead of waiting for the pulse to end.
         if (cumulative_ms_ + elapsed >= cfg_.max_cumulative_ms) {
-          failure_lockout_ = true;
           stopInternal(now, reasons::kStoppedMaxRuntime, effectiveCooldown());
           return;
         }
@@ -205,7 +201,6 @@ class IrrigationController {
           cumulative_ms_ += elapsed;
           pump_on_ = false;
           if (cumulative_ms_ >= cfg_.max_cumulative_ms) {
-            failure_lockout_ = true;
             // The pulse has already ended, so stopInternal() must not add the
             // pulse time a second time.
             state_ = IrrigationState::Soaking;
@@ -230,12 +225,10 @@ class IrrigationController {
             return;
           }
           if (pulses_done_ >= cfg_.max_pulses) {
-            failure_lockout_ = true;
             finish(now, reasons::kStoppedMaxPulses, effectiveCooldown());
             return;
           }
           if (cumulative_ms_ >= cfg_.max_cumulative_ms) {
-            failure_lockout_ = true;
             finish(now, reasons::kStoppedMaxRuntime, effectiveCooldown());
             return;
           }
@@ -283,17 +276,12 @@ class IrrigationController {
                   : &reasons::kPumpManualWaterUnknown;
   }
 
-  void clearFailureLockout(uint32_t now) {
-    failure_lockout_ = false;
-    cooldown_until_ms_ = now;
-  }
 
   IrrigationStatus status(uint32_t now) const {
     IrrigationStatus s;
     s.auto_enabled = cfg_.auto_enabled;
     s.pump_enabled = cfg_.pump_enabled;
     s.mode = mode_;
-    s.failure_lockout = failure_lockout_;
     s.pump_on = pumpOn();
     s.state = state_;
     s.session = session_;
@@ -339,11 +327,14 @@ class IrrigationController {
 
   uint32_t effectiveCooldown() const {
     // The exhibition runs with no cooldown, so the configured value is the
-    // whole story -- including after a safety stop.  A failure stop still
-    // latches `failure_lockout_`, and only a genuinely wet reading clears that
-    // (see updateIdle), so a probe that never gets wet cannot water forever.
-    // Before 2026-11-20 this returned at least 30 minutes, which put the
-    // exhibit into a half-hour wait after four dry pulses.
+    // whole story -- including after a safety stop.  **There is no failure
+    // lockout** (asked for 2026-11-21): a session that reaches its pulse or
+    // cumulative limit simply ends, and the next one starts after the dry
+    // confirmation, because a visitor who has just watched ten pulses must not
+    // meet a controller that has locked itself out.  The limits are per
+    // session, so the pump still cannot run continuously: 10 pulses of 4 s
+    // with 8 s soaks, then the same again only while the soil still reads dry.
+    // Before 2026-11-20 this returned at least 30 minutes.
     return cfg_.cooldown_ms;
   }
 
@@ -359,7 +350,6 @@ class IrrigationController {
 
   void startPulse(uint32_t now, bool first) {
     if (pulses_done_ >= cfg_.max_pulses) {
-      failure_lockout_ = true;
       finish(now, reasons::kStoppedMaxPulses, effectiveCooldown());
       return;
     }
@@ -367,7 +357,6 @@ class IrrigationController {
                                    ? cfg_.max_cumulative_ms - cumulative_ms_
                                    : 0;
     if (remaining < 500) {
-      failure_lockout_ = true;
       finish(now, reasons::kStoppedMaxRuntime, effectiveCooldown());
       return;
     }
@@ -406,19 +395,6 @@ class IrrigationController {
 
   void updateIdle(uint32_t now, const IrrigationInputs& in) {
     pump_on_ = false;
-
-    if (failure_lockout_) {
-      // A genuinely wet probe proves that watering worked; clear the lockout
-      // so the village is not stuck forever after a dry probe was fixed.
-      if (in.soil_valid && in.soil_calibrated && std::isfinite(in.soil_percent) &&
-          in.soil_percent >= static_cast<float>(cfg_.stop_pct)) {
-        failure_lockout_ = false;
-      } else {
-        reason_ = &reasons::kIdleFailureLockout;
-        dry_timer_active_ = false;
-        return;
-      }
-    }
 
     if (!effectivePump()) {
       reason_ = &reasons::kIdlePumpDisabled;
@@ -482,7 +458,6 @@ class IrrigationController {
   PumpMode mode_ = PumpMode::Auto;
   bool manual_on_ = false;
   bool pump_on_ = false;
-  bool failure_lockout_ = false;
   IrrigationState state_ = IrrigationState::Idle;
   SessionKind session_ = SessionKind::None;
   uint8_t pulses_done_ = 0;

@@ -147,7 +147,7 @@ gone and the firmware no longer has the settings, so an old note about
 | Soak | 45 s | Wait before checking moisture again |
 | Max cumulative | 15 s | Total pump-on time per session |
 | Max pulses | 4 | Finite session limit |
-| Cooldown | 5 min | Wait before another session (30 min after a failure lockout) |
+| Cooldown | 5 min | Wait before another session (there is **no failure lockout** since firmware 0.2.10) |
 | Manual link timeout | 30 s | A manual session stops if the laptop disappears |
 
 Change these only after observing the real soil and pump. The pump cannot run

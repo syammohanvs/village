@@ -195,14 +195,15 @@ the values the board's **saved configuration** carries:
 
 So the loop a visitor watches is: **3 s dry → 4 s pump → 8 s soak → check**;
 if the soil still reads dry, the next pulse follows (no wait); if it reads wet,
-watering stops and waits for the soil to dry again. A probe that **never** gets
-wet stops after ten pulses and latches the safety lockout, which only a wet
-reading clears — so a disconnected probe cannot run the pump forever.
+watering stops and waits for the soil to dry again. Ten pulses or 45 s of
+pumping end that **session**, and — since **2026-11-21** — the next one starts
+after the 3 s dry confirmation instead of the controller locking itself out.
+That is deliberate for an exhibition: a visitor who has just watched the pump
+work must never meet an “irrigation is locked out” card.
 
 **What is still not relaxed:** the 5-second startup guard, the 35 % / 55 %
-moisture thresholds, the cumulative runtime cap, the low-water stop, the tank
-check on a manual On, the manual On/Off switch, and the no-rise lockout (it is
-cleared by a wet reading, not by a timer).
+moisture thresholds, the per-session cumulative runtime cap, the ten-pulse
+limit, the low-water stop, and the tank check on a manual On.
 
 The firmware defaults and Simulation use the same four values. On a board that
 already has a saved configuration, **changing the firmware defaults is not

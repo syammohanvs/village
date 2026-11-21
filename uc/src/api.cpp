@@ -218,7 +218,6 @@ void buildStatus(JsonDocument& doc) {
   JsonObject ir = root["irrigation"].to<JsonObject>();
   ir["auto_enabled"] = irr.auto_enabled;
   ir["pump_enabled"] = irr.pump_enabled;
-  ir["failure_lockout"] = irr.failure_lockout;
   ir["state"] = toString(irr.state);
   ir["session"] = toString(irr.session);
   ir["pulses_done"] = irr.pulses_done;

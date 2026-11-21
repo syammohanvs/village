@@ -166,10 +166,11 @@ ALL FIRMWARE CORE TESTS PASSED
 ```
 
 They cover wet-soil blocking, low-water blocking and stopping, invalid sensor
-stops, maximum runtime, pulse limits and lockout, boot pump-off, duplicate
-commands, stop interruption, LDR hysteresis (and that an uninstalled LDR
-reports nothing), bin echo loss, calibration polarity, command history
-persistence and the GPIO rules.
+stops, maximum runtime, pulse limits (the failure lockout those tests once
+pinned was **removed in 0.2.10**), boot pump-off, duplicate commands, stop
+interruption, LDR hysteresis (and that an uninstalled LDR reports nothing), bin
+echo loss, calibration polarity, command history persistence and the GPIO
+rules.
 
 ## Backend
 

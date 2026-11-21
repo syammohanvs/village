@@ -190,8 +190,8 @@ statement about GPIO electrical limits.
 - [ ] Low reservoir blocks and stops irrigation.
 - [ ] Unplugging the soil or reservoir sensor stops a running session.
 - [ ] Maximum cumulative pump time stops the session.
-- [ ] The pulse limit / lockout prevents endless watering when moisture never
-      rises.
+- [ ] The pulse limit ends a session when moisture never rises, and (firmware
+      0.2.10, no lockout) the next session starts after the dry confirmation.
 - [ ] Two Start requests with the same command id do not start twice.
 - [ ] A second Start while active is refused as already active.
 - [ ] Stop interrupts the state machine immediately.

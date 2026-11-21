@@ -201,7 +201,6 @@ TEST(irrigation_stops_on_low_water_mid_pulse) {
   CHECK(s.reason == &reasons::kStoppedLowWater);
   CHECK(s.cumulative_pump_ms == 1500);
   CHECK(s.last.reason == &reasons::kStoppedLowWater);
-  CHECK(!s.failure_lockout);
 }
 
 TEST(irrigation_stops_on_invalid_sensor_during_soak) {
@@ -248,18 +247,21 @@ TEST(irrigation_max_cumulative_accounts_exactly_once) {
   CHECK(s.reason == &reasons::kStoppedMaxRuntime);
   CHECK(s.cumulative_pump_ms == 6000);
   CHECK(s.last.pumped_ms == 6000);  // not double-counted
-  CHECK(s.failure_lockout);
   // The configured cooldown, not a hidden 30-minute one.
   CHECK(s.cooldown_remaining_ms == cfg.cooldown_ms);
 }
 
-TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
+TEST(irrigation_max_pulses_ends_the_session_without_locking_out) {
+  // Asked for 2026-11-21: the exhibition has no failure lockout.  A session
+  // that reaches its pulse limit simply ends; the next one is allowed
+  // immediately (this fixture carries no cooldown, like the board's config).
   IrrigationConfig cfg = manualCfg();
   cfg.pulse_ms = 1000;
   cfg.max_pulse_ms = 1000;
   cfg.soak_ms = 1000;
   cfg.max_cumulative_ms = 12000;
   cfg.max_pulses = 2;
+  cfg.cooldown_ms = 0;
 
   IrrigationController c;
   c.begin(0, cfg);
@@ -273,22 +275,43 @@ TEST(irrigation_max_pulses_locks_out_and_wet_soil_clears_it) {
   IrrigationStatus s = c.status(10000);
   CHECK(!s.pump_on);
   CHECK(s.reason == &reasons::kStoppedMaxPulses);
-  CHECK(s.failure_lockout);
   CHECK(s.cumulative_pump_ms == 2000);
+  CHECK(s.last.reason == &reasons::kStoppedMaxPulses);
 
-  CHECK(c.requestManual(10001, dryInputs()).reason == &reasons::kBlockedLockout);
+  // No latch: a new request is accepted straight away and the pump runs.
+  CHECK(c.requestManual(10001, dryInputs()).result == CommandResult::Accepted);
+  CHECK(c.pumpOn());
+}
 
-  IrrigationInputs wet = dryInputs();
-  wet.soil_percent = 60.0f;
-  c.tick(20000, wet);
-  CHECK(!c.status(20000).failure_lockout);
-  // A wet reading clears the latch, but the configured cooldown still holds
-  // until it expires (here 60 s, because this fixture sets one).
-  CHECK(c.status(20000).reason == &reasons::kIdleCooldown);
+TEST(irrigation_auto_restarts_after_the_pulse_limit_without_a_lockout) {
+  // The same rule in Auto: the session ends at its limit and the still-dry
+  // soil starts the next one after the 3 s confirmation.
+  IrrigationConfig cfg = autoCfg();
+  cfg.pulse_ms = 1000;
+  cfg.max_pulse_ms = 1000;
+  cfg.soak_ms = 1000;
+  cfg.max_cumulative_ms = 12000;
+  cfg.max_pulses = 2;
+  cfg.cooldown_ms = 0;
+  cfg.dry_confirm_ms = 3000;
 
-  c.clearFailureLockout(20000);
-  c.tick(20000, wet);
-  CHECK(c.status(20000).reason == &reasons::kIdleSoilAdequate);
+  IrrigationController c;
+  c.begin(0, cfg);
+  uint32_t t = 6000;  // past the boot guard
+  for (; t <= 14000; t += 250) c.tick(t, dryInputs());
+  CHECK(c.status(t).last.reason == &reasons::kStoppedMaxPulses);
+
+  // Within one dry confirmation the controller is pumping again -- there is
+  // nothing to clear by hand.
+  bool restarted = false;
+  for (; t <= 20000; t += 250) {
+    c.tick(t, dryInputs());
+    if (c.status(t).state == IrrigationState::Pumping) {
+      restarted = true;
+      break;
+    }
+  }
+  CHECK(restarted);
 }
 
 // The exhibition timings, end to end on the real controller: 3 s dry
@@ -388,7 +411,6 @@ TEST(irrigation_completes_when_soil_reaches_stop_level) {
   CHECK(!s.pump_on);
   CHECK(s.reason == &reasons::kCompleteMoisture);
   CHECK(s.last.reason == &reasons::kCompleteMoisture);
-  CHECK(!s.failure_lockout);
   CHECK(s.cumulative_pump_ms == 4000);
 }
 

@@ -3241,3 +3241,41 @@ separate"; a crayon gets the same sentence and a grammatical spoken line; the
 decision unit pins `reasonId: 'reuse'` for all three words).  Verified in
 Chromium: EN crayon, HI and ML pencil all show and speak the translated reuse
 sentence.
+
+**The failure lockout is gone — firmware 0.2.10 (2026-11-21, asked for).**
+"This is exhibition so no lock out needed."  Until today a session that reached
+its pulse or cumulative limit set `failure_lockout_`, which only a genuinely
+wet reading cleared — so after ten dry pulses the controller refused to water
+again and the card said *"Irrigation is locked out after repeated watering with
+no moisture rise"*.  That is exactly what happened this morning on the board
+(10 pulses, 40 s pumped, then latched) while the soil probe was disconnected,
+which read 0 % and could never clear it.
+
+- **The latch is removed** from the firmware (`uc/include/village/core/
+  irrigation.h`), from the simulator and from the `/status` payload; the
+  `IDLE_FAILURE_LOCKOUT` and `IRRIGATION_BLOCKED_LOCKOUT` codes are no longer
+  emitted (the firmware's `reasons.h` definitions are deleted; the frontend
+  messages and the simulator's reason table keep the strings so a board still
+  running 0.2.9 reads sensibly).  `kBlockedCooldown`'s text now says "waiting
+  before the next watering session" instead of calling it a lockout.
+- **What still bounds the pump:** a *session* ends at **10 pulses** or **45 s**
+  of pumping, and the next session starts after the 3 s dry confirmation (no
+  cooldown).  The wet-reading stop, the low-water stop, the tank check on a
+  manual On, the 5 s boot guard and the 35/55 % thresholds are unchanged.
+- **Tests:** firmware **593 checks** (two new: a max-pulses session ends with no
+  latch and a new request is accepted immediately; Auto restarts by itself
+  after the limit), backend **205** (the scenario test now pins that the payload
+  carries no `failure_lockout` and that a scenario still waters).
+- **Flashed over OTA** (image built with the OTA marker, `espota` from the
+  Windows host at the board's current lease **192.168.137.31**): the board
+  reports **firmware 0.2.10**, boot `b-ae42e344`.  **Verified on the real
+  board**: the first session ended at `10/10` pulses
+  (`IRRIGATION_STOPPED_MAX_PULSES`), and the next line was a new session at
+  `pulses 1/10` with no lockout and no wait.
+- **Known consequence, deliberately stated:** with the **soil probe
+  disconnected** (it read `raw 4095 → 0 %` after the tank work) the controller
+  believes the soil is bone dry and will water indefinitely, one 40 s session
+  every ~2 minutes.  The pump was therefore **switched Off by hand**
+  (`PUMP_OFF`, mode `off`) until the soil probe is back on `D34`/`GND`; press
+  **Auto** on the Watering card to resume.  A working probe is what ends a
+  session now — the latch is not coming back to do it.
