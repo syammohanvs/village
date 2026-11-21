@@ -3279,3 +3279,29 @@ which read 0 % and could never clear it.
   (`PUMP_OFF`, mode `off`) until the soil probe is back on `D34`/`GND`; press
   **Auto** on the Watering card to resume.  A working probe is what ends a
   session now — the latch is not coming back to do it.
+
+**The pump pulse is 8 seconds, not 4 (2026-11-21, asked for).**  "pump on time is
+now 4 seconds increase it to 8 seconds."
+
+- **The board's saved configuration** (revision **8**) now carries
+  `pulse_ms` **8000**; `max_pulse_ms` is already 8000, so the pulse sits exactly
+  at the hard cap — asking for **10 s later needs `max_pulse_ms` raised too**.
+  Written through the revision-checked `PUT /api/v1/device/config`.
+- **Firmware default and simulator** moved with it (`config.h`, `simulator.py`)
+  and the firmware was rebuilt as **0.2.11** and flashed over OTA (boot
+  `b-8a83487c`).  Verified on the real board: `pulse_remaining_ms` counts
+  **7951 → 187** over one pulse with the pad high throughout, i.e. a full 8 s;
+  the demo device reports `8000 → 6979 → 5960`.
+- **The simulator's soil wetting rate was halved** (`SOIL_WET_PER_MS`
+  0.0045 → 0.00225 %/ms): at the old rate an 8 s pulse added 36 points, so the
+  first pulse alone made the demo's soil "wet" and the demonstration ended after
+  eight seconds.  Two pulses now take 20 % → 38 % → 56 %.
+- **One consequence to know:** `max_cumulative_ms` is still **45000**, so a
+  session now ends after **5.6 pulses of 8 s** (~45 s of pumping) rather than
+  reaching `max_pulses` 10; with no lockout the next session starts 3 s later.
+  Raise `max_cumulative_ms` (ceiling 120000 in validation) if longer sessions
+  are wanted.
+- Gates: firmware **593 checks**, backend **205** (the exhibition-sequence test
+  was re-timed to 8 s), frontend **473**, build clean; app restarted on :8010.
+  **The pump is left switched Off by hand** because the soil probe is still
+  disconnected (0 %) — press **Auto** on the Watering card once it is back.

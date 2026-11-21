@@ -63,7 +63,7 @@ struct IrrigationConfig {
   // 2026-11-21 for the exhibition), so the next session starts after the dry
   // confirmation instead of the controller refusing to water.
   uint32_t dry_confirm_ms = 3000;   // 3 s
-  uint32_t pulse_ms = 4000;         // 4 s ON
+  uint32_t pulse_ms = 8000;         // 8 s ON (asked for 2026-11-21)
   uint32_t max_pulse_ms = 8000;
   uint32_t soak_ms = 8000;          // 8 s OFF between pulses
   uint32_t max_cumulative_ms = 45000;

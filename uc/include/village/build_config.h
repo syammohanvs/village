@@ -9,7 +9,7 @@
 // the manual Auto/On/Off switch beside it, whose only remaining check is the
 // tank.
 
-#define VILLAGE_FIRMWARE_VERSION "0.2.10"
+#define VILLAGE_FIRMWARE_VERSION "0.2.11"
 #define VILLAGE_PROTOCOL_VERSION 1
 
 // How long the controller refuses any irrigation start after boot.  It also

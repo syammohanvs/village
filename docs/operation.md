@@ -187,13 +187,13 @@ the values the board's **saved configuration** carries:
 | setting | exhibition value | what the visitor sees |
 | --- | ---: | --- |
 | `irrigation.dry_confirm_ms` | **3000 ms** | dry soil must hold for 3 seconds |
-| `irrigation.pulse_ms` | **4000 ms** | the pump runs for 4 seconds |
+| `irrigation.pulse_ms` | **8000 ms** | the pump runs for 8 seconds (raised from 4 s on 2026-11-21) |
 | `irrigation.soak_ms` | **8000 ms** | an 8-second pause to let water spread |
 | `irrigation.cooldown_ms` | **0 ms** | no wait: 3 seconds after the soak, the next pulse |
 | `irrigation.max_pulses` | **10** | up to ten pulses before a session stops |
 | `irrigation.max_cumulative_ms` | **45000 ms** | 45 seconds of pumping in one session |
 
-So the loop a visitor watches is: **3 s dry → 4 s pump → 8 s soak → check**;
+So the loop a visitor watches is: **3 s dry → 8 s pump → 8 s soak → check**;
 if the soil still reads dry, the next pulse follows (no wait); if it reads wet,
 watering stops and waits for the soil to dry again. Ten pulses or 45 s of
 pumping end that **session**, and — since **2026-11-21** — the next one starts

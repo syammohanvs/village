@@ -107,7 +107,7 @@ def test_the_exhibition_timings_are_what_simulation_rehearses() -> None:
     """
     irr = default_config()["irrigation"]
     assert irr["dry_confirm_ms"] == 3000
-    assert irr["pulse_ms"] == 4000
+    assert irr["pulse_ms"] == 8000
     assert irr["soak_ms"] == 8000
     assert irr["cooldown_ms"] == 0
     assert irr["max_pulses"] == 10
@@ -124,17 +124,17 @@ def test_the_exhibition_sequence_runs_confirm_pulse_soak_and_restarts_without_a_
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "idle", irrigation["reason"]
 
-    # 3 s of dry soil: a 4 s pulse.
+    # 3 s of dry soil: an 8 s pulse (raised from 4 s on 2026-11-21).
     device.advance(1)
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "pumping", irrigation["reason"]
-    assert irrigation["pulse_remaining_ms"] == 4000
+    assert irrigation["pulse_remaining_ms"] == 8000
 
-    # 4 s ON, then 8 s of soak.
-    device.advance(4000)
+    # 8 s ON, then 8 s of soak.
+    device.advance(8000)
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "soaking", irrigation["reason"]
-    assert irrigation["cumulative_pump_ms"] == 4000
+    assert irrigation["cumulative_pump_ms"] == 8000
 
     device.advance(7999)
     assert status(device)["irrigation"]["state"] == "soaking"
@@ -145,7 +145,7 @@ def test_the_exhibition_sequence_runs_confirm_pulse_soak_and_restarts_without_a_
 
     # The second pulse ends, and the next soak is judged with wet-enough soil:
     # the cycle completes, with **no** cooldown to wait out.
-    device.advance(4000)
+    device.advance(8000)
     assert status(device)["irrigation"]["state"] == "soaking"
     device.scenario({"soil_pct": 60})
     device.advance(8000)
@@ -155,14 +155,14 @@ def test_the_exhibition_sequence_runs_confirm_pulse_soak_and_restarts_without_a_
     assert irrigation["cooldown_remaining_ms"] == 0
 
     # The soil dries again: the dry timer arms, 3 s of confirmation follows and
-    # the next 4 s pulse starts -- with no wait in between.
+    # the next 8 s pulse starts -- with no wait in between.
     device.scenario({"soil_pct": 20})
     device.advance(1000)
     assert status(device)["irrigation"]["state"] == "idle"
     device.advance(3000)
     irrigation = status(device)["irrigation"]
     assert irrigation["state"] == "pumping", irrigation["reason"]
-    assert irrigation["pulse_remaining_ms"] == 4000
+    assert irrigation["pulse_remaining_ms"] == 8000
 
 
 def test_low_water_blocks_automatic_watering() -> None:

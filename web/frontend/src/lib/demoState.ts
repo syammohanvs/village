@@ -216,7 +216,7 @@ export function makeState(options: StateOptions = {}): StateEnvelope {
         session: watering ? 'manual' : 'none',
         pulses_done: watering ? 1 : 0,
         pulse_limit: 4,
-        cumulative_pump_ms: watering ? 4000 : 0,
+        cumulative_pump_ms: watering ? 8000 : 0,
         max_cumulative_pump_ms: 15_000,
         cooldown_remaining_ms: 0,
         reason_code: watering ? 'IRRIGATION_STARTED' : 'IDLE_SOIL_DRY',

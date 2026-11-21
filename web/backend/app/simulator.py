@@ -121,8 +121,8 @@ def default_config() -> dict[str, Any]:
             # will carry: a whole cycle fits inside a demonstration.  The rest
             # of the lab's protections keep their own values.
             "dry_confirm_ms": 3000,
-            "pulse_ms": 4000,
-            "max_pulse_ms": 4000,
+            "pulse_ms": 8000,
+            "max_pulse_ms": 8000,
             "soak_ms": 8000,
             "max_cumulative_ms": 45000,
             "max_pulses": 10,
@@ -143,6 +143,14 @@ def default_config() -> dict[str, Any]:
 DARK_THRESHOLD = 2100
 BRIGHT_THRESHOLD = 2500
 DARK_METRIC = 1820
+
+# How fast the simulated soil wets while the pump runs, in percent per
+# millisecond.  Tuned to the exhibition pulse (8 s, raised from 4 s on
+# 2026-11-21): one pulse adds ~18 points, so a visit that starts at 20 % needs
+# two pulses to reach the 55 % stop.  At the old 0.0045 an 8 s pulse added 36
+# points and the first pulse alone made the soil "wet", which ended the
+# demonstration after eight seconds.
+SOIL_WET_PER_MS = 0.00225
 BRIGHT_METRIC = 2820
 
 
@@ -251,7 +259,7 @@ class SimulatedDevice:
                 self.pulse_started = self.now_ms
                 self.pulse_len = 1 << 60
                 self._add_event(*reason("IRRIGATION_STARTED"))
-            self.soil_pct = min(72.0, self.soil_pct + dt * 0.0045)
+            self.soil_pct = min(72.0, self.soil_pct + dt * SOIL_WET_PER_MS)
             return
         if self.pump_manual == "off":
             if self.state == "pumping":
@@ -260,7 +268,7 @@ class SimulatedDevice:
             return
 
         if self.state == "pumping":
-            self.soil_pct = min(72.0, self.soil_pct + dt * 0.0045)
+            self.soil_pct = min(72.0, self.soil_pct + dt * SOIL_WET_PER_MS)
             if self.now_ms - self.pulse_started >= self.pulse_len:
                 self.cumulative_ms += self.now_ms - self.pulse_started
                 self.state = "soaking"
